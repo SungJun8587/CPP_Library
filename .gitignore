@@ -1,0 +1,10 @@
+obj/
+bin/
+AssemblyInfo.cs
+.vs/
+Win32/
+x64/
+Image/
+*.zip
+.7z
+.msi
