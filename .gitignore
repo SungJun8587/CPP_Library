@@ -6,5 +6,6 @@ Win32/
 x64/
 Image/
 *.zip
-.7z
-.msi
+*.7z
+*.msi
+ExternalLib/
