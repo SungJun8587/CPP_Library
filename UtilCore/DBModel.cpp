@@ -860,7 +860,7 @@ _tstring Helpers::RemoveWhiteSpace(const _tstring& str)
 
 //***************************************************************************
 //
-DataType Helpers::String2DataType(const TCHAR* str, OUT int32& maxLen)
+DataType Helpers::StringToDataType(const TCHAR* str, OUT int32& maxLen)
 {
 	_tregex reg(_T("([a-z]+)(\\((max|\\d+)\\))?"));
 	_tcmatch ret;
@@ -897,7 +897,7 @@ DataType Helpers::String2DataType(const TCHAR* str, OUT int32& maxLen)
 
 //***************************************************************************
 //
-_tstring Helpers::String2DataTypeLength(DataType type, int32 iLength)
+_tstring Helpers::StringToDataTypeLength(DataType type, int32 iLength)
 {
 	switch( type )
 	{
@@ -924,6 +924,17 @@ _tstring Helpers::String2DataTypeLength(DataType type, int32 iLength)
 	}
 
 	return _T("");
+}
+
+//***************************************************************************
+//
+ParameterMode Helpers::StringToParamMode(const _tstring str)
+{
+	if( ::_tcsicmp(str.c_str(), _T("RET")) == 0 ) return ParameterMode::PARAM_RETURN;
+	if( ::_tcsicmp(str.c_str(), _T("IN")) == 0 ) return ParameterMode::PARAM_IN;
+	if( ::_tcsicmp(str.c_str(), _T("OUT")) == 0 ) return ParameterMode::PARAM_OUT;
+
+	return ParameterMode::PARAM_IN;
 }
 
 //***************************************************************************

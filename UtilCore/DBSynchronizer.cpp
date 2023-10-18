@@ -9,7 +9,7 @@
 
 namespace SP
 {
-	class GetDBTables : public CDBBind<0, 4>
+	class GetDBTables : public CDBBind<0, 6>
 	{
 	public:
 		GetDBTables(DB_CLASS dbClass, CBaseODBC& conn) : CDBBind(conn, GetTableInfo(dbClass))
@@ -30,6 +30,14 @@ namespace SP
 		void Out_AutoIncrementValue(OUT int64& value)
 		{
 			BindCol(3, value);
+		}
+		template<int32 N> void Out_CreateDate(OUT TCHAR(&value)[N])
+		{
+			BindCol(4, value);
+		}
+		template<int32 N> void Out_ModifyDate(OUT TCHAR(&value)[N])
+		{
+			BindCol(5, value);
 		}
 	};
 
@@ -209,7 +217,7 @@ namespace SP
 		}
 	};
 
-	class GetDBStoredProcedures : public CDBBind<0, 4>
+	class GetDBStoredProcedures : public CDBBind<0, 6>
 	{
 	public:
 		GetDBStoredProcedures(DB_CLASS dbClass, CBaseODBC& conn) : CDBBind(conn, GetStoredProcedureInfo(dbClass))
@@ -231,9 +239,17 @@ namespace SP
 		{
 			BindCol(3, value, len);
 		}
+		template<int32 N> void Out_CreateDate(OUT TCHAR(&value)[N])
+		{
+			BindCol(4, value);
+		}
+		template<int32 N> void Out_ModifyDate(OUT TCHAR(&value)[N])
+		{
+			BindCol(5, value);
+		}
 	};
 
-	class GetDBStoredProcedureParams : public CDBBind<0, 8>
+	class GetDBStoredProcedureParams : public CDBBind<0, 9>
 	{
 	public:
 		GetDBStoredProcedureParams(DB_CLASS dbClass, CBaseODBC& conn) : CDBBind(conn, GetStoredProcedureParamInfo(dbClass))
@@ -247,33 +263,37 @@ namespace SP
 		{
 			BindCol(1, value);
 		}
-		template<int32 N> void Out_ParamName(OUT TCHAR(&value)[N])
+		void Out_ParamId(OUT int32& value)
 		{
 			BindCol(2, value);
 		}
-		void Out_ParamId(OUT int32& value)
+		void Out_ParamMode(OUT int8& value)
 		{
 			BindCol(3, value);
 		}
-		template<int32 N> void Out_DataType(OUT TCHAR(&value)[N])
+		template<int32 N> void Out_ParamName(OUT TCHAR(&value)[N])
 		{
 			BindCol(4, value);
 		}
-		void Out_MaxLength(OUT int32& value)
+		template<int32 N> void Out_DataType(OUT TCHAR(&value)[N])
 		{
 			BindCol(5, value);
 		}
-		template<int32 N> void Out_DataTypeDesc(OUT TCHAR(&value)[N])
+		void Out_MaxLength(OUT int32& value)
 		{
 			BindCol(6, value);
 		}
-		template<int32 N> void Out_ParamComment(OUT TCHAR(&value)[N])
+		template<int32 N> void Out_DataTypeDesc(OUT TCHAR(&value)[N])
 		{
 			BindCol(7, value);
 		}
+		template<int32 N> void Out_ParamComment(OUT TCHAR(&value)[N])
+		{
+			BindCol(8, value);
+		}
 	};
 
-	class GetDBFunctions : public CDBBind<0, 4>
+	class GetDBFunctions : public CDBBind<0, 6>
 	{
 	public:
 		GetDBFunctions(DB_CLASS dbClass, CBaseODBC& conn) : CDBBind(conn, GetFunctionInfo(dbClass))
@@ -295,9 +315,17 @@ namespace SP
 		{
 			BindCol(3, value, len);
 		}
+		template<int32 N> void Out_CreateDate(OUT TCHAR(&value)[N])
+		{
+			BindCol(4, value);
+		}
+		template<int32 N> void Out_ModifyDate(OUT TCHAR(&value)[N])
+		{
+			BindCol(5, value);
+		}
 	};
 
-	class GetDBFunctionParams : public CDBBind<0, 8>
+	class GetDBFunctionParams : public CDBBind<0, 9>
 	{
 	public:
 		GetDBFunctionParams(DB_CLASS dbClass, CBaseODBC& conn) : CDBBind(conn, GetFunctionParamInfo(dbClass))
@@ -311,29 +339,33 @@ namespace SP
 		{
 			BindCol(1, value);
 		}
-		template<int32 N> void Out_ParamName(OUT TCHAR(&value)[N])
+		void Out_ParamId(OUT int32& value)
 		{
 			BindCol(2, value);
 		}
-		void Out_ParamId(OUT int32& value)
+		void Out_ParamMode(OUT int8& value)
 		{
 			BindCol(3, value);
 		}
-		template<int32 N> void Out_DataType(OUT TCHAR(&value)[N])
+		template<int32 N> void Out_ParamName(OUT TCHAR(&value)[N])
 		{
 			BindCol(4, value);
 		}
-		void Out_MaxLength(OUT int32& value)
+		template<int32 N> void Out_DataType(OUT TCHAR(&value)[N])
 		{
 			BindCol(5, value);
 		}
-		template<int32 N> void Out_DataTypeDesc(OUT TCHAR(&value)[N])
+		void Out_MaxLength(OUT int32& value)
 		{
 			BindCol(6, value);
 		}
-		template<int32 N> void Out_ParamComment(OUT TCHAR(&value)[N])
+		template<int32 N> void Out_DataTypeDesc(OUT TCHAR(&value)[N])
 		{
 			BindCol(7, value);
+		}
+		template<int32 N> void Out_ParamComment(OUT TCHAR(&value)[N])
+		{
+			BindCol(8, value);
 		}
 	};
 
@@ -479,7 +511,7 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 	for( CXMLNode& table : tables )
 	{
 		DBModel::TableRef t = MakeShared<DBModel::Table>();
-		t->_name = table.GetStringAttr(_T("tszName"));
+		t->_name = table.GetStringAttr(_T("name"));
 		t->_desc = table.GetStringAttr(_T("desc"));
 		t->_auto_increment_value = table.GetStringAttr(_T("auto_increment_value"));
 
@@ -489,11 +521,11 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 			DBModel::ColumnRef c = MakeShared<DBModel::Column>();
 			c->_tableName = t->_name;
 			c->_seq = column.GetStringAttr(_T("seq"));
-			c->_name = column.GetStringAttr(_T("tszName"));
+			c->_name = column.GetStringAttr(_T("name"));
 			c->_desc = column.GetStringAttr(_T("desc"));
 			c->_datatypedesc = column.GetStringAttr(_T("type"));
 
-			DBModel::DataType columnType = DBModel::Helpers::String2DataType(c->_datatypedesc.c_str(), OUT c->_maxLength);
+			DBModel::DataType columnType = DBModel::Helpers::StringToDataType(c->_datatypedesc.c_str(), OUT c->_maxLength);
 			ASSERT_CRASH(columnType != DBModel::DataType::NONE);
 
 			c->_datatype = DBModel::Helpers::DataType2String(columnType);
@@ -519,7 +551,7 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 		{
 			DBModel::IndexRef i = MakeShared<DBModel::Index>();
 			i->_tableName = t->_name;
-			i->_name = index.GetStringAttr(_T("tszName"));
+			i->_name = index.GetStringAttr(_T("name"));
 
 			const TCHAR* kindStr = index.GetStringAttr(_T("kind"));
 			i->_kind = DBModel::Helpers::StringToIndexKind(kindStr);
@@ -535,7 +567,7 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 			{
 				DBModel::IndexColumnRef c = MakeShared<DBModel::IndexColumn>();
 				c->_seq = column.GetInt32Attr(_T("seq"), 0);
-				c->_name = column.GetStringAttr(_T("tszName"));
+				c->_name = column.GetStringAttr(_T("name"));
 				const TCHAR* indexOrderStr = column.GetStringAttr(_T("order"));
 				if( ::_tcsicmp(indexOrderStr, _T("DESC")) == 0 )
 					c->_sort = 2;
@@ -551,27 +583,27 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 		{
 			DBModel::ForeignKeyRef fk = MakeShared<DBModel::ForeignKey>();
 			fk->_tableName = t->_name;
-			fk->_foreignKeyName = foreignKey.GetStringAttr(_T("tszName"));
+			fk->_foreignKeyName = foreignKey.GetStringAttr(_T("name"));
 			fk->_updateRule = foreignKey.GetStringAttr(_T("update_rule"));
 			fk->_deleteRule = foreignKey.GetStringAttr(_T("delete_rule"));
 
 			CXMLNode foreignKeyTable = foreignKey.FindChild(_T("ForeignKeyTable"));
-			fk->_foreignKeyTableName = foreignKeyTable.GetStringAttr(_T("tszName"));
+			fk->_foreignKeyTableName = foreignKeyTable.GetStringAttr(_T("name"));
 			CVector<CXMLNode> foreignKeyColumns = foreignKeyTable.FindChildren(_T("Column"));
 			for( CXMLNode& foreignKeyColumn : foreignKeyColumns )
 			{
 				DBModel::IndexColumnRef c = MakeShared<DBModel::IndexColumn>();
-				c->_name = foreignKeyColumn.GetStringAttr(_T("tszName"));
+				c->_name = foreignKeyColumn.GetStringAttr(_T("name"));
 				fk->_foreignKeyColumns.push_back(c);
 			}
 
 			CXMLNode referenceKeyTable = foreignKey.FindChild(_T("ReferenceKeyTable"));
-			fk->_referenceKeyTableName = referenceKeyTable.GetStringAttr(_T("tszName"));
+			fk->_referenceKeyTableName = referenceKeyTable.GetStringAttr(_T("name"));
 			CVector<CXMLNode> referenceKeyColumns = referenceKeyTable.FindChildren(_T("Column"));
 			for( CXMLNode& referenceKeyColumn : referenceKeyColumns )
 			{
 				DBModel::IndexColumnRef c = MakeShared<DBModel::IndexColumn>();
-				c->_name = referenceKeyColumn.GetStringAttr(_T("tszName"));
+				c->_name = referenceKeyColumn.GetStringAttr(_T("name"));
 				fk->_referenceKeyColumns.push_back(c);
 			}
 			t->_foreignKeys.push_back(fk);
@@ -584,7 +616,7 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 	for( CXMLNode& procedure : procedures )
 	{
 		DBModel::ProcedureRef p = MakeShared<DBModel::Procedure>();
-		p->_name = procedure.GetStringAttr(_T("tszName"));
+		p->_name = procedure.GetStringAttr(_T("name"));
 		p->_desc = procedure.GetStringAttr(_T("desc"));
 		p->_body = procedure.FindChild(_T("body")).GetStringValue();
 
@@ -592,7 +624,9 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 		for( CXMLNode& param : params )
 		{
 			DBModel::ProcParamRef procParam = MakeShared<DBModel::ProcParam>();
-			procParam->_name = param.GetStringAttr(_T("tszName"));
+			procParam->_paramId = param.GetStringAttr(_T("seq"));
+			procParam->_paramMode = DBModel::Helpers::StringToParamMode(param.GetStringAttr(_T("mode")));
+			procParam->_name = param.GetStringAttr(_T("name"));
 			procParam->_desc = param.GetStringAttr(_T("desc"));
 			procParam->_datatypedesc = param.GetStringAttr(_T("type"));
 			p->_parameters.push_back(procParam);
@@ -604,7 +638,7 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 	for( CXMLNode& function : functions )
 	{
 		DBModel::FunctionRef p = MakeShared<DBModel::Function>();
-		p->_name = function.GetStringAttr(_T("tszName"));
+		p->_name = function.GetStringAttr(_T("name"));
 		p->_desc = function.GetStringAttr(_T("desc"));
 		p->_body = function.FindChild(_T("body")).GetStringValue();
 
@@ -612,7 +646,9 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 		for( CXMLNode& param : params )
 		{
 			DBModel::FuncParamRef funcParam = MakeShared<DBModel::FuncParam>();
-			funcParam->_name = param.GetStringAttr(_T("tszName"));
+			funcParam->_paramId = param.GetStringAttr(_T("seq"));
+			funcParam->_paramMode = DBModel::Helpers::StringToParamMode(param.GetStringAttr(_T("mode")));
+			funcParam->_name = param.GetStringAttr(_T("name"));
 			funcParam->_desc = param.GetStringAttr(_T("desc"));
 			funcParam->_datatypedesc = param.GetStringAttr(_T("type"));
 			p->_parameters.push_back(funcParam);
@@ -623,7 +659,7 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 	CVector<CXMLNode> removedTables = root.FindChildren(_T("RemovedTable"));
 	for( CXMLNode& removedTable : removedTables )
 	{
-		_xmlRemovedTables.insert(removedTable.GetStringAttr(_T("tszName")));
+		_xmlRemovedTables.insert(removedTable.GetStringAttr(_T("name")));
 	}
 }
 
@@ -646,7 +682,7 @@ bool CDBSynchronizer::DBToCreateXml(const TCHAR* path)
 	for( DBModel::TableRef& dbTable : _dbTables )
 	{
 		_tXmlNodeType* table = doc.allocate_node(rapidxml::node_type::node_element, _T("Table"));
-		table->append_attribute(doc.allocate_attribute(_T("tszName"), dbTable->_name.c_str()));
+		table->append_attribute(doc.allocate_attribute(_T("name"), dbTable->_name.c_str()));
 		table->append_attribute(doc.allocate_attribute(_T("desc"), dbTable->_desc.c_str()));
 		table->append_attribute(doc.allocate_attribute(_T("auto_increment_value"), dbTable->_auto_increment_value.c_str()));
 		root->append_node(table);
@@ -655,7 +691,7 @@ bool CDBSynchronizer::DBToCreateXml(const TCHAR* path)
 		{
 			_tXmlNodeType* column = doc.allocate_node(rapidxml::node_type::node_element, _T("Column"));
 			column->append_attribute(doc.allocate_attribute(_T("seq"), dbColumn->_seq.c_str()));
-			column->append_attribute(doc.allocate_attribute(_T("tszName"), dbColumn->_name.c_str()));
+			column->append_attribute(doc.allocate_attribute(_T("name"), dbColumn->_name.c_str()));
 			column->append_attribute(doc.allocate_attribute(_T("type"), dbColumn->_datatypedesc.c_str()));
 			column->append_attribute(doc.allocate_attribute(_T("notnull"), !dbColumn->_nullable ? _T("true") : _T("false")));
 			if( dbColumn->_default.size() > 0 ) column->append_attribute(doc.allocate_attribute(_T("default"), dbColumn->_default.c_str()));
@@ -667,7 +703,7 @@ bool CDBSynchronizer::DBToCreateXml(const TCHAR* path)
 		for( DBModel::IndexRef& dbIndex : dbTable->_indexes )
 		{
 			_tXmlNodeType* index = doc.allocate_node(rapidxml::node_type::node_element, _T("Index"));
-			index->append_attribute(doc.allocate_attribute(_T("tszName"), dbIndex->_name.c_str()));
+			index->append_attribute(doc.allocate_attribute(_T("name"), dbIndex->_name.c_str()));
 
 			if( dbIndex->_kind == DBModel::IndexKind::Clustered )
 				index->append_attribute(doc.allocate_attribute(_T("kind"), _T("CLUSTERED")));
@@ -692,7 +728,7 @@ bool CDBSynchronizer::DBToCreateXml(const TCHAR* path)
 				_tXmlNodeType* column = doc.allocate_node(rapidxml::node_type::node_element, _T("Column"));
 
 				column->append_attribute(doc.allocate_attribute(_T("seq"), dbIndexColumn->_seq.c_str()));
-				column->append_attribute(doc.allocate_attribute(_T("tszName"), dbIndexColumn->_name.c_str()));
+				column->append_attribute(doc.allocate_attribute(_T("name"), dbIndexColumn->_name.c_str()));
 				column->append_attribute(doc.allocate_attribute(_T("order"), dbIndexColumn->_sort == 1 ? _T("ASC") : _T("DESC")));
 				index->append_node(column);
 			}
@@ -702,26 +738,26 @@ bool CDBSynchronizer::DBToCreateXml(const TCHAR* path)
 		for( DBModel::ForeignKeyRef& dbForeignKey : dbTable->_foreignKeys )
 		{
 			_tXmlNodeType* referenceKey = doc.allocate_node(rapidxml::node_type::node_element, _T("ForeignKey"));
-			referenceKey->append_attribute(doc.allocate_attribute(_T("tszName"), dbForeignKey->_foreignKeyName.c_str()));
+			referenceKey->append_attribute(doc.allocate_attribute(_T("name"), dbForeignKey->_foreignKeyName.c_str()));
 			referenceKey->append_attribute(doc.allocate_attribute(_T("update_rule"), dbForeignKey->_updateRule.c_str()));
 			referenceKey->append_attribute(doc.allocate_attribute(_T("delete_rule"), dbForeignKey->_deleteRule.c_str()));
 
 			_tXmlNodeType* foreignKeyTable = doc.allocate_node(rapidxml::node_type::node_element, _T("ForeignKeyTable"));
-			foreignKeyTable->append_attribute(doc.allocate_attribute(_T("tszName"), dbForeignKey->_foreignKeyTableName.c_str()));
+			foreignKeyTable->append_attribute(doc.allocate_attribute(_T("name"), dbForeignKey->_foreignKeyTableName.c_str()));
 			for( DBModel::IndexColumnRef& dbForeignKeyColumn : dbForeignKey->_foreignKeyColumns )
 			{
 				_tXmlNodeType* column = doc.allocate_node(rapidxml::node_type::node_element, _T("Column"));
-				column->append_attribute(doc.allocate_attribute(_T("tszName"), dbForeignKeyColumn->_name.c_str()));
+				column->append_attribute(doc.allocate_attribute(_T("name"), dbForeignKeyColumn->_name.c_str()));
 				foreignKeyTable->append_node(column);
 			}
 			referenceKey->append_node(foreignKeyTable);
 
 			_tXmlNodeType* referenceKeyTable = doc.allocate_node(rapidxml::node_type::node_element, _T("ReferenceKeyTable"));
-			referenceKeyTable->append_attribute(doc.allocate_attribute(_T("tszName"), dbForeignKey->_referenceKeyTableName.c_str()));
+			referenceKeyTable->append_attribute(doc.allocate_attribute(_T("name"), dbForeignKey->_referenceKeyTableName.c_str()));
 			for( DBModel::IndexColumnRef& dbReferenceKeyColumn : dbForeignKey->_referenceKeyColumns )
 			{
 				_tXmlNodeType* column = doc.allocate_node(rapidxml::node_type::node_element, _T("Column"));
-				column->append_attribute(doc.allocate_attribute(_T("tszName"), dbReferenceKeyColumn->_name.c_str()));
+				column->append_attribute(doc.allocate_attribute(_T("name"), dbReferenceKeyColumn->_name.c_str()));
 				referenceKeyTable->append_node(column);
 			}
 			referenceKey->append_node(referenceKeyTable);
@@ -733,12 +769,14 @@ bool CDBSynchronizer::DBToCreateXml(const TCHAR* path)
 	for( DBModel::ProcedureRef& dbProcedure : _dbProcedures )
 	{
 		_tXmlNodeType* procedure = doc.allocate_node(rapidxml::node_type::node_element, _T("Procedure"));
-		procedure->append_attribute(doc.allocate_attribute(_T("tszName"), dbProcedure->_name.c_str()));
+		procedure->append_attribute(doc.allocate_attribute(_T("name"), dbProcedure->_name.c_str()));
 		procedure->append_attribute(doc.allocate_attribute(_T("desc"), dbProcedure->_desc.c_str()));
 		for( DBModel::ProcParamRef& dbProcParam : dbProcedure->_parameters )
 		{
 			_tXmlNodeType* procParam = doc.allocate_node(rapidxml::node_type::node_element, _T("Param"));
-			procParam->append_attribute(doc.allocate_attribute(_T("tszName"), dbProcParam->_name.c_str()));
+			procParam->append_attribute(doc.allocate_attribute(_T("seq"), dbProcParam->_paramId.c_str()));
+			procParam->append_attribute(doc.allocate_attribute(_T("mode"), static_cast<int8>(dbProcParam->_paramMode) == 0 ? _T("RET") : (static_cast<int8>(dbProcParam->_paramMode) == 1 ? _T("IN") : _T("OUT"))));
+			procParam->append_attribute(doc.allocate_attribute(_T("name"), dbProcParam->_name.c_str()));
 			procParam->append_attribute(doc.allocate_attribute(_T("type"), dbProcParam->_datatypedesc.c_str()));
 			procParam->append_attribute(doc.allocate_attribute(_T("desc"), dbProcParam->_desc.c_str()));
 			procedure->append_node(procParam);
@@ -754,12 +792,14 @@ bool CDBSynchronizer::DBToCreateXml(const TCHAR* path)
 	for( DBModel::FunctionRef& dbFunction : _dbFunctions )
 	{
 		_tXmlNodeType* function = doc.allocate_node(rapidxml::node_type::node_element, _T("Function"));
-		function->append_attribute(doc.allocate_attribute(_T("tszName"), dbFunction->_name.c_str()));
+		function->append_attribute(doc.allocate_attribute(_T("name"), dbFunction->_name.c_str()));
 		function->append_attribute(doc.allocate_attribute(_T("desc"), dbFunction->_desc.c_str()));
 		for( DBModel::FuncParamRef& dbFuncParam : dbFunction->_parameters )
 		{
 			_tXmlNodeType* funcParam = doc.allocate_node(rapidxml::node_type::node_element, _T("Param"));
-			funcParam->append_attribute(doc.allocate_attribute(_T("tszName"), dbFuncParam->_name.c_str()));
+			funcParam->append_attribute(doc.allocate_attribute(_T("seq"), dbFuncParam->_paramId.c_str()));
+			funcParam->append_attribute(doc.allocate_attribute(_T("mode"), static_cast<int8>(dbFuncParam->_paramMode) == 0 ? _T("RET") : (static_cast<int8>(dbFuncParam->_paramMode) == 1 ? _T("IN") : _T("OUT"))));
+			funcParam->append_attribute(doc.allocate_attribute(_T("name"), dbFuncParam->_name.c_str()));
 			funcParam->append_attribute(doc.allocate_attribute(_T("type"), dbFuncParam->_datatypedesc.c_str()));
 			funcParam->append_attribute(doc.allocate_attribute(_T("desc"), dbFuncParam->_desc.c_str()));
 			function->append_node(funcParam);
@@ -788,12 +828,16 @@ bool CDBSynchronizer::GatherDBTables()
 	int64 auto_increment_value;
 	TCHAR tszTableName[101] = {0, };
 	TCHAR tszTableComment[4000] = {0, };
+	TCHAR tszCreateDate[DATETIME_STRLEN] = {0, };
+	TCHAR tszModifyDate[DATETIME_STRLEN] = {0, };
 
 	SP::GetDBTables getDBTables(_dbClass, _dbConn);
 	getDBTables.Out_ObjectId(OUT objectId);
 	getDBTables.Out_TableName(OUT tszTableName);
 	getDBTables.Out_TableComment(OUT tszTableComment);
 	getDBTables.Out_AutoIncrementValue(OUT auto_increment_value);
+	getDBTables.Out_CreateDate(OUT tszCreateDate);
+	getDBTables.Out_ModifyDate(OUT tszModifyDate);
 
 	if( getDBTables.ExecDirect() == false )
 		return false;
@@ -805,6 +849,8 @@ bool CDBSynchronizer::GatherDBTables()
 		tableRef->_name = tszTableName;
 		tableRef->_desc = tszTableComment;
 		tableRef->_auto_increment_value = DBModel::Helpers::Format(_T("%lld"), auto_increment_value);
+		tableRef->_createDate = tszCreateDate;
+		tableRef->_modifyDate = tszModifyDate;
 		_dbTables.push_back(tableRef);
 
 		tszTableComment[0] = _T('\0');
@@ -972,7 +1018,7 @@ bool CDBSynchronizer::GatherDBForeignKeys()
 	TCHAR tszForeignKeyName[101] = {0, };
 	TCHAR tszForeignKeyTableName[101] = {0, };
 	TCHAR tszForeignKeyColumnName[101] = {0, };
-	TCHAR tszReferenceKeyTableName[101] = { 0, };
+	TCHAR tszReferenceKeyTableName[101] = {0, };
 	TCHAR tszReferenceKeyColumnName[101] = {0, };
 	TCHAR tszUpdateRule[101] = {0, };
 	TCHAR tszDeleteRule[101] = {0, };
@@ -1078,6 +1124,8 @@ bool CDBSynchronizer::GatherDBStoredProcedures()
 	int32 objectId;
 	TCHAR tszProcName[101] = {0, };
 	TCHAR tszProcComment[4000] = {0, };
+	TCHAR tszCreateDate[DATETIME_STRLEN] = {0, };
+	TCHAR tszModifyDate[DATETIME_STRLEN] = {0, };
 
 	CVector<TCHAR> body;
 	body.resize(DATABASE_OBJECT_CONTENTTEXT_STRLEN);
@@ -1087,6 +1135,8 @@ bool CDBSynchronizer::GatherDBStoredProcedures()
 	getDBStoredProcedures.Out_SPName(OUT tszProcName);
 	getDBStoredProcedures.Out_SPComment(OUT tszProcComment);
 	getDBStoredProcedures.Out_Body(OUT &body[0], DATABASE_OBJECT_CONTENTTEXT_STRLEN);
+	getDBStoredProcedures.Out_CreateDate(OUT tszCreateDate);
+	getDBStoredProcedures.Out_ModifyDate(OUT tszModifyDate);
 
 	if( getDBStoredProcedures.ExecDirect() == false )
 		return false;
@@ -1098,6 +1148,8 @@ bool CDBSynchronizer::GatherDBStoredProcedures()
 		procRef->_name = tszProcName;
 		procRef->_desc = tszProcComment;
 		procRef->_fullBody = _tstring(body.begin(), std::find(body.begin(), body.end(), 0));
+		procRef->_createDate = tszCreateDate;
+		procRef->_modifyDate = tszModifyDate;
 		_dbProcedures.push_back(procRef);
 
 		tszProcComment[0] = _T('\0');
@@ -1121,11 +1173,12 @@ bool CDBSynchronizer::GatherDBStoredProcedureParams()
 {
 	int32 objectId;
 	TCHAR tszProcName[101] = {0, };
+	int32 paramId;
+	int8  paramMode;
 	TCHAR tszParamName[101] = {0, };
 	TCHAR tszDataType[101] = {0, };
-	TCHAR tszDataTypeDesc[101] = {0, };
-	int32 paramId;
 	int32 maxLength;
+	TCHAR tszDataTypeDesc[101] = {0, };
 	TCHAR tszParamComment[4000] = {0, };
 
 	CVector<TCHAR> body;
@@ -1134,8 +1187,9 @@ bool CDBSynchronizer::GatherDBStoredProcedureParams()
 	SP::GetDBStoredProcedureParams getDBStoredProcedureParams(_dbClass, _dbConn);
 	getDBStoredProcedureParams.Out_ObjectId(OUT objectId);
 	getDBStoredProcedureParams.Out_SPName(OUT tszProcName);
-	getDBStoredProcedureParams.Out_ParamName(OUT tszParamName);
 	getDBStoredProcedureParams.Out_ParamId(OUT paramId);
+	getDBStoredProcedureParams.Out_ParamMode(OUT paramMode);
+	getDBStoredProcedureParams.Out_ParamName(OUT tszParamName);
 	getDBStoredProcedureParams.Out_DataType(OUT tszDataType);
 	getDBStoredProcedureParams.Out_MaxLength(OUT maxLength);
 	getDBStoredProcedureParams.Out_DataTypeDesc(OUT tszDataTypeDesc);
@@ -1155,13 +1209,14 @@ bool CDBSynchronizer::GatherDBStoredProcedureParams()
 		});
 		ASSERT_CRASH(findProc != _dbProcedures.end());
 		CVector<DBModel::ProcParamRef>& procParams = (*findProc)->_parameters;
-		auto findProcParam = std::find_if(procParams.begin(), procParams.end(), [paramId](DBModel::ProcParamRef& procParam) { return procParam->_paramId == paramId; });
+		auto findProcParam = std::find_if(procParams.begin(), procParams.end(), [tszParamName](DBModel::ProcParamRef& procParam) { return _tcsicmp(procParam->_name.c_str(), tszParamName) == 0 ? true : false; });
 		if( findProcParam == procParams.end() )
 		{
 			DBModel::ProcParamRef procParamRef = MakeShared<DBModel::ProcParam>();
 			{
+				procParamRef->_paramId = DBModel::Helpers::Format(_T("%d"), paramId);;
+				procParamRef->_paramMode = static_cast<DBModel::ParameterMode>(paramMode);
 				procParamRef->_name = tszParamName;
-				procParamRef->_paramId = paramId;
 				procParamRef->_datatype = tszDataType;
 				procParamRef->_maxLength = (_tcsicmp(procParamRef->_datatype.c_str(), _T("nvarchar")) == 0 || _tcsicmp(procParamRef->_datatype.c_str(), _T("nchar")) == 0 ? maxLength / 2 : maxLength);
 				procParamRef->_datatypedesc = tszDataTypeDesc;
@@ -1185,6 +1240,8 @@ bool CDBSynchronizer::GatherDBFunctions()
 	int32 objectId;
 	TCHAR tszFuncName[101] = {0, };
 	TCHAR tszFuncComment[4000] = {0, };
+	TCHAR tszCreateDate[DATETIME_STRLEN] = {0, };
+	TCHAR tszModifyDate[DATETIME_STRLEN] = {0, };
 
 	CVector<TCHAR> body;
 	body.resize(DATABASE_OBJECT_CONTENTTEXT_STRLEN);
@@ -1194,6 +1251,8 @@ bool CDBSynchronizer::GatherDBFunctions()
 	getDBFunctions.Out_FCName(OUT tszFuncName);
 	getDBFunctions.Out_FCComment(OUT tszFuncComment);
 	getDBFunctions.Out_Body(OUT &body[0], DATABASE_OBJECT_CONTENTTEXT_STRLEN);
+	getDBFunctions.Out_CreateDate(OUT tszCreateDate);
+	getDBFunctions.Out_ModifyDate(OUT tszModifyDate);
 
 	if( getDBFunctions.ExecDirect() == false )
 		return false;
@@ -1205,6 +1264,8 @@ bool CDBSynchronizer::GatherDBFunctions()
 		funcRef->_name = tszFuncName;
 		funcRef->_desc = tszFuncComment;
 		funcRef->_fullBody = _tstring(body.begin(), std::find(body.begin(), body.end(), 0));
+		funcRef->_createDate = tszCreateDate;
+		funcRef->_modifyDate = tszModifyDate;
 		_dbFunctions.push_back(funcRef);
 
 		tszFuncComment[0] = _T('\0');
@@ -1228,10 +1289,11 @@ bool CDBSynchronizer::GatherDBFunctionParams()
 {
 	int32 objectId;
 	TCHAR tszFuncName[101] = {0, };
+	int32 paramId;
+	int8  paramMode;
 	TCHAR tszParamName[101] = {0, };
 	TCHAR tszDataType[101] = {0, };
 	TCHAR tszDataTypeDesc[101] = {0, };
-	int32 paramId;
 	int32 maxLength;
 	TCHAR tszParamComment[4000] = {0, };
 
@@ -1241,8 +1303,9 @@ bool CDBSynchronizer::GatherDBFunctionParams()
 	SP::GetDBFunctionParams getDBFunctionParams(_dbClass, _dbConn);
 	getDBFunctionParams.Out_ObjectId(OUT objectId);
 	getDBFunctionParams.Out_FCName(OUT tszFuncName);
-	getDBFunctionParams.Out_ParamName(OUT tszParamName);
 	getDBFunctionParams.Out_ParamId(OUT paramId);
+	getDBFunctionParams.Out_ParamMode(OUT paramMode);
+	getDBFunctionParams.Out_ParamName(OUT tszParamName);
 	getDBFunctionParams.Out_DataType(OUT tszDataType);
 	getDBFunctionParams.Out_MaxLength(OUT maxLength);
 	getDBFunctionParams.Out_DataTypeDesc(OUT tszDataTypeDesc);
@@ -1262,13 +1325,14 @@ bool CDBSynchronizer::GatherDBFunctionParams()
 		});
 		ASSERT_CRASH(findFunc != _dbFunctions.end());
 		CVector<DBModel::FuncParamRef>& funcParams = (*findFunc)->_parameters;
-		auto findFuncParam = std::find_if(funcParams.begin(), funcParams.end(), [paramId](DBModel::FuncParamRef& funcParam) { return funcParam->_paramId == paramId; });
+		auto findFuncParam = std::find_if(funcParams.begin(), funcParams.end(), [tszParamName](DBModel::FuncParamRef& funcParam) { return _tcsicmp(funcParam->_name.c_str(), tszParamName) == 0 ? true : false; });
 		if( findFuncParam == funcParams.end() )
 		{
 			DBModel::FuncParamRef funcParamRef = MakeShared<DBModel::FuncParam>();
 			{
+				funcParamRef->_paramId = DBModel::Helpers::Format(_T("%d"), paramId);;
+				funcParamRef->_paramMode = static_cast<DBModel::ParameterMode>(paramMode);
 				funcParamRef->_name = tszParamName;
-				funcParamRef->_paramId = paramId;
 				funcParamRef->_datatype = tszDataType;
 				funcParamRef->_maxLength = (_tcsicmp(funcParamRef->_datatype.c_str(), _T("nvarchar")) == 0 || _tcsicmp(funcParamRef->_datatype.c_str(), _T("nchar")) == 0 ? maxLength / 2 : maxLength);
 				funcParamRef->_datatypedesc = tszDataTypeDesc;

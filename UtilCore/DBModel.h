@@ -45,6 +45,13 @@ enum class DataType
 	NCHAR = 239
 };
 
+enum class ParameterMode : uint8
+{
+	PARAM_RETURN = 0,
+	PARAM_IN = 1,
+	PARAM_OUT = 2
+};
+
 //***************************************************************************
 //
 class TABLE_INFO
@@ -54,6 +61,8 @@ public:
 	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN];		// 테이블 명
 	TCHAR	tszTableComment[DATABASE_WVARCHAR_MAX];			// 테이블 주석
 	int64	AutoIncrementValue;								// Identity 생성된 마지막 값
+	TCHAR	tszCreateDate[DATETIME_STRLEN];					// 생성 일시
+	TCHAR	tszModifyDate[DATETIME_STRLEN];					// 수정 일시
 };
 
 //***************************************************************************
@@ -129,6 +138,8 @@ public:
 	TCHAR   tszProcName[DATABASE_OBJECT_NAME_STRLEN];				// 저장프로시저 명
 	TCHAR	tszProcComment[DATABASE_WVARCHAR_MAX];					// 저장프로시저 주석
 	TCHAR   tszProcText[DATABASE_OBJECT_CONTENTTEXT_STRLEN];		// 저장프로시저 내용
+	TCHAR	tszCreateDate[DATETIME_STRLEN];							// 생성 일시
+	TCHAR	tszModifyDate[DATETIME_STRLEN];							// 수정 일시
 };
 
 //***************************************************************************
@@ -138,6 +149,8 @@ class PROCEDURE_PARAM_INFO
 public:
 	int32	ObjectId;												// MSSQL 저장프로시저 고유번호
 	TCHAR   tszProcName[DATABASE_OBJECT_NAME_STRLEN];				// 저장프로시저 명
+	int32	Seq;													// 파라미터 순서
+	int8	ParamMode;												// 파라미터 입출력 구분(0/1/2 : RETURN/IN/OUT)
 	TCHAR	tszParamName[DATABASE_COLUMN_NAME_STRLEN];				// 파라미터 명
 	TCHAR   tszDataType[DATABASE_DATATYPEDESC_STRLEN];				// 파라미터 데이터타입
 	int16	MaxLength;												// 파라미터의 최대 길이(바이트)
@@ -154,6 +167,8 @@ public:
 	TCHAR   tszFuncName[DATABASE_OBJECT_NAME_STRLEN];				// 함수 명
 	TCHAR	tszFuncComment[DATABASE_WVARCHAR_MAX];					// 함수 주석
 	TCHAR   tszFuncText[DATABASE_OBJECT_CONTENTTEXT_STRLEN];		// 함수 내용
+	TCHAR	tszCreateDate[DATETIME_STRLEN];							// 생성 일시
+	TCHAR	tszModifyDate[DATETIME_STRLEN];							// 수정 일시
 };
 
 //***************************************************************************
@@ -163,6 +178,8 @@ class FUNCTION_PARAM_INFO
 public:
 	int32	ObjectId;												// MSSQL 함수 고유번호
 	TCHAR   tszFuncName[DATABASE_OBJECT_NAME_STRLEN];				// 함수 명
+	int32	Seq;													// 파라미터 순서
+	int8	ParamMode;												// 파라미터 입출력 구분(0/1/2 : RETURN/IN/OUT)
 	TCHAR	tszParamName[DATABASE_COLUMN_NAME_STRLEN];				// 파라미터 명
 	TCHAR   tszDataType[DATABASE_DATATYPEDESC_STRLEN];				// 파라미터 데이터타입
 	int16	MaxLength;												// 파라미터의 최대 길이(바이트)
@@ -289,6 +306,8 @@ public:
 	_tstring					_name;
 	_tstring					_desc;
 	_tstring					_auto_increment_value;
+	_tstring					_createDate;
+	_tstring					_modifyDate;
 	CVector<ColumnRef>			_columns;
 	CVector<IndexRef>			_indexes;
 	CVector<ForeignKeyRef>		_foreignKeys;
@@ -297,12 +316,13 @@ public:
 class ProcParam
 {
 public:
+	_tstring			_paramId;
+	ParameterMode		_paramMode;
 	_tstring			_name;
-	_tstring			_desc;
-	int32				_paramId = 0;
 	_tstring			_datatype;
 	int32				_maxLength = 0;
 	_tstring			_datatypedesc;
+	_tstring			_desc;
 };
 
 class Procedure
@@ -317,18 +337,21 @@ public:
 	_tstring					_desc;
 	_tstring					_fullBody;
 	_tstring					_body;
+	_tstring					_createDate;
+	_tstring					_modifyDate;
 	CVector<ProcParamRef>		_parameters;
 };
 
 class FuncParam
 {
 public:
+	_tstring			_paramId;
+	ParameterMode		_paramMode;
 	_tstring			_name;
-	_tstring			_desc;
-	int32				_paramId = 0;
 	_tstring			_datatype;
 	int32				_maxLength = 0;
 	_tstring			_datatypedesc;
+	_tstring			_desc;
 };
 
 class Function
@@ -343,20 +366,23 @@ public:
 	_tstring					_desc;
 	_tstring					_fullBody;
 	_tstring					_body;
+	_tstring					_createDate;
+	_tstring					_modifyDate;
 	CVector<FuncParamRef>		_parameters;
 };
 
 class Helpers
 {
 public:
-	static IndexKind    StringToIndexKind(const TCHAR* ptszIndexKind);
-	static IndexType    StringToIndexType(const TCHAR* ptszIndexType);
-	static _tstring		Format(const TCHAR* format, ...);
-	static _tstring		DataType2String(DataType type);
-	static _tstring		RemoveWhiteSpace(const _tstring& str);
-	static DataType		String2DataType(const TCHAR* str, OUT int32& maxLen);
-	static _tstring		String2DataTypeLength(DataType type, int32 iLength);
-	static void			LogFileWrite(DB_CLASS dbClass, _tstring title, _tstring sql, bool newline = false);
+	static IndexKind		StringToIndexKind(const TCHAR* ptszIndexKind);
+	static IndexType		StringToIndexType(const TCHAR* ptszIndexType);
+	static _tstring			Format(const TCHAR* format, ...);
+	static _tstring			DataType2String(DataType type);
+	static _tstring			RemoveWhiteSpace(const _tstring& str);
+	static ParameterMode	StringToParamMode(const _tstring str);
+	static DataType			StringToDataType(const TCHAR* str, OUT int32& maxLen);
+	static _tstring			StringToDataTypeLength(DataType type, int32 iLength);
+	static void				LogFileWrite(DB_CLASS dbClass, _tstring title, _tstring sql, bool newline = false);
 };
 
 NAMESPACE_END
