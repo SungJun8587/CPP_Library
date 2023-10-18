@@ -35,11 +35,21 @@
 #define FILEINFO_LASTWRITETIME				3
 #define MAX_FILENAME_CONVERT_INDEX_NUM		10000
 
+enum EFileType
+{
+	DEFAULT = 0,
+	ANSI,
+	UTF16_LE,
+	UTF16_BE,
+	UTF8_BOM,
+	UTF8_NOBOM
+};
+
 //***************************************************************************
 //
 typedef struct _SH_APPLY_FILEINFO
 {
-	BOOL		m_bIsApply;
+	bool		m_bIsApply;
 	TCHAR		m_tszApplyExt[MAX_BUFFER_SIZE];
 	TCHAR		m_tszModifyStDate[DATE_STRLEN];
 	TCHAR		m_tszModifyEdDate[DATE_STRLEN];
@@ -88,46 +98,54 @@ typedef struct _SH_REGISTRY_INFO
 	DWORD	m_dwValueLen;
 } SH_REGISTRY_INFO, * PSH_REGISTRY_INFO;
 
-BOOL	IsAbleFile(const TCHAR* ptszSourceFullPath, const SH_APPLY_FILEINFO ShApplyFileInfo);
+bool	IsAbleFile(const TCHAR* ptszSourceFullPath, const SH_APPLY_FILEINFO ShApplyFileInfo);
 
-BOOL	CreateDirectoryRecursive(const TCHAR* ptszFolder);
-BOOL	RemoveDirectoryRecursive(const TCHAR* ptszFolder, const BOOL bSelfDel = TRUE);
-BOOL	CopyFileRecursive(const TCHAR* ptszSourceFolder, const TCHAR* ptszDestFolder, const SH_APPLY_FILEINFO& ShApplyFileInfo);
-BOOL	MoveFileRecursive(const TCHAR* ptszSourceFolder, const TCHAR* ptszDestFolder, const SH_APPLY_FILEINFO& ShApplyFileInfo);
-BOOL	IsDirectory(const TCHAR* ptszFolder);
+bool	CreateDirectoryRecursive(const TCHAR* ptszFolder);
+bool	RemoveDirectoryRecursive(const TCHAR* ptszFolder, const bool  bSelfDel = TRUE);
+bool	CopyFileRecursive(const TCHAR* ptszSourceFolder, const TCHAR* ptszDestFolder, const SH_APPLY_FILEINFO& ShApplyFileInfo);
+bool	MoveFileRecursive(const TCHAR* ptszSourceFolder, const TCHAR* ptszDestFolder, const SH_APPLY_FILEINFO& ShApplyFileInfo);
+bool	IsDirectory(const TCHAR* ptszFolder);
 
-long	RegCreateKeyExRecursive(const HKEY hRoot, const TCHAR* ptszSubKey, const bool bReadOnly);
+long	RegCreateKeyExRecursive(const HKEY hRoot, const TCHAR* ptszSubKey, const bool  bReadOnly);
 long	RegDeleteKeyRecursive(const HKEY hKey, const TCHAR* ptszSubKey);
-BOOL	RegSetValue(const HKEY hRoot, const TCHAR* ptszSubKey, const DWORD dwOptions, const REGSAM samDesired, const TCHAR* ptszName, DWORD dwType, const void* pvValue, const DWORD dwLength);
-BOOL	RegSetValue(const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* ptszName, const BYTE* pbValue, const DWORD dwLength);
-BOOL	RegSetValue(const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* ptszName, const DWORD dwValue);
+bool	RegSetValue(const HKEY hRoot, const TCHAR* ptszSubKey, const DWORD dwOptions, const REGSAM samDesired, const TCHAR* ptszName, DWORD dwType, const void* pvValue, const DWORD dwLength);
+bool	RegSetValue(const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* ptszName, const BYTE* pbValue, const DWORD dwLength);
+bool	RegSetValue(const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* ptszName, const DWORD dwValue);
 
 DWORD	GetRegSzValueLen(const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* ptszName);
-BOOL	RegGetValue(void* pvValue, DWORD& dwLength, const HKEY hRoot, const TCHAR* ptszSubKey, const DWORD dwOptions, const REGSAM samDesired, const TCHAR* ptszName, DWORD& dwType);
-BOOL	RegGetValue(BYTE* pbValue, DWORD& dwLength, const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* ptszName);
-BOOL	RegGetValue(DWORD* pdwValue, const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* ptszName);
-BOOL	IsRegKey(const HKEY hKey, const TCHAR* ptszSubKey);
+bool	RegGetValue(void* pvValue, DWORD& dwLength, const HKEY hRoot, const TCHAR* ptszSubKey, const DWORD dwOptions, const REGSAM samDesired, const TCHAR* ptszName, DWORD& dwType);
+bool	RegGetValue(BYTE* pbValue, DWORD& dwLength, const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* ptszName);
+bool	RegGetValue(DWORD* pdwValue, const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* ptszName);
+bool	IsRegKey(const HKEY hKey, const TCHAR* ptszSubKey);
 
 HANDLE	GetFileHandleDuplicate(TCHAR* ptszDestFullPath, TCHAR* ptszDestFileNameExt, const TCHAR* ptszFullPath);
 
-int		IsFileType(const TCHAR* ptszFullPath);
-BOOL	ReadFile(CMemBuffer<BYTE>& ByteDestination, const TCHAR* ptszFullPath);
-BOOL	ReadFile(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszFullPath);
-BOOL	ReadFileMap(CMemBuffer<BYTE>& ByteDestination, const TCHAR* ptszFullPath);
-BOOL	ReadFileMap(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszFullPath);
+bool		IsUTF8WithoutBom(const void* pBuffer, const size_t BuffSize);
+EFileType	IsFileType(const TCHAR* ptszFullPath);
+bool		ReadFile(CMemBuffer<BYTE>& ByteDestination, const TCHAR* ptszFullPath);
+bool		ReadFileMap(CMemBuffer<BYTE>& ByteDestination, const TCHAR* ptszFullPath);
 
-BOOL	SaveFile(const TCHAR* ptszFullPath, const BYTE* pbBuffer, const DWORD dwLength);
-BOOL	SaveAnsiFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer);
-BOOL	SaveUnicodeLEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer);
-BOOL	SaveUnicodeBEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer);
-BOOL	SaveUTF8File(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer);
+bool		ReadFile(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszFullPath);
+bool		ReadFileMap(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszFullPath);
 
-BOOL	GetFileInfoTime(const TCHAR* ptszFilePath, const int nCase, SYSTEMTIME& stLocal);
-BOOL	IsExistFile(const TCHAR* ptszFilePath);
-DWORD	GetFileSize(const TCHAR* ptszFilePath);
-BOOL	GetFileInformation(const TCHAR* ptszFilePath, LPBY_HANDLE_FILE_INFORMATION lpFileInformation);
+#ifdef _STRING_
+bool		ReadFile(_tstring& DestString, const TCHAR* ptszFullPath);
+bool		ReadFileMap(_tstring& DestString, const TCHAR* ptszFullPath);
+#endif
 
-BOOL	GetProductKeyExtract(CMemBuffer<TCHAR>& TProductKey, const BYTE* pbDigitalProductID, const DWORD dwLength, const BOOL bIsExtractBytesRange);
+bool		SaveFile(const TCHAR* ptszFullPath, const BYTE* pbBuffer, const DWORD dwLength);
+bool		SaveAnsiFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize);
+bool		SaveUnicodeBEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize);
+bool		SaveUnicodeLEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize);
+bool		SaveUTF8BOMFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize);
+bool		SaveUTF8NOBOMFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize);
+
+bool		GetFileInfoTime(const TCHAR* ptszFilePath, const int nCase, SYSTEMTIME& stLocal);
+bool		IsExistFile(const TCHAR* ptszFilePath);
+DWORD		GetFileSize(const TCHAR* ptszFilePath);
+bool		GetFileInformation(const TCHAR* ptszFilePath, LPBY_HANDLE_FILE_INFORMATION lpFileInformation);
+
+bool		GetProductKeyExtract(CMemBuffer<TCHAR>& TProductKey, const BYTE* pbDigitalProductID, const DWORD dwLength, const bool  bIsExtractBytesRange);
 
 #endif // ndef __SHELLUTIL_H__
 

@@ -35,7 +35,7 @@
 #define YELLOW_BG   (RED_BG | GREEN_BG) 
 #define SKYBLUE_BG  (GREEN_BG | BLUE_BG) 
 
-enum ELOG_TYPE
+enum class ELOG_TYPE : short
 {
 	LOG_TYPE_DEBUG,
 	LOG_TYPE_TRACE,
@@ -46,7 +46,7 @@ enum ELOG_TYPE
 	LOG_TYPE_MAX_NUM
 };
 
-enum ELOG_TYPE_COLOR
+enum class ELOG_TYPE_COLOR : short
 {
 	LOG_TYPE_DEBUG_COLOR = WHITE,
 	LOG_TYPE_TRACE_COLOR = BLUE,
@@ -77,38 +77,27 @@ private:
 };
 
 #define LOG_WRITE(LOGLEVEL, LOGFLAG, ...) \
-	LogManager::Instance()->Write(LOGLEVEL, LOGFLAG, __VA_ARGS__)
+	gpLogmanager->Write(LOGLEVEL, LOGFLAG, __VA_ARGS__)
 
 #define LOG_DEBUG(...) \
-	LogManager::Instance()->Write(LOG_TYPE_DEBUG, true, __VA_ARGS__)
+	gpLogmanager->Write(ELOG_TYPE::LOG_TYPE_DEBUG, true, __VA_ARGS__)
 #define LOG_TRACE(...) \
-	LogManager::Instance()->Write(LOG_TYPE_TRACE, true, __VA_ARGS__)
+	gpLogmanager->Write(ELOG_TYPE::LOG_TYPE_TRACE, true, __VA_ARGS__)
 #define LOG_INFO(...) \
-	LogManager::Instance()->Write(LOG_TYPE_INFO, true, __VA_ARGS__)
+	gpLogmanager->Write(ELOG_TYPE::LOG_TYPE_INFO, true, __VA_ARGS__)
 #define LOG_WARNING(...) \
-	LogManager::Instance()->Write(LOG_TYPE_WARNING, true, __VA_ARGS__)
+	gpLogmanager->Write(ELOG_TYPE::LOG_TYPE_WARNING, true, __VA_ARGS__)
 #define LOG_ERROR(...) \
-	LogManager::Instance()->Write(LOG_TYPE_ERROR, true, __VA_ARGS__)
+	gpLogmanager->Write(ELOG_TYPE::LOG_TYPE_ERROR, true, __VA_ARGS__)
 
-class LogManager
+class CLogManager
 {
 public:
 	void Create(const TCHAR* ptszDirecoryName);
 	void Write(const ELOG_TYPE p_nType, const bool bFlag, const TCHAR* ptszFormat, ...);
 
-	static LogManager* Instance();
-
 private:
-	CLog m_LogType[LOG_TYPE_MAX_NUM];
+	CLog m_LogType[static_cast<short>(ELOG_TYPE::LOG_TYPE_MAX_NUM)];
 };
-
-static LogManager* gpLogmanager;
-
-inline LogManager* LogManager::Instance() {
-	if( !gpLogmanager )
-		gpLogmanager = new LogManager();
-
-	return gpLogmanager;
-}
 
 #endif // ndef __LOG_H__

@@ -25,7 +25,7 @@ public:
 	int PushBack(const TYPE Element);
 	int PopBack(TYPE& Element);
 
-	BOOL IsEmpty();
+	bool IsEmpty();
 	int GetSize();
 
 #ifdef _UNICODE
@@ -74,7 +74,7 @@ int CBaseLinkedDeque<TYPE>::PopBack(TYPE& Element)
 //***************************************************************************
 //
 template<class TYPE>
-BOOL CBaseLinkedDeque<TYPE>::IsEmpty()
+bool CBaseLinkedDeque<TYPE>::IsEmpty()
 {
 	return CBaseDoublyLinkedList<TYPE>::GetCount() < 1 ? true : false;
 }

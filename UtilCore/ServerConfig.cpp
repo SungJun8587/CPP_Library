@@ -29,7 +29,7 @@ CServerConfig::~CServerConfig(void)
 
 //***************************************************************************
 //
-BOOL CServerConfig::Init(const TCHAR* tszServerInfo)
+bool CServerConfig::Init(const TCHAR* tszServerInfo)
 {
 	int32 nSize = 0;
 
@@ -55,10 +55,10 @@ BOOL CServerConfig::Init(const TCHAR* tszServerInfo)
 		for( int32 i = 0; i < nSize; ++i )
 		{
 			CJSONParser node = serverNodeValue[i];
-			m_ServerNodeVec[i].m_nID = (int16)node[_T("ID")];
+			m_ServerNodeVec[i].m_nID = static_cast<int16>(node[_T("ID")]);
 			_tcsncpy_s(m_ServerNodeVec[i].m_tszServerName, DATABASE_SERVER_NAME_STRLEN, ((_tstring)node[_T("Name")]).c_str(), _TRUNCATE);
 			_tcsncpy_s(m_ServerNodeVec[i].m_tszIP, IP_STRLEN, ((_tstring)node[_T("IP")]).c_str(), _TRUNCATE);
-			m_ServerNodeVec[i].m_nPort = (int32)node[_T("Port")];
+			m_ServerNodeVec[i].m_nPort = static_cast<int32>(node[_T("Port")]);
 		}
 	}
 
@@ -72,9 +72,10 @@ BOOL CServerConfig::Init(const TCHAR* tszServerInfo)
 		{
 			CJSONParser node = dbNodeValue[i];
 
-			m_DBNodeVec[i].m_nID = (int16)node[_T("ID")];
+			m_DBNodeVec[i].m_nID = static_cast<int16>(node[_T("ID")]);
+			m_DBNodeVec[i].m_dbClass = GetInt8ToDBClass(static_cast<int8>(node[_T("DBClass")]));
 			_tcsncpy_s(m_DBNodeVec[i].m_tszDBHost, IP_STRLEN, ((_tstring)node[_T("IP")]).c_str(), _TRUNCATE);
-			m_DBNodeVec[i].m_nPort = (int32)node[_T("Port")];
+			m_DBNodeVec[i].m_nPort = static_cast<int32>(node[_T("Port")]);
 			_tcsncpy_s(m_DBNodeVec[i].m_tszDBUserId, DATABASE_DSN_USER_ID_STRLEN, ((_tstring)node[_T("UID")]).c_str(), _TRUNCATE);
 			_tcsncpy_s(m_DBNodeVec[i].m_tszDBPasswd, DATABASE_DSN_USER_PASSWORD_STRLEN, ((_tstring)node[_T("PWD")]).c_str(), _TRUNCATE);
 			_tcsncpy_s(m_DBNodeVec[i].m_tszDBName, DATABASE_NAME_STRLEN, ((_tstring)node[_T("DBName")]).c_str(), _TRUNCATE);

@@ -31,11 +31,11 @@ SYSTEMTIME& operator<<(SYSTEMTIME& stime, const time_t& t);
 SYSTEMTIME& operator<<(SYSTEMTIME& stime, const TIMESTAMP_STRUCT& ts);
 TIMESTAMP_STRUCT& operator<<(TIMESTAMP_STRUCT& ts, const SYSTEMTIME& stime);
 
-BOOL operator==(SYSTEMTIME& stime1, SYSTEMTIME& stime2);
-BOOL operator>(SYSTEMTIME& stime1, SYSTEMTIME& stime2);
-BOOL operator>=(SYSTEMTIME& stime1, SYSTEMTIME& stime2);
-BOOL operator<(SYSTEMTIME& stime1, SYSTEMTIME& stime2);
-BOOL operator<=(SYSTEMTIME& stime1, SYSTEMTIME& stime2);
+bool  operator==(SYSTEMTIME& stime1, SYSTEMTIME& stime2);
+bool  operator>(SYSTEMTIME& stime1, SYSTEMTIME& stime2);
+bool  operator>=(SYSTEMTIME& stime1, SYSTEMTIME& stime2);
+bool  operator<(SYSTEMTIME& stime1, SYSTEMTIME& stime2);
+bool  operator<=(SYSTEMTIME& stime1, SYSTEMTIME& stime2);
 uint64 operator-(const SYSTEMTIME& stime1, const SYSTEMTIME& stime2);
 
 SYSTEMTIME& operator<<(SYSTEMTIME& stime, TCHAR* tszDateTime);
@@ -49,29 +49,29 @@ void    GetYesterday(TCHAR* ptszDate);
 
 time_t	GetTimestampToDateTime(const SYSTEMTIME tTime);
 time_t	GetTimestampToDateTime(const TCHAR* ptszDateTime);
-BOOL	GetSystemTimeToTimestamp(SYSTEMTIME& tTime, const time_t timestamp);
-BOOL	GetDateTimeToTimestamp(TCHAR* ptszDateTime, const time_t timestamp);
+bool	GetSystemTimeToTimestamp(SYSTEMTIME& tTime, const time_t timestamp);
+bool	GetDateTimeToTimestamp(TCHAR* ptszDateTime, const time_t timestamp);
 
-BOOL	IsValidDateTime(const TCHAR* ptszDateTime);
-BOOL	IsValidDate(const TCHAR* ptszDate);
-BOOL	IsValidTime(const TCHAR* ptszTime);
+bool	IsValidDateTime(const TCHAR* ptszDateTime);
+bool	IsValidDate(const TCHAR* ptszDate);
+bool	IsValidTime(const TCHAR* ptszTime);
 
 int		CompareToday(const TCHAR* ptszDate);
 
-BOOL	GetDateIntervalDate(TCHAR* ptszDestDate, const TCHAR* ptszSrcDate, const int nInterval);
-BOOL	GetDateIntervalToday(TCHAR* ptszDate, const int nInterval);
-BOOL	GetIntervalSec(const TCHAR* ptszTime1, const TCHAR* ptszTime2, long& lSecInterval);
-BOOL	GetSqlTime(SQL_TIMESTAMP_STRUCT& stDateTime, const TCHAR* ptszDateTime);
-BOOL	GetSystemTime(SYSTEMTIME& tTime, const TCHAR* ptszDateTime);
+bool	GetDateIntervalDate(TCHAR* ptszDestDate, const TCHAR* ptszSrcDate, const int nInterval);
+bool	GetDateIntervalToday(TCHAR* ptszDate, const int nInterval);
+bool	GetIntervalSec(const TCHAR* ptszTime1, const TCHAR* ptszTime2, long& lSecInterval);
+bool	GetSqlTime(SQL_TIMESTAMP_STRUCT& stDateTime, const TCHAR* ptszDateTime);
+bool	GetSystemTime(SYSTEMTIME& tTime, const TCHAR* ptszDateTime);
 
-BOOL	GetMonthName(TCHAR* ptszMonthName, const int nMonth);
-BOOL	GetDayOfWeek(TCHAR* ptszDayOfWeek, const int nYear, const int nMonth, const int nDay);
+bool	GetMonthName(TCHAR* ptszMonthName, const int nMonth);
+bool	GetDayOfWeek(TCHAR* ptszDayOfWeek, const int nYear, const int nMonth, const int nDay);
 int		DayOfWeek(const int nYear, const int nMonth, const int nDay);
 
 int		CountOfFeb29(int nYear);
-BOOL	IsLeapYear(int nYear);
-BOOL	GetTimeOfSecond(TCHAR* ptszTime, const long lSecond);
-BOOL	GetTimeOfSecond(int& nHour, int& nMinute, int& nSec, const long lSecond);
+bool	IsLeapYear(int nYear);
+bool	GetTimeOfSecond(TCHAR* ptszTime, const long lSecond);
+bool	GetTimeOfSecond(int& nHour, int& nMinute, int& nSec, const long lSecond);
 
 void	GetGMTTime(TCHAR* ptszStdDateTime, SYSTEMTIME sTime);
 void	ConvertLocaltimeToGMT(time_t& dest, const time_t& src);

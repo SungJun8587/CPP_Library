@@ -34,7 +34,7 @@ CMySQLConnPool::~CMySQLConnPool(void)
 
 //***************************************************************************
 //
-BOOL CMySQLConnPool::Init(const char* pszDBHost, const char* pszDBUserId, const char* pszDBPasswd, const char* pszDBName, const uint32 uiPort)
+bool CMySQLConnPool::Init(const char* pszDBHost, const char* pszDBUserId, const char* pszDBPasswd, const char* pszDBName, const uint32 uiPort)
 {
 	clear();
 
@@ -59,7 +59,7 @@ BOOL CMySQLConnPool::Init(const char* pszDBHost, const char* pszDBUserId, const 
 
 //***************************************************************************
 //
-BOOL CMySQLConnPool::Init(const wchar_t* pwszDBHost, const wchar_t* pwszDBUserId, const wchar_t* pwszDBPasswd, const wchar_t* pwszDBName, const uint32 uiPort)
+bool CMySQLConnPool::Init(const wchar_t* pwszDBHost, const wchar_t* pwszDBUserId, const wchar_t* pwszDBPasswd, const wchar_t* pwszDBName, const uint32 uiPort)
 {
 	clear();
 

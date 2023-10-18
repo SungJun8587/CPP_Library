@@ -30,10 +30,10 @@ public:
 	int Push(st_DBAsyncRq* pAsyncRq);
 	st_DBAsyncRq* Pop();
 
-	BOOL StartService(INT32 nMaxThreadCnt, std::vector<DBNode> DBNodeVec);
-	BOOL Action();
+	bool StartService(INT32 nMaxThreadCnt, std::vector<DBNode> DBNodeVec);
+	bool Action();
 
-	BOOL InitMySQL(INT32 nMaxThreadCnt, std::vector<DBNode> DBNodeVec);
+	bool InitMySQL(INT32 nMaxThreadCnt, std::vector<DBNode> DBNodeVec);
 
 	CMySQLConnPool* GetMySQLConnPool(uint64 m_nID);
 

@@ -29,13 +29,14 @@ namespace SECURITY
 {
 	inline void Encrypt(char* pBuf, __int64& refKey, __int32 nLen)
 	{
-		if (nLen <= 0)
+		if( nLen <= 0 )
 			return;
 
 		char* pKey = (char*)(&refKey);
 
 		pBuf[0] = pBuf[0] ^ pKey[0];
-		for (__int32 i = 1; i < nLen; ++i) {
+		for( __int32 i = 1; i < nLen; ++i )
+		{
 			pBuf[i] = pBuf[i] ^ pBuf[i - 1] ^ pKey[i & 7];
 		}
 
@@ -44,7 +45,7 @@ namespace SECURITY
 
 	inline void Decrypt(char* pBuf, __int64& refKey, __int32 nLen)
 	{
-		if (nLen <= 0)
+		if( nLen <= 0 )
 			return;
 
 		char* pKey = (char*)(&refKey);
@@ -53,7 +54,7 @@ namespace SECURITY
 
 		source = pBuf[0];
 		pBuf[0] = pBuf[0] ^ pKey[0];
-		for (__int32 i = 1; i<nLen; ++i)
+		for( __int32 i = 1; i < nLen; ++i )
 		{
 			next_source = pBuf[i];
 			pBuf[i] = pBuf[i] ^ source ^ pKey[i & 7];
@@ -64,44 +65,70 @@ namespace SECURITY
 	}
 }
 
-/*
 //***************************************************************************
-//
-__inline std::string &ltrim(std::string &s)
+// 
+inline _tstring ltrim(const _tstring& s, const TCHAR* t = _T(" \t\n\r\f\v"))
 {
-	s.erase(s.begin(), std::find_if(s.begin(), s.end(), std::not1(std::ptr_fun<__int32, __int32>(std::isspace))));
-	return s;
+	size_t start = s.find_first_not_of(t);
+	return (start == _tstring::npos) ? _T("") : s.substr(start);
+}
+
+//***************************************************************************
+// 
+inline _tstring rtrim(const _tstring& s, const TCHAR* t = _T(" \t\n\r\f\v"))
+{
+	size_t end = s.find_last_not_of(t);
+	return (end == std::string::npos) ? _T("") : s.substr(0, end + 1);
+}
+
+//***************************************************************************
+// 
+inline _tstring trim(const _tstring& s, const TCHAR* t = _T(" \t\n\r\f\v"))
+{
+	return rtrim(ltrim(s, t));
 }
 
 //***************************************************************************
 //
-__inline std::string &rtrim(std::string &s)
+__inline _tstring replaceAll(const _tstring& message, const _tstring& pattern, const _tstring& replace)
 {
-	s.erase(std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
-	return s;
-}
-*/
+	_tstring result = message;
+	size_t pos = 0;
+	size_t offset = 0;
 
-//***************************************************************************
-//
-__inline std::string format_arg_list(const char *fmt, va_list args)
-{
-	if (!fmt) return "";
-	__int32   result = -1, length = 256;
-	char *buffer = 0;
-	while (result == -1)
+	while( (pos = result.find(pattern, offset)) != _tstring::npos )
 	{
-		if (buffer) delete [] buffer;
-		buffer = new char [length + 1];
-		memset(buffer, 0, length + 1);
+		result.replace(result.begin() + pos, result.begin() + pos + pattern.size(), replace);
+		offset = pos + replace.size();
+	}
+
+	return result;
+}
+
+//***************************************************************************
+//
+__inline _tstring format_arg_list(const TCHAR* ptszFmt, va_list args)
+{
+	if( !ptszFmt ) return _T("");
+
+	__int32 result = -1, length = 256;
+	TCHAR* ptszBuffer = 0;
+
+	while( result == -1 )
+	{
+		if( ptszBuffer ) delete [] ptszBuffer;
+		ptszBuffer = new TCHAR[length + 1];
+		memset(ptszBuffer, 0, length + 1);
+
 #pragma warning(push)
 #pragma warning(disable:4996)
-		result = _vsnprintf(buffer, length, fmt, args);
+		result = _vsntprintf(ptszBuffer, length, ptszFmt, args);
 #pragma warning(pop)
 		length *= 2;
 	}
-	std::string s(buffer);
-	delete [] buffer;
+	_tstring s(ptszBuffer);
+	delete [] ptszBuffer;
+
 	return s;
 }
 
@@ -114,6 +141,8 @@ T random(T minimum, T maximum)
 	return distribution(engine);
 }
 
+void		GetDBDSNString(TCHAR* ptszDSN, const DB_CLASS dbClass, const TCHAR* ptszDBHost, const unsigned int nPort, const TCHAR* ptszDBUserId, const TCHAR* ptszDBPasswd, const TCHAR* ptszDBName);
+DB_CLASS	GetInt8ToDBClass(uint8 num);
 uint32		GetUInt32(const char* pszText);
 uint64		GetUInt64(const char* pszText);
 uint32		GetUInt32(const wchar_t* pwszText);

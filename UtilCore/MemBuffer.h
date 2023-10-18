@@ -46,20 +46,24 @@ void	MemBufferDestroy(MEMORY_CHAR_BUFFER* pMemBuffer);
 template<class TYPE> class CMemBuffer
 {
 public:
-	CMemBuffer() {
+	CMemBuffer()
+	{
 		m_pBuffer = NULL;
 		m_nBufSize = 0;
+		m_nBufLength = 0;
 	}
 
-	~CMemBuffer() {
+	~CMemBuffer()
+	{
 		Destroy();
 	}
 
-	void Init(size_t nBufSize) {
+	void Init(size_t nBufSize)
+	{
 		const char* pszTypeName = typeid(TYPE).name();
 
 		if( strcmp(pszTypeName, "wchar_t") == 0 )
-			m_nBufSize = sizeof(wchar_t) * nBufSize;
+			m_nBufSize = sizeof(wchar_t) * nBufSize - 1;
 		else m_nBufSize = nBufSize;
 
 		if( m_nBufSize < nBufSize ) Destroy();
@@ -71,7 +75,8 @@ public:
 #endif
 
 		memset(m_pBuffer, 0, m_nBufSize);
-}
+		m_nBufLength = nBufSize;
+	}
 
 	void Destroy()
 	{
@@ -84,20 +89,32 @@ public:
 #endif
 			m_pBuffer = NULL;
 			m_nBufSize = 0;
-	}
+			m_nBufLength = 0;
+		}
 	}
 
-	TYPE* GetBuffer() const {
+	// 버퍼 포인터
+	TYPE* GetBuffer() const
+	{
 		return m_pBuffer;
 	}
 
-	size_t GetBufSize() const {
+	// 버퍼에 할당된 바이트 수 : 바이트 수 + 1('\0')
+	size_t GetBufSize() const
+	{
 		return m_nBufSize;
 	}
 
+	// 버퍼에 저장된 문자 수 : 문자 수 + 1('\0')
+	size_t GetBufLength() const
+	{
+		return m_nBufLength;
+	}
+
 public:
-	TYPE* m_pBuffer;
-	size_t	m_nBufSize;
-	};
+	TYPE* m_pBuffer;		// 버퍼 포인터
+	size_t	m_nBufSize;		// 버퍼에 할당된 바이트 수 : 바이트 수 + 1('\0')
+	size_t  m_nBufLength;	// 버퍼에 저장된 문자 수 : 문자 수 + 1('\0')
+};
 
 #endif // ndef __MEMBUFFER_H__

@@ -65,7 +65,7 @@ bool CEventLog::EventLog(TCHAR* ptszLog, bool bFlag)
 #ifdef _UNICODE
 		char szBuffer[EVENTLOG_MAX_BUFFER_SIZE];
 
-		if( !WideCharToMultiByteStr(szBuffer, _countof(szBuffer), tszBuffer) )
+		if( !UnicodeToAnsi(szBuffer, _countof(szBuffer), tszBuffer, wcslen(tszBuffer) + 1) )
 		{
 			return false;
 		}
@@ -122,7 +122,7 @@ bool CEventLog::EventLog(bool bFlag, TCHAR* ptszFormat, ...)
 #ifdef _UNICODE
 		char szBuffer[EVENTLOG_MAX_BUFFER_SIZE];
 
-		if( !WideCharToMultiByteStr(szBuffer, _countof(szBuffer), tszBuffer) )
+		if( !UnicodeToAnsi(szBuffer, _countof(szBuffer), tszBuffer, wcslen(tszBuffer) + 1) )
 		{
 			return false;
 		}
@@ -158,7 +158,7 @@ bool CEventLog::LogString()
 #ifdef _UNICODE
 		char szBuffer[EVENTLOG_MAX_BUFFER_SIZE];
 
-		if( !WideCharToMultiByteStr(szBuffer, _countof(szBuffer), m_tszBuffer) )
+		if( !UnicodeToAnsi(szBuffer, _countof(szBuffer), m_tszBuffer, wcslen(m_tszBuffer) + 1) )
 		{
 			return false;
 		}

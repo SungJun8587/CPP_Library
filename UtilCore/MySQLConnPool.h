@@ -21,8 +21,8 @@ public:
 	CMySQLConnPool(int32& nMaxThreadCnt);
 	virtual ~CMySQLConnPool(void);
 
-	BOOL		Init(const char* pszDBHost, const char* pszDBUserId, const char* pszDBPasswd, const char* pszDBName, const uint32 uiPort);
-	BOOL		Init(const wchar_t* pwszDBHost, const wchar_t* pwszDBUserId, const wchar_t* pwszDBPasswd, const wchar_t* pwszDBName, const uint32 uiPort);
+	bool		Init(const char* pszDBHost, const char* pszDBUserId, const char* pszDBPasswd, const char* pszDBName, const uint32 uiPort);
+	bool		Init(const wchar_t* pwszDBHost, const wchar_t* pwszDBUserId, const wchar_t* pwszDBPasswd, const wchar_t* pwszDBName, const uint32 uiPort);
 	CBaseMySQL*	GetMySQLConn(int32 nType);
 
 protected:

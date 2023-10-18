@@ -9,34 +9,11 @@
 
 #pragma once
 
-#define SVR									CServiceSvr::GetSvrInstance()
-#define TLS_IDX								CThreadManager::GetTlsValue()
-#define SERVER_CONFIG						CServerConfig::GetSingletonPtr()
-
-#define CRASH								{ char *p = 0; *p = 1; }
-#define SAFE_DELETE(p)						{ if ( p ) delete p; p = nullptr; } 
-#define SAFE_DELETE_ARRAY(p)				{ if ( p ) delete[] p; p = nullptr; }
-
-#ifdef _UNICODE
-#	define _tmemset			wmemset
-#	define _tmemcpy			wmemcpy
-#	define __TFUNCTION__	__FUNCTIONW__
-#else
-#	define _tmemset			memset
-#	define _tmemcpy			memcpy
-#	define __TFUNCTION__	__FUNCTION__
-#endif
-
-#if (_WIN32_WINNT >= 0x0600)
-#define _GetTickCount	GetTickCount64
-#else
-#define _GetTickCount	GetTickCount
-#endif
-
 //***************************************************************************
 //
-enum DB_CLASS
+enum class DB_CLASS : unsigned char
 {
+	DB_NONE = 0,
 	DB_MSSQL = 1,
 	DB_MYSQL,
 	DB_ORACLE
@@ -44,12 +21,23 @@ enum DB_CLASS
 
 //***************************************************************************
 //
-enum DB_RETURN_TYPE
+enum class DB_RETURN_TYPE : short
 {
-	DB_RETURN_TYPE_INVAlID = -1,
-	DB_RETURN_TYPE_OK = 0,
-	DB_RETURN_TYPE_TIMEOUT,
-	DB_RETURN_TYPE_FETCH_NOT_FIND,
+	INVALID = -1,
+	OK = 0,
+	TIMEOUT,
+	FETCH_NOT_FIND,
+};
+
+//***************************************************************************
+//
+enum class DB_OBJECT : unsigned char
+{
+	TABLE = 1,
+	PROCEDURE,
+	FUNCTION,
+	TRIGGERS,
+	EVENTS
 };
 
 //***************************************************************************
@@ -143,6 +131,8 @@ enum DB_RETURN_TYPE
 #define DATABASE_CHARACTERSET_STRLEN				20
 #define DATABASE_TABLE_NAME_STRLEN					128
 #define DATABASE_COLUMN_NAME_STRLEN					128
+#define DATABASE_OBJECT_NAME_STRLEN					128
+#define DATABASE_DATATYPEDESC_STRLEN				128
 
 #define DATABASE_SCHEDULE_TIME_STRLEN				8
 
@@ -153,10 +143,16 @@ enum DB_RETURN_TYPE
 #define DATABASE_BUFFER_SIZE						2048
 #define DATABASE_ERRORMSG_STRLEN					4096	
 
+#define DATABASE_VARCHAR_MAX						8000
+#define DATABASE_WVARCHAR_MAX						4000
+#define DATABASE_BINARY_MAX							8000
+
 #define MYSQL_MAX_MESSAGE_LENGTH					512
 #define MYSQL_DEFAULT_CONNECTION_TIMEOUT			2
 #define MYSQL_DEFAULT_QUERY_READ_TIMEOUT			2
 #define MYSQL_DEFAULT_QUERY_WRITE_TIMEOUT			2
+
+#define DATABASE_OBJECT_CONTENTTEXT_STRLEN			10000
 
 #define	SERVICE_INSTALL						_T("install")
 #define	SERVICE_UNINSTALL					_T("uninstall")
@@ -169,7 +165,8 @@ enum DB_RETURN_TYPE
 #define DEADLOCK_STAMP_FREQ				(5*1000)			// Dead Lock 인지 체크 주기 (5 sec.)
 #define DEADLOCK_STAMP_CNT				10					// DEADLOCK_STAMP_FREQ(5초)주기로 10번 체크하여 Count가 0이 되면 서버 강제종료(30 sec.)
 
-#define _CONSOLE_LOG
+//#define _CONSOLE_LOG
+#define _FILE_LOG
 
 //End************************************************************************
 //***************************************************************************

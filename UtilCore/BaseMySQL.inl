@@ -1,7 +1,7 @@
 //***************************************************************************
 // 
 template< typename _TMain >
-BOOL CBaseMySQL::BindParam(_TMain tValue)
+bool CBaseMySQL::BindParam(_TMain tValue)
 {
 	if( m_pStmt == NULL )
 	{

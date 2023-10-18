@@ -80,6 +80,7 @@ public:
 	{
 		m_dbParamAttr.SetParamAttr(odbc_param_attr<DataType>::c_data_type, odbc_param_attr<DataType>::sql_data_type, odbc_param_attr<DataType>::param_size);
 		m_dbParamAttr.SetValue(&data, sizeof(DataType));
+
 		return m_dbParamAttr;
 	}
 
@@ -87,8 +88,9 @@ public:
 	{
 		m_dbParamAttr.SetParamAttr(odbc_param_attr<CHAR*>::c_data_type, odbc_param_attr<CHAR*>::sql_data_type, odbc_param_attr<CHAR*>::param_size);
 
-		m_dbParamAttr.SetValue(data, static_cast<int32>(strlen(data)));
-		m_dbParamAttr.m_nParamSize = (SQLULEN)strlen(data) + 1;
+		int32 nBuffSize = static_cast<int32>(strlen(data));
+		m_dbParamAttr.SetValue(data, nBuffSize);
+		m_dbParamAttr.m_nParamSize = (SQLULEN)nBuffSize + 1;
 
 		return m_dbParamAttr;
 	}

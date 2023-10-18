@@ -11,10 +11,22 @@
 // Construction/Destruction 
 //***************************************************************************
 
-CBaseODBC::CBaseODBC(bool bLoadExcelFile /*= false*/)
+CBaseODBC::CBaseODBC(const DB_CLASS dbClass, const bool bLoadExcelFile /*= false*/)
+	: m_hEnv(NULL), m_hConn(NULL), m_hStmt(NULL), m_DbClass(dbClass), m_nParamNum(0), m_nColNum(0), m_nFetchedRows(0)
+	, m_bLoadExcelFile(bLoadExcelFile)
+{
+	memset(m_tszDSN, 0, sizeof(m_tszDSN));
+	memset(m_tszQueryInfo, 0, sizeof(m_tszQueryInfo));
+	memset(m_tszLastError, 0, sizeof(m_tszLastError));
+}
+
+CBaseODBC::CBaseODBC(const DB_CLASS dbClass, const TCHAR* ptszDSN, const bool bLoadExcelFile /*= false*/)
 	: m_hEnv(NULL), m_hConn(NULL), m_hStmt(NULL), m_nParamNum(0), m_nColNum(0), m_nFetchedRows(0)
 	, m_bLoadExcelFile(bLoadExcelFile)
 {
+	m_DbClass = dbClass;
+	_tcsncpy_s(m_tszDSN, _countof(m_tszDSN), ptszDSN, _TRUNCATE);
+
 	memset(m_tszQueryInfo, 0, sizeof(m_tszQueryInfo));
 	memset(m_tszLastError, 0, sizeof(m_tszLastError));
 }
@@ -28,7 +40,7 @@ CBaseODBC::~CBaseODBC()
 
 //***************************************************************************
 //
-BOOL CBaseODBC::InitEnvHandle(void)
+bool CBaseODBC::InitEnvHandle(void)
 {
 	if( SQL_SUCCESS != SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &m_hEnv) )
 		return false;
@@ -42,7 +54,7 @@ BOOL CBaseODBC::InitEnvHandle(void)
 
 //***************************************************************************
 //
-BOOL CBaseODBC::InitConnHandle(const LONG_PTR lLoginTimeOut, const LONG_PTR lConnectionTimeOut)
+bool CBaseODBC::InitConnHandle(const LONG_PTR lLoginTimeOut, const LONG_PTR lConnectionTimeOut)
 {
 	if( SQL_SUCCESS != SQLAllocHandle(SQL_HANDLE_DBC, m_hEnv, &m_hConn) )
 		return false;
@@ -58,7 +70,7 @@ BOOL CBaseODBC::InitConnHandle(const LONG_PTR lLoginTimeOut, const LONG_PTR lCon
 
 //***************************************************************************
 //
-BOOL CBaseODBC::InitStmtHandle(const LONG_PTR lQueryTimeOut)
+bool CBaseODBC::InitStmtHandle(const LONG_PTR lQueryTimeOut)
 {
 	if( SQL_SUCCESS != SQLAllocHandle(SQL_HANDLE_STMT, m_hConn, (SQLHSTMT*)&m_hStmt) )
 		return false;
@@ -75,6 +87,8 @@ BOOL CBaseODBC::InitStmtHandle(const LONG_PTR lQueryTimeOut)
 	return true;
 }
 
+//***************************************************************************
+//
 void CBaseODBC::ClearStmt(void)
 {
 	if( m_hStmt )
@@ -85,11 +99,13 @@ void CBaseODBC::ClearStmt(void)
 	}
 
 	_tcsncpy_s(m_tszQueryInfo, SQL_MAX_MESSAGE_LENGTH, _T(""), _TRUNCATE);
+	m_nParamNum = 0;
+	m_nColNum = 0;
 }
 
 //***************************************************************************
 //
-BOOL CBaseODBC::Connect(TCHAR* ptszDSN)
+bool CBaseODBC::Connect()
 {
 	TCHAR tszOutConnStr[DATABASE_BUFFER_SIZE];
 	SQLRETURN nRet;
@@ -97,7 +113,7 @@ BOOL CBaseODBC::Connect(TCHAR* ptszDSN)
 
 	if( m_hConn ) return false;
 
-	if( !ptszDSN )
+	if( !m_tszDSN )
 		return false;
 
 	try
@@ -109,9 +125,9 @@ BOOL CBaseODBC::Connect(TCHAR* ptszDSN)
 			throw 0;
 
 #ifdef _UNICODE
-		nRet = SQLDriverConnect(m_hConn, NULL, (SQLWCHAR*)ptszDSN, (SQLSMALLINT)_tcslen(ptszDSN), (SQLWCHAR*)tszOutConnStr, DATABASE_BUFFER_SIZE, &nLen, SQL_DRIVER_NOPROMPT);
+		nRet = SQLDriverConnect(m_hConn, NULL, (SQLWCHAR*)m_tszDSN, (SQLSMALLINT)_tcslen(m_tszDSN), (SQLWCHAR*)tszOutConnStr, DATABASE_BUFFER_SIZE, &nLen, SQL_DRIVER_NOPROMPT);
 #else
-		nRet = SQLDriverConnect(m_hConn, NULL, (SQLCHAR*)ptszDSN, (SQLSMALLINT)_tcslen(ptszDSN), (SQLCHAR*)tszOutConnStr, DATABASE_BUFFER_SIZE, &nLen, SQL_DRIVER_NOPROMPT);
+		nRet = SQLDriverConnect(m_hConn, NULL, (SQLCHAR*)m_tszDSN, (SQLSMALLINT)_tcslen(m_tszDSN), (SQLCHAR*)tszOutConnStr, DATABASE_BUFFER_SIZE, &nLen, SQL_DRIVER_NOPROMPT);
 #endif
 
 		if( nRet != SQL_SUCCESS && nRet != SQL_SUCCESS_WITH_INFO )
@@ -136,7 +152,7 @@ BOOL CBaseODBC::Connect(TCHAR* ptszDSN)
 
 //***************************************************************************
 //	
-BOOL CBaseODBC::Disconnect()
+bool CBaseODBC::Disconnect()
 {
 	SQLRETURN nRet;
 
@@ -178,7 +194,7 @@ BOOL CBaseODBC::Disconnect()
 
 //***************************************************************************
 //	
-BOOL CBaseODBC::IsConnected()
+bool CBaseODBC::IsConnected()
 {
 	if( !m_hConn ) return false;
 
@@ -196,12 +212,40 @@ BOOL CBaseODBC::IsConnected()
 
 //***************************************************************************
 //	
-BOOL CBaseODBC::PrepareQuery(TCHAR* ptszQueryInfo)
+bool CBaseODBC::DBMSInfo(TCHAR* ptszServerName, TCHAR* ptszDBMSName, TCHAR* ptszDBMSVersion)
+{
+	SQLRETURN nRet;
+	SQLSMALLINT buffSize;
+
+#ifdef _UNICODE	
+	nRet = SQLGetInfo(m_hConn, SQL_SERVER_NAME, (SQLWCHAR*)ptszServerName, (SQLSMALLINT)DATABASE_BUFFER_SIZE, (SQLSMALLINT*)&buffSize);
+	if( SQL_SUCCESS != nRet ) return false;
+
+	nRet = SQLGetInfo(m_hConn, SQL_DBMS_NAME, (SQLWCHAR*)ptszDBMSName, (SQLSMALLINT)DATABASE_BUFFER_SIZE, (SQLSMALLINT*)&buffSize);
+	if( SQL_SUCCESS != nRet ) return false;
+
+	nRet = SQLGetInfo(m_hConn, SQL_DBMS_VER, (SQLWCHAR*)ptszDBMSVersion, (SQLSMALLINT)DATABASE_BUFFER_SIZE, (SQLSMALLINT*)&buffSize);
+	if( SQL_SUCCESS != nRet ) return false;
+#else
+	nRet = SQLGetInfo(m_hConn, SQL_SERVER_NAME, (SQLCHAR*)ptszServerName, (SQLSMALLINT)DATABASE_BUFFER_SIZE, (SQLSMALLINT*)&buffSize);
+	if( SQL_SUCCESS != nRet ) return false;
+
+	nRet = SQLGetInfo(m_hConn, SQL_DBMS_NAME, (SQLCHAR*)ptszDBMSName, (SQLSMALLINT)DATABASE_BUFFER_SIZE, (SQLSMALLINT*)&buffSize);
+	if( SQL_SUCCESS != nRet ) return false;
+
+	nRet = SQLGetInfo(m_hConn, SQL_DBMS_VER, (SQLCHAR*)ptszDBMSVersion, (SQLSMALLINT)DATABASE_BUFFER_SIZE, (SQLSMALLINT*)&buffSize);
+	if( SQL_SUCCESS != nRet ) return false;
+#endif	
+
+	return true;
+}
+
+//***************************************************************************
+//	
+bool CBaseODBC::PrepareQuery(const TCHAR* ptszQueryInfo)
 {
 	ClearStmt();
 
-	m_nParamNum = 0;
-	m_nColNum = 0;
 	_tcsncpy_s(m_tszQueryInfo, SQL_MAX_MESSAGE_LENGTH, ptszQueryInfo, _TRUNCATE);
 
 	SQLRETURN nRet;
@@ -225,7 +269,7 @@ BOOL CBaseODBC::PrepareQuery(TCHAR* ptszQueryInfo)
 
 //***************************************************************************
 //	
-BOOL CBaseODBC::Execute()
+bool CBaseODBC::Execute()
 {
 	SQLRETURN nRet;
 
@@ -253,7 +297,7 @@ BOOL CBaseODBC::Execute()
 
 //***************************************************************************
 //	
-BOOL CBaseODBC::ExecDirect(TCHAR* ptszQueryInfo)
+bool CBaseODBC::ExecDirect(const TCHAR* ptszQueryInfo)
 {
 	SQLRETURN nRet;
 
@@ -276,7 +320,7 @@ BOOL CBaseODBC::ExecDirect(TCHAR* ptszQueryInfo)
 	{
 		TCHAR	tszMessage[SQL_MAX_MESSAGE_LENGTH] = { 0, };
 		CDBError()(SQL_HANDLE_STMT, m_hStmt, tszMessage);
-		LOG_ERROR(_T("%s, QueryInfo[%s], Ret[%d], ErrorMsg : %s"), __TFUNCTION__, m_tszQueryInfo, nRet, tszMessage);
+		LOG_ERROR(_T("%s, QueryInfo[%s], Ret[%d], ErrorMsg : %s"), __TFUNCTION__, ptszQueryInfo, nRet, tszMessage);
 		return false;
 	}
 
@@ -285,7 +329,7 @@ BOOL CBaseODBC::ExecDirect(TCHAR* ptszQueryInfo)
 
 //***************************************************************************
 //
-BOOL CBaseODBC::AllSets(LONG_PTR nQueryResultRecordSize, LONG_PTR nMaxRowSize)
+bool CBaseODBC::AllSets(LONG_PTR nQueryResultRecordSize, LONG_PTR nMaxRowSize)
 {
 	SQLRETURN nRet = SQL_ERROR;
 
@@ -309,7 +353,7 @@ BOOL CBaseODBC::AllSets(LONG_PTR nQueryResultRecordSize, LONG_PTR nMaxRowSize)
 
 //***************************************************************************
 //	
-BOOL CBaseODBC::Fetch(void)
+bool CBaseODBC::Fetch(void)
 {
 	SQLRETURN nRet = SQLFetch(m_hStmt);
 	if( SQL_SUCCESS != nRet && SQL_SUCCESS_WITH_INFO != nRet )
@@ -345,7 +389,7 @@ SQLRETURN CBaseODBC::MoreResults(void)
 
 //***************************************************************************
 //	
-BOOL CBaseODBC::AutoCommitOff(void)
+bool CBaseODBC::AutoCommitOff(void)
 {
 	if( NULL == m_hConn )
 		return false;
@@ -358,7 +402,7 @@ BOOL CBaseODBC::AutoCommitOff(void)
 
 //***************************************************************************
 //	
-BOOL CBaseODBC::Commit()
+bool CBaseODBC::Commit()
 {
 	SQLRETURN	nRet;
 
@@ -369,7 +413,7 @@ BOOL CBaseODBC::Commit()
 
 //***************************************************************************
 //	
-BOOL CBaseODBC::Rollback()
+bool CBaseODBC::Rollback()
 {
 	SQLRETURN	nRet;
 
@@ -380,7 +424,7 @@ BOOL CBaseODBC::Rollback()
 
 //***************************************************************************
 //	
-BOOL CBaseODBC::AutoCommitOn(void)
+bool CBaseODBC::AutoCommitOn(void)
 {
 	if( NULL == m_hConn )
 		return false;
@@ -393,13 +437,30 @@ BOOL CBaseODBC::AutoCommitOn(void)
 
 //***************************************************************************
 //	
-BOOL CBaseODBC::BindParamInput(TCHAR* ptszValue)
+bool CBaseODBC::BindParamInput(int32 iParamIndex, const TCHAR* ptszValue, SQLLEN& lRetSize)
 {
-	CDBParamAttr& dbParam = m_DBParamAttrMgr(ptszValue);
+	SQLSMALLINT nCDataType = SQL_C_DEFAULT;
+	SQLSMALLINT nSqlDataType = SQL_VARCHAR;
+	SQLULEN nBuffSize = 0;
 
-	SQLRETURN nRet = SQLBindParameter(m_hStmt, ++m_nParamNum, SQL_PARAM_INPUT, dbParam.m_nCDataType, dbParam.m_nSqlDataType, dbParam.m_nParamSize,
-									  0, dbParam.m_ptrBuff, dbParam.m_nBuffSize, NULL);
+#ifdef _UNICODE
+	nBuffSize = static_cast<SQLULEN>((::wcslen(ptszValue) + 1) * 2);
+	nCDataType = SQL_C_WCHAR;
+	if( nBuffSize > DATABASE_WVARCHAR_MAX )
+		nSqlDataType = SQL_WLONGVARCHAR;
+	else nSqlDataType = SQL_WVARCHAR;
+#else
+	nBuffSize = static_cast<SQLULEN>((::strlen(ptszValue) + 1));
+	nCDataType = SQL_C_CHAR;
+	if( nBuffSize > DATABASE_VARCHAR_MAX )
+		nSqlDataType = SQL_LONGVARCHAR;
+	else nSqlDataType = SQL_VARCHAR;
+#endif
 
+	lRetSize = SQL_NTSL;
+
+	SQLRETURN nRet = SQLBindParameter(m_hStmt, iParamIndex, SQL_PARAM_INPUT, nCDataType, nSqlDataType, nBuffSize,
+									  0, (SQLPOINTER)ptszValue, 0, &lRetSize);
 	if( SQL_SUCCESS != nRet )
 	{
 		TCHAR	tszMessage[SQL_MAX_MESSAGE_LENGTH] = { 0, };
@@ -412,40 +473,120 @@ BOOL CBaseODBC::BindParamInput(TCHAR* ptszValue)
 
 //***************************************************************************
 //	
-BOOL CBaseODBC::BindParamOutput(TCHAR* ptszValue, int32 nBuffSize)
+bool CBaseODBC::BindParamInput(int32 iParamIndex, const BYTE* pbData, int32 iSize, SQLLEN& lRetSize)
 {
-	CDBParamAttr& dbParam = m_DBParamAttrMgr(ptszValue, nBuffSize);
+	SQLSMALLINT cType = SQL_C_BINARY;
+	SQLSMALLINT sqlType;
 
-	SQLRETURN nRet = SQLBindParameter(m_hStmt, ++m_nParamNum, SQL_PARAM_OUTPUT, dbParam.m_nCDataType, dbParam.m_nSqlDataType, dbParam.m_nParamSize,
-									  0, dbParam.m_ptrBuff, dbParam.m_nBuffSize, (SQLLEN*)&dbParam.m_nBuffSize);
+	if( pbData == nullptr )
+	{
+		lRetSize = SQL_NULL_DATA;
+		iSize = 1;
+	}
+	else
+		lRetSize = iSize;
 
+	if( iSize > DATABASE_BINARY_MAX )
+		sqlType = SQL_LONGVARBINARY;
+	else sqlType = SQL_BINARY;
+
+	SQLRETURN nRet = SQLBindParameter(m_hStmt, iParamIndex, SQL_PARAM_INPUT, cType, sqlType, iSize, 0, (BYTE*)pbData, 0, &lRetSize);
 	if( SQL_SUCCESS != nRet )
 	{
 		TCHAR	tszMessage[SQL_MAX_MESSAGE_LENGTH] = { 0, };
 		CDBError()(SQL_HANDLE_STMT, m_hStmt, tszMessage);
-		LOG_ERROR(_T("%s, QueryInfo[%s], tValue[%s,%d], ErrorMsg : %s"), __TFUNCTION__, m_tszQueryInfo, ptszValue, nBuffSize, tszMessage);
+		LOG_ERROR(_T("%s, QueryInfo[%s], ErrorMsg : %s"), __TFUNCTION__, m_tszQueryInfo, tszMessage);
 		return false;
 	}
-
 	return true;
 }
 
 //***************************************************************************
 //	
-BOOL CBaseODBC::BindCol(TCHAR* ptszValue, int32 nBuffSize)
+bool CBaseODBC::BindParamOutput(int32 iParamIndex, TCHAR* ptszValue, int32& iBuffSize, SQLLEN& lRetSize)
 {
-	long	lRetSize = 0;
+	CDBParamAttr& dbParam = m_DBParamAttrMgr(ptszValue, iBuffSize);
 
-	CDBColAttr& dbCol = m_DBColAttrMgr(ptszValue, nBuffSize);
-
-	SQLRETURN nRet = SQLBindCol(m_hStmt, ++m_nColNum, dbCol.m_nTargetType, dbCol.m_ptrBuff, dbCol.m_nBuffSize, (SQLLEN*)&lRetSize);
+	SQLRETURN nRet = SQLBindParameter(m_hStmt, iParamIndex, SQL_PARAM_OUTPUT, dbParam.m_nCDataType, dbParam.m_nSqlDataType, dbParam.m_nParamSize,
+									  0, dbParam.m_ptrBuff, dbParam.m_nBuffSize, &lRetSize);
 	if( SQL_SUCCESS != nRet )
 	{
 		TCHAR	tszMessage[SQL_MAX_MESSAGE_LENGTH] = { 0, };
 		CDBError()(SQL_HANDLE_STMT, m_hStmt, tszMessage);
-		LOG_ERROR(_T("%s, QueryInfo[%s], tValue[%s,%d], ErrorMsg : %s"), __TFUNCTION__, m_tszQueryInfo, ptszValue, nBuffSize, tszMessage);
+		LOG_ERROR(_T("%s, QueryInfo[%s], tValue[%s,%d], ErrorMsg : %s"), __TFUNCTION__, m_tszQueryInfo, ptszValue, iBuffSize, tszMessage);
 		return false;
 	}
+	return true;
+}
+
+//***************************************************************************
+//	
+bool CBaseODBC::BindCol(int32 iParamIndex, TCHAR* ptszValue, int32& iBuffSize, SQLLEN& lRetSize)
+{
+	CDBColAttr& dbCol = m_DBColAttrMgr(ptszValue, iBuffSize);
+
+	SQLRETURN nRet = SQLBindCol(m_hStmt, iParamIndex, dbCol.m_nTargetType, dbCol.m_ptrBuff, dbCol.m_nBuffSize, &lRetSize);
+	if( SQL_SUCCESS != nRet )
+	{
+		TCHAR	tszMessage[SQL_MAX_MESSAGE_LENGTH] = { 0, };
+		CDBError()(SQL_HANDLE_STMT, m_hStmt, tszMessage);
+		LOG_ERROR(_T("%s, QueryInfo[%s], tValue[%s,%d], ErrorMsg : %s"), __TFUNCTION__, m_tszQueryInfo, ptszValue, iBuffSize, tszMessage);
+		return false;
+	}
+	return true;
+}
+
+//***************************************************************************
+//	
+bool CBaseODBC::BindParamInput(const TCHAR* ptszValue)
+{
+	CDBParamAttr& dbParam = m_DBParamAttrMgr((TCHAR*)ptszValue);
+
+	SQLRETURN nRet = SQLBindParameter(m_hStmt, ++m_nParamNum, SQL_PARAM_INPUT, dbParam.m_nCDataType, dbParam.m_nSqlDataType, dbParam.m_nParamSize,
+									  0, dbParam.m_ptrBuff, dbParam.m_nBuffSize, NULL);
+	if( SQL_SUCCESS != nRet )
+	{
+		TCHAR	tszMessage[SQL_MAX_MESSAGE_LENGTH] = { 0, };
+		CDBError()(SQL_HANDLE_STMT, m_hStmt, tszMessage);
+		LOG_ERROR(_T("%s, QueryInfo[%s], tValue[%s], ErrorMsg : %s"), __TFUNCTION__, m_tszQueryInfo, ptszValue, tszMessage);
+		return false;
+	}
+	return true;
+}
+
+//***************************************************************************
+//	
+bool CBaseODBC::BindParamOutput(TCHAR* ptszValue, int32& iBuffSize)
+{
+	CDBParamAttr& dbParam = m_DBParamAttrMgr(ptszValue, iBuffSize);
+
+	SQLRETURN nRet = SQLBindParameter(m_hStmt, ++m_nParamNum, SQL_PARAM_OUTPUT, dbParam.m_nCDataType, dbParam.m_nSqlDataType, dbParam.m_nParamSize,
+									  0, dbParam.m_ptrBuff, dbParam.m_nBuffSize, (SQLLEN*)&dbParam.m_nBuffSize);
+	if( SQL_SUCCESS != nRet )
+	{
+		TCHAR	tszMessage[SQL_MAX_MESSAGE_LENGTH] = { 0, };
+		CDBError()(SQL_HANDLE_STMT, m_hStmt, tszMessage);
+		LOG_ERROR(_T("%s, QueryInfo[%s], tValue[%s,%d], ErrorMsg : %s"), __TFUNCTION__, m_tszQueryInfo, ptszValue, iBuffSize, tszMessage);
+		return false;
+	}
+	return true;
+}
+
+//***************************************************************************
+//	
+bool CBaseODBC::BindCol(TCHAR* ptszValue, int32& iBuffSize)
+{
+	CDBColAttr& dbCol = m_DBColAttrMgr(ptszValue, iBuffSize);
+
+	SQLRETURN nRet = SQLBindCol(m_hStmt, ++m_nColNum, dbCol.m_nTargetType, dbCol.m_ptrBuff, dbCol.m_nBuffSize, NULL);
+	if( SQL_SUCCESS != nRet )
+	{
+		TCHAR	tszMessage[SQL_MAX_MESSAGE_LENGTH] = { 0, };
+		CDBError()(SQL_HANDLE_STMT, m_hStmt, tszMessage);
+		LOG_ERROR(_T("%s, QueryInfo[%s], tValue[%s,%d], ErrorMsg : %s"), __TFUNCTION__, m_tszQueryInfo, ptszValue, iBuffSize, tszMessage);
+		return false;
+	}
+	iBuffSize = dbCol.m_nBuffSize;
 
 	return true;
 }
@@ -464,26 +605,16 @@ short CBaseODBC::GetNumCols()
 
 //***************************************************************************
 //	
-long CBaseODBC::NumResults()
+int64 CBaseODBC::RowCount()
 {
-	long	temp;
-	short	temp_l = 0;
-
-	SQLGetInfo(m_hConn, SQL_BATCH_ROW_COUNT, &temp, 0, &temp_l);
-
-	return temp;
-}
-
-//***************************************************************************
-//	
-long CBaseODBC::RowCount()
-{
-	long		lRowCount;
+	int64		i64RowCount;
 	SQLRETURN	nRet;
 
-	nRet = SQLRowCount(m_hStmt, (SQLLEN*)&lRowCount);
+	nRet = SQLRowCount(m_hStmt, (SQLLEN*)&i64RowCount);
+	if( nRet == SQL_SUCCESS || nRet == SQL_SUCCESS_WITH_INFO )
+		return i64RowCount;
 
-	return lRowCount;
+	return -1;
 }
 
 //***************************************************************************
@@ -499,33 +630,34 @@ long CBaseODBC::RowNumber()
 
 //***************************************************************************
 //	
-BOOL CBaseODBC::DescribeCol(int nColNum, COL_DESCRIPTION& ColDescription)
+bool CBaseODBC::DescribeCol(int32 iColNum, COL_DESCRIPTION& ColDescription)
 {
 	SQLRETURN	nRet;
 
 #ifdef _UNICODE	
-	nRet = SQLDescribeCol(m_hStmt, nColNum, ColDescription.tszColName, DATABASE_COLUMN_NAME_STRLEN, &ColDescription.NameLength,
+	nRet = SQLDescribeCol(m_hStmt, iColNum, ColDescription.tszColName, DATABASE_COLUMN_NAME_STRLEN, &ColDescription.NameLength,
 						  &ColDescription.DataType, (SQLULEN*)&ColDescription.dwColSize, &ColDescription.DigitSize, &ColDescription.Nullable);
 #else
-	nRet = SQLDescribeCol(m_hStmt, nColNum, (SQLCHAR*)ColDescription.tszColName, DATABASE_COLUMN_NAME_STRLEN, &ColDescription.NameLength,
+	nRet = SQLDescribeCol(m_hStmt, iColNum, (SQLCHAR*)ColDescription.tszColName, DATABASE_COLUMN_NAME_STRLEN, &ColDescription.NameLength,
 						  &ColDescription.DataType, (SQLULEN*)&ColDescription.dwColSize, &ColDescription.DigitSize, &ColDescription.Nullable);
 #endif
 
-	nRet = SQLColAttribute(m_hStmt, nColNum, SQL_DESC_DISPLAY_SIZE, NULL, 0, NULL, (SQLLEN*)&ColDescription.DispLength);
+	nRet = SQLColAttribute(m_hStmt, iColNum, SQL_DESC_DISPLAY_SIZE, NULL, 0, NULL, (SQLLEN*)&ColDescription.DispLength);
 
 	return nRet == SQL_SUCCESS || nRet == SQL_SUCCESS_WITH_INFO;
 }
 
 //***************************************************************************
 //	
-BOOL CBaseODBC::GetData(int nColNum, TCHAR* ptszData, int nBufSize, long& lRetSize)
+bool CBaseODBC::GetData(int32 iColNum, TCHAR* ptszData, int32& iBufSize)
 {
+	long		lRetSize = 0;
 	SQLRETURN	nRet;
 
 #ifdef _UNICODE	
-	nRet = SQLGetData(m_hStmt, nColNum, SQL_C_CHAR, (SQLWCHAR*)ptszData, nBufSize, (SQLLEN*)&lRetSize);
+	nRet = SQLGetData(m_hStmt, iColNum, SQL_C_CHAR, (SQLWCHAR*)ptszData, iBufSize, (SQLLEN*)&lRetSize);
 #else
-	nRet = SQLGetData(m_hStmt, nColNum, SQL_C_CHAR, (SQLCHAR*)ptszData, nBufSize, (SQLLEN*)&lRetSize);
+	nRet = SQLGetData(m_hStmt, iColNum, SQL_C_CHAR, (SQLCHAR*)ptszData, iBufSize, (SQLLEN*)&lRetSize);
 #endif
 
 	if( lRetSize == SQL_NO_TOTAL || lRetSize == SQL_NULL_DATA )

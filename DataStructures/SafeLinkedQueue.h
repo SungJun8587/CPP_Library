@@ -18,7 +18,7 @@ class CSafeLinkedQueue : public CBaseLinkedQueue<TYPE>
 public:
 	int EnQueue(const TYPE Element);
 	int DeQueue(TYPE &Element);
-	BOOL IsEmpty();
+	bool IsEmpty();
 	int GetSize();
 
 #ifdef _UNICODE
@@ -68,7 +68,7 @@ int CSafeLinkedQueue<TYPE>::DeQueue(TYPE &Element)
 template<class TYPE>
 int CSafeLinkedQueue<TYPE>::IsEmpty()
 {
-	BOOL bRet;
+	bool bRet;
 
 	m_RWLock.SharedLock();
 	{

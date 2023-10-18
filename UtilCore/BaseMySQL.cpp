@@ -34,7 +34,7 @@ CBaseMySQL::~CBaseMySQL()
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::InitConnHandle(const int nConnectTimeOut, const int nReadTimeOut, const int nWriteTimeOut)
+bool CBaseMySQL::InitConnHandle(const int nConnectTimeOut, const int nReadTimeOut, const int nWriteTimeOut)
 {
 	if( (m_pConn = mysql_init(m_pConn)) == NULL )
 	{
@@ -69,7 +69,7 @@ BOOL CBaseMySQL::InitConnHandle(const int nConnectTimeOut, const int nReadTimeOu
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::Connect()
+bool CBaseMySQL::Connect()
 {
 	if( m_bConnected ) return true;
 
@@ -117,7 +117,7 @@ BOOL CBaseMySQL::Connect()
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::PrepareClose()
+bool CBaseMySQL::PrepareClose()
 {
 	if( m_pBind )
 	{
@@ -147,7 +147,7 @@ BOOL CBaseMySQL::PrepareClose()
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::Connect(const char* pszDBHost, const char* pszDBUserId, const char* pszDBPasswd, const char* pszDBName, const unsigned int nPort)
+bool CBaseMySQL::Connect(const char* pszDBHost, const char* pszDBUserId, const char* pszDBPasswd, const char* pszDBName, const unsigned int nPort)
 {
 	strncpy_s(m_szDBHost, _countof(m_szDBHost), pszDBHost, _TRUNCATE);
 	strncpy_s(m_szDBUserId, _countof(m_szDBUserId), pszDBUserId, _TRUNCATE);
@@ -161,7 +161,7 @@ BOOL CBaseMySQL::Connect(const char* pszDBHost, const char* pszDBUserId, const c
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::Disconnect()
+bool CBaseMySQL::Disconnect()
 {
 	PrepareClose();
 
@@ -181,14 +181,14 @@ MYSQL* CBaseMySQL::GetConnPtr()
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::IsConnected()
+bool CBaseMySQL::IsConnected()
 {
 	return m_bConnected;
 }
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::GetServerInfo(TCHAR* ptszServerInfo)
+bool CBaseMySQL::GetServerInfo(TCHAR* ptszServerInfo)
 {
 	if( !m_bConnected ) return false;
 
@@ -213,7 +213,7 @@ BOOL CBaseMySQL::GetServerInfo(TCHAR* ptszServerInfo)
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::GetClientInfo(TCHAR* ptszClientInfo)
+bool CBaseMySQL::GetClientInfo(TCHAR* ptszClientInfo)
 {
 	if( !m_bConnected ) return false;
 
@@ -237,7 +237,7 @@ BOOL CBaseMySQL::GetClientInfo(TCHAR* ptszClientInfo)
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::SetCharacterSetName(const TCHAR* ptszCharacterSetName)
+bool CBaseMySQL::SetCharacterSetName(const TCHAR* ptszCharacterSetName)
 {
 #ifdef _UNICODE	
 	int nLength = WideCharToMultiByte(CP_ACP, 0, ptszCharacterSetName, -1, NULL, 0, NULL, NULL);
@@ -252,7 +252,7 @@ BOOL CBaseMySQL::SetCharacterSetName(const TCHAR* ptszCharacterSetName)
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::GetCharacterSetName(TCHAR* ptszCharacterSetName)
+bool CBaseMySQL::GetCharacterSetName(TCHAR* ptszCharacterSetName)
 {
 	if( !m_bConnected ) return false;
 
@@ -276,7 +276,7 @@ BOOL CBaseMySQL::GetCharacterSetName(TCHAR* ptszCharacterSetName)
 // mysql_query("SET NAMES 'utf8mb4'");
 // mysql_query("SET CHARACTER SET utf8mb4");
 // mysql_query("SET COLLATION_CONNECTION = 'utf8mb4_unicode_ci'");
-BOOL CBaseMySQL::GetCharacterSetInfo(MY_CHARSET_INFO& charset)
+bool CBaseMySQL::GetCharacterSetInfo(MY_CHARSET_INFO& charset)
 {
 	if( !m_bConnected ) return false;
 
@@ -287,7 +287,7 @@ BOOL CBaseMySQL::GetCharacterSetInfo(MY_CHARSET_INFO& charset)
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::GetEscapeString(char* pszDest, const char* pszSrc, int32 iLen)
+bool CBaseMySQL::GetEscapeString(char* pszDest, const char* pszSrc, int32 iLen)
 {
 	if( mysql_real_escape_string(m_pConn, pszDest, pszSrc, iLen) != 0 ) return false;
 
@@ -296,7 +296,7 @@ BOOL CBaseMySQL::GetEscapeString(char* pszDest, const char* pszSrc, int32 iLen)
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::Autocommit(bool bSetvalue)
+bool CBaseMySQL::Autocommit(bool bSetvalue)
 {
 	int ac = (bSetvalue) ? 1 : 0;
 
@@ -310,7 +310,7 @@ BOOL CBaseMySQL::Autocommit(bool bSetvalue)
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::StartTransaction()
+bool CBaseMySQL::StartTransaction()
 {
 	if( mysql_query(m_pConn, "START TRANSACTION") != 0 )
 	{
@@ -322,7 +322,7 @@ BOOL CBaseMySQL::StartTransaction()
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::Commit()
+bool CBaseMySQL::Commit()
 {
 	if( mysql_query(m_pConn, "COMMIT") != 0 )
 	{
@@ -334,7 +334,7 @@ BOOL CBaseMySQL::Commit()
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::Rollback()
+bool CBaseMySQL::Rollback()
 {
 	if( mysql_query(m_pConn, "ROLLBACK") != 0 )
 	{
@@ -365,7 +365,7 @@ uint32 CBaseMySQL::GetErrorNo()
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::GetErrorMessage(TCHAR* ptszMessage)
+bool CBaseMySQL::GetErrorMessage(TCHAR* ptszMessage)
 {
 	if( !m_bConnected ) return false;
 
@@ -384,7 +384,7 @@ BOOL CBaseMySQL::GetErrorMessage(TCHAR* ptszMessage)
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::GetStmtErrorMessage(TCHAR* ptszMessage)
+bool CBaseMySQL::GetStmtErrorMessage(TCHAR* ptszMessage)
 {
 	if( !m_bConnected ) return false;
 
@@ -403,7 +403,7 @@ BOOL CBaseMySQL::GetStmtErrorMessage(TCHAR* ptszMessage)
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::SelectDB(const char* pszSelectDBName)
+bool CBaseMySQL::SelectDB(const char* pszSelectDBName)
 {
 	if( !m_bConnected )
 	{
@@ -426,7 +426,7 @@ BOOL CBaseMySQL::SelectDB(const char* pszSelectDBName)
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::SelectDB(const wchar_t* pwszSelectDBName)
+bool CBaseMySQL::SelectDB(const wchar_t* pwszSelectDBName)
 {
 	char szSelectDBName[DATABASE_NAME_STRLEN];
 
@@ -455,7 +455,7 @@ BOOL CBaseMySQL::SelectDB(const wchar_t* pwszSelectDBName)
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::Prepare(const char* pszSQL)
+bool CBaseMySQL::Prepare(const char* pszSQL)
 {
 	if( !m_bConnected )
 	{
@@ -522,7 +522,7 @@ BOOL CBaseMySQL::Prepare(const char* pszSQL)
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::Prepare(const wchar_t* pwszSQL)
+bool CBaseMySQL::Prepare(const wchar_t* pwszSQL)
 {
 	char szSQL[DATABASE_BUFFER_SIZE];
 
@@ -535,7 +535,7 @@ BOOL CBaseMySQL::Prepare(const wchar_t* pwszSQL)
 
 //***************************************************************************
 // 
-BOOL CBaseMySQL::BindParam(const char* pszValue, ulong ulBufSize)
+bool CBaseMySQL::BindParam(const char* pszValue, ulong ulBufSize)
 {
 	if( m_pStmt == NULL )
 	{
@@ -563,7 +563,7 @@ BOOL CBaseMySQL::BindParam(const char* pszValue, ulong ulBufSize)
 
 //***************************************************************************
 // 
-BOOL CBaseMySQL::BindParam(const wchar_t* pwszValue, ulong ulBufSize)
+bool CBaseMySQL::BindParam(const wchar_t* pwszValue, ulong ulBufSize)
 {
 	if( m_pStmt == NULL )
 	{
@@ -596,7 +596,7 @@ BOOL CBaseMySQL::BindParam(const wchar_t* pwszValue, ulong ulBufSize)
 // 2. BindParam() 함수 호출
 // 3. PrepareExecute() 함수 호출
 // 4. PrepareClose() 함수 호출
-BOOL CBaseMySQL::PrepareExecute(uint64_t* pnIdx)
+bool CBaseMySQL::PrepareExecute(uint64_t* pnIdx)
 {
 	if( m_pStmt == NULL )
 	{
@@ -634,21 +634,21 @@ BOOL CBaseMySQL::PrepareExecute(uint64_t* pnIdx)
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::Execute(const char* pszSQL)
+bool CBaseMySQL::Execute(const char* pszSQL)
 {
 	return Query(pszSQL);
 }
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::Execute(const wchar_t* pwszSQL)
+bool CBaseMySQL::Execute(const wchar_t* pwszSQL)
 {
 	return Query(pwszSQL);
 }
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::Query(const char* pszSQL)
+bool CBaseMySQL::Query(const char* pszSQL)
 {
 	char cTryCount = 0;
 	bool bRes = false;
@@ -702,7 +702,7 @@ BOOL CBaseMySQL::Query(const char* pszSQL)
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::Query(const wchar_t* pwszSQL)
+bool CBaseMySQL::Query(const wchar_t* pwszSQL)
 {
 	char szSQL[DATABASE_BUFFER_SIZE];
 
@@ -715,7 +715,7 @@ BOOL CBaseMySQL::Query(const wchar_t* pwszSQL)
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::Query(const char* pszSQL, MYSQL_RES*& pRes)
+bool CBaseMySQL::Query(const char* pszSQL, MYSQL_RES*& pRes)
 {
 	if( Query(pszSQL) == false ) return false;
 
@@ -731,7 +731,7 @@ BOOL CBaseMySQL::Query(const char* pszSQL, MYSQL_RES*& pRes)
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::Query(const wchar_t* pwszSQL, MYSQL_RES*& pRes)
+bool CBaseMySQL::Query(const wchar_t* pwszSQL, MYSQL_RES*& pRes)
 {
 	char szSQL[DATABASE_BUFFER_SIZE];
 
@@ -744,7 +744,7 @@ BOOL CBaseMySQL::Query(const wchar_t* pwszSQL, MYSQL_RES*& pRes)
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::Query(const char* pszSQL, void* pclsData, bool (*FetchRow)(void*, MYSQL_ROW& Row))
+bool CBaseMySQL::Query(const char* pszSQL, void* pclsData, bool (*FetchRow)(void*, MYSQL_ROW& Row))
 {
 	if( Query(pszSQL) == false ) return false;
 
@@ -769,7 +769,7 @@ BOOL CBaseMySQL::Query(const char* pszSQL, void* pclsData, bool (*FetchRow)(void
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::Query(const wchar_t* pwszSQL, void* pclsData, bool (*FetchRow)(void*, MYSQL_ROW& Row))
+bool CBaseMySQL::Query(const wchar_t* pwszSQL, void* pclsData, bool (*FetchRow)(void*, MYSQL_ROW& Row))
 {
 	char szSQL[DATABASE_BUFFER_SIZE];
 
@@ -818,7 +818,7 @@ uint64 CBaseMySQL::GetFieldCount(MYSQL_RES* pRes)
 
 //***************************************************************************
 //
-BOOL CBaseMySQL::GetFields(MYSQL_RES* pRes, MYSQL_FIELD*& pFields, uint64& ui64FieldCount)
+bool CBaseMySQL::GetFields(MYSQL_RES* pRes, MYSQL_FIELD*& pFields, uint64& ui64FieldCount)
 {
 	if( pRes == NULL ) return false;
 

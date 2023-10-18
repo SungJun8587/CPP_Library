@@ -22,7 +22,7 @@ public:
 	int PushBack(const TYPE Element);
 	int PopBack(TYPE &Element);
 
-	BOOL IsEmpty();
+	bool IsEmpty();
 	int GetSize();
 
 #ifdef _UNICODE
@@ -104,7 +104,7 @@ int CSafeLinkedDeque<TYPE>::PopBack(TYPE &Element)
 template<class TYPE>
 int CSafeLinkedDeque<TYPE>::IsEmpty()
 {
-	BOOL bRet;
+	bool bRet;
 
 	m_RWLock.SharedLock();
 	{

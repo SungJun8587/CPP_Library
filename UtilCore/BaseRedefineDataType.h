@@ -9,6 +9,15 @@
 
 #pragma once
 
+#include <string>
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <filesystem>
+#include <regex>
+
+using namespace std;
+
 typedef signed char			int8;
 typedef signed short		int16;
 typedef signed int			int32;
@@ -27,11 +36,15 @@ typedef unsigned __int64	uint64, time64;
 		typedef std::wstringstream  _tstringstream;
 		typedef std::wifstream      _tifstream;
 		typedef std::wofstream      _tofstream;
+		typedef std::wregex			_tregex;
+		typedef std::wcmatch		_tcmatch;
 	#else
 		typedef std::string			_tstring;
 		typedef std::ostringstream  _tstringstream;
 		typedef std::ifstream       _tifstream;
 		typedef std::ofstream       _tofstream;
+		typedef std::regex			_tregex;
+		typedef std::cmatch			_tcmatch;
 	#endif
 #endif
 

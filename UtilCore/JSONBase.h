@@ -52,18 +52,18 @@ class CJSONBase
 public:	
 	CJSONBase() {};
 
-	BOOL DeserializeFromFile(const _tstring& filePath);
-	BOOL SerializeToFile(const _tstring& filePath, bool isPretty = true);
+	bool DeserializeFromFile(const _tstring& filePath);
+	bool SerializeToFile(const _tstring& filePath, bool isPretty = true);
 	_tstring SerializeToJsonText(bool isPretty = true);
 
 	virtual _tstring Serialize(bool isPretty = false) const;
-	virtual BOOL Deserialize(const _tstring& s) = 0;
-	virtual BOOL Deserialize(const _tValue& obj) = 0;
-	virtual BOOL Serialize(_tWriter* writer) const = 0;
-	virtual BOOL Serialize(_tPrettyWriter* writer) const = 0;
+	virtual bool Deserialize(const _tstring& s) = 0;
+	virtual bool Deserialize(const _tValue& obj) = 0;
+	virtual bool Serialize(_tWriter* writer) const = 0;
+	virtual bool Serialize(_tPrettyWriter* writer) const = 0;
 
 protected:	
-	BOOL InitDocument(const _tstring& s, _tDocument &doc);
+	bool InitDocument(const _tstring& s, _tDocument &doc);
 };
 
 #endif // ndef __JSONBASE_H__

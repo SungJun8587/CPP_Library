@@ -14,11 +14,11 @@ public:
 	virtual	~CServiceSvr(void);
 
 	virtual void	Main(const int32& nArgCnt, TCHAR** pptszArgVec) = 0;
-	virtual	BOOL	Init(char* pszArgv = nullptr) = 0;
-	virtual	BOOL	Start(void) = 0;
-	virtual BOOL	Running(void) = 0;
-	virtual	BOOL	Stop(void) = 0;
-	virtual	BOOL	Cleanup(void) = 0;
+	virtual	bool	Init(char* pszArgv = nullptr) = 0;
+	virtual	bool	Start(void) = 0;
+	virtual bool	Running(void) = 0;
+	virtual	bool	Stop(void) = 0;
+	virtual	bool	Cleanup(void) = 0;
 	virtual void	serviceMain(DWORD dwArgc, LPTSTR* lpszArgv) = 0;
 
 	void	StartService(TCHAR* tszMachineName, TCHAR* tszServiceName, DWORD dwArgc, LPTSTR* lpszArgv);

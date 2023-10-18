@@ -23,7 +23,7 @@ public:
 
 private:
 	long	GetSize( long lMaxSize );
-	BOOL	CheckPrime( long lPrime );
+	bool	CheckPrime( long lPrime );
 
 public:
 	long	m_lMaxCollision;

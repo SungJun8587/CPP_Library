@@ -36,26 +36,26 @@ static _tValue gNullValue(kNullType);
 class CJSONParser 
 {
 public:
-	CJSONParser(BOOL bIsDebugPrint = false);
+	CJSONParser(bool bIsDebugPrint = false);
 	CJSONParser(const CJSONParser& other);
 	~CJSONParser(void);
 
 	CJSONParser& operator=(const CJSONParser& Other);
 
-	void 	SetDebugPrint(BOOL bIsDebugPrint) {
+	void 	SetDebugPrint(bool bIsDebugPrint) {
 		m_bIsDebugPrint = bIsDebugPrint;
 		Print_DebugInfo(_T("%s is set %s\n"), __TFUNCTION__, bIsDebugPrint ? _T("on") : _T("off"));
 	}
 
-	BOOL   GetDebugPrint() {
+	bool   GetDebugPrint() {
 		return m_bIsDebugPrint;
 	}
 
 	_tstring	ReadFile(const TCHAR* ptszFilePath);
-	BOOL		WriteFile(const TCHAR* ptszFilePath, TCHAR* ptszJsonString);
-	BOOL		WriteJson(const TCHAR* ptszFilePath);
+	bool		WriteFile(const TCHAR* ptszFilePath, TCHAR* ptszJsonString);
+	bool		WriteJson(const TCHAR* ptszFilePath);
 
-	BOOL		Parse(const _tstring jsonString);
+	bool		Parse(const _tstring jsonString);
 	_tstring	GetJsonText(bool isPretty = false) const;
 
 	CJSONParser operator[](const TCHAR* ptszValue);
@@ -77,6 +77,8 @@ public:
 	CJSONParser& operator=(bool bValue);
 
 	operator _tstring() const;
+	operator int8() const;
+	operator uint8() const;
 	operator int16() const;
 	operator uint16() const;
 	operator int32() const;
@@ -86,31 +88,31 @@ public:
 	operator double() const;
 	operator bool() const;
 
-	BOOL IsObject() const;
-	BOOL IsString() const;
-	BOOL IsNumber() const;
-	BOOL IsStringNumber() const;
-	BOOL IsInt32() const;
-	BOOL IsInt64() const;
-	BOOL IsUint32() const;
-	BOOL IsUint64() const;
-	BOOL IsDouble() const;
-	BOOL IsBool() const;
-	BOOL IsExists(const TCHAR* ptszKey) const;
-	BOOL IsExists(const _tstring& strKey) const;
+	bool IsObject() const;
+	bool IsString() const;
+	bool IsNumber() const;
+	bool IsStringNumber() const;
+	bool IsInt32() const;
+	bool IsInt64() const;
+	bool IsUint32() const;
+	bool IsUint64() const;
+	bool IsDouble() const;
+	bool IsBool() const;
+	bool IsExists(const TCHAR* ptszKey) const;
+	bool IsExists(const _tstring& strKey) const;
 
-	BOOL Remove(const TCHAR* ptszKey) const;
-	BOOL Remove(const _tstring& strKey) const;
-	BOOL Remove(uint32 ui32ArrayIndex) const;
-
-	template< typename DataType >
-	BOOL Add(TCHAR* ptszNodePath, DataType data);
+	bool Remove(const TCHAR* ptszKey) const;
+	bool Remove(const _tstring& strKey) const;
+	bool Remove(uint32 ui32ArrayIndex) const;
 
 	template< typename DataType >
-	BOOL Update(TCHAR* ptszNodePath, DataType data);
+	bool Add(TCHAR* ptszNodePath, DataType data);
 
 	template< typename DataType >
-	_tstring SerializeToJson(const DataType& data, BOOL bIsPretty = true);
+	bool Update(TCHAR* ptszNodePath, DataType data);
+
+	template< typename DataType >
+	_tstring SerializeToJson(const DataType& data, bool bIsPretty = true);
 
 	template< typename DataType >
 	DataType DeserializeViaDom(const TCHAR* const json);
@@ -120,7 +122,7 @@ public:
 
 #if __cplusplus >= 201703L
 	template< typename DataType >
-	void SerializeToJson(const DataType& data, const std::filesystem::path& path, BOOL bIsPretty = true);
+	void SerializeToJson(const DataType& data, const std::filesystem::path& path, bool bIsPretty = true);
 
 	template< typename DataType >
 	DataType DeserializeViaDom(const std::filesystem::path& path);
@@ -147,8 +149,8 @@ private:
 	DataType Deserialize(_tStringStream& stream);
 
 private:
-	BOOL	m_bIsDebugPrint;
-	BOOL    m_bRoot;
+	bool	m_bIsDebugPrint;
+	bool    m_bRoot;
 
 	_tDocument*	m_pDocument;
 	_tValue*	m_pValue;

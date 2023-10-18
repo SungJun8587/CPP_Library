@@ -113,7 +113,7 @@ SYSTEMTIME& operator<<(SYSTEMTIME& stime, const TIMESTAMP_STRUCT& ts)
 
 //***************************************************************************
 //
-BOOL operator==(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
+bool  operator==(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 {
 	FILETIME ft1, ft2;
 	uint64* pnVal1, * pnVal2;
@@ -129,7 +129,7 @@ BOOL operator==(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 
 //***************************************************************************
 //
-BOOL operator>(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
+bool  operator>(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 {
 	FILETIME ft1, ft2;
 	uint64* pnVal1, * pnVal2;
@@ -145,7 +145,7 @@ BOOL operator>(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 
 //***************************************************************************
 //
-BOOL operator>=(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
+bool  operator>=(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 {
 	FILETIME ft1, ft2;
 	uint64* pnVal1, * pnVal2;
@@ -161,7 +161,7 @@ BOOL operator>=(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 
 //***************************************************************************
 //
-BOOL operator<(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
+bool  operator<(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 {
 	FILETIME ft1, ft2;
 	uint64* pnVal1, * pnVal2;
@@ -177,7 +177,7 @@ BOOL operator<(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 
 //***************************************************************************
 //
-BOOL operator<=(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
+bool  operator<=(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 {
 	FILETIME ft1, ft2;
 	uint64* pnVal1, * pnVal2;
@@ -243,7 +243,7 @@ time_t GetCurTimestamp()
 // return YYYYMMDDhhmmss(14 char)
 void GetCurDateTime(TCHAR* ptszDateTime)
 {
-	if( ptszDateTime == NULL ) return;
+	if( ptszDateTime == nullptr ) return;
 
 	SYSTEMTIME	stime;
 	GetLocalTime(&stime);
@@ -255,7 +255,7 @@ void GetCurDateTime(TCHAR* ptszDateTime)
 // return YYYYMMDD(8 char)
 void GetCurDate(TCHAR* ptszDate)
 {
-	if( ptszDate == NULL ) return;
+	if( ptszDate == nullptr ) return;
 
 	SYSTEMTIME	stime;
 	GetLocalTime(&stime);
@@ -267,7 +267,7 @@ void GetCurDate(TCHAR* ptszDate)
 // return YYYYMMDDhhmmss
 void GetYesterdayTime(TCHAR* ptszDateTime)
 {
-	if( ptszDateTime == NULL ) return;
+	if( ptszDateTime == nullptr ) return;
 
 	SYSTEMTIME	stime;
 	GetLocalTime(&stime);
@@ -301,7 +301,7 @@ void GetYesterdayTime(TCHAR* ptszDateTime)
 // return YYYYMMDD
 void GetYesterday(TCHAR* ptszDate)
 {
-	if( ptszDate == NULL ) return;
+	if( ptszDate == nullptr ) return;
 
 	SYSTEMTIME	stime;
 	GetLocalTime(&stime);
@@ -372,7 +372,7 @@ time_t GetTimestampToDateTime(const TCHAR* ptszDateTime)
 
 //***************************************************************************
 //
-BOOL GetSystemTimeToTimestamp(SYSTEMTIME& tTime, const time_t timestamp)
+bool  GetSystemTimeToTimestamp(SYSTEMTIME& tTime, const time_t timestamp)
 {
 	struct tm tm_info;
 
@@ -391,7 +391,7 @@ BOOL GetSystemTimeToTimestamp(SYSTEMTIME& tTime, const time_t timestamp)
 
 //***************************************************************************
 //
-BOOL GetDateTimeToTimestamp(TCHAR* ptszDateTime, const time_t timestamp)
+bool  GetDateTimeToTimestamp(TCHAR* ptszDateTime, const time_t timestamp)
 {
 	struct tm tm_info;
 
@@ -405,7 +405,7 @@ BOOL GetDateTimeToTimestamp(TCHAR* ptszDateTime, const time_t timestamp)
 
 //***************************************************************************
 // YYYYMMDDhhmmss
-BOOL IsValidDateTime(const TCHAR* ptszDateTime)
+bool  IsValidDateTime(const TCHAR* ptszDateTime)
 {
 	int i = 0;
 
@@ -438,7 +438,7 @@ BOOL IsValidDateTime(const TCHAR* ptszDateTime)
 
 //***************************************************************************
 // YYYYMMDD
-BOOL IsValidDate(const TCHAR* ptszDate)
+bool  IsValidDate(const TCHAR* ptszDate)
 {
 	int i = 0;
 
@@ -465,7 +465,7 @@ BOOL IsValidDate(const TCHAR* ptszDate)
 
 //***************************************************************************
 // hhmmss
-BOOL IsValidTime(const TCHAR* ptszTime)
+bool  IsValidTime(const TCHAR* ptszTime)
 {
 	int i = 0;
 
@@ -487,7 +487,7 @@ BOOL IsValidTime(const TCHAR* ptszTime)
 //
 int CompareToday(const TCHAR* ptszDate)
 {
-	if( ptszDate == NULL ) return -9999;
+	if( ptszDate == nullptr ) return -9999;
 
 	size_t nRet = _tcslen(ptszDate);
 	if( nRet != 8 && nRet != 14 )
@@ -509,7 +509,7 @@ int CompareToday(const TCHAR* ptszDate)
 
 //***************************************************************************
 // return YYYYMMDD
-BOOL GetDateIntervalDate(TCHAR* ptszDestDate, const TCHAR* ptszSrcDate, const int nInterval)
+bool  GetDateIntervalDate(TCHAR* ptszDestDate, const TCHAR* ptszSrcDate, const int nInterval)
 {
 	int nYear(0), nMonth(0), nDay(0);
 
@@ -620,9 +620,9 @@ BOOL GetDateIntervalDate(TCHAR* ptszDestDate, const TCHAR* ptszSrcDate, const in
 
 //***************************************************************************
 // return YYYYMMDD
-BOOL GetDateIntervalToday(TCHAR* ptszDate, const int nInterval)
+bool  GetDateIntervalToday(TCHAR* ptszDate, const int nInterval)
 {
-	if( ptszDate == NULL ) return false;
+	if( ptszDate == nullptr ) return false;
 
 	SYSTEMTIME	stime;
 	GetLocalTime(&stime);
@@ -721,7 +721,7 @@ BOOL GetDateIntervalToday(TCHAR* ptszDate, const int nInterval)
 
 //***************************************************************************
 //
-BOOL GetIntervalSec(const TCHAR* ptszTime1, const TCHAR* ptszTime2, long& lSecInterval)
+bool  GetIntervalSec(const TCHAR* ptszTime1, const TCHAR* ptszTime2, long& lSecInterval)
 {
 	if( _tcslen(ptszTime1) != 14 || _tcslen(ptszTime2) != 14 ) return false;
 
@@ -762,7 +762,7 @@ BOOL GetIntervalSec(const TCHAR* ptszTime1, const TCHAR* ptszTime2, long& lSecIn
 
 //***************************************************************************
 //
-BOOL GetSqlTime(SQL_TIMESTAMP_STRUCT& stDateTime, const TCHAR* ptszDateTime)
+bool  GetSqlTime(SQL_TIMESTAMP_STRUCT& stDateTime, const TCHAR* ptszDateTime)
 {
 	int nYear(0), nMonth(0), nDay(0), nHour(0), nMinute(0), nSec(0);
 
@@ -790,7 +790,7 @@ BOOL GetSqlTime(SQL_TIMESTAMP_STRUCT& stDateTime, const TCHAR* ptszDateTime)
 
 //***************************************************************************
 //
-BOOL GetSystemTime(SYSTEMTIME& tTime, const TCHAR* ptszDateTime)
+bool  GetSystemTime(SYSTEMTIME& tTime, const TCHAR* ptszDateTime)
 {
 	int nYear(0), nMonth(0), nDay(0), nHour(0), nMinute(0), nSec(0);
 
@@ -818,7 +818,7 @@ BOOL GetSystemTime(SYSTEMTIME& tTime, const TCHAR* ptszDateTime)
 
 //***************************************************************************
 //
-BOOL GetMonthName(TCHAR* ptszMonthName, const int nMonth)
+bool  GetMonthName(TCHAR* ptszMonthName, const int nMonth)
 {
 	const static TCHAR atszMonthNames[][MONTH_ENAME_STRLEN] =
 	{
@@ -834,7 +834,7 @@ BOOL GetMonthName(TCHAR* ptszMonthName, const int nMonth)
 
 //***************************************************************************
 //
-BOOL GetDayOfWeek(TCHAR* ptszDayOfWeek, const int nYear, const int nMonth, const int nDay)
+bool  GetDayOfWeek(TCHAR* ptszDayOfWeek, const int nYear, const int nMonth, const int nDay)
 {
 	int		nDayOfWeek;
 
@@ -895,7 +895,7 @@ int	CountOfFeb29(int nYear)
 
 //***************************************************************************
 //
-BOOL IsLeapYear(int nYear)
+bool  IsLeapYear(int nYear)
 {
 	if( nYear % 4 != 0 ) return false;
 	if( nYear % 100 != 0 )	return true;
@@ -904,7 +904,7 @@ BOOL IsLeapYear(int nYear)
 
 //***************************************************************************
 //
-BOOL GetTimeOfSecond(TCHAR* ptszTime, const long lSecond)
+bool  GetTimeOfSecond(TCHAR* ptszTime, const long lSecond)
 {
 	int	nHour = 0, nMinute = 0, nSec = 0;
 	int	nRemindHour = 0;
@@ -934,7 +934,7 @@ BOOL GetTimeOfSecond(TCHAR* ptszTime, const long lSecond)
 
 //***************************************************************************
 //
-BOOL GetTimeOfSecond(int& nHour, int& nMinute, int& nSec, const long lSecond)
+bool  GetTimeOfSecond(int& nHour, int& nMinute, int& nSec, const long lSecond)
 {
 	int	nRemindHour = 0;
 

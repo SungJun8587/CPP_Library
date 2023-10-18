@@ -22,7 +22,7 @@ public:
 	int Push(const TYPE Element);
 	int Pop(TYPE& Element);
 	TYPE Peek();
-	BOOL IsEmpty();
+	bool IsEmpty();
 	int GetSize();
 
 #ifdef _UNICODE
@@ -61,7 +61,7 @@ TYPE CBaseLinkedStack<TYPE>::Peek()
 //***************************************************************************
 //
 template<class TYPE>
-BOOL CBaseLinkedStack<TYPE>::IsEmpty()
+bool CBaseLinkedStack<TYPE>::IsEmpty()
 {
 	return CBaseDoublyLinkedList<TYPE>::GetCount() < 1 ? true : false;
 }

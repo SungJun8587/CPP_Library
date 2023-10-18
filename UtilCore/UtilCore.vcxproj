@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="AdoDB.h" />
+    <ClInclude Include="BaseDefine.h" />
+    <ClInclude Include="BaseFile.h" />
+    <ClInclude Include="BaseGlobal.h" />
+    <ClInclude Include="BaseMacro.h" />
+    <ClInclude Include="BaseMySQL.h" />
+    <ClInclude Include="BaseODBC.h" />
+    <ClInclude Include="BaseRedefineDataType.h" />
+    <ClInclude Include="CalculatedElapsedTime.h" />
+    <ClInclude Include="ClusteredMap.h" />
+    <ClInclude Include="CommonUtil.h" />
+    <ClInclude Include="Containers.h" />
+    <ClInclude Include="CriticalSection.h" />
+    <ClInclude Include="CustomAllocator.h" />
+    <ClInclude Include="DateTimeUtil.h" />
+    <ClInclude Include="DBAsyncSrv.h" />
+    <ClInclude Include="DBBind.h" />
+    <ClInclude Include="DBModel.h" />
+    <ClInclude Include="DBSynchronizer.h" />
+    <ClInclude Include="Endian.h" />
+    <ClInclude Include="EventLog.h" />
+    <ClInclude Include="JSONBase.h" />
+    <ClInclude Include="JSONParser.h" />
+    <ClInclude Include="LockGuard.h" />
+    <ClInclude Include="Log.h" />
+    <ClInclude Include="MemBuffer.h" />
+    <ClInclude Include="Memory.h" />
+    <ClInclude Include="MemoryPool.h" />
+    <ClInclude Include="MySQLAsyncSrv.h" />
+    <ClInclude Include="MySQLConnPool.h" />
+    <ClInclude Include="ObjectPool.h" />
+    <ClInclude Include="OdbcAsyncSrv.h" />
+    <ClInclude Include="OdbcConnPool.h" />
+    <ClInclude Include="OrderedMap.h" />
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="Regular.h" />
+    <ClInclude Include="RWLock.h" />
+    <ClInclude Include="ServerConfig.h" />
+    <ClInclude Include="ServerConnectInfo.h" />
+    <ClInclude Include="ServiceSvr.h" />
+    <ClInclude Include="ShellUtil.h" />
+    <ClInclude Include="Singleton.h" />
+    <ClInclude Include="Stream.h" />
+    <ClInclude Include="StringUtil.h" />
+    <ClInclude Include="Thread.h" />
+    <ClInclude Include="ThreadManager.h" />
+    <ClInclude Include="UnOrderedMap.h" />
+    <ClInclude Include="UtilCore.h" />
+    <ClInclude Include="WebUtil.h" />
+    <ClInclude Include="XMLParser.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="AdoDB.cpp" />
+    <ClCompile Include="BaseFile.cpp" />
+    <ClCompile Include="BaseGlobal.cpp" />
+    <ClCompile Include="BaseMySQL.cpp" />
+    <ClCompile Include="BaseODBC.cpp" />
+    <ClCompile Include="ClusteredMap.cpp" />
+    <ClCompile Include="CommonUtil.cpp" />
+    <ClCompile Include="CustomAllocator.cpp" />
+    <ClCompile Include="DateTimeUtil.cpp" />
+    <ClCompile Include="DBBind.cpp" />
+    <ClCompile Include="DBModel.cpp" />
+    <ClCompile Include="DBSynchronizer.cpp" />
+    <ClCompile Include="Endian.cpp" />
+    <ClCompile Include="EventLog.cpp" />
+    <ClCompile Include="JSONBase.cpp" />
+    <ClCompile Include="JSONParser.cpp" />
+    <ClCompile Include="Log.cpp" />
+    <ClCompile Include="MemBuffer.cpp" />
+    <ClCompile Include="Memory.cpp" />
+    <ClCompile Include="MemoryPool.cpp" />
+    <ClCompile Include="MySQLAsyncSrv.cpp" />
+    <ClCompile Include="MySQLConnPool.cpp" />
+    <ClCompile Include="OdbcAsyncSrv.cpp" />
+    <ClCompile Include="OdbcConnPool.cpp" />
+    <ClCompile Include="OrderedMap.cpp" />
+    <ClCompile Include="Regular.cpp" />
+    <ClCompile Include="RWLock.cpp" />
+    <ClCompile Include="ServerConfig.cpp" />
+    <ClCompile Include="ServiceSvr.cpp" />
+    <ClCompile Include="ShellUtil.cpp" />
+    <ClCompile Include="Stream.cpp" />
+    <ClCompile Include="StringUtil.cpp" />
+    <ClCompile Include="Thread.cpp" />
+    <ClCompile Include="ThreadManager.cpp" />
+    <ClCompile Include="UnOrderedMap.cpp" />
+    <ClCompile Include="pch.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="WebUtil.cpp" />
+    <ClCompile Include="XMLParser.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="BaseMySQL.inl" />
+    <None Include="BaseODBC.inl" />
+    <None Include="DB_ColAttr.inl" />
+    <None Include="DB_Error.inl" />
+    <None Include="DB_ParamAttr.inl" />
+    <None Include="JSONParser.inl" />
+    <None Include="MySQL_ParamAttr.inl" />
+    <None Include="Singleton.inl" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{79869ef7-2179-4648-ae2e-6a4f9ff4286a}</ProjectGuid>
+    <RootNamespace>UtilCore</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+    <OutDir>$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(Platform)\$(Configuration)\</IntDir>
+    <TargetName>$(ProjectName)32D</TargetName>
+    <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\JSON-Utilities-master\source;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.33-winx64\include;E:\GitHub\CPP\Library\ExternalLib\cryptopp-CRYPTOPP_8_9_0;$(ProjectDir);$(IncludePath)</IncludePath>
+    <LibraryPath>E:\GitHub\CPP\Library\ExternalLib\Bin\Win32\Debug;$(LibraryPath)</LibraryPath>
+    <SourcePath>$(SourcePath)</SourcePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <OutDir>$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(Platform)\$(Configuration)\</IntDir>
+    <TargetName>$(ProjectName)64D</TargetName>
+    <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\JSON-Utilities-master\source;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.33-winx64\include;E:\GitHub\CPP\Library\ExternalLib\cryptopp-CRYPTOPP_8_9_0;$(ProjectDir);$(IncludePath)</IncludePath>
+    <LibraryPath>E:\GitHub\CPP\Library\ExternalLib\Bin\x64\Debug;$(LibraryPath)</LibraryPath>
+    <SourcePath>$(SourcePath)</SourcePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(Platform)\$(Configuration)\</IntDir>
+    <TargetName>$(ProjectName)32</TargetName>
+    <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\JSON-Utilities-master\source;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.33-winx64\include;E:\GitHub\CPP\Library\ExternalLib\cryptopp-CRYPTOPP_8_9_0;$(ProjectDir);$(IncludePath)</IncludePath>
+    <LibraryPath>E:\GitHub\CPP\Library\ExternalLib\Bin\Win32\Release;E:\GitHub\CPP\Library\ExternalLib\Bin\Win32\Release-Patch;$(LibraryPath)</LibraryPath>
+    <SourcePath>$(SourcePath)</SourcePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(Platform)\$(Configuration)\</IntDir>
+    <TargetName>$(ProjectName)64</TargetName>
+    <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\JSON-Utilities-master\source;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.33-winx64\include;$(ProjectDir);E:\GitHub\CPP\Library\ExternalLib\cryptopp-CRYPTOPP_8_9_0;$(IncludePath)</IncludePath>
+    <LibraryPath>E:\GitHub\CPP\Library\ExternalLib\Bin\x64\Release;E:\GitHub\CPP\Library\ExternalLib\Bin\x64\Release-Patch;$(LibraryPath)</LibraryPath>
+    <SourcePath>$(SourcePath)</SourcePath>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>
+      </SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>
+      </SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/MP %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>
+      </SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/MP %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>
+      </SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

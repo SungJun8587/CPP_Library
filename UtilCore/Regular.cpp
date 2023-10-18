@@ -9,7 +9,7 @@
 
 //***************************************************************************
 //
-BOOL IsAllAscii(const TCHAR *ptszSource)
+bool IsAllAscii(const TCHAR *ptszSource)
 {
 	const TCHAR	*ptszSourceLoc = NULL;
 
@@ -24,7 +24,7 @@ BOOL IsAllAscii(const TCHAR *ptszSource)
 
 //***************************************************************************
 //
-BOOL IsAllAlpha(const TCHAR *ptszSource)
+bool IsAllAlpha(const TCHAR *ptszSource)
 {
 	const TCHAR	*ptszSourceLoc = NULL;
 
@@ -39,7 +39,7 @@ BOOL IsAllAlpha(const TCHAR *ptszSource)
 
 //***************************************************************************
 //
-BOOL IsAllKorean(const TCHAR *ptszSource)
+bool IsAllKorean(const TCHAR *ptszSource)
 {
 	const TCHAR	*ptszSourceLoc = NULL;
 
@@ -54,7 +54,7 @@ BOOL IsAllKorean(const TCHAR *ptszSource)
 
 //***************************************************************************
 //
-BOOL IsAllNumeric(const TCHAR *ptszSource)
+bool IsAllNumeric(const TCHAR *ptszSource)
 {
 	const TCHAR	*ptszSourceLoc = NULL;
 
@@ -69,7 +69,7 @@ BOOL IsAllNumeric(const TCHAR *ptszSource)
 
 //***************************************************************************
 //
-BOOL IsAllAlphaNum(const TCHAR *ptszSource)
+bool IsAllAlphaNum(const TCHAR *ptszSource)
 {
 	const TCHAR	*ptszSourceLoc = NULL;
 
@@ -84,7 +84,7 @@ BOOL IsAllAlphaNum(const TCHAR *ptszSource)
 
 //***************************************************************************
 //
-BOOL IsAllAlphaKor(const TCHAR *ptszSource)
+bool IsAllAlphaKor(const TCHAR *ptszSource)
 {
 	const TCHAR	*ptszSourceLoc = NULL;
 
@@ -99,7 +99,7 @@ BOOL IsAllAlphaKor(const TCHAR *ptszSource)
 
 //***************************************************************************
 //
-BOOL IsAllKorNum(const TCHAR *ptszSource)
+bool IsAllKorNum(const TCHAR *ptszSource)
 {
 	const TCHAR	*ptszSourceLoc = NULL;
 
@@ -114,7 +114,7 @@ BOOL IsAllKorNum(const TCHAR *ptszSource)
 
 //***************************************************************************
 //
-BOOL IsAllAlphaKorNum(const TCHAR *ptszSource)
+bool IsAllAlphaKorNum(const TCHAR *ptszSource)
 {
 	const TCHAR	*ptszSourceLoc = NULL;
 
@@ -129,7 +129,7 @@ BOOL IsAllAlphaKorNum(const TCHAR *ptszSource)
 
 //***************************************************************************
 //
-BOOL IsCharacter(const int ch)
+bool IsCharacter(const int ch)
 {
 	if( ch >= _T('0') && ch <= _T('9') ) return true;
 	if( ch >= _T('a') && ch <= _T('z') ) return true;
@@ -141,7 +141,7 @@ BOOL IsCharacter(const int ch)
 
 //***************************************************************************
 //
-BOOL IsKoreanChar(const TCHAR ch)
+bool IsKoreanChar(const TCHAR ch)
 {
 	return (ch & 0x80);
 }

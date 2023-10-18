@@ -7,6 +7,8 @@
 #ifndef __ADODB_H__
 #define __ADODB_H__
 
+#include <comutil.h>
+
 #define  ADO_COM_CREATE_ERROR		-3
 #define  ADO_OPEN_ERROR				-2
 #define  ADO_COINITIALIZE_ERROR     -1
@@ -14,7 +16,7 @@
 
 #pragma warning(push)
 #pragma warning(disable:4146)
-#import "c:\program files\common files\system\ado\msado15.dll" rename ("EOF","adoEOF") no_namespace
+#import "C:\Program Files\Common Files\System\ado\msado15.dll" no_namespace rename("EOF", "adoEOF")
 #pragma warning(pop) 
 
 class CAdoDB

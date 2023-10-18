@@ -4,9 +4,18 @@
 //
 //***************************************************************************
 
+#pragma once
+
 #include "CustomAllocator.h"
 
-#pragma once
+#include <vector>
+#include <list>
+#include <forward_list>
+#include <queue>
+#include <set>
+#include <map>
+#include <unordered_set>
+#include <unordered_map>
 
 template<class _TMain, class _Ax = CCustomAllocator<_TMain> >
 class CVector : public std::vector<_TMain, _Ax> {};

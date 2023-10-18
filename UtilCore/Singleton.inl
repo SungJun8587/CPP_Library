@@ -7,6 +7,8 @@
 #include "pch.h"
 #include "Singleton.h"
 
+#include <assert.h>
+
 //***************************************************************************
 //
 template<typename T>
@@ -25,7 +27,7 @@ CCriticalSection CSingleton<T>::sm_Lock;
 template<typename T>
 CSingleton<T>::CSingleton(void)
 {
-	assert(nullptr == sm_pSingleton);
+	assert(sm_pSingleton == nullptr);
 }
 
 
@@ -39,7 +41,7 @@ CSingleton<T>::~CSingleton(void)
 template<typename T>
 T& CSingleton<T>::GetSingleton(void)
 {
-	if( nullptr == sm_pSingleton )
+	if( sm_pSingleton == nullptr )
 		createInstance();
 
 	return *sm_pSingleton;
@@ -50,7 +52,7 @@ T& CSingleton<T>::GetSingleton(void)
 template<typename T>
 T* CSingleton<T>::GetSingletonPtr(void)
 {
-	if( nullptr == sm_pSingleton )
+	if( sm_pSingleton == nullptr )
 		createInstance();
 
 	return sm_pSingleton;
@@ -72,7 +74,7 @@ void CSingleton<T>::createInstance(void)
 {
 	CLockGuard<CCriticalSection>	lockGuard(sm_Lock);
 
-	if( nullptr == sm_pSingleton )
+	if( sm_pSingleton == nullptr )
 		sm_pSingleton = new T;
 }
 

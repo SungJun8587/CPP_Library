@@ -11,17 +11,17 @@
 #include <tchar.h>
 #endif
 
-BOOL	IsAllAscii(const TCHAR *ptszSource);
-BOOL	IsAllAlphaNum(const TCHAR *ptszSource);
-BOOL	IsAllAlphaKor(const TCHAR *ptszSource);
-BOOL	IsAllKorNum(const TCHAR *ptszSource);
-BOOL	IsAllAlphaKorNum(const TCHAR *ptszSource);
+bool	IsAllAscii(const TCHAR *ptszSource);
+bool	IsAllAlphaNum(const TCHAR *ptszSource);
+bool	IsAllAlphaKor(const TCHAR *ptszSource);
+bool	IsAllKorNum(const TCHAR *ptszSource);
+bool	IsAllAlphaKorNum(const TCHAR *ptszSource);
 
-BOOL	IsAllAlpha(const TCHAR *ptszSource);
-BOOL	IsAllKorean(const TCHAR *ptszSource);
-BOOL	IsAllNumeric(const TCHAR *ptszSource);
+bool	IsAllAlpha(const TCHAR *ptszSource);
+bool	IsAllKorean(const TCHAR *ptszSource);
+bool	IsAllNumeric(const TCHAR *ptszSource);
 
-BOOL	IsCharacter(const int ch);
-BOOL	IsKoreanChar(const TCHAR ch);
+bool	IsCharacter(const int ch);
+bool	IsKoreanChar(const TCHAR ch);
 
 #endif // ndef __REGULAR_H__

@@ -32,7 +32,7 @@ _tstring CJSONBase::Serialize(bool isPretty) const
 
 //***************************************************************************
 //
-BOOL CJSONBase::Deserialize(const _tstring& s)
+bool CJSONBase::Deserialize(const _tstring& s)
 {
 	_tDocument doc;
 	if( !InitDocument(s, doc) )
@@ -45,7 +45,7 @@ BOOL CJSONBase::Deserialize(const _tstring& s)
 
 //***************************************************************************
 //
-BOOL CJSONBase::DeserializeFromFile(const _tstring& filePath)
+bool CJSONBase::DeserializeFromFile(const _tstring& filePath)
 {
 	_tifstream f(filePath);
 	_tstringstream buffer;
@@ -58,7 +58,7 @@ BOOL CJSONBase::DeserializeFromFile(const _tstring& filePath)
 
 //***************************************************************************
 //
-BOOL CJSONBase::SerializeToFile(const _tstring& filePath, bool isPretty)
+bool CJSONBase::SerializeToFile(const _tstring& filePath, bool isPretty)
 {
 	_tofstream f(filePath);
 	_tstring s = Serialize(isPretty);
@@ -81,7 +81,7 @@ _tstring CJSONBase::SerializeToJsonText(bool isPretty)
 
 //***************************************************************************
 //
-BOOL CJSONBase::InitDocument(const _tstring& s, _tDocument& doc)
+bool CJSONBase::InitDocument(const _tstring& s, _tDocument& doc)
 {
 	if( s.empty() )
 		return false;

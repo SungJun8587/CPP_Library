@@ -36,12 +36,12 @@ public:
 
 	// Comparison 
 public:
-	BOOL operator <  (const CSortedArrayList& x) const;
-	BOOL operator <= (const CSortedArrayList& x) const;
-	BOOL operator == (const CSortedArrayList& x) const;
-	BOOL operator != (const CSortedArrayList& x) const;
-	BOOL operator >  (const CSortedArrayList& x) const;
-	BOOL operator >= (const CSortedArrayList& x) const;
+	bool operator <  (const CSortedArrayList& x) const;
+	bool operator <= (const CSortedArrayList& x) const;
+	bool operator == (const CSortedArrayList& x) const;
+	bool operator != (const CSortedArrayList& x) const;
+	bool operator >  (const CSortedArrayList& x) const;
+	bool operator >= (const CSortedArrayList& x) const;
 
 	// Operator
 public:
@@ -568,7 +568,7 @@ inline void CSortedArrayList<TYPE>::SetAt(TYPE tValue)
 //***************************************************************************
 //
 template<class TYPE>
-inline BOOL CSortedArrayList<TYPE>::operator < (const CSortedArrayList& x) const
+inline bool CSortedArrayList<TYPE>::operator < (const CSortedArrayList& x) const
 {
 	return CBaseArrayList<TYPE>::operator < (x);
 }
@@ -576,7 +576,7 @@ inline BOOL CSortedArrayList<TYPE>::operator < (const CSortedArrayList& x) const
 //***************************************************************************
 //
 template<class TYPE>
-inline BOOL CSortedArrayList<TYPE>::operator <= (const CSortedArrayList& x) const
+inline bool CSortedArrayList<TYPE>::operator <= (const CSortedArrayList& x) const
 {
 	return CBaseArrayList<TYPE>::operator <= (x);
 }
@@ -584,7 +584,7 @@ inline BOOL CSortedArrayList<TYPE>::operator <= (const CSortedArrayList& x) cons
 //***************************************************************************
 //
 template<class TYPE>
-inline BOOL CSortedArrayList<TYPE>::operator == (const CSortedArrayList& x) const
+inline bool CSortedArrayList<TYPE>::operator == (const CSortedArrayList& x) const
 {
 	return CBaseArrayList<TYPE>::operator == (x);
 }
@@ -592,7 +592,7 @@ inline BOOL CSortedArrayList<TYPE>::operator == (const CSortedArrayList& x) cons
 //***************************************************************************
 //
 template<class TYPE>
-inline BOOL CSortedArrayList<TYPE>::operator != (const CSortedArrayList& x) const
+inline bool CSortedArrayList<TYPE>::operator != (const CSortedArrayList& x) const
 {
 	return CBaseArrayList<TYPE>::operator != (x);
 }
@@ -600,7 +600,7 @@ inline BOOL CSortedArrayList<TYPE>::operator != (const CSortedArrayList& x) cons
 //***************************************************************************
 //
 template<class TYPE>
-inline BOOL CSortedArrayList<TYPE>::operator > (const CSortedArrayList& x) const
+inline bool CSortedArrayList<TYPE>::operator > (const CSortedArrayList& x) const
 {
 	return CBaseArrayList<TYPE>::operator > (x);
 }
@@ -608,7 +608,7 @@ inline BOOL CSortedArrayList<TYPE>::operator > (const CSortedArrayList& x) const
 //***************************************************************************
 //
 template<class TYPE>
-inline BOOL CSortedArrayList<TYPE>::operator >= (const CSortedArrayList& x) const
+inline bool CSortedArrayList<TYPE>::operator >= (const CSortedArrayList& x) const
 {
 	return CBaseArrayList<TYPE>::operator >= (x);
 }

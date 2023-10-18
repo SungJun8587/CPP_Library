@@ -49,6 +49,25 @@ void CLog::Write(const ELOG_TYPE p_nType, const TCHAR* ptszLog, const bool bFlag
 	CLockGuard<CCriticalSection> lockGuard(m_kLock);
 
 #ifdef _FILE_LOG
+	switch( p_nType )
+	{
+		case ELOG_TYPE::LOG_TYPE_DEBUG:
+			m_cLogFmt = LOG_FMT_DAILY;
+			break;
+		case ELOG_TYPE::LOG_TYPE_TRACE:
+			m_cLogFmt = LOG_FMT_DAILY;
+			break;
+		case ELOG_TYPE::LOG_TYPE_INFO:
+			m_cLogFmt = LOG_FMT_DAILY;
+			break;
+		case ELOG_TYPE::LOG_TYPE_WARNING:
+			m_cLogFmt = LOG_FMT_DAILY;
+			break;
+		case ELOG_TYPE::LOG_TYPE_ERROR:
+			m_cLogFmt = LOG_FMT_DAILY;
+			break;
+	}
+
 	switch( m_cLogFmt )
 	{
 		case LOG_FMT_SEC:
@@ -92,27 +111,31 @@ void CLog::Write(const ELOG_TYPE p_nType, const TCHAR* ptszLog, const bool bFlag
 
 	switch( p_nType )
 	{
-		case LOG_TYPE_DEBUG:
-			sConsoleTextColor = LOG_TYPE_DEBUG_COLOR;
+		case ELOG_TYPE::LOG_TYPE_DEBUG:
+			sConsoleTextColor = static_cast<short>(ELOG_TYPE_COLOR::LOG_TYPE_DEBUG_COLOR);
 			break;
-		case LOG_TYPE_TRACE:
-			sConsoleTextColor = LOG_TYPE_TRACE_COLOR;
+		case ELOG_TYPE::LOG_TYPE_TRACE:
+			sConsoleTextColor = static_cast<short>(ELOG_TYPE_COLOR::LOG_TYPE_TRACE_COLOR);
 			break;
-		case LOG_TYPE_INFO:
-			sConsoleTextColor = LOG_TYPE_INFO_COLOR;
+		case ELOG_TYPE::LOG_TYPE_INFO:
+			sConsoleTextColor = static_cast<short>(ELOG_TYPE_COLOR::LOG_TYPE_INFO_COLOR);
 			break;
-		case LOG_TYPE_WARNING:
-			sConsoleTextColor = LOG_TYPE_WARNING_COLOR;
+		case ELOG_TYPE::LOG_TYPE_WARNING:
+			sConsoleTextColor = static_cast<short>(ELOG_TYPE_COLOR::LOG_TYPE_WARNING_COLOR);
 			break;
-		case LOG_TYPE_ERROR:
-			sConsoleTextColor = LOG_TYPE_ERROR_COLOR;
+		case ELOG_TYPE::LOG_TYPE_ERROR:
+			sConsoleTextColor = static_cast<short>(ELOG_TYPE_COLOR::LOG_TYPE_ERROR_COLOR);
 			break;
 	}
 
 	if( sConsoleTextColor != WHITE )
 		SetTextColor(sConsoleTextColor);
 
+#ifdef _UNICODE
 	std::wcout << tszLogFormat << std::endl;
+#else
+	std::cout << tszLogFormat << std::endl;
+#endif
 
 	SetTextColor(WHITE);
 #endif
@@ -136,17 +159,18 @@ void CLog::SetTextColor(short sColor)
 
 //***************************************************************************
 //
-void LogManager::Create(const TCHAR* ptszDirecoryName)
+void CLogManager::Create(const TCHAR* ptszDirecoryName)
 {
-	m_LogType[LOG_TYPE_DEBUG].Init(ptszDirecoryName, _T("1_DEBUG"), LOG_FMT_DAILY);
-	m_LogType[LOG_TYPE_TRACE].Init(ptszDirecoryName, _T("1_TRACE"), LOG_FMT_DAILY);
-	m_LogType[LOG_TYPE_INFO].Init(ptszDirecoryName, _T("1_INFO"), LOG_FMT_DAILY);
-	m_LogType[LOG_TYPE_ERROR].Init(ptszDirecoryName, _T("1_ERROR"), LOG_FMT_DAILY);
+	m_LogType[static_cast<short>(ELOG_TYPE::LOG_TYPE_DEBUG)].Init(ptszDirecoryName, _T("1_DEBUG"), LOG_FMT_DAILY);
+	m_LogType[static_cast<short>(ELOG_TYPE::LOG_TYPE_TRACE)].Init(ptszDirecoryName, _T("1_TRACE"), LOG_FMT_DAILY);
+	m_LogType[static_cast<short>(ELOG_TYPE::LOG_TYPE_INFO)].Init(ptszDirecoryName, _T("1_INFO"), LOG_FMT_DAILY);
+	m_LogType[static_cast<short>(ELOG_TYPE::LOG_TYPE_ERROR)].Init(ptszDirecoryName, _T("1_WARNING"), LOG_FMT_DAILY);
+	m_LogType[static_cast<short>(ELOG_TYPE::LOG_TYPE_ERROR)].Init(ptszDirecoryName, _T("1_ERROR"), LOG_FMT_DAILY);
 }
 
 //***************************************************************************
 //
-void LogManager::Write(const ELOG_TYPE p_nType, const bool bFlag, const TCHAR* ptszFormat, ...)
+void CLogManager::Write(const ELOG_TYPE p_nType, const bool bFlag, const TCHAR* ptszFormat, ...)
 {
 	TCHAR tszLog[LOG_MAX_BUFFER_SIZE] = { 0, };
 	va_list args;
@@ -155,7 +179,7 @@ void LogManager::Write(const ELOG_TYPE p_nType, const bool bFlag, const TCHAR* p
 	_vsntprintf_s(tszLog, _countof(tszLog), LOG_MAX_BUFFER_SIZE, ptszFormat, args);
 	va_end(args);
 
-	m_LogType[p_nType].LogWrite(p_nType, tszLog, bFlag);
+	m_LogType[static_cast<short>(p_nType)].LogWrite(p_nType, tszLog, bFlag);
 }
 
 

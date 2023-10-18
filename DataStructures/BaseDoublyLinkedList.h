@@ -33,8 +33,8 @@ template<class TYPE> class OElement
 {
 public:
 	TYPE Element;
-	OElement<TYPE>* pPrev;
-	OElement<TYPE>* pNext = NULL;
+	OElement<TYPE>* pPrev = nullptr;
+	OElement<TYPE>* pNext = nullptr;
 };
 
 #endif // __OELEMENT__

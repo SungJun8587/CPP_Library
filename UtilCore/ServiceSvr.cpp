@@ -281,7 +281,7 @@ BOOL CServiceSvr::registerSCHandler(void)
 //
 BOOL CServiceSvr::reportStatusToSCMgr(DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD dwWaitHint)
 {
-	BOOL bResult = TRUE;
+	bool bResult = TRUE;
 
 	if( !m_bConsoleMode )	// when debugging we don't report to the SCM
 	{

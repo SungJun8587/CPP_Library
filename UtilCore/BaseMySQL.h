@@ -7,6 +7,11 @@
 #ifndef __BASEMYSQL_H__
 #define __BASEMYSQL_H__
 
+#include <mysql.h>
+#include <mysqld_error.h>
+
+#pragma comment (lib, "libmySQL.lib")
+
 #include "MySQL_ParamAttr.inl"
 
 #ifndef	__OBJECTPOOL_H__
@@ -44,55 +49,55 @@ public:
 		strncpy_s(m_szPluginDir, FULLPATH_STRLEN, pszPluginDir, _TRUNCATE);
 	}
 
-	BOOL		Connect(const char* pszDBHost, const char* pszDBUserId, const char* pszDBPasswd, const char* pszDBName, const unsigned int nPort);
-	BOOL		Disconnect();
+	bool		Connect(const char* pszDBHost, const char* pszDBUserId, const char* pszDBPasswd, const char* pszDBName, const unsigned int nPort);
+	bool		Disconnect();
 
 	MYSQL*		GetConnPtr();
-	BOOL		IsConnected();
-	BOOL		GetServerInfo(TCHAR* ptszServerInfo);
-	BOOL		GetClientInfo(TCHAR* ptszClientInfo);
-	BOOL        SetCharacterSetName(const TCHAR* ptszCharacterSetName);
-	BOOL        GetCharacterSetName(TCHAR* ptszCharacterSetName);
-	BOOL		GetCharacterSetInfo(MY_CHARSET_INFO& charset);
-	BOOL		GetEscapeString(char* pszDest, const char* pszSrc, int32 iLen);
+	bool		IsConnected();
+	bool		GetServerInfo(TCHAR* ptszServerInfo);
+	bool		GetClientInfo(TCHAR* ptszClientInfo);
+	bool        SetCharacterSetName(const TCHAR* ptszCharacterSetName);
+	bool        GetCharacterSetName(TCHAR* ptszCharacterSetName);
+	bool		GetCharacterSetInfo(MY_CHARSET_INFO& charset);
+	bool		GetEscapeString(char* pszDest, const char* pszSrc, int32 iLen);
 
-	BOOL		Autocommit(bool bSetvalue);
-	BOOL		StartTransaction();
-	BOOL		Commit();
-	BOOL		Rollback();
+	bool		Autocommit(bool bSetvalue);
+	bool		StartTransaction();
+	bool		Commit();
+	bool		Rollback();
 
 	uint64		GetAffectedRow();
 	uint32		GetErrorNo();
-	BOOL		GetErrorMessage(TCHAR* ptszMessage);
-	BOOL		GetStmtErrorMessage(TCHAR* ptszMessage);
+	bool		GetErrorMessage(TCHAR* ptszMessage);
+	bool		GetStmtErrorMessage(TCHAR* ptszMessage);
 	
-	BOOL		SelectDB(const char* pszSelectDBName);
-	BOOL		SelectDB(const wchar_t* pszSelectDBName);
+	bool		SelectDB(const char* pszSelectDBName);
+	bool		SelectDB(const wchar_t* pszSelectDBName);
 
-	BOOL		Prepare(const char* pszSQL);
-	BOOL		Prepare(const wchar_t* pwszSQL);
+	bool		Prepare(const char* pszSQL);
+	bool		Prepare(const wchar_t* pwszSQL);
 
 	template< typename _TMain >
-	BOOL		BindParam(_TMain tValue);
-	BOOL		BindParam(const char* pszValue, ulong ulBufSize);
-	BOOL		BindParam(const wchar_t* pwszValue, ulong ulBufSize);
+	bool		BindParam(_TMain tValue);
+	bool		BindParam(const char* pszValue, ulong ulBufSize);
+	bool		BindParam(const wchar_t* pwszValue, ulong ulBufSize);
 
-	BOOL		PrepareExecute(uint64_t* pnIdx = NULL);
+	bool		PrepareExecute(uint64_t* pnIdx = NULL);
 
-	BOOL		Execute(const char* pszSQL);
-	BOOL		Execute(const wchar_t* pwszSQL);
+	bool		Execute(const char* pszSQL);
+	bool		Execute(const wchar_t* pwszSQL);
 
-	BOOL		Query(const char* pszSQL);
-	BOOL		Query(const wchar_t* pwszSQL);
-	BOOL		Query(const char* pszSQL, MYSQL_RES*& pRes);
-	BOOL		Query(const wchar_t* pszSQL, MYSQL_RES*& pRes);
+	bool		Query(const char* pszSQL);
+	bool		Query(const wchar_t* pwszSQL);
+	bool		Query(const char* pszSQL, MYSQL_RES*& pRes);
+	bool		Query(const wchar_t* pszSQL, MYSQL_RES*& pRes);
 
-	BOOL		Query(const char* pszSQL, void* pclsData, bool (*FetchRow)(void*, MYSQL_ROW& Row));
-	BOOL		Query(const wchar_t* pwszSQL, void* pclsData, bool (*FetchRow)(void*, MYSQL_ROW& Row));
+	bool		Query(const char* pszSQL, void* pclsData, bool (*FetchRow)(void*, MYSQL_ROW& Row));
+	bool		Query(const wchar_t* pwszSQL, void* pclsData, bool (*FetchRow)(void*, MYSQL_ROW& Row));
 
 	uint64		GetRowCount(MYSQL_RES* pRes);
 	uint64		GetFieldCount(MYSQL_RES* pRes);
-	BOOL		GetFields(MYSQL_RES* pRes, MYSQL_FIELD*& pFields, uint64& ui64FieldCount);
+	bool		GetFields(MYSQL_RES* pRes, MYSQL_FIELD*& pFields, uint64& ui64FieldCount);
 
 	void		GetData(const MYSQL_ROW Row, const int nColNum, bool& bIsData);
 	void		GetData(const MYSQL_ROW Row, const int nColNum, char* pszValue, int nBufSize);
@@ -103,17 +108,17 @@ public:
 	void		GetData(const MYSQL_ROW Row, const int nColNum, uint64& ui64Data);
 
 protected:
-	BOOL		InitConnHandle(const int nConnectTimeOut = MYSQL_DEFAULT_CONNECTION_TIMEOUT, const int nReadTimeOut = MYSQL_DEFAULT_QUERY_READ_TIMEOUT, const int nWriteTimeOut = MYSQL_DEFAULT_QUERY_WRITE_TIMEOUT);
+	bool		InitConnHandle(const int nConnectTimeOut = MYSQL_DEFAULT_CONNECTION_TIMEOUT, const int nReadTimeOut = MYSQL_DEFAULT_QUERY_READ_TIMEOUT, const int nWriteTimeOut = MYSQL_DEFAULT_QUERY_WRITE_TIMEOUT);
 
 private:
-	BOOL		Connect();
-	BOOL		PrepareClose();
+	bool		Connect();
+	bool		PrepareClose();
 
 	void        ErrorQuery(const char* pszFunc, const char* pszSQL, uint32 uiErrno = 0, const char* pszMessage = nullptr);
 	void        StmtErrorQuery(const char* pszFunc, const char* pszSQL, uint32 uiErrno = 0, const char* pszMessage = nullptr);
 
 private:
-	BOOL		m_bConnected;
+	bool		m_bConnected;
 
 	char		m_szDBHost[DATABASE_SERVER_NAME_STRLEN];
 	char		m_szDBUserId[DATABASE_DSN_USER_ID_STRLEN];

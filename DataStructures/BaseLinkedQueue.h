@@ -21,7 +21,7 @@ class CBaseLinkedQueue : private CBaseLinkedList<TYPE>
 public:
 	int EnQueue(const TYPE Element);
 	int DeQueue(TYPE& Element);
-	BOOL IsEmpty();
+	bool IsEmpty();
 	int GetSize();
 
 #ifdef _UNICODE
@@ -52,7 +52,7 @@ int CBaseLinkedQueue<TYPE>::DeQueue(TYPE& Element)
 //***************************************************************************
 //
 template<class TYPE>
-BOOL CBaseLinkedQueue<TYPE>::IsEmpty()
+bool CBaseLinkedQueue<TYPE>::IsEmpty()
 {
 	return CBaseLinkedList<TYPE>::GetCount() < 1 ? true : false;
 }

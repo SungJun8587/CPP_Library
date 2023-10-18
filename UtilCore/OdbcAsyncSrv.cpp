@@ -33,14 +33,14 @@ CDBAsyncSrvHandler* COdbcAsyncSrv::Regist(const BYTE command, CDBAsyncSrvHandler
 
 //***************************************************************************
 //
-BOOL COdbcAsyncSrv::StartService(INT32 nMaxThreadCnt, std::vector<CDBNode> DBNodeVec)
+bool COdbcAsyncSrv::StartService(INT32 nMaxThreadCnt, std::vector<CDBNode> DBNodeVec)
 {
 	return InitOdbc(nMaxThreadCnt, DBNodeVec);
 }
 
 //***************************************************************************
 //
-BOOL COdbcAsyncSrv::InitOdbc(INT32 nMaxThreadCnt, std::vector<CDBNode> DBNodeVec)
+bool COdbcAsyncSrv::InitOdbc(INT32 nMaxThreadCnt, std::vector<CDBNode> DBNodeVec)
 {
 	m_nMaxThreadCnt = nMaxThreadCnt;
 
@@ -53,9 +53,6 @@ BOOL COdbcAsyncSrv::InitOdbc(INT32 nMaxThreadCnt, std::vector<CDBNode> DBNodeVec
 
 	for( auto& iter : DBNodeVec )
 	{
-		TCHAR tszConnStr[DATABASE_DSN_STRLEN] = { 0, };
-		_tcsncpy_s(tszConnStr, DATABASE_DSN_STRLEN, iter.m_tszDSN, _TRUNCATE);
-
 		if( nIdx >= m_nDBCount ) break;
 
 		m_pOdbcConnPools[nIdx] = new COdbcConnPool(m_nMaxThreadCnt);
@@ -65,9 +62,9 @@ BOOL COdbcAsyncSrv::InitOdbc(INT32 nMaxThreadCnt, std::vector<CDBNode> DBNodeVec
 			return false;
 		}
 
-		if( false == m_pOdbcConnPools[nIdx]->Init(tszConnStr) )
+		if( false == m_pOdbcConnPools[nIdx]->Init(iter.m_dbClass, iter.m_tszDSN) )
 		{
-			LOG_ERROR(_T("Failed to Initialize COdbcConnPool[%s]"), tszConnStr);
+			LOG_ERROR(_T("Failed to Initialize COdbcConnPool"));
 			return false;
 		}
 
@@ -96,13 +93,13 @@ bool COdbcAsyncSrv::RunningThread(const __int32& nThreadIdx)
 
 //***************************************************************************
 //
-BOOL COdbcAsyncSrv::Action()
+bool COdbcAsyncSrv::Action()
 {
 	static uint64 cumulateCallCnt = 0;
 	while( 1 )
 	{
 		st_DBAsyncRq* pAsyncRq = Pop();	// DB 콜 구조체를 큐에서 가저오기
-		if( nullptr == pAsyncRq )
+		if( pAsyncRq == nullptr )
 		{
 			Sleep(1);
 			continue;
@@ -120,14 +117,13 @@ BOOL COdbcAsyncSrv::Action()
 
 		CDBAsyncSrvHandler* command = static_cast<CDBAsyncSrvHandler*>(it->second);
 		int nRet = command->ProcessAsyncCall(pAsyncRq);	// 패킷 처리
-		if( DB_RETURN_TYPE_OK != nRet )
+		if( nRet != static_cast<short>(DB_RETURN_TYPE::OK) )
 		{
 			LOG_ERROR(_T("Failed Async Call... callIdent: [%u]"), pAsyncRq->callIdent);
 
 			// TODO.. 
 			// DB 처리에서 false 리턴하면 이곳으로 온다.
-
-			if( nRet == DB_RETURN_TYPE_TIMEOUT && pAsyncRq->bReTry == false )
+			if( nRet == static_cast<short>(DB_RETURN_TYPE::TIMEOUT) && pAsyncRq->bReTry == false )
 			{
 				uint64 endTick = _GetTickCount();
 				if( 300 <= endTick - startTick )
@@ -190,7 +186,7 @@ st_DBAsyncRq* COdbcAsyncSrv::Pop()
 //
 COdbcConnPool* COdbcAsyncSrv::GetAccountOdbcConnPool(void)
 {
-	if( nullptr == m_pOdbcConnPools )
+	if( m_pOdbcConnPools == nullptr )
 	{
 		LOG_ERROR(_T("[%s]m_pOdbcConnPools Is Null"), __TFUNCTION__);
 		return nullptr;
@@ -209,7 +205,7 @@ COdbcConnPool* COdbcAsyncSrv::GetAccountOdbcConnPool(void)
 //
 COdbcConnPool* COdbcAsyncSrv::GetOdbcConnPool(uint64 m_nID)
 {
-	if( nullptr == m_pOdbcConnPools )
+	if( m_pOdbcConnPools == nullptr )
 	{
 		LOG_ERROR(_T("[%s]m_pOdbcConnPools Is Null"), __TFUNCTION__);
 		return nullptr;
@@ -229,7 +225,7 @@ COdbcConnPool* COdbcAsyncSrv::GetOdbcConnPool(uint64 m_nID)
 //
 COdbcConnPool* COdbcAsyncSrv::GetLogOdbcConnPool()
 {
-	if( nullptr == m_pOdbcConnPools )
+	if( m_pOdbcConnPools == nullptr )
 	{
 		LOG_ERROR(_T("[%s]m_pOdbcConnPools Is Null"), __TFUNCTION__);
 		return nullptr;

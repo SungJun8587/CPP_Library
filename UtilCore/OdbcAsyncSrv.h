@@ -30,10 +30,10 @@ public:
 	int Push(st_DBAsyncRq* pAsyncRq);
 	st_DBAsyncRq* Pop();
 
-	BOOL StartService(INT32 nMaxThreadCnt, std::vector<CDBNode> DBNodeVec);
-	BOOL Action();
+	bool StartService(INT32 nMaxThreadCnt, std::vector<CDBNode> DBNodeVec);
+	bool Action();
 
-	BOOL InitOdbc(INT32 nMaxThreadCnt, std::vector<CDBNode> DBNodeVec);
+	bool InitOdbc(INT32 nMaxThreadCnt, std::vector<CDBNode> DBNodeVec);
 
 	COdbcConnPool* GetAccountOdbcConnPool(void);
 	COdbcConnPool* GetOdbcConnPool(uint64 m_nID);

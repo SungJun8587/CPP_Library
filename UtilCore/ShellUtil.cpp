@@ -9,7 +9,7 @@
 
 //***************************************************************************
 //
-BOOL IsAbleFile(const TCHAR* ptszSourceFullPath, const SH_APPLY_FILEINFO ShApplyFileInfo)
+bool IsAbleFile(const TCHAR* ptszSourceFullPath, const SH_APPLY_FILEINFO ShApplyFileInfo)
 {
 	size_t		nTokenCount = 0;
 	size_t		nIndex = 0;
@@ -17,14 +17,14 @@ BOOL IsAbleFile(const TCHAR* ptszSourceFullPath, const SH_APPLY_FILEINFO ShApply
 	TCHAR		tszFileName[FILENAME_STRLEN];
 	TCHAR		tszFileExt[FILEEXT_STRLEN];
 	TCHAR		tszTime[FILEATT_DATETIME_STRLEN];
-	TCHAR* ptszApplyExt = NULL;
+	TCHAR* ptszApplyExt = nullptr;
 
-	CMemBuffer<TCHAR>* pTDestination = NULL;
+	CMemBuffer<TCHAR>* pTDestination = nullptr;
 
 	SYSTEMTIME	stLocal;
 
-	if( !ptszSourceFullPath ) return false;
-	if( _tcslen(ptszSourceFullPath) < 1 ) return false;
+	int iLength = static_cast<int>(_tcslen(ptszSourceFullPath));
+	if( ptszSourceFullPath == nullptr || iLength == 0 ) return false;
 
 	if( _tcslen(ShApplyFileInfo.m_tszModifyStDate) > 0 || _tcslen(ShApplyFileInfo.m_tszModifyEdDate) > 0 )
 	{
@@ -56,8 +56,8 @@ BOOL IsAbleFile(const TCHAR* ptszSourceFullPath, const SH_APPLY_FILEINFO ShApply
 
 			if( pTDestination )
 			{
-				delete[]pTDestination;
-				pTDestination = NULL;
+				delete [] pTDestination;
+				pTDestination = nullptr;
 			}
 
 			if( ShApplyFileInfo.m_bIsApply )
@@ -78,31 +78,30 @@ BOOL IsAbleFile(const TCHAR* ptszSourceFullPath, const SH_APPLY_FILEINFO ShApply
 
 //***************************************************************************
 //
-BOOL CreateDirectoryRecursive(const TCHAR* ptszFolder)
+bool CreateDirectoryRecursive(const TCHAR* ptszFolder)
 {
-	size_t		nLen = 0;
-	size_t		nCount = 0;
-	TCHAR		tszActiveFolder[DIRECTORY_STRLEN + 16];
-	TCHAR		tszSourceFolder[DIRECTORY_STRLEN];
-	TCHAR* ptszSourceLoc = NULL;
+	int		iCount = 0;
+	TCHAR	tszActiveFolder[DIRECTORY_STRLEN + 16];
+	TCHAR	tszSourceFolder[DIRECTORY_STRLEN];
+	TCHAR* ptszSourceLoc = nullptr;
 
 	WIN32_FIND_DATA		FindData;
 	HANDLE				hFindFile;
 
-	if( !ptszFolder ) return false;
-	if( (nLen = _tcslen(ptszFolder)) < 1 ) return false;
+	int iLength = static_cast<int>(_tcslen(ptszFolder));
+	if( ptszFolder == nullptr || iLength == 0 ) return false;
 
-	for( ptszSourceLoc = (TCHAR*)(ptszFolder + nLen - 1); nCount < nLen; ptszSourceLoc-- )
+	for( ptszSourceLoc = (TCHAR*)(ptszFolder + iLength - 1); iCount < iLength; ptszSourceLoc-- )
 	{
 		if( *ptszSourceLoc == '/' || *ptszSourceLoc == '\\' )
 		{
-			nCount++;
+			iCount++;
 			break;
 		}
-		nCount++;
+		iCount++;
 	}
 
-	_tcsncpy_s(tszSourceFolder, _countof(tszSourceFolder), ptszFolder, nLen - nCount);
+	_tcsncpy_s(tszSourceFolder, _countof(tszSourceFolder), ptszFolder, iLength - iCount);
 	_sntprintf_s(tszActiveFolder, _countof(tszActiveFolder), _TRUNCATE, _T("%s\\*.*"), tszSourceFolder);
 
 	if( (hFindFile = FindFirstFile(tszActiveFolder, &FindData)) == INVALID_HANDLE_VALUE )
@@ -116,16 +115,16 @@ BOOL CreateDirectoryRecursive(const TCHAR* ptszFolder)
 
 	FindClose(hFindFile);
 
-	return CreateDirectory(ptszFolder, NULL);
+	return CreateDirectory(ptszFolder, nullptr);
 }
 
 //***************************************************************************
 //
-BOOL RemoveDirectoryRecursive(const TCHAR* ptszFolder, const BOOL bSelfDel)
+bool RemoveDirectoryRecursive(const TCHAR* ptszFolder, const bool bSelfDel)
 {
 	static TCHAR	tszSelfSourceFolder[DIRECTORY_STRLEN] = { 0, };
 
-	BOOL		bResult = true;
+	bool		bResult = true;
 	TCHAR		tszActiveFullPath[FULLPATH_STRLEN];
 	TCHAR		tszActiveFolder[DIRECTORY_STRLEN + 16];
 	TCHAR		tszSourceFolder[DIRECTORY_STRLEN];
@@ -133,8 +132,8 @@ BOOL RemoveDirectoryRecursive(const TCHAR* ptszFolder, const BOOL bSelfDel)
 	WIN32_FIND_DATA		FindData;
 	HANDLE				hFindFile;
 
-	if( !ptszFolder ) return false;
-	if( _tcslen(ptszFolder) < 1 ) return false;
+	int iLength = static_cast<int>(_tcslen(ptszFolder));
+	if( ptszFolder == nullptr || iLength == 0 ) return false;
 
 	if( ptszFolder[_tcslen(ptszFolder) - 1] != '/' && ptszFolder[_tcslen(ptszFolder) - 1] != '\\' )
 	{
@@ -191,9 +190,9 @@ BOOL RemoveDirectoryRecursive(const TCHAR* ptszFolder, const BOOL bSelfDel)
 
 //***************************************************************************
 //
-BOOL CopyFileRecursive(const TCHAR* ptszSourceFolder, const TCHAR* ptszDestFolder, const SH_APPLY_FILEINFO& ShApplyFileInfo)
+bool CopyFileRecursive(const TCHAR* ptszSourceFolder, const TCHAR* ptszDestFolder, const SH_APPLY_FILEINFO& ShApplyFileInfo)
 {
-	BOOL		bResult = true;
+	bool		bResult = true;
 	TCHAR		tszActiveFullPath[FULLPATH_STRLEN];
 	TCHAR		tszActiveFolder[DIRECTORY_STRLEN + 16];
 	TCHAR		tszSourceFolder[DIRECTORY_STRLEN];
@@ -203,7 +202,7 @@ BOOL CopyFileRecursive(const TCHAR* ptszSourceFolder, const TCHAR* ptszDestFolde
 	WIN32_FIND_DATA		FindData;
 	HANDLE				hFindFile;
 
-	if( !ptszSourceFolder || !ptszDestFolder ) return false;
+	if( ptszSourceFolder == nullptr || ptszDestFolder == nullptr ) return false;
 	if( _tcslen(ptszSourceFolder) < 1 || _tcslen(ptszDestFolder) < 1 ) return false;
 
 	if( ptszSourceFolder[_tcslen(ptszSourceFolder) - 1] != '/' && ptszSourceFolder[_tcslen(ptszSourceFolder) - 1] != '\\' )
@@ -261,9 +260,9 @@ BOOL CopyFileRecursive(const TCHAR* ptszSourceFolder, const TCHAR* ptszDestFolde
 
 //***************************************************************************
 //
-BOOL MoveFileRecursive(const TCHAR* ptszSourceFolder, const TCHAR* ptszDestFolder, const SH_APPLY_FILEINFO& ShApplyFileInfo)
+bool MoveFileRecursive(const TCHAR* ptszSourceFolder, const TCHAR* ptszDestFolder, const SH_APPLY_FILEINFO& ShApplyFileInfo)
 {
-	BOOL		bResult = true;
+	bool		bResult = true;
 	TCHAR		tszActiveFullPath[FULLPATH_STRLEN];
 	TCHAR		tszActiveFolder[DIRECTORY_STRLEN + 16];
 	TCHAR		tszSourceFolder[DIRECTORY_STRLEN];
@@ -273,7 +272,7 @@ BOOL MoveFileRecursive(const TCHAR* ptszSourceFolder, const TCHAR* ptszDestFolde
 	WIN32_FIND_DATA		FindData;
 	HANDLE				hFindFile;
 
-	if( !ptszSourceFolder || !ptszDestFolder ) return false;
+	if( ptszSourceFolder == nullptr || ptszDestFolder == nullptr ) return false;
 	if( _tcslen(ptszSourceFolder) < 1 || _tcslen(ptszDestFolder) < 1 ) return false;
 
 	if( ptszSourceFolder[_tcslen(ptszSourceFolder) - 1] != '/' && ptszSourceFolder[_tcslen(ptszSourceFolder) - 1] != '\\' )
@@ -331,16 +330,16 @@ BOOL MoveFileRecursive(const TCHAR* ptszSourceFolder, const TCHAR* ptszDestFolde
 
 //***************************************************************************
 //
-BOOL IsDirectory(const TCHAR* ptszFolder)
+bool IsDirectory(const TCHAR* ptszFolder)
 {
-	BOOL		bResult = true;
+	bool		bResult = true;
 	TCHAR		tszActiveFolder[DIRECTORY_STRLEN + 16];
 
 	WIN32_FIND_DATA		FindData;
 	HANDLE				hFindFile;
 
-	if( !ptszFolder ) return false;
-	if( _tcslen(ptszFolder) < 1 ) return false;
+	int iLength = static_cast<int>(_tcslen(ptszFolder));
+	if( ptszFolder == nullptr || iLength == 0 ) return false;
 
 	if( ptszFolder[_tcslen(ptszFolder) - 1] != '/' && ptszFolder[_tcslen(ptszFolder) - 1] != '\\' )
 		_sntprintf_s(tszActiveFolder, _countof(tszActiveFolder), _TRUNCATE, _T("%s\\*.*"), ptszFolder);
@@ -366,7 +365,7 @@ long RegCreateKeyExRecursive(const HKEY hRoot, const TCHAR* ptszSubKey, const bo
 	int			nLen = 0;
 	long		lRetCode = 0;
 	DWORD		dwDisposition = 0;
-	TCHAR* ptszActiveSubKey = NULL;
+	TCHAR* ptszActiveSubKey = nullptr;
 
 	HKEY		hKey;
 	REGSAM		samDesired = bReadOnly ? KEY_QUERY_VALUE | KEY_READ : KEY_ALL_ACCESS;
@@ -385,21 +384,21 @@ long RegCreateKeyExRecursive(const HKEY hRoot, const TCHAR* ptszSubKey, const bo
 			lRetCode = RegCreateKeyExRecursive(hRoot, ptszActiveSubKey, bReadOnly);
 			if( lRetCode != ERROR_SUCCESS )
 			{
-				delete[]ptszActiveSubKey;
-				ptszActiveSubKey = NULL;
+				delete []ptszActiveSubKey;
+				ptszActiveSubKey = nullptr;
 
 				RegCloseKey(hKey);
 
 				return lRetCode;
 			}
 
-			delete[]ptszActiveSubKey;
-			ptszActiveSubKey = NULL;
+			delete []ptszActiveSubKey;
+			ptszActiveSubKey = nullptr;
 		}
 	}
 
-	lRetCode = RegCreateKeyEx(hRoot, ptszSubKey, 0, _T(""), REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS,
-							  NULL, &hKey, &dwDisposition);
+	lRetCode = RegCreateKeyEx(hRoot, ptszSubKey, 0, nullptr, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS,
+							  nullptr, &hKey, &dwDisposition);
 
 	RegCloseKey(hKey);
 
@@ -424,7 +423,7 @@ long RegDeleteKeyRecursive(const HKEY hKey, const TCHAR* ptszSubKey)
 	while( 1 )
 	{
 		dwSize = REGISTRY_KEY_STRLEN;
-		lRetCode = RegEnumKeyEx(newKey, 0, szNewSubKey, &dwSize, NULL, NULL, NULL, &FileTime);
+		lRetCode = RegEnumKeyEx(newKey, 0, szNewSubKey, &dwSize, nullptr, nullptr, nullptr, &FileTime);
 		if( lRetCode != ERROR_SUCCESS ) break;
 
 		lRetCode = RegDeleteKeyRecursive(newKey, szNewSubKey);
@@ -438,7 +437,7 @@ long RegDeleteKeyRecursive(const HKEY hKey, const TCHAR* ptszSubKey)
 
 //***************************************************************************
 //
-BOOL RegSetValue(const HKEY hRoot, const TCHAR* ptszSubKey, const DWORD dwOptions, const REGSAM samDesired, const TCHAR* ptszName, DWORD dwType, const void* pvValue, DWORD dwLength)
+bool RegSetValue(const HKEY hRoot, const TCHAR* ptszSubKey, const DWORD dwOptions, const REGSAM samDesired, const TCHAR* ptszName, DWORD dwType, const void* pvValue, DWORD dwLength)
 {
 	long		lRetCode = 0;
 	DWORD		dwDisposition = 0;
@@ -452,7 +451,6 @@ BOOL RegSetValue(const HKEY hRoot, const TCHAR* ptszSubKey, const DWORD dwOption
 	if( lRetCode != ERROR_SUCCESS )
 	{
 		RegCloseKey(hKey);
-
 		return false;
 	}
 
@@ -463,21 +461,20 @@ BOOL RegSetValue(const HKEY hRoot, const TCHAR* ptszSubKey, const DWORD dwOption
 
 //***************************************************************************
 //
-BOOL RegSetValue(const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* ptszName, const BYTE* pbValue, DWORD dwLength)
+bool RegSetValue(const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* ptszName, const BYTE* pbValue, DWORD dwLength)
 {
 	long		lRetCode = 0;
 	DWORD		dwDisposition = 0;
 
 	HKEY		hKey;
 
-	lRetCode = RegCreateKeyEx(hRoot, ptszSubKey, 0, _T(""), REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &hKey, &dwDisposition);
+	lRetCode = RegCreateKeyEx(hRoot, ptszSubKey, 0, nullptr, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, nullptr, &hKey, &dwDisposition);
 	if( lRetCode != ERROR_SUCCESS ) return false;
 
 	lRetCode = RegSetValueEx(hKey, ptszName, 0, REG_SZ, pbValue, dwLength);
 	if( lRetCode != ERROR_SUCCESS )
 	{
 		RegCloseKey(hKey);
-
 		return false;
 	}
 
@@ -488,21 +485,20 @@ BOOL RegSetValue(const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* ptszNam
 
 //***************************************************************************
 //
-BOOL RegSetValue(const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* ptszName, const DWORD dwValue)
+bool RegSetValue(const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* ptszName, const DWORD dwValue)
 {
 	long		lRetCode = 0;
 	DWORD		dwDisposition = 0;
 
 	HKEY		hKey;
 
-	lRetCode = RegCreateKeyEx(hRoot, ptszSubKey, 0, _T(""), REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &hKey, &dwDisposition);
+	lRetCode = RegCreateKeyEx(hRoot, ptszSubKey, 0, nullptr, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, nullptr, &hKey, &dwDisposition);
 	if( lRetCode != ERROR_SUCCESS ) return false;
 
 	lRetCode = RegSetValueEx(hKey, ptszName, 0, REG_DWORD, (CONST BYTE*) & dwValue, sizeof(DWORD));
 	if( lRetCode != ERROR_SUCCESS )
 	{
 		RegCloseKey(hKey);
-
 		return false;
 	}
 
@@ -522,14 +518,13 @@ DWORD GetRegSzValueLen(const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* p
 
 	HKEY		hKey;
 
-	lRetCode = RegCreateKeyEx(hRoot, ptszSubKey, 0, _T(""), REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &hKey, &dwDisposition);
+	lRetCode = RegCreateKeyEx(hRoot, ptszSubKey, 0, nullptr, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, nullptr, &hKey, &dwDisposition);
 	if( lRetCode != ERROR_SUCCESS ) return 0;
 
-	lRetCode = RegQueryValueEx(hKey, ptszName, NULL, &dwType, NULL, &dwLength);
+	lRetCode = RegQueryValueEx(hKey, ptszName, nullptr, &dwType, nullptr, &dwLength);
 	if( lRetCode != ERROR_SUCCESS )
 	{
 		RegCloseKey(hKey);
-
 		return 0;
 	}
 
@@ -538,7 +533,7 @@ DWORD GetRegSzValueLen(const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* p
 
 //***************************************************************************
 //
-BOOL RegGetValue(void* pvValue, DWORD& dwLength, const HKEY hRoot, const TCHAR* ptszSubKey, const DWORD dwOptions, const REGSAM samDesired, const TCHAR* ptszName, DWORD& dwType)
+bool RegGetValue(void* pvValue, DWORD& dwLength, const HKEY hRoot, const TCHAR* ptszSubKey, const DWORD dwOptions, const REGSAM samDesired, const TCHAR* ptszName, DWORD& dwType)
 {
 	long		lRetCode = 0;
 	DWORD		dwDisposition = 0;
@@ -548,11 +543,10 @@ BOOL RegGetValue(void* pvValue, DWORD& dwLength, const HKEY hRoot, const TCHAR* 
 	lRetCode = RegOpenKeyEx(hRoot, ptszSubKey, dwOptions, samDesired, &hKey);
 	if( lRetCode != ERROR_SUCCESS ) return false;
 
-	lRetCode = RegQueryValueEx(hKey, ptszName, NULL, &dwType, (BYTE*)pvValue, &dwLength);
+	lRetCode = RegQueryValueEx(hKey, ptszName, nullptr, &dwType, (BYTE*)pvValue, &dwLength);
 	if( lRetCode != ERROR_SUCCESS )
 	{
 		RegCloseKey(hKey);
-
 		return false;
 	}
 
@@ -563,7 +557,7 @@ BOOL RegGetValue(void* pvValue, DWORD& dwLength, const HKEY hRoot, const TCHAR* 
 
 //***************************************************************************
 //
-BOOL RegGetValue(BYTE* pbValue, DWORD& dwLength, const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* ptszName)
+bool RegGetValue(BYTE* pbValue, DWORD& dwLength, const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* ptszName)
 {
 	long		lRetCode = 0;
 	DWORD		dwType = 0;
@@ -571,14 +565,13 @@ BOOL RegGetValue(BYTE* pbValue, DWORD& dwLength, const HKEY hRoot, const TCHAR* 
 
 	HKEY		hKey;
 
-	lRetCode = RegCreateKeyEx(hRoot, ptszSubKey, 0, _T(""), REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &hKey, &dwDisposition);
+	lRetCode = RegCreateKeyEx(hRoot, ptszSubKey, 0, nullptr, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, nullptr, &hKey, &dwDisposition);
 	if( lRetCode != ERROR_SUCCESS ) return false;
 
-	lRetCode = RegQueryValueEx(hKey, ptszName, NULL, &dwType, pbValue, &dwLength);
+	lRetCode = RegQueryValueEx(hKey, ptszName, nullptr, &dwType, pbValue, &dwLength);
 	if( lRetCode != ERROR_SUCCESS )
 	{
 		RegCloseKey(hKey);
-
 		return false;
 	}
 
@@ -589,7 +582,7 @@ BOOL RegGetValue(BYTE* pbValue, DWORD& dwLength, const HKEY hRoot, const TCHAR* 
 
 //***************************************************************************
 //
-BOOL RegGetValue(DWORD* pdwValue, const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* ptszName)
+bool RegGetValue(DWORD* pdwValue, const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* ptszName)
 {
 	long		lRetCode = 0;
 	DWORD		dwType = 0;
@@ -598,15 +591,14 @@ BOOL RegGetValue(DWORD* pdwValue, const HKEY hRoot, const TCHAR* ptszSubKey, con
 
 	HKEY		hKey;
 
-	lRetCode = RegCreateKeyEx(hRoot, ptszSubKey, 0, _T(""), REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &hKey, &dwDisposition);
+	lRetCode = RegCreateKeyEx(hRoot, ptszSubKey, 0, nullptr, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, nullptr, &hKey, &dwDisposition);
 	if( lRetCode != ERROR_SUCCESS ) return false;
 
 	dwSize = sizeof(DWORD);
-	lRetCode = RegQueryValueEx(hKey, ptszName, NULL, &dwType, (BYTE*)pdwValue, &dwSize);
+	lRetCode = RegQueryValueEx(hKey, ptszName, nullptr, &dwType, (BYTE*)pdwValue, &dwSize);
 	if( lRetCode != ERROR_SUCCESS )
 	{
 		RegCloseKey(hKey);
-
 		return false;
 	}
 
@@ -617,7 +609,7 @@ BOOL RegGetValue(DWORD* pdwValue, const HKEY hRoot, const TCHAR* ptszSubKey, con
 
 //***************************************************************************
 //
-BOOL IsRegKey(const HKEY hKey, const TCHAR* ptszSubKey)
+bool IsRegKey(const HKEY hKey, const TCHAR* ptszSubKey)
 {
 	long	lRetCode = 0;
 
@@ -654,7 +646,7 @@ HANDLE GetFileHandleDuplicate(TCHAR* ptszDestFullPath, TCHAR* ptszDestFileNameEx
 	_sntprintf_s(tszTempFullPath, _countof(tszTempFullPath), _TRUNCATE, _T("%s%s"), tszFolderPath, tszFileNameExt);
 	_sntprintf_s(tszTempFileNameExt, _countof(tszTempFileNameExt), _TRUNCATE, _T("%s.%s"), tszFileName, tszFileExt);
 
-	hFile = CreateFile(tszTempFullPath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	hFile = CreateFile(tszTempFullPath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_NEW, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile == INVALID_HANDLE_VALUE )
 	{
 		CloseHandle(hFile);
@@ -665,7 +657,7 @@ HANDLE GetFileHandleDuplicate(TCHAR* ptszDestFullPath, TCHAR* ptszDestFileNameEx
 		{
 			_sntprintf_s(tszTempFileNameExt, _countof(tszTempFileNameExt), _TRUNCATE, _T("%s(%d).%s"), tszFileName, i, tszFileExt);
 			_sntprintf_s(tszTempFullPath, _countof(tszTempFullPath), _TRUNCATE, _T("%s%s"), tszFolderPath, tszTempFileNameExt);
-			hFile = CreateFile(tszTempFullPath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_ARCHIVE, NULL);
+			hFile = CreateFile(tszTempFullPath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_NEW, FILE_ATTRIBUTE_ARCHIVE, NULL);
 
 			if( hFile != INVALID_HANDLE_VALUE ) break;
 
@@ -683,31 +675,80 @@ HANDLE GetFileHandleDuplicate(TCHAR* ptszDestFullPath, TCHAR* ptszDestFileNameEx
 	return hFile;
 }
 
-int IsFileType(const TCHAR* ptszFullPath)
+//***************************************************************************
+//
+bool IsUTF8WithoutBom(const void* pBuffer, const size_t BuffSize)
 {
-	BOOL	bReturn = false;
-	DWORD	dwReadSize = 0;
-	int		nIsType = 0;
-	WORD	wWord1, wWord2;
-	BYTE    bByte;
-	wchar_t wszBuffer[3];
+	bool bUTF8 = true;
+	unsigned char* start = (unsigned char*)pBuffer;
+	unsigned char* end = (unsigned char*)pBuffer + BuffSize;
+	while( start < end )
+	{
+		if( *start < 0x80 )			// (10000000)[output][/output]
+		{
+			start++;
+		}
+		else if( *start < (0xC0) )	// (11000000)
+		{
+			bUTF8 = false;
+			break;
+		}
+		else if( *start < (0xE0) )	// (11100000)
+		{
+			if( start >= end - 1 )
+				break;
+			if( (start[1] & (0xC0)) != 0x80 )
+			{
+				bUTF8 = false;
+				break;
+			}
+			start += 2;
+		}
+		else if( *start < (0xF0) )	// (11110000)
+		{
+			if( start >= end - 2 )
+				break;
+			if( (start[1] & (0xC0)) != 0x80 || (start[2] & (0xC0)) != 0x80 )
+			{
+				bUTF8 = false;
+				break;
+			}
+			start += 3;
+		}
+		else
+		{
+			bUTF8 = false;
+			break;
+		}
+	}
+	return bUTF8;
+}
+
+//***************************************************************************
+//
+EFileType IsFileType(const TCHAR* ptszFullPath)
+{
+	BOOL		bReturn = false;
+	DWORD		dwReadSize = 0;
+	WORD		wWord1, wWord2;
+	BYTE		bByte;
+	wchar_t		wszBuffer[3];
+	EFileType	eFileType = DEFAULT;
 
 	HANDLE	hFile;
 
-	hFile = CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	hFile = CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile == INVALID_HANDLE_VALUE )
 	{
 		CloseHandle(hFile);
-
-		return 0;
+		return eFileType;
 	}
 
 	bReturn = ReadFile(hFile, wszBuffer, sizeof(WORD) * 2, &dwReadSize, NULL);
 	if( !bReturn )
 	{
 		CloseHandle(hFile);
-
-		return 0;
+		return eFileType;
 	}
 	wszBuffer[2] = '\0';
 
@@ -718,25 +759,33 @@ int IsFileType(const TCHAR* ptszFullPath)
 	if( wWord1 == UNICODE_LE_FILE_IDENTIFIER_WORD || wWord1 == UNICODE_BE_FILE_IDENTIFIER_WORD )
 	{
 		if( wWord1 == UNICODE_LE_FILE_IDENTIFIER_WORD )
-			nIsType = 1;		// UNICODE 
+			eFileType = UTF16_LE;		// UNICODE(LITTLE ENDIAN) 
 		else if( wWord1 == UNICODE_BE_FILE_IDENTIFIER_WORD )
-			nIsType = 2;		// UNICODE(BIG ENDIAN)
+			eFileType = UTF16_BE;		// UNICODE(BIG ENDIAN)
 	}
 	else
 	{
 		bByte = ((BYTE)(wWord2 & 0xff));
 		if( wWord1 == (WORD)UTF_FILE_IDENTIFIER_WORD && bByte == (BYTE)UTF_FILE_IDENTIFIER_BYTE )
-			nIsType = 3;		// UTF-8
+			eFileType = UTF8_BOM;	// UTF8_BOM
 		else
-			nIsType = 4;		// ANSI
+		{
+			CMemBuffer<BYTE> ByteDestination;
+			if( !ReadFileMap(ByteDestination, ptszFullPath) ) return eFileType;
+
+			if( IsUTF8WithoutBom((const void*)ByteDestination.GetBuffer(), ByteDestination.GetBufSize()) )
+				eFileType = UTF8_NOBOM;		// UTF8_NOBOM
+			else
+				eFileType = ANSI;			// ANSI
+		}
 	}
 
-	return nIsType;
+	return eFileType;
 }
 
 //***************************************************************************
 //
-BOOL ReadFile(CMemBuffer<BYTE>& ByteDestination, const TCHAR* ptszFullPath)
+bool ReadFile(CMemBuffer<BYTE>& ByteDestination, const TCHAR* ptszFullPath)
 {
 	long	lReadSize = 0;
 	DWORD	dwLength = 0;
@@ -744,17 +793,18 @@ BOOL ReadFile(CMemBuffer<BYTE>& ByteDestination, const TCHAR* ptszFullPath)
 	DWORD	dwMaxReadSize = MAX_BUFFER_SIZE;
 	DWORD	dwReadOffset = 0;
 	DWORD	dwReadNumSize = 0;
-	BYTE* pbBuffer = NULL;
+	BYTE* pbBuffer = nullptr;
 
-	HANDLE	hFile;
+	HANDLE		hFile;
+
+	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
 
 	dwLength = GetFileSize(ptszFullPath);
 
-	hFile = CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	hFile = CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile == INVALID_HANDLE_VALUE )
 	{
 		CloseHandle(hFile);
-
 		return false;
 	}
 
@@ -767,11 +817,10 @@ BOOL ReadFile(CMemBuffer<BYTE>& ByteDestination, const TCHAR* ptszFullPath)
 	pbBuffer = ByteDestination.GetBuffer();
 	while( 1 )
 	{
-		BOOL bReturn = ReadFile(hFile, pbBuffer + dwReadOffset, dwReadNumSize, &dwReadSize, NULL);
+		bool bReturn = ReadFile(hFile, pbBuffer + dwReadOffset, dwReadNumSize, &dwReadSize, NULL);
 		if( bReturn == FALSE )
 		{
 			CloseHandle(hFile);
-
 			return false;
 		}
 
@@ -791,11 +840,10 @@ BOOL ReadFile(CMemBuffer<BYTE>& ByteDestination, const TCHAR* ptszFullPath)
 
 //***************************************************************************
 //
-BOOL ReadFile(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszFullPath)
+bool ReadFile(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszFullPath)
 {
-	BOOL	bReturn = false;
+	bool	bReturn = false;
 	int		i = 0;
-	int		nIsType = 0;
 	long	lReadSize = 0;
 	DWORD	dwLength = 0;
 	DWORD	dwTotFileSize = 0;
@@ -803,71 +851,50 @@ BOOL ReadFile(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszFullPath)
 	DWORD	dwMaxReadSize = MAX_BUFFER_SIZE;
 	DWORD	dwReadOffset = 0;
 	DWORD	dwReadNumSize = 0;
-	WORD	wWord1, wWord2;
-	BYTE    bByte;
 	wchar_t	wcChar = L'\0';
-	char* pszBuffer = NULL;
-	wchar_t wszBuffer[3];
-	wchar_t* pwszBuffer = NULL;
+	char* pszBuffer = nullptr;
+	wchar_t* pwszBuffer = nullptr;
 
-	HANDLE	hFile;
+	HANDLE		hFile;
+	EFileType	eFileType = DEFAULT;
 
 	CMemBuffer<char>	StrBuffer;
 	CMemBuffer<wchar_t>	WStrBuffer;
 
-	if( !ptszFullPath ) return false;
-	if( _tcslen(ptszFullPath) < 1 ) return false;
+	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
 
 	dwLength = GetFileSize(ptszFullPath);
 	dwMaxReadSize = dwLength;
 
-	hFile = CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	eFileType = IsFileType(ptszFullPath);
+
+	hFile = CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile == INVALID_HANDLE_VALUE )
 	{
 		CloseHandle(hFile);
-
 		return false;
 	}
 
-	bReturn = ReadFile(hFile, wszBuffer, sizeof(WORD) * 2, &dwReadSize, NULL);
-	if( !bReturn )
+	if( eFileType == UTF16_BE || eFileType == UTF16_LE )
 	{
-		CloseHandle(hFile);
-
-		return false;
-	}
-	wszBuffer[2] = '\0';
-
-	wWord1 = wszBuffer[0];
-	wWord2 = wszBuffer[1];
-	if( wWord1 == UNICODE_LE_FILE_IDENTIFIER_WORD || wWord1 == UNICODE_BE_FILE_IDENTIFIER_WORD )
-	{
-		if( wWord1 == UNICODE_LE_FILE_IDENTIFIER_WORD ) nIsType = 1;
-		else if( wWord1 == UNICODE_BE_FILE_IDENTIFIER_WORD ) nIsType = 2;
+		SetFilePointer(hFile, sizeof(WORD), nullptr, FILE_BEGIN);
 
 		dwLength = dwLength - sizeof(WORD);
 
 		WStrBuffer.Init(dwLength + 1);
-
 		pwszBuffer = WStrBuffer.GetBuffer();
 
-		pwszBuffer[0] = wWord2;
-
-		dwReadOffset = dwReadOffset + 1;
-
 		dwTotFileSize = dwLength + 1;
-
 		if( dwTotFileSize > dwMaxReadSize )
 			dwReadNumSize = dwMaxReadSize;
 		else dwReadNumSize = dwTotFileSize;
 
 		while( 1 )
 		{
-			BOOL bReturn = ReadFile(hFile, pwszBuffer + dwReadOffset, dwReadNumSize, &dwReadSize, NULL);
+			bool bReturn = ReadFile(hFile, pwszBuffer + dwReadOffset, dwReadNumSize, &dwReadSize, NULL);
 			if( bReturn == FALSE )
 			{
 				CloseHandle(hFile);
-
 				return false;
 			}
 
@@ -882,52 +909,36 @@ BOOL ReadFile(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszFullPath)
 
 		CloseHandle(hFile);
 	}
-	else
+	else if( eFileType == ANSI || eFileType == UTF8_BOM || eFileType == UTF8_NOBOM )
 	{
-		bByte = ((BYTE)(wWord2 & 0xff));
-		if( wWord1 == (WORD)UTF_FILE_IDENTIFIER_WORD && bByte == (BYTE)UTF_FILE_IDENTIFIER_BYTE )
+		if( eFileType == UTF8_BOM )
 		{
-			nIsType = 3;
+			SetFilePointer(hFile, sizeof(WORD) + sizeof(BYTE), nullptr, FILE_BEGIN);
 
-			dwLength = dwLength - sizeof(WORD) - sizeof(BYTE);
+			dwLength = dwLength - (sizeof(WORD) + sizeof(BYTE));
 
 			StrBuffer.Init(dwLength + 1);
-
 			pszBuffer = StrBuffer.GetBuffer();
-
-			pszBuffer[0] = ((BYTE)(wWord2 >> 8));
-
-			dwReadOffset = dwReadOffset + 1;
 		}
 		else
 		{
-			nIsType = 4;
-
 			StrBuffer.Init(dwLength + 1);
-
 			pszBuffer = StrBuffer.GetBuffer();
 
-			pszBuffer[0] = ((BYTE)(wWord1 & 0xff));
-			pszBuffer[1] = ((BYTE)(wWord1 >> 8));
-			pszBuffer[2] = ((BYTE)(wWord2 & 0xff));
-			pszBuffer[3] = ((BYTE)(wWord2 >> 8));
-
-			dwReadOffset = dwReadOffset + 4;
+			dwMaxReadSize = dwMaxReadSize + 1;
 		}
 
 		dwTotFileSize = dwLength + 1;
-
 		if( dwTotFileSize > dwMaxReadSize )
 			dwReadNumSize = dwMaxReadSize;
 		else dwReadNumSize = dwTotFileSize;
 
 		while( 1 )
 		{
-			BOOL bReturn = ReadFile(hFile, pszBuffer + dwReadOffset, dwReadNumSize, &dwReadSize, NULL);
+			bool bReturn = ReadFile(hFile, pszBuffer + dwReadOffset, dwReadNumSize, &dwReadSize, NULL);
 			if( bReturn == FALSE )
 			{
 				CloseHandle(hFile);
-
 				return false;
 			}
 
@@ -945,15 +956,28 @@ BOOL ReadFile(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszFullPath)
 		CloseHandle(hFile);
 	}
 
+	if( eFileType == UTF16_LE || eFileType == UTF16_BE )
+	{
+		if( pwszBuffer == nullptr ) return false;
+	}
+	else if( eFileType == UTF8_BOM || eFileType == UTF8_NOBOM )
+	{
+		if( pszBuffer == nullptr ) return false;
+	}
+	else
+	{
+		if( pszBuffer == nullptr ) return false;
+	}
+
 #ifdef _UNICODE
-	if( nIsType == 1 )
+	if( eFileType == UTF16_LE )
 	{
 		TDestination.Init(wcslen(pwszBuffer) + 1);
 		_tcsncpy_s(TDestination.GetBuffer(), TDestination.GetBufSize(), pwszBuffer, _TRUNCATE);
 	}
-	else if( nIsType == 2 )
+	else if( eFileType == UTF16_BE )
 	{
-		for( int i = 0; *pwszBuffer; i++ )
+		for( i = 0; *pwszBuffer; i++ )
 		{
 			wcChar = *pwszBuffer;
 
@@ -962,7 +986,7 @@ BOOL ReadFile(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszFullPath)
 
 			*pwszBuffer = wcChar;
 
-			pwszBuffer++;
+			pwszBuffer = pwszBuffer++;
 		}
 		*pwszBuffer = '\0';
 
@@ -971,20 +995,20 @@ BOOL ReadFile(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszFullPath)
 		TDestination.Init(wcslen(pwszBuffer) + 1);
 		_tcsncpy_s(TDestination.GetBuffer(), TDestination.GetBufSize(), pwszBuffer, _TRUNCATE);
 	}
-	else if( nIsType == 3 )
+	else if( eFileType == UTF8_BOM || eFileType == UTF8_NOBOM )
 	{
-		if( !UnicodeToUTF8(TDestination, pszBuffer) ) return false;
+		if( Utf8ToUnicode(TDestination, pszBuffer, strlen(pszBuffer) + 1) != 0 ) return false;
 	}
 	else
 	{
-		if( !MultiByteToWideCharStr(TDestination, pszBuffer) ) return false;
+		if( AnsiToUnicode(TDestination, pszBuffer, strlen(pszBuffer) + 1) != 0 ) return false;
 	}
 #else
-	if( nIsType == 1 )
+	if( eFileType == UTF16_LE )
 	{
-		if( !WideCharToMultiByteStr(TDestination, pwszBuffer) ) return false;
+		if( UnicodeToAnsi(TDestination, pwszBuffer, wcslen(pwszBuffer) + 1) != 0 ) return false;
 	}
-	else if( nIsType == 2 )
+	else if( eFileType == UTF16_BE )
 	{
 		for( i = 0; *pwszBuffer; i++ )
 		{
@@ -1000,11 +1024,11 @@ BOOL ReadFile(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszFullPath)
 		*pwszBuffer = '\0';
 
 		pwszBuffer = pwszBuffer - i;
-		if( !WideCharToMultiByteStr(TDestination, pwszBuffer) ) return false;
+		if( UnicodeToAnsi(TDestination, pwszBuffer, wcslen(pwszBuffer) + 1) != 0 ) return false;
 	}
-	else if( nIsType == 3 )
+	else if( eFileType == UTF8_BOM || eFileType == UTF8_NOBOM )
 	{
-		if( !AnsiToUTF8(TDestination, pszBuffer) ) return false;
+		if( Utf8ToAnsi(TDestination, pszBuffer, strlen(pszBuffer) + 1) != 0 ) return false;
 	}
 	else
 	{
@@ -1018,37 +1042,36 @@ BOOL ReadFile(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszFullPath)
 
 //***************************************************************************
 //
-BOOL ReadFileMap(CMemBuffer<BYTE>& ByteDestination, const TCHAR* ptszFullPath)
+bool ReadFileMap(CMemBuffer<BYTE>& ByteDestination, const TCHAR* ptszFullPath)
 {
 	DWORD	dwLength = 0;
 	HANDLE	hFile, hFileMap;
 	LPVOID	lpvFile;
 
-	hFile = CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
+
+	hFile = CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile == INVALID_HANDLE_VALUE )
 	{
 		CloseHandle(hFile);
-
 		return false;
 	}
 
 	dwLength = GetFileSize(ptszFullPath);
 
-	hFileMap = CreateFileMapping(hFile, NULL, PAGE_WRITECOPY, 0, dwLength, NULL);
-	if( hFileMap == NULL )
+	hFileMap = CreateFileMapping(hFile, nullptr, PAGE_WRITECOPY, 0, dwLength, nullptr);
+	if( hFileMap == nullptr )
 	{
 		CloseHandle(hFile);
-
 		return false;
 	}
 
 	lpvFile = MapViewOfFile(hFileMap, FILE_MAP_COPY, 0, 0, 0);
 
-	if( lpvFile == NULL )
+	if( lpvFile == nullptr )
 	{
 		CloseHandle(hFile);
 		CloseHandle(hFileMap);
-
 		return false;
 	}
 
@@ -1057,7 +1080,7 @@ BOOL ReadFileMap(CMemBuffer<BYTE>& ByteDestination, const TCHAR* ptszFullPath)
 	memcpy(ByteDestination.GetBuffer(), lpvFile, dwLength);
 
 	UnmapViewOfFile(lpvFile);
-	lpvFile = NULL;
+	lpvFile = nullptr;
 
 	CloseHandle(hFile);
 	CloseHandle(hFileMap);
@@ -1067,59 +1090,58 @@ BOOL ReadFileMap(CMemBuffer<BYTE>& ByteDestination, const TCHAR* ptszFullPath)
 
 //***************************************************************************
 //
-BOOL ReadFileMap(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszFullPath)
+bool ReadFileMap(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszFullPath)
 {
-	BOOL	bIsProcess = false;
+	bool	bIsProcess = false;
 	DWORD	dwLength = 0;
 	int		i = 0;
-	int		nFileType = 0;
+	EFileType	eFileType = DEFAULT;
 
 	HANDLE	hFile, hFileMap;
 	LPVOID	lpvFile;
 
-	nFileType = IsFileType(ptszFullPath);
+	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
 
-	hFile = CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	eFileType = IsFileType(ptszFullPath);
+
+	hFile = CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, nullptr);
 	if( hFile == INVALID_HANDLE_VALUE )
 	{
 		CloseHandle(hFile);
-
 		return false;
 	}
 
 	dwLength = GetFileSize(ptszFullPath);
 
-	hFileMap = CreateFileMapping(hFile, NULL, PAGE_WRITECOPY, 0, dwLength, NULL);
-	if( hFileMap == NULL )
+	hFileMap = CreateFileMapping(hFile, nullptr, PAGE_WRITECOPY, 0, dwLength, nullptr);
+	if( hFileMap == nullptr )
 	{
 		CloseHandle(hFile);
-
 		return false;
 	}
 
 	lpvFile = MapViewOfFile(hFileMap, FILE_MAP_COPY, 0, 0, 0);
 
-	if( lpvFile == NULL )
+	if( lpvFile == nullptr )
 	{
 		CloseHandle(hFile);
 		CloseHandle(hFileMap);
-
 		return false;
 	}
 
 	bIsProcess = true;
 
 #ifdef _UNICODE
-	if( nFileType == 1 )				// UNICODE FILE
+	if( eFileType == UTF16_LE )
 	{
 		TDestination.Init(dwLength + 1);
 
 		_tcsncpy_s(TDestination.GetBuffer(), dwLength + 1, (wchar_t*)lpvFile + 1, _TRUNCATE);
 	}
-	else if( nFileType == 2 )			// UNICODE(BIG ENDIAN) FILE
+	else if( eFileType == UTF16_BE )
 	{
 		wchar_t	wcChar = L'\0';
-		wchar_t* pwszBuffer = NULL;
+		wchar_t* pwszBuffer = nullptr;
 
 		pwszBuffer = new wchar_t[dwLength + 1];
 
@@ -1145,27 +1167,27 @@ BOOL ReadFileMap(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszFullPath)
 
 		if( pwszBuffer )
 		{
-			delete pwszBuffer;
-			pwszBuffer = NULL;
+			delete [] pwszBuffer;
+			pwszBuffer = nullptr;
 		}
 	}
-	else if( nFileType == 3 )			// UTF-8 FILE
+	else if( eFileType == UTF8_BOM || eFileType == UTF8_NOBOM )
 	{
-		if( !UnicodeToUTF8(TDestination, (char*)lpvFile + 1) ) bIsProcess = false;
+		if( Utf8ToUnicode(TDestination, (char*)lpvFile + 1, dwLength + 1) != 0 ) bIsProcess = false;
 	}
-	else if( nFileType == 4 )			// ANSI FILE
+	else if( eFileType == ANSI )
 	{
-		if( !MultiByteToWideCharStr(TDestination, (char*)lpvFile) ) bIsProcess = false;
+		if( AnsiToUnicode(TDestination, (char*)lpvFile, dwLength + 1) != 0 ) bIsProcess = false;
 	}
 #else
-	if( nFileType == 1 )				// UNICODE FILE
+	if( eFileType == UTF16_LE )
 	{
-		if( !WideCharToMultiByteStr(TDestination, (wchar_t*)lpvFile + 1) ) bIsProcess = false;
+		if( UnicodeToAnsi(TDestination, (wchar_t*)lpvFile + 1, dwLength + 1) != 0 ) bIsProcess = false;
 	}
-	else if( nFileType == 2 )			// UNICODE(BIG ENDIAN) FILE
+	else if( eFileType == UTF16_BE )
 	{
 		wchar_t	wcChar = L'\0';
-		wchar_t* pwszBuffer = NULL;
+		wchar_t* pwszBuffer = nullptr;
 
 		pwszBuffer = new wchar_t[dwLength + 1];
 
@@ -1185,19 +1207,19 @@ BOOL ReadFileMap(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszFullPath)
 		*pwszBuffer = '\0';
 
 		pwszBuffer = pwszBuffer - i;
-		if( !WideCharToMultiByteStr(TDestination, pwszBuffer) ) bIsProcess = false;
+		if( UnicodeToAnsi(TDestination, pwszBuffer, wcslen(pwszBuffer) + 1) != 0 ) bIsProcess = false;
 
 		if( pwszBuffer )
 		{
-			delete pwszBuffer;
-			pwszBuffer = NULL;
+			delete [] pwszBuffer;
+			pwszBuffer = nullptr;
 		}
 	}
-	else if( nFileType == 3 )			// UTF-8 FILE	
+	else if( eFileType == UTF8_BOM || eFileType == UTF8_NOBOM )
 	{
-		if( !AnsiToUTF8(TDestination, (char*)lpvFile + 1) ) bIsProcess = false;
+		if( Utf8ToAnsi(TDestination, (char*)lpvFile + 1, dwLength + 1) != 0 ) bIsProcess = false;
 	}
-	else if( nFileType == 4 )			// ANSI FILE
+	else if( eFileType == ANSI )
 	{
 		TDestination.Init(dwLength + 1);
 
@@ -1206,7 +1228,7 @@ BOOL ReadFileMap(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszFullPath)
 #endif
 
 	UnmapViewOfFile(lpvFile);
-	lpvFile = NULL;
+	lpvFile = nullptr;
 
 	CloseHandle(hFile);
 	CloseHandle(hFileMap);
@@ -1214,9 +1236,361 @@ BOOL ReadFileMap(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszFullPath)
 	return bIsProcess;
 }
 
+#ifdef _STRING_
 //***************************************************************************
 //
-BOOL SaveFile(const TCHAR* ptszFullPath, const BYTE* pbBuffer, const DWORD dwLength)
+bool ReadFile(_tstring& DestString, const TCHAR* ptszFullPath)
+{
+	bool	bReturn = false;
+	int		i = 0;
+	long	lReadSize = 0;
+	DWORD	dwLength = 0;
+	DWORD	dwTotFileSize = 0;
+	DWORD	dwReadSize = 0;
+	DWORD	dwMaxReadSize = MAX_BUFFER_SIZE;
+	DWORD	dwReadOffset = 0;
+	DWORD	dwReadNumSize = 0;
+	wchar_t	wcChar = L'\0';
+	char* pszBuffer = nullptr;
+	wchar_t* pwszBuffer = nullptr;
+
+	HANDLE		hFile;
+	EFileType	eFileType = DEFAULT;
+
+	std::string		StrBuffer;
+	std::wstring	WStrBuffer;
+
+	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
+
+	dwLength = GetFileSize(ptszFullPath);
+	dwMaxReadSize = dwLength;
+
+	eFileType = IsFileType(ptszFullPath);
+
+	hFile = CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	if( hFile == INVALID_HANDLE_VALUE )
+	{
+		CloseHandle(hFile);
+		return false;
+	}
+
+	if( eFileType == UTF16_BE || eFileType == UTF16_LE )
+	{
+		SetFilePointer(hFile, sizeof(WORD), nullptr, FILE_BEGIN);
+
+		dwLength = dwLength - sizeof(WORD);
+
+		WStrBuffer.resize(dwLength + 1);
+		pwszBuffer = (wchar_t*)WStrBuffer.c_str();
+
+		dwTotFileSize = dwLength + 1;
+		if( dwTotFileSize > dwMaxReadSize )
+			dwReadNumSize = dwMaxReadSize;
+		else dwReadNumSize = dwTotFileSize;
+
+		while( 1 )
+		{
+			bool bReturn = ReadFile(hFile, pwszBuffer + dwReadOffset, dwReadNumSize, &dwReadSize, NULL);
+			if( bReturn == FALSE )
+			{
+				CloseHandle(hFile);
+				return false;
+			}
+
+			if( dwMaxReadSize > dwReadSize ) break;
+
+			dwReadOffset = dwReadOffset + dwReadNumSize;
+			lReadSize = dwTotFileSize - dwReadOffset - dwMaxReadSize;
+			if( lReadSize < 0 )
+				dwReadNumSize = dwTotFileSize - dwReadOffset;
+			else dwReadNumSize = dwMaxReadSize;
+		}
+
+		CloseHandle(hFile);
+	}
+	else if( eFileType == ANSI || eFileType == UTF8_BOM || eFileType == UTF8_NOBOM )
+	{
+		if( eFileType == UTF8_BOM )
+		{
+			SetFilePointer(hFile, sizeof(WORD) + sizeof(BYTE), nullptr, FILE_BEGIN);
+
+			dwLength = dwLength - (sizeof(WORD) + sizeof(BYTE));
+
+			StrBuffer.resize(dwLength + 1);
+			pszBuffer = (char *)StrBuffer.c_str();
+		}
+		else
+		{
+			StrBuffer.resize(dwLength + 1);
+			pszBuffer = (char*)StrBuffer.c_str();
+
+			dwMaxReadSize = dwMaxReadSize + 1;
+		}
+
+		dwTotFileSize = dwLength + 1;
+		if( dwTotFileSize > dwMaxReadSize )
+			dwReadNumSize = dwMaxReadSize;
+		else dwReadNumSize = dwTotFileSize;
+
+		while( 1 )
+		{
+			bool bReturn = ReadFile(hFile, pszBuffer + dwReadOffset, dwReadNumSize, &dwReadSize, NULL);
+			if( bReturn == FALSE )
+			{
+				CloseHandle(hFile);
+				return false;
+			}
+
+			if( dwMaxReadSize > dwReadSize ) break;
+
+			dwReadOffset = dwReadOffset + dwReadNumSize;
+			lReadSize = dwTotFileSize - dwReadOffset - dwMaxReadSize;
+			if( lReadSize < 0 )
+				dwReadNumSize = dwTotFileSize - dwReadOffset;
+			else dwReadNumSize = dwMaxReadSize;
+		}
+
+		*(pszBuffer + dwReadNumSize - 1) = '\0';
+
+		CloseHandle(hFile);
+	}
+
+	if( eFileType == UTF16_LE || eFileType == UTF16_BE )
+	{
+		if( pwszBuffer == nullptr ) return false;
+	}
+	else if( eFileType == UTF8_BOM || eFileType == UTF8_NOBOM )
+	{
+		if( pszBuffer == nullptr ) return false;
+	}
+	else
+	{
+		if( pszBuffer == nullptr ) return false;
+	}
+
+#ifdef _UNICODE
+	if( eFileType == UTF16_LE )
+	{
+		DestString = pwszBuffer;
+	}
+	else if( eFileType == UTF16_BE )
+	{
+		for( i = 0; *pwszBuffer; i++ )
+		{
+			wcChar = *pwszBuffer;
+
+			wcChar = SWAP16(wcChar);
+			if( wcChar == 0xCDCD ) break;
+
+			*pwszBuffer = wcChar;
+
+			pwszBuffer = pwszBuffer++;
+		}
+		*pwszBuffer = '\0';
+
+		pwszBuffer = pwszBuffer - i;
+
+		DestString = pwszBuffer;
+	}
+	else if( eFileType == UTF8_BOM || eFileType == UTF8_NOBOM )
+	{
+		if( Utf8ToUnicode_String(DestString, pszBuffer, strlen(pszBuffer) + 1) != 0 ) return false;
+	}
+	else
+	{
+		if( AnsiToUnicode_String(DestString, pszBuffer, strlen(pszBuffer) + 1) != 0 ) return false;
+	}
+#else
+	if( eFileType == UTF16_LE )
+	{
+		if( UnicodeToAnsi_String(DestString, pwszBuffer, wcslen(pwszBuffer) + 1) != 0 ) return false;
+	}
+	else if( eFileType == UTF16_BE )
+	{
+		for( i = 0; *pwszBuffer; i++ )
+		{
+			wcChar = *pwszBuffer;
+
+			wcChar = SWAP16(wcChar);
+			if( wcChar == 0xCDCD ) break;
+
+			*pwszBuffer = wcChar;
+
+			pwszBuffer++;
+		}
+		*pwszBuffer = '\0';
+
+		pwszBuffer = pwszBuffer - i;
+		if( UnicodeToAnsi_String(DestString, pwszBuffer, wcslen(pwszBuffer) + 1) != 0 ) return false;
+	}
+	else if( eFileType == UTF8_BOM || eFileType == UTF8_NOBOM )
+	{
+		if( Utf8ToAnsi_String(DestString, pszBuffer, strlen(pszBuffer) + 1) != 0 ) return false;
+	}
+	else
+	{
+		DestString = pszBuffer;
+	}
+#endif
+
+	return true;
+}
+
+//***************************************************************************
+//
+bool ReadFileMap(_tstring& DestString, const TCHAR* ptszFullPath)
+{
+	bool	bIsProcess = false;
+	DWORD	dwLength = 0;
+	int		i = 0;
+	EFileType	eFileType = DEFAULT;
+
+	HANDLE	hFile, hFileMap;
+	LPVOID	lpvFile;
+
+	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
+
+	eFileType = IsFileType(ptszFullPath);
+
+	hFile = CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, nullptr);
+	if( hFile == INVALID_HANDLE_VALUE )
+	{
+		CloseHandle(hFile);
+		return false;
+	}
+
+	dwLength = GetFileSize(ptszFullPath);
+
+	hFileMap = CreateFileMapping(hFile, nullptr, PAGE_WRITECOPY, 0, dwLength, nullptr);
+	if( hFileMap == nullptr )
+	{
+		CloseHandle(hFile);
+		return false;
+	}
+
+	lpvFile = MapViewOfFile(hFileMap, FILE_MAP_COPY, 0, 0, 0);
+
+	if( lpvFile == nullptr )
+	{
+		CloseHandle(hFile);
+		CloseHandle(hFileMap);
+		return false;
+	}
+
+	bIsProcess = true;
+
+#ifdef _UNICODE
+	if( eFileType == UTF16_LE )
+	{
+		DestString = (wchar_t*)lpvFile + 1;
+	}
+	else if( eFileType == UTF16_BE )
+	{
+		wchar_t	wcChar = L'\0';
+		wchar_t* pwszBuffer = nullptr;
+
+		pwszBuffer = new wchar_t[dwLength + 1];
+
+		_tcsncpy_s(pwszBuffer, dwLength + 1, (wchar_t*)lpvFile + 1, _TRUNCATE);
+
+		for( i = 0; *pwszBuffer; i++ )
+		{
+			wcChar = *pwszBuffer;
+
+			wcChar = SWAP16(wcChar);
+			if( wcChar == 0xCDCD ) break;
+
+			*pwszBuffer = wcChar;
+
+			pwszBuffer++;
+		}
+		*pwszBuffer = '\0';
+
+		pwszBuffer = pwszBuffer - i;
+
+		DestString = pwszBuffer;
+
+		if( pwszBuffer )
+		{
+			delete [] pwszBuffer;
+			pwszBuffer = nullptr;
+		}
+	}
+	else if( eFileType == UTF8_BOM )
+	{
+		if( Utf8ToUnicode_String(DestString, (char*)lpvFile + 3, dwLength + 1) != 0 ) bIsProcess = false;
+	}
+	else if( eFileType == UTF8_NOBOM )
+	{
+		if( Utf8ToUnicode_String(DestString, (char*)lpvFile, dwLength + 1) != 0 ) bIsProcess = false;
+	}
+	else if( eFileType == ANSI )
+	{
+		if( AnsiToUnicode_String(DestString, (char*)lpvFile, dwLength + 1) != 0 ) bIsProcess = false;
+	}
+#else
+	if( eFileType == UTF16_LE )
+	{
+		if( UnicodeToAnsi_String(DestString, (wchar_t*)lpvFile + 1, dwLength + 1) != 0 ) bIsProcess = false;
+	}
+	else if( eFileType == UTF16_BE )
+	{
+		wchar_t	wcChar = L'\0';
+		wchar_t* pwszBuffer = nullptr;
+
+		pwszBuffer = new wchar_t[dwLength + 1];
+
+		wcscpy_s(pwszBuffer, dwLength + 1, (wchar_t*)lpvFile + 1);
+
+		for( i = 0; *pwszBuffer; i++ )
+		{
+			wcChar = *pwszBuffer;
+
+			wcChar = SWAP16(wcChar);
+			if( wcChar == 0xCDCD ) break;
+
+			*pwszBuffer = wcChar;
+
+			pwszBuffer++;
+		}
+		*pwszBuffer = '\0';
+
+		pwszBuffer = pwszBuffer - i;
+		if( UnicodeToAnsi_String(DestString, pwszBuffer, wcslen(pwszBuffer) + 1) != 0 ) bIsProcess = false;
+
+		if( pwszBuffer )
+		{
+			delete [] pwszBuffer;
+			pwszBuffer = nullptr;
+		}
+	}
+	else if( eFileType == UTF8_BOM )
+	{
+		if( Utf8ToAnsi_String(DestString, (char*)lpvFile + 3, dwLength + 1) != 0 ) bIsProcess = false;
+	}
+	else if( eFileType == UTF8_NOBOM )
+	{
+		if( Utf8ToAnsi_String(DestString, (char*)lpvFile, dwLength + 1) != 0 ) bIsProcess = false;
+	}
+	else if( eFileType == ANSI )
+	{
+		DestString = (char*)lpvFile;
+	}
+#endif
+
+	UnmapViewOfFile(lpvFile);
+	lpvFile = nullptr;
+
+	CloseHandle(hFile);
+	CloseHandle(hFileMap);
+
+	return bIsProcess;
+}
+#endif
+
+//***************************************************************************
+//
+bool SaveFile(const TCHAR* ptszFullPath, const BYTE* pbBuffer, const DWORD dwLength)
 {
 	long	lWriteSize = 0;
 	DWORD	dwWrittenSize = 0;
@@ -1226,11 +1600,10 @@ BOOL SaveFile(const TCHAR* ptszFullPath, const BYTE* pbBuffer, const DWORD dwLen
 
 	HANDLE	hFile;
 
-	hFile = CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	hFile = CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile == INVALID_HANDLE_VALUE )
 	{
 		CloseHandle(hFile);
-
 		return false;
 	}
 
@@ -1240,11 +1613,10 @@ BOOL SaveFile(const TCHAR* ptszFullPath, const BYTE* pbBuffer, const DWORD dwLen
 
 	while( 1 )
 	{
-		BOOL bReturn = WriteFile(hFile, pbBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL);
+		bool bReturn = WriteFile(hFile, pbBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL);
 		if( bReturn == FALSE )
 		{
 			CloseHandle(hFile);
-
 			return false;
 		}
 
@@ -1264,39 +1636,36 @@ BOOL SaveFile(const TCHAR* ptszFullPath, const BYTE* pbBuffer, const DWORD dwLen
 
 //***************************************************************************
 //
-BOOL SaveAnsiFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer)
+bool SaveAnsiFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
 {
-	BOOL	bReturn = false;
+	bool	bReturn = false;
 	long	lWriteSize = 0;
 	DWORD	dwTotFileSize = 0;
 	DWORD	dwWrittenSize = 0;
 	DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
 	DWORD	dwWriteOffset = 0;
 	DWORD	dwWriteSize = 0;
-	char* pszBuffer = NULL;
+	char* pszBuffer = nullptr;
 
 	HANDLE	hFile;
 
-	if( !ptszFullPath ) return false;
-	if( _tcslen(ptszFullPath) < 1 ) return false;
-	if( !ptszBuffer ) return false;
-	if( _tcslen(ptszBuffer) < 1 ) return false;
+	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
+	if( ptszBuffer == nullptr || _tcslen(ptszBuffer) < 1 ) return false;
 
 #ifdef _UNICODE
 	CMemBuffer<char>	StrBuffer;
 
-	if( !WideCharToMultiByteStr(StrBuffer, ptszBuffer) ) return false;
+	if( UnicodeToAnsi(StrBuffer, ptszBuffer, _tcslen(ptszBuffer) + 1) != 0 ) return false;
 
 	pszBuffer = StrBuffer.GetBuffer();
 #else
-	pszBuffer = (TCHAR*)ptszBuffer;
+	pszBuffer = (char*)ptszBuffer;
 #endif
 
-	hFile = CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	hFile = CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile == INVALID_HANDLE_VALUE )
 	{
 		CloseHandle(hFile);
-
 		return false;
 	}
 
@@ -1312,7 +1681,6 @@ BOOL SaveAnsiFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer)
 		if( !bReturn )
 		{
 			CloseHandle(hFile);
-
 			return false;
 		}
 
@@ -1332,118 +1700,37 @@ BOOL SaveAnsiFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer)
 
 //***************************************************************************
 //
-BOOL SaveUnicodeLEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer)
+bool SaveUnicodeBEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
 {
-	BOOL	bReturn = false;
-	long	lWriteSize = 0;
+	bool	bReturn = false;
 	DWORD	dwTotFileSize = 0;
 	DWORD	dwWrittenSize = 0;
 	DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
 	DWORD	dwWriteOffset = 0;
 	DWORD	dwWriteSize = 0;
+	wchar_t	wcChar = L'\0';
 	wchar_t	wszChar[2];
-	wchar_t* pwszBuffer = NULL;
+	wchar_t* pwszBuffer = nullptr;
 
 	HANDLE	hFile;
 
-	if( !ptszFullPath ) return false;
-	if( _tcslen(ptszFullPath) < 1 ) return false;
-	if( !ptszBuffer ) return false;
-	if( _tcslen(ptszBuffer) < 1 ) return false;
+	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
+	if( ptszBuffer == nullptr || _tcslen(ptszBuffer) < 1 ) return false;
 
 #ifdef _UNICODE
 	pwszBuffer = (TCHAR*)ptszBuffer;
 #else
 	CMemBuffer<wchar_t>	WStrBuffer;
 
-	if( !MultiByteToWideCharStr(WStrBuffer, ptszBuffer) ) return false;
+	if( AnsiToUnicode(WStrBuffer, ptszBuffer, BufferSize) != 0 ) return false;
 
 	pwszBuffer = WStrBuffer.GetBuffer();
 #endif
 
-	hFile = CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	hFile = CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile == INVALID_HANDLE_VALUE )
 	{
 		CloseHandle(hFile);
-
-		return false;
-	}
-
-	swprintf_s(wszChar, 2, L"%c", UNICODE_LE_FILE_IDENTIFIER_WORD);
-	bReturn = WriteFile(hFile, wszChar, (DWORD)wcslen(wszChar) + 1, &dwWrittenSize, NULL);
-	if( !bReturn )
-	{
-		CloseHandle(hFile);
-
-		return false;
-	}
-
-	dwTotFileSize = ((DWORD)wcslen(pwszBuffer) * 2);
-
-	if( dwTotFileSize > dwMaxWriteSize )
-		dwWriteSize = dwMaxWriteSize;
-	else dwWriteSize = dwTotFileSize;
-
-	while( 1 )
-	{
-		bReturn = WriteFile(hFile, pwszBuffer + (dwWriteOffset / 2), dwWriteSize, &dwWrittenSize, NULL);
-		if( !bReturn )
-		{
-			CloseHandle(hFile);
-
-			return false;
-		}
-
-		if( dwMaxWriteSize > dwWrittenSize ) break;
-
-		dwWriteOffset = dwWriteOffset + dwWriteSize;
-		lWriteSize = dwTotFileSize - dwWriteOffset - dwMaxWriteSize;
-		if( lWriteSize < 0 )
-			dwWriteSize = dwTotFileSize - dwWriteOffset;
-		else dwWriteSize = dwMaxWriteSize;
-	}
-
-	CloseHandle(hFile);
-
-	return true;
-}
-
-//***************************************************************************
-//
-BOOL SaveUnicodeBEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer)
-{
-	BOOL	bReturn = false;
-	DWORD	dwTotFileSize = 0;
-	DWORD	dwWrittenSize = 0;
-	DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
-	DWORD	dwWriteOffset = 0;
-	DWORD	dwWriteSize = 0;
-	wchar_t wcChar = L'\0';
-	wchar_t	wszChar[2];
-	wchar_t* pwszBuffer = NULL;
-
-	HANDLE	hFile;
-
-	if( !ptszFullPath ) return false;
-	if( _tcslen(ptszFullPath) < 1 ) return false;
-	if( !ptszBuffer ) return false;
-	if( _tcslen(ptszBuffer) < 1 ) return false;
-
-#ifdef _UNICODE
-	pwszBuffer = (TCHAR*)ptszBuffer;
-#else
-	CMemBuffer<wchar_t>	WStrBuffer;
-
-	if( !MultiByteToWideCharStr(WStrBuffer, ptszBuffer) ) return false;
-
-	pwszBuffer = WStrBuffer.GetBuffer();
-#endif
-
-	hFile = CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
-	if( hFile == INVALID_HANDLE_VALUE )
-	{
-		CloseHandle(hFile);
-
 		return false;
 	}
 
@@ -1452,7 +1739,6 @@ BOOL SaveUnicodeBEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer)
 	if( !bReturn )
 	{
 		CloseHandle(hFile);
-
 		return false;
 	}
 
@@ -1468,7 +1754,6 @@ BOOL SaveUnicodeBEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer)
 		if( !bReturn )
 		{
 			CloseHandle(hFile);
-
 			return false;
 		}
 
@@ -1482,55 +1767,49 @@ BOOL SaveUnicodeBEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer)
 
 //***************************************************************************
 //
-BOOL SaveUTF8File(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer)
+bool SaveUnicodeLEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
 {
-	BOOL	bReturn = false;
+	bool	bReturn = false;
 	long	lWriteSize = 0;
 	DWORD	dwTotFileSize = 0;
 	DWORD	dwWrittenSize = 0;
 	DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
 	DWORD	dwWriteOffset = 0;
 	DWORD	dwWriteSize = 0;
-	char* pszBuffer = NULL;
-	wchar_t	wszChar[3];
+	wchar_t	wszChar[2];
+	wchar_t* pwszBuffer = nullptr;
 
 	HANDLE	hFile;
 
-	CMemBuffer<char>	StrBuffer;
-
-	if( !ptszFullPath ) return false;
-	if( _tcslen(ptszFullPath) < 1 ) return false;
-	if( !ptszBuffer ) return false;
-	if( _tcslen(ptszBuffer) < 1 ) return false;
+	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
+	if( ptszBuffer == nullptr || _tcslen(ptszBuffer) < 1 ) return false;
 
 #ifdef _UNICODE
-	if( !UTF8ToUnicode(StrBuffer, ptszBuffer) ) return false;
-
-	pszBuffer = StrBuffer.GetBuffer();
+	pwszBuffer = (TCHAR*)ptszBuffer;
 #else
-	if( !UTF8ToAnsi(StrBuffer, ptszBuffer) ) return false;
+	CMemBuffer<wchar_t>	WStrBuffer;
 
-	pszBuffer = StrBuffer.GetBuffer();
+	if( AnsiToUnicode(WStrBuffer, ptszBuffer, BufferSize) != 0 ) return false;
+
+	pwszBuffer = WStrBuffer.GetBuffer();
 #endif
 
-	hFile = CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	hFile = CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile == INVALID_HANDLE_VALUE )
 	{
 		CloseHandle(hFile);
-
 		return false;
 	}
 
-	swprintf_s(wszChar, 3, L"%c%c", UTF_FILE_IDENTIFIER_WORD, UTF_FILE_IDENTIFIER_BYTE);
+	swprintf_s(wszChar, 2, L"%c", UNICODE_LE_FILE_IDENTIFIER_WORD);
 	bReturn = WriteFile(hFile, wszChar, (DWORD)wcslen(wszChar) + 1, &dwWrittenSize, NULL);
 	if( !bReturn )
 	{
 		CloseHandle(hFile);
-
 		return false;
 	}
 
-	dwTotFileSize = (DWORD)strlen(pszBuffer);
+	dwTotFileSize = ((DWORD)wcslen(pwszBuffer) * 2);
 
 	if( dwTotFileSize > dwMaxWriteSize )
 		dwWriteSize = dwMaxWriteSize;
@@ -1538,11 +1817,10 @@ BOOL SaveUTF8File(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer)
 
 	while( 1 )
 	{
-		bReturn = WriteFile(hFile, pszBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL);
+		bReturn = WriteFile(hFile, pwszBuffer + (dwWriteOffset / 2), dwWriteSize, &dwWrittenSize, NULL);
 		if( !bReturn )
 		{
 			CloseHandle(hFile);
-
 			return false;
 		}
 
@@ -1562,21 +1840,163 @@ BOOL SaveUTF8File(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer)
 
 //***************************************************************************
 //
-BOOL GetFileInfoTime(const TCHAR* ptszFilePath, const int nCase, SYSTEMTIME& stLocal)
+bool SaveUTF8BOMFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
+{
+	bool	bReturn = false;
+	long	lWriteSize = 0;
+	DWORD	dwTotFileSize = 0;
+	DWORD	dwWrittenSize = 0;
+	DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
+	DWORD	dwWriteOffset = 0;
+	DWORD	dwWriteSize = 0;
+	char* pszBuffer = nullptr;
+	wchar_t	wszChar[3];
+
+	HANDLE	hFile;
+
+	CMemBuffer<char>	StrBuffer;
+
+	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
+	if( ptszBuffer == nullptr || _tcslen(ptszBuffer) < 1 ) return false;
+
+#ifdef _UNICODE
+	if( UnicodeToUtf8(StrBuffer, ptszBuffer, BufferSize) != 0 ) return false;
+
+	pszBuffer = StrBuffer.GetBuffer();
+#else
+	if( AnsiToUtf8(StrBuffer, ptszBuffer, BufferSize) != 0 ) return false;
+
+	pszBuffer = StrBuffer.GetBuffer();
+#endif
+
+	hFile = CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	if( hFile == INVALID_HANDLE_VALUE )
+	{
+		CloseHandle(hFile);
+		return false;
+	}
+
+	swprintf_s(wszChar, 3, L"%c%c", UTF_FILE_IDENTIFIER_WORD, UTF_FILE_IDENTIFIER_BYTE);
+	bReturn = WriteFile(hFile, wszChar, (DWORD)wcslen(wszChar) + 1, &dwWrittenSize, NULL);
+	if( !bReturn )
+	{
+		CloseHandle(hFile);
+		return false;
+	}
+
+	dwTotFileSize = (DWORD)strlen(pszBuffer);
+
+	if( dwTotFileSize > dwMaxWriteSize )
+		dwWriteSize = dwMaxWriteSize;
+	else dwWriteSize = dwTotFileSize;
+
+	while( 1 )
+	{
+		bReturn = WriteFile(hFile, pszBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL);
+		if( !bReturn )
+		{
+			CloseHandle(hFile);
+			return false;
+		}
+
+		if( dwMaxWriteSize > dwWrittenSize ) break;
+
+		dwWriteOffset = dwWriteOffset + dwWriteSize;
+		lWriteSize = dwTotFileSize - dwWriteOffset - dwMaxWriteSize;
+		if( lWriteSize < 0 )
+			dwWriteSize = dwTotFileSize - dwWriteOffset;
+		else dwWriteSize = dwMaxWriteSize;
+	}
+
+	CloseHandle(hFile);
+
+	return true;
+}
+
+//***************************************************************************
+//
+bool SaveUTF8NOBOMFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
+{
+	bool	bReturn = false;
+	long	lWriteSize = 0;
+	DWORD	dwTotFileSize = 0;
+	DWORD	dwWrittenSize = 0;
+	DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
+	DWORD	dwWriteOffset = 0;
+	DWORD	dwWriteSize = 0;
+	char* pszBuffer = nullptr;
+
+	HANDLE	hFile;
+
+	CMemBuffer<char>	StrBuffer;
+
+	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
+	if( ptszBuffer == nullptr || _tcslen(ptszBuffer) < 1 ) return false;
+
+#ifdef _UNICODE
+	if( UnicodeToUtf8(StrBuffer, ptszBuffer, BufferSize) != 0 ) return false;
+
+	pszBuffer = StrBuffer.GetBuffer();
+#else
+	if( AnsiToUtf8(StrBuffer, ptszBuffer, BufferSize) != 0 ) return false;
+
+	pszBuffer = StrBuffer.GetBuffer();
+#endif
+
+	hFile = CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	if( hFile == INVALID_HANDLE_VALUE )
+	{
+		CloseHandle(hFile);
+		return false;
+	}
+
+	dwTotFileSize = (DWORD)strlen(pszBuffer);
+
+	if( dwTotFileSize > dwMaxWriteSize )
+		dwWriteSize = dwMaxWriteSize;
+	else dwWriteSize = dwTotFileSize;
+
+	while( 1 )
+	{
+		bReturn = WriteFile(hFile, pszBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL);
+		if( !bReturn )
+		{
+			CloseHandle(hFile);
+			return false;
+		}
+
+		if( dwMaxWriteSize > dwWrittenSize ) break;
+
+		dwWriteOffset = dwWriteOffset + dwWriteSize;
+		lWriteSize = dwTotFileSize - dwWriteOffset - dwMaxWriteSize;
+		if( lWriteSize < 0 )
+			dwWriteSize = dwTotFileSize - dwWriteOffset;
+		else dwWriteSize = dwMaxWriteSize;
+	}
+
+	CloseHandle(hFile);
+
+	return true;
+}
+
+//***************************************************************************
+//
+bool GetFileInfoTime(const TCHAR* ptszFullPath, const int nCase, SYSTEMTIME& stLocal)
 {
 	FILETIME ftCreate, ftAccess, ftWrite;
 	SYSTEMTIME stUTC;
 
 	HANDLE hFile;
 
-	hFile = CreateFile(ptszFilePath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
+
+	hFile = CreateFile(ptszFullPath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if( hFile == INVALID_HANDLE_VALUE ) return false;
 
 	// Retrieve the file times for the file.
 	if( !GetFileTime(hFile, &ftCreate, &ftAccess, &ftWrite) )
 	{
 		CloseHandle(hFile);
-
 		return false;
 	}
 
@@ -1590,23 +2010,24 @@ BOOL GetFileInfoTime(const TCHAR* ptszFilePath, const int nCase, SYSTEMTIME& stL
 		FileTimeToSystemTime(&ftWrite, &stUTC);
 	else return false;
 
-	SystemTimeToTzSpecificLocalTime(NULL, &stUTC, &stLocal);
+	SystemTimeToTzSpecificLocalTime(nullptr, &stUTC, &stLocal);
 
 	return true;
 }
 
 //***************************************************************************
 //
-BOOL IsExistFile(const TCHAR* ptszFilePath)
+bool IsExistFile(const TCHAR* ptszFullPath)
 {
 	HANDLE		hFile;
 
-	hFile = CreateFile(ptszFilePath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
+
+	hFile = CreateFile(ptszFullPath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
 
 	if( hFile == INVALID_HANDLE_VALUE )
 	{
 		CloseHandle(hFile);
-
 		return false;
 	}
 
@@ -1617,14 +2038,16 @@ BOOL IsExistFile(const TCHAR* ptszFilePath)
 
 //***************************************************************************
 //
-DWORD GetFileSize(const TCHAR* ptszFilePath)
+DWORD GetFileSize(const TCHAR* ptszFullPath)
 {
 	DWORD		dwFileSizeLow = 0;
 	DWORD		dwFileSizeHigh = 0;
 
 	HANDLE		hFile;
 
-	hFile = CreateFile(ptszFilePath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
+
+	hFile = CreateFile(ptszFullPath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
 
 	if( hFile != INVALID_HANDLE_VALUE )
 		dwFileSizeLow = GetFileSize(hFile, &dwFileSizeHigh);
@@ -1637,13 +2060,15 @@ DWORD GetFileSize(const TCHAR* ptszFilePath)
 
 //***************************************************************************
 //
-BOOL GetFileInformation(const TCHAR* ptszFilePath, LPBY_HANDLE_FILE_INFORMATION lpFileInformation)
+bool GetFileInformation(const TCHAR* ptszFullPath, LPBY_HANDLE_FILE_INFORMATION lpFileInformation)
 {
-	BOOL		bResult = false;
+	bool		bResult = false;
 
 	HANDLE		hFile;
 
-	hFile = CreateFile(ptszFilePath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
+
+	hFile = CreateFile(ptszFullPath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
 
 	if( hFile != INVALID_HANDLE_VALUE )
 		bResult = GetFileInformationByHandle(hFile, lpFileInformation);
@@ -1655,17 +2080,17 @@ BOOL GetFileInformation(const TCHAR* ptszFilePath, LPBY_HANDLE_FILE_INFORMATION 
 
 //***************************************************************************
 //
-BOOL GetProductKeyExtract(CMemBuffer<TCHAR>& TProductKey, const BYTE* pbDigitalProductID, const DWORD dwLength, const BOOL bIsExtractBytesRange)
+bool GetProductKeyExtract(CMemBuffer<TCHAR>& TProductKey, const BYTE* pbDigitalProductID, const DWORD dwLength, const bool bIsExtractBytesRange)
 {
 	int		nKeyStartIndex = 0;
 	int		nKeyEndIndex = 0;
 	int		nIsContainsN = 0;
 	BYTE	bProductKeyExtract[16];
-	BYTE* pbSrcDigitalProductID = NULL;
-	TCHAR* ptszDecodedChars = NULL;
-	TCHAR* ptszDestLoc = NULL;
+	BYTE* pbSrcDigitalProductID = nullptr;
+	TCHAR* ptszDecodedChars = nullptr;
+	TCHAR* ptszDestLoc = nullptr;
 
-	TCHAR ptszKeyChars[] = {
+	TCHAR ptszKeyChars [] = {
 							_T('B'), _T('C'), _T('D'), _T('F'), _T('G'), _T('H'), _T('J'), _T('K'), _T('M'),
 							_T('P'), _T('Q'), _T('R'), _T('T'), _T('V'), _T('W'), _T('X'), _T('Y'),
 							_T('2'), _T('3'), _T('4'), _T('6'), _T('7'), _T('8'), _T('9'), _T('\0')
@@ -1754,8 +2179,8 @@ BOOL GetProductKeyExtract(CMemBuffer<TCHAR>& TProductKey, const BYTE* pbDigitalP
 
 	if( ptszDecodedChars )
 	{
-		delete[]ptszDecodedChars;
-		ptszDecodedChars = NULL;
+		delete []ptszDecodedChars;
+		ptszDecodedChars = nullptr;
 	}
 
 	return true;

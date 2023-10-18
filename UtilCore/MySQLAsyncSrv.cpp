@@ -25,12 +25,12 @@ CDBAsyncSrvHandler* CMySQLAsyncSrv::Regist(const BYTE command, CDBAsyncSrvHandle
 	return handler;
 }
 
-BOOL CMySQLAsyncSrv::StartService(INT32 nMaxThreadCnt, std::vector<DBNode> DBNodeVec)
+bool CMySQLAsyncSrv::StartService(INT32 nMaxThreadCnt, std::vector<DBNode> DBNodeVec)
 {
 	return InitMySQL(nMaxThreadCnt, DBNodeVec);
 }
 
-BOOL CMySQLAsyncSrv::InitMySQL(INT32 nMaxThreadCnt, std::vector<DBNode> DBNodeVec)
+bool CMySQLAsyncSrv::InitMySQL(INT32 nMaxThreadCnt, std::vector<DBNode> DBNodeVec)
 {
 	m_nMaxThreadCnt = nMaxThreadCnt;
 
@@ -79,13 +79,13 @@ bool CMySQLAsyncSrv::RunningThread(const __int32& nThreadIdx)
 	return true;
 }
 
-BOOL CMySQLAsyncSrv::Action()
+bool CMySQLAsyncSrv::Action()
 {
 	static uint64 cumulateCallCnt = 0;
 	while( 1 )
 	{
 		st_DBAsyncRq* pAsyncRq = Pop();	// DB 콜 구조체를 큐에서 가저오기
-		if( nullptr == pAsyncRq )
+		if( pAsyncRq == nullptr )
 		{
 			Sleep(1);
 			continue;
@@ -103,14 +103,13 @@ BOOL CMySQLAsyncSrv::Action()
 
 		CDBAsyncSrvHandler* command = static_cast<CDBAsyncSrvHandler*>(it->second);
 		int nRet = command->ProcessAsyncCall(pAsyncRq);	// 패킷 처리
-		if( DB_RETURN_TYPE_OK != nRet )
+		if( nRet != static_cast<short>(DB_RETURN_TYPE::OK) )
 		{
 			LOG_ERROR(_T("Failed Async Call... callIdent: [%u]"), pAsyncRq->callIdent);
 
 			// TODO.. 
 			// DB 처리에서 false 리턴하면 이곳으로 온다.
-
-			if( nRet == DB_RETURN_TYPE_TIMEOUT && pAsyncRq->bReTry == false )
+			if( nRet != static_cast<short>(DB_RETURN_TYPE::TIMEOUT) && pAsyncRq->bReTry == false )
 			{
 				uint64 endTick = _GetTickCount();
 				if( 300 <= endTick - startTick )
@@ -167,7 +166,7 @@ st_DBAsyncRq* CMySQLAsyncSrv::Pop()
 
 CMySQLConnPool* CMySQLAsyncSrv::GetMySQLConnPool(uint64 m_nID)
 {
-	if( nullptr == m_pMySQLConnPools )
+	if( m_pMySQLConnPools == nullptr )
 	{
 		LOG_ERROR(_T("[%s]m_pOdbcConnPools Is Null"), __TFUNCTION__);
 		return nullptr;

@@ -11,7 +11,7 @@
 // Construction/Destruction 
 //***************************************************************************
 
-CJSONParser::CJSONParser(BOOL bIsDebugPrint) : m_bRoot(true), m_pDocument(new _tDocument()), m_pValue(new _tValue(kObjectType))
+CJSONParser::CJSONParser(bool bIsDebugPrint) : m_bRoot(true), m_pDocument(new _tDocument()), m_pValue(new _tValue(kObjectType))
 {
 	m_bIsDebugPrint = bIsDebugPrint;
 	Print_DebugInfo(_T("JsonParser() create instance\n"));
@@ -97,7 +97,7 @@ _tstring CJSONParser::ReadFile(const TCHAR* ptszFilePath)
 
 //***************************************************************************
 //
-BOOL CJSONParser::WriteFile(const TCHAR* ptszFilePath, TCHAR* ptszJsonString)
+bool CJSONParser::WriteFile(const TCHAR* ptszFilePath, TCHAR* ptszJsonString)
 {
 	_tofstream out(ptszFilePath);
 
@@ -119,7 +119,7 @@ BOOL CJSONParser::WriteFile(const TCHAR* ptszFilePath, TCHAR* ptszJsonString)
 
 //***************************************************************************
 //
-BOOL CJSONParser::WriteJson(const TCHAR* ptszFilePath)
+bool CJSONParser::WriteJson(const TCHAR* ptszFilePath)
 {
 	_tStringBuffer buffer;
 
@@ -147,7 +147,7 @@ BOOL CJSONParser::WriteJson(const TCHAR* ptszFilePath)
 
 //***************************************************************************
 //
-BOOL CJSONParser::Parse(const _tstring jsonString)
+bool CJSONParser::Parse(const _tstring jsonString)
 {
 	if( jsonString.compare(_T("")) == 0 )
 	{
@@ -398,6 +398,28 @@ CJSONParser::operator _tstring() const
 
 //***************************************************************************
 //
+CJSONParser::operator int8() const
+{
+#ifdef _UNICODE
+	return ConvertToNumber<int8>(_wtoi, 0);
+#else
+	return ConvertToNumber<int8>(_ttoi, 0);
+#endif
+}
+
+//***************************************************************************
+//
+CJSONParser::operator uint8() const
+{
+#ifdef _UNICODE
+	return ConvertToNumber<uint8>(_wtoi, 0);
+#else
+	return ConvertToNumber<uint8>(_ttoi, 0);
+#endif
+}
+
+//***************************************************************************
+//
 CJSONParser::operator int16() const
 {
 #ifdef _UNICODE
@@ -486,7 +508,7 @@ CJSONParser::operator bool() const
 
 //***************************************************************************
 //
-BOOL CJSONParser::IsObject() const
+bool CJSONParser::IsObject() const
 {
 	switch( m_pValue->GetType() )
 	{
@@ -502,21 +524,21 @@ BOOL CJSONParser::IsObject() const
 
 //***************************************************************************
 //
-BOOL CJSONParser::IsString() const
+bool CJSONParser::IsString() const
 {
 	return m_pValue->IsString();
 }
 
 //***************************************************************************
 //
-BOOL CJSONParser::IsNumber() const
+bool CJSONParser::IsNumber() const
 {
 	return m_pValue->IsNumber();
 }
 
 //***************************************************************************
 //
-BOOL CJSONParser::IsStringNumber() const
+bool CJSONParser::IsStringNumber() const
 {
 	if( false == IsString() )
 		return false;
@@ -544,42 +566,42 @@ BOOL CJSONParser::IsStringNumber() const
 
 //***************************************************************************
 //
-BOOL CJSONParser::IsInt32() const
+bool CJSONParser::IsInt32() const
 {
 	return m_pValue->IsInt();
 }
 
 //***************************************************************************
 //
-BOOL CJSONParser::IsInt64() const
+bool CJSONParser::IsInt64() const
 {
 	return m_pValue->IsInt64();
 }
 
 //***************************************************************************
 //
-BOOL CJSONParser::IsUint32() const
+bool CJSONParser::IsUint32() const
 {
 	return m_pValue->IsUint();
 }
 
 //***************************************************************************
 //
-BOOL CJSONParser::IsUint64() const
+bool CJSONParser::IsUint64() const
 {
 	return m_pValue->IsUint64();
 }
 
 //***************************************************************************
 //
-BOOL CJSONParser::IsDouble() const
+bool CJSONParser::IsDouble() const
 {
 	return m_pValue->IsDouble();
 }
 
 //***************************************************************************
 //
-BOOL CJSONParser::IsBool() const
+bool CJSONParser::IsBool() const
 {
 	switch( m_pValue->GetType() )
 	{
@@ -593,21 +615,21 @@ BOOL CJSONParser::IsBool() const
 
 //***************************************************************************
 //
-BOOL CJSONParser::IsExists(const TCHAR* ptszKey) const
+bool CJSONParser::IsExists(const TCHAR* ptszKey) const
 {
 	return m_pValue->HasMember(ptszKey);
 }
 
 //***************************************************************************
 //
-BOOL CJSONParser::IsExists(const _tstring& strKey) const
+bool CJSONParser::IsExists(const _tstring& strKey) const
 {
 	return IsExists(strKey.c_str());
 }
 
 //***************************************************************************
 //
-BOOL CJSONParser::Remove(const TCHAR* ptszKey) const
+bool CJSONParser::Remove(const TCHAR* ptszKey) const
 {
 	if( m_pValue->HasMember(ptszKey) )
 	{
@@ -619,14 +641,14 @@ BOOL CJSONParser::Remove(const TCHAR* ptszKey) const
 
 //***************************************************************************
 //
-BOOL CJSONParser::Remove(const _tstring& strKey) const
+bool CJSONParser::Remove(const _tstring& strKey) const
 {
 	return Remove(strKey.c_str());
 }
 
 //***************************************************************************
 //
-BOOL CJSONParser::Remove(uint32 ui32ArrayIndex) const
+bool CJSONParser::Remove(uint32 ui32ArrayIndex) const
 {
 	if( false == m_pValue->IsArray() )
 		return false;

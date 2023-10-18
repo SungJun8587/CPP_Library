@@ -9,6 +9,10 @@
 
 #pragma once
 
+#pragma comment(lib, LIB_NAME("libtcmalloc_minimal"))
+
+#include <gperftools/tcmalloc.h>
+
 class CPoolObj
 {
 public:

@@ -44,7 +44,7 @@ DataType CJSONParser::ConvertToNumber(_CONVERT_FUNC pFunc, _DEF_VAL tDefValue) c
 //***************************************************************************
 //	
 template< typename DataType >
-BOOL CJSONParser::Add(TCHAR* ptszNodePath, DataType data)
+bool CJSONParser::Add(TCHAR* ptszNodePath, DataType data)
 {
 	_tValue* value;
 	if( (value = _tPointer(ptszNodePath).Get(*m_pDocument)) == 0 )
@@ -59,7 +59,7 @@ BOOL CJSONParser::Add(TCHAR* ptszNodePath, DataType data)
 //***************************************************************************
 //	
 template< typename DataType >
-BOOL CJSONParser::Update(TCHAR* ptszNodePath, DataType data)
+bool CJSONParser::Update(TCHAR* ptszNodePath, DataType data)
 {
 	_tValue* value;
 	if( (value = _tPointer(ptszNodePath).Get(*m_pDocument)) == 0 )
@@ -74,7 +74,7 @@ BOOL CJSONParser::Update(TCHAR* ptszNodePath, DataType data)
 //***************************************************************************
 //	
 template< typename DataType >
-_tstring CJSONParser::SerializeToJson(const DataType& data, BOOL bIsPretty)
+_tstring CJSONParser::SerializeToJson(const DataType& data, bool bIsPretty)
 {
 	_tStringBuffer buffer;
 	buffer.Clear();
@@ -149,7 +149,7 @@ DataType CJSONParser::DeserializeViaDom(const _tstring& json)
 //***************************************************************************
 //
 template< typename DataType >
-void CJSONParser::SerializeToJson(const DataType& data, const std::filesystem::path& path, BOOL bIsPretty)
+void CJSONParser::SerializeToJson(const DataType& data, const std::filesystem::path& path, bool bIsPretty)
 {
 	_tofstream file_stream{ path };
 

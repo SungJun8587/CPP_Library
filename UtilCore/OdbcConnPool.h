@@ -17,7 +17,7 @@ public:
 	COdbcConnPool(int32& nMaxThreadCnt);
 	virtual ~COdbcConnPool(void);
 
-	BOOL		Init(TCHAR* ptszConnStr);
+	bool Init(const DB_CLASS dbClass, const TCHAR* ptszDSN);
 	CBaseODBC*	GetOdbcConn(int32 nType);
 
 protected:
@@ -28,7 +28,8 @@ protected:
 	COdbcConnPool& operator=(const COdbcConnPool& rhs);
 
 	CBaseODBC**		m_pOdbcConns;
-	TCHAR			m_szConnStr[DATABASE_DSN_STRLEN];
+	DB_CLASS		m_dbClass;
+	TCHAR			m_tszDSN[DATABASE_DSN_STRLEN];
 	int32			m_nMaxThreadCnt;
 };
 

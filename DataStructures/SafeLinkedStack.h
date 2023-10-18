@@ -19,7 +19,7 @@ public:
 	int Push(const TYPE Element);
 	int Pop(TYPE &Element);
 	TYPE Peek();
-	BOOL IsEmpty();
+	bool IsEmpty();
 	int GetSize();
 
 #ifdef _UNICODE
@@ -85,7 +85,7 @@ TYPE CSafeLinkedStack<TYPE>::Peek()
 template<class TYPE>
 int CSafeLinkedStack<TYPE>::IsEmpty()
 {
-	BOOL bRet;
+	bool bRet;
 
 	m_RWLock.SharedLock();
 	{

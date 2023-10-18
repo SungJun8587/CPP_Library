@@ -94,7 +94,7 @@ int CAdoDB::DBConnect(LPCTSTR lptszConnstring, const int nTimeOut)
 	}
 	catch( ... )
 	{
-		bResult = ADO_OPEN_ERROR; // OpenDatabase ����... 
+		bResult = ADO_OPEN_ERROR;
 	}
 
 	return bResult;
@@ -227,7 +227,7 @@ void CAdoDB::GetFieldByIndex(_variant_t x, LPTSTR lptszValue, int nValueLen)
 
 		_tcscpy_s(lptszValue, nValueLen, (LPTSTR)strFieldValue);
 	}
-	else lptszValue[0] = '\0';
+	else lptszValue[0] = _T('\0');
 }
 
 //***************************************************************************
@@ -245,7 +245,7 @@ void CAdoDB::GetFieldByName(LPCTSTR lptszFieldName, LPTSTR lptszValue, int nValu
 
 		_tcscpy_s(lptszValue, nValueLen, (LPTSTR)strFieldValue);
 	}
-	else lptszValue[0] = '\0';
+	else lptszValue[0] = _T('\0');
 }
 
 //***************************************************************************
@@ -356,7 +356,7 @@ void CAdoDB::CreateArgParamAppend(_bstr_t bstrName, enum DataTypeEnum enumType, 
 
 				m_Param = m_pCmd->CreateParameter(bstrName, enumType, adParamInput, 1, _varNULL);
 			}
-			else m_Param = m_pCmd->CreateParameter(bstrName, enumType, adParamInput, strlen((LPCSTR)bstrParam), bstrParam);
+			else m_Param = m_pCmd->CreateParameter(bstrName, enumType, adParamInput, static_cast<long>(strlen((LPCSTR)bstrParam)), bstrParam);
 		}
 		else if( enumType == adInteger )
 			m_Param = m_pCmd->CreateParameter(bstrName, enumType, adParamInput, 4, vt);
