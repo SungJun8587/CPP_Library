@@ -18,9 +18,9 @@ inline _tstring GetTableInfo(DB_CLASS dbClass)
 	switch( dbClass )
 	{
 		case DB_CLASS::DB_MSSQL:
-			sql = _T("SELECT t.object_id, t.name AS table_name, CAST(ep.[value] AS NVARCHAR(4000)) AS table_comment, ");
-			sql = sql + _T("(SELECT CAST(ISNULL(last_value, 0) AS BIGINT) FROM sys.identity_columns WHERE object_id = t.object_id AND last_value > 0) AS auto_increment, ");
-			sql = sql + _T("CONVERT(VARCHAR(23), create_date, 121) AS create_date, CONVERT(VARCHAR(23), modify_date, 121) AS modify_date");
+			sql = _T("SELECT t.object_id AS object_id, SCHEMA_NAME(t.schema_id) AS schema_name, t.name AS table_name, ");
+			sql = sql + _T("ISNULL((SELECT CAST(ISNULL(last_value, 0) AS BIGINT) FROM sys.identity_columns WHERE object_id = t.object_id AND last_value > 0), 0) AS auto_increment, ");
+			sql = sql + _T("CAST(ep.[value] AS NVARCHAR(4000)) AS table_comment, CONVERT(VARCHAR(23), create_date, 121) AS create_date, CONVERT(VARCHAR(23), modify_date, 121) AS modify_date");
 			sql = sql + _T("\n") + _T("FROM sys.tables AS t");
 			sql = sql + _T("\n") + _T("LEFT OUTER JOIN sys.extended_properties AS ep");
 			sql = sql + _T("\n") + _T("ON t.object_id = ep.major_id AND ep.minor_id = 0 AND ep.name = 'MS_Description'");
@@ -28,8 +28,8 @@ inline _tstring GetTableInfo(DB_CLASS dbClass)
 			sql = sql + _T("\n") + _T("ORDER BY t.name ASC;");
 			break;
 		case DB_CLASS::DB_MYSQL:
-			sql = _T("SELECT 0 AS `object_id`, `TABLE_NAME` AS `tablename`, `TABLE_COMMENT` AS `table_comment`, `AUTO_INCREMENT` AS auto_increment, ");
-			sql = sql + _T("`CREATE_TIME` AS `create_date`, `UPDATE_TIME` AS `modify_date`");
+			sql = _T("SELECT 0 AS `object_id`, '' AS `schema_name`, `TABLE_NAME` AS `table_name`, `AUTO_INCREMENT` AS auto_increment, ");
+			sql = sql + _T("`TABLE_COMMENT` AS `table_comment`, `CREATE_TIME` AS `create_date`, `UPDATE_TIME` AS `modify_date`");
 			sql = sql + _T("\n") + _T("FROM INFORMATION_SCHEMA.TABLES");
 			sql = sql + _T("\n") + _T("WHERE `TABLE_SCHEMA` = DATABASE()");
 			sql = sql + _T("\n") + _T("ORDER BY `TABLE_NAME` ASC;");
@@ -48,12 +48,12 @@ inline _tstring GetTableColumnInfo(DB_CLASS dbClass)
 	switch( dbClass )
 	{
 		case DB_CLASS::DB_MSSQL:
-			sql = _T("SELECT col.object_id, col.table_name AS table_name, col.column_id AS seq, col.name AS column_name, UPPER(TYPE_NAME(col.user_type_id)) AS datatype, col.max_length, ");
+			sql = _T("SELECT col.object_id AS object_id, col.table_name AS table_name, col.column_id AS seq, col.name AS column_name, UPPER(TYPE_NAME(col.user_type_id)) AS datatype, col.max_length, ");
 			sql = sql + _T("(UPPER(TYPE_NAME(col.user_type_id)) + (CASE WHEN TYPE_NAME(col.user_type_id) = 'varchar' OR TYPE_NAME(col.user_type_id) = 'char' THEN '(' ");
 			sql = sql + _T("+ (CASE WHEN col.max_length = -1 THEN 'MAX' ELSE CAST(col.max_length AS VARCHAR) END) + ')' WHEN TYPE_NAME(col.user_type_id) = 'nvarchar' ");
 			sql = sql + _T("OR TYPE_NAME(col.user_type_id) = 'nchar' THEN '(' + (CASE WHEN col.max_length = -1 THEN 'MAX' ELSE CAST(col.max_length / 2 AS VARCHAR) END) + ')' ");
 			sql = sql + _T("WHEN TYPE_NAME(col.user_type_id) = 'decimal' THEN '(' + CAST(col.precision AS VARCHAR) + ',' + CAST(col.scale AS VARCHAR) + ')' ELSE '' END)) AS datatype_desc, ");
-			sql = sql + _T("col.is_nullable, col.is_identity, CAST(ic.seed_value AS BIGINT) AS seed_value, CAST(ic.increment_value AS BIGINT) AS inc_value, ");
+			sql = sql + _T("col.is_nullable, col.is_identity, CAST(ISNULL(ic.seed_value, 0) AS BIGINT) AS seed_value, CAST(ISNULL(ic.increment_value, 0) AS BIGINT) AS inc_value, ");
 			sql = sql + _T("comm.text AS default_definition, CAST(ep.[value] AS NVARCHAR(4000)) AS column_comment");
 			sql = sql + _T("\n") + _T("FROM");
 			sql = sql + _T("\n") + _T("(");
@@ -96,7 +96,7 @@ inline _tstring GetIndexInfo(DB_CLASS dbClass)
 	switch( dbClass )
 	{
 		case DB_CLASS::DB_MSSQL:
-			sql = _T("SELECT i.object_id, i.table_name AS table_name, i.name AS index_name, i.index_id, i.type AS index_kind, 0 AS index_type, i.is_primary_key, ");
+			sql = _T("SELECT i.object_id AS object_id, i.table_name AS table_name, i.name AS index_name, i.index_id, i.type AS index_kind, 0 AS index_type, i.is_primary_key, ");
 			sql = sql + _T("i.is_unique, ic.index_column_id AS index_seq, COL_NAME(ic.object_id, ic.column_id) AS column_name, ");
 			sql = sql + _T("(CASE is_descending_key WHEN 1 THEN 2 ELSE 1 END) AS index_sort");
 			sql = sql + _T("\n") + _T("FROM");
@@ -109,7 +109,7 @@ inline _tstring GetIndexInfo(DB_CLASS dbClass)
 			sql = sql + _T("\n") + _T(") AS i");
 			sql = sql + _T("\n") + _T("INNER JOIN sys.index_columns AS ic");
 			sql = sql + _T("\n") + _T("ON i.object_id = ic.object_id AND i.index_id = ic.index_id");
-			sql = sql + _T("\n") + _T("WHERE i.type > 0 AND i.object_id IN(SELECT object_id FROM sys.tables WHERE type = 'U')");
+			sql = sql + _T("\n") + _T("WHERE i.type > 0");
 			sql = sql + _T("\n") + _T("ORDER BY i.object_id ASC, i.index_id ASC, ic.index_column_id ASC;");
 			break;
 		case DB_CLASS::DB_MYSQL:
@@ -153,7 +153,6 @@ inline _tstring GetForeignKeyInfo(DB_CLASS dbClass)
 			sql = sql + _T("\n") + _T(") AS fk");
 			sql = sql + _T("\n") + _T("INNER JOIN sys.foreign_key_columns AS fkcol");
 			sql = sql + _T("\n") + _T("ON fk.object_id = fkcol.constraint_object_id");
-			sql = sql + _T("\n") + _T("WHERE fk.parent_object_id IN(SELECT object_id FROM sys.tables WHERE type = 'U')");
 			sql = sql + _T("\n") + _T("ORDER BY fk.parent_object_id ASC, fk.name ASC, fkcol.constraint_column_id ASC, fkcol.referenced_column_id ASC;");
 			break;
 		case DB_CLASS::DB_MYSQL:
@@ -168,6 +167,66 @@ inline _tstring GetForeignKeyInfo(DB_CLASS dbClass)
 			sql = sql + _T("\n") + _T("ON const.`TABLE_SCHEMA` = refconst.`CONSTRAINT_SCHEMA` AND const.`TABLE_NAME` = refconst.`TABLE_NAME` AND const.`CONSTRAINT_NAME` = refconst.`CONSTRAINT_NAME`");
 			sql = sql + _T("\n") + _T("WHERE const.`TABLE_SCHEMA` = DATABASE() AND const.`CONSTRAINT_TYPE` IN('FOREIGN KEY')");
 			sql = sql + _T("\n") + _T("ORDER BY const.`TABLE_NAME` ASC, const.`CONSTRAINT_NAME` ASC, colusage.`ORDINAL_POSITION` ASC;");
+			break;
+	}
+
+	return sql;
+}
+
+//***************************************************************************
+//
+inline _tstring GetDefaultConstInfo(DB_CLASS dbClass)
+{
+	_tstring sql;
+
+	switch( dbClass )
+	{
+		case DB_CLASS::DB_MSSQL:
+			sql = _T("SELECT const.parent_object_id AS object_id, const.table_name AS table_name, const.name AS default_const_name, ");
+			sql = sql + _T("COL_NAME(const.parent_object_id, const.parent_column_id) AS column_name, const.definition AS default_value");
+			sql = sql + _T("\n") + _T("FROM");
+			sql = sql + _T("\n") + _T("(");
+			sql = sql + _T("\n\t") + _T("SELECT a.*, b.name AS table_name");
+			sql = sql + _T("\n\t") + _T("FROM sys.default_constraints AS a");
+			sql = sql + _T("\n\t") + _T("INNER JOIN sys.tables AS b");
+			sql = sql + _T("\n\t") + _T("ON a.parent_object_id = b.object_id");
+			sql = sql + _T("\n\t") + _T("WHERE b.type = 'U'");
+			sql = sql + _T("\n") + _T(") AS const");
+			sql = sql + _T("\n") + _T("ORDER BY const.parent_object_id ASC, const.name ASC;");
+			break;
+		case DB_CLASS::DB_MYSQL:
+			break;
+	}
+
+	return sql;
+}
+
+//***************************************************************************
+//
+inline _tstring GetCheckConstInfo(DB_CLASS dbClass)
+{
+	_tstring sql;
+
+	switch( dbClass )
+	{
+		case DB_CLASS::DB_MSSQL:
+			sql = _T("SELECT const.parent_object_id AS object_id, const.table_name AS table_name, const.name AS check_const_name, const.definition AS check_value");
+			sql = sql + _T("\n") + _T("FROM");
+			sql = sql + _T("\n") + _T("(");
+			sql = sql + _T("\n\t") + _T("SELECT a.*, b.name AS table_name");
+			sql = sql + _T("\n\t") + _T("FROM sys.check_constraints AS a");
+			sql = sql + _T("\n\t") + _T("INNER JOIN sys.tables AS b");
+			sql = sql + _T("\n\t") + _T("ON a.parent_object_id = b.object_id");
+			sql = sql + _T("\n\t") + _T("WHERE b.type = 'U'");
+			sql = sql + _T("\n") + _T(") AS const");
+			sql = sql + _T("\n") + _T("ORDER BY const.parent_object_id ASC, const.name ASC;");
+			break;
+		case DB_CLASS::DB_MYSQL:
+			sql = _T("SELECT 0 AS `object_id`, const.`TABLE_NAME` AS `table_name`, const.`CONSTRAINT_NAME` AS `check_const_name`, ckconst.`CHECK_CLAUSE` AS `check_value`");
+			sql = sql + _T("\n") + _T("FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS AS const");
+			sql = sql + _T("\n") + _T("INNER JOIN INFORMATION_SCHEMA.CHECK_CONSTRAINTS AS ckconst");
+			sql = sql + _T("\n") + _T("ON const.`TABLE_SCHEMA` = ckconst.`CONSTRAINT_SCHEMA` AND const.`CONSTRAINT_NAME` = ckconst.`CONSTRAINT_NAME`");
+			sql = sql + _T("\n") + _T("WHERE const.`TABLE_SCHEMA` = DATABASE() AND const.`CONSTRAINT_TYPE` IN('CHECK');");
 			break;
 	}
 
@@ -214,7 +273,7 @@ inline _tstring GetStoredProcedureInfo(DB_CLASS dbClass)
 	switch( dbClass )
 	{
 		case DB_CLASS::DB_MSSQL:
-			sql = sql + _T("SELECT stproc.object_id, stproc.name AS proc_name, CAST(ep.[value] AS NVARCHAR(4000)) AS proc_comment, OBJECT_DEFINITION(stproc.object_id) AS proc_body, ");
+			sql = sql + _T("SELECT stproc.object_id AS object_id, SCHEMA_NAME(stproc.schema_id) AS schema_name, stproc.name AS proc_name, CAST(ep.[value] AS NVARCHAR(4000)) AS proc_comment, OBJECT_DEFINITION(stproc.object_id) AS proc_body, ");
 			sql = sql + _T("CONVERT(VARCHAR(23), stproc.create_date, 121) AS create_date, CONVERT(VARCHAR(23), stproc.modify_date, 121) AS modify_date");
 			sql = sql + _T("\n") + _T("FROM sys.procedures AS stproc");
 			sql = sql + _T("\n") + _T("LEFT OUTER JOIN sys.extended_properties AS ep");
@@ -222,7 +281,7 @@ inline _tstring GetStoredProcedureInfo(DB_CLASS dbClass)
 			sql = sql + _T("\n") + _T("ORDER BY stproc.name ASC;");
 			break;
 		case DB_CLASS::DB_MYSQL:
-			sql = _T("SELECT 0 AS `object_id`, `ROUTINE_NAME` AS `proc_name`, `ROUTINE_COMMENT` AS `proc_comment`, '' AS `proc_body`, `CREATED` AS `create_date`, `LAST_ALTERED` AS `modify_date`");
+			sql = _T("SELECT 0 AS `object_id`, '' AS `schema_name`, `ROUTINE_NAME` AS `proc_name`, `ROUTINE_COMMENT` AS `proc_comment`, '' AS `proc_body`, `CREATED` AS `create_date`, `LAST_ALTERED` AS `modify_date`");
 			sql = sql + _T("\n") + _T("FROM INFORMATION_SCHEMA.ROUTINES");
 			sql = sql + _T("\n") + _T("WHERE `ROUTINE_SCHEMA` = DATABASE() AND `ROUTINE_TYPE` = 'PROCEDURE'");
 			sql = sql + _T("\n") + _T("ORDER BY `ROUTINE_NAME` ASC;");
@@ -241,7 +300,7 @@ inline _tstring GetStoredProcedureParamInfo(DB_CLASS dbClass)
 	switch( dbClass )
 	{
 		case DB_CLASS::DB_MSSQL:
-			sql = _T("SELECT param.object_id, param.proc_name AS proc_name, param.parameter_id, (CASE param.is_output WHEN 1 THEN (CASE WHEN (param.name IS NULL OR param.name = '') THEN 0 ELSE 2 END) ELSE 1 END) AS param_mode, ");
+			sql = _T("SELECT param.object_id AS object_id, param.proc_name AS proc_name, param.parameter_id, (CASE param.is_output WHEN 1 THEN (CASE WHEN (param.name IS NULL OR param.name = '') THEN 0 ELSE 2 END) ELSE 1 END) AS param_mode, ");
 			sql = sql + _T("param.name AS param_name, UPPER(TYPE_NAME(param.user_type_id)) AS datatype, param.max_length, ");
 			sql = sql + _T("(UPPER(TYPE_NAME(param.user_type_id)) + (CASE WHEN TYPE_NAME(param.user_type_id) = 'varchar' OR TYPE_NAME(param.user_type_id) = 'char' THEN '(' ");
 			sql = sql + _T("+ (CASE WHEN param.max_length = -1 THEN 'MAX' ELSE CAST(param.max_length AS VARCHAR) END) + ')' WHEN TYPE_NAME(param.user_type_id) = 'nvarchar' ");
@@ -282,7 +341,7 @@ inline _tstring GetFunctionInfo(DB_CLASS dbClass)
 	switch( dbClass )
 	{
 		case DB_CLASS::DB_MSSQL:
-			sql = sql + _T("SELECT so.object_id, so.name AS func_name, CAST(ep.[value] AS NVARCHAR(4000)) AS func_comment, OBJECT_DEFINITION(so.object_id) AS func_body, ");
+			sql = sql + _T("SELECT so.object_id AS object_id, SCHEMA_NAME(so.schema_id) AS schema_name, so.name AS func_name, CAST(ep.[value] AS NVARCHAR(4000)) AS func_comment, OBJECT_DEFINITION(so.object_id) AS func_body, ");
 			sql = sql + _T("CONVERT(VARCHAR(23), so.create_date, 121) AS create_date, CONVERT(VARCHAR(23), so.modify_date, 121) AS modify_date");
 			sql = sql + _T("\n") + _T("FROM sys.objects AS so");
 			sql = sql + _T("\n") + _T("LEFT OUTER JOIN sys.extended_properties AS ep");
@@ -291,7 +350,7 @@ inline _tstring GetFunctionInfo(DB_CLASS dbClass)
 			sql = sql + _T("\n") + _T("ORDER BY so.name ASC;");
 			break;
 		case DB_CLASS::DB_MYSQL:
-			sql = _T("SELECT 0 AS `object_id`, `ROUTINE_NAME` AS `func_name`, `ROUTINE_COMMENT` AS `func_comment`, '' AS `func_body`, `CREATED` AS `create_date`, `LAST_ALTERED` AS `modify_date`");
+			sql = _T("SELECT 0 AS `object_id`, '' AS `schema_name`, `ROUTINE_NAME` AS `func_name`, `ROUTINE_COMMENT` AS `func_comment`, '' AS `func_body`, `CREATED` AS `create_date`, `LAST_ALTERED` AS `modify_date`");
 			sql = sql + _T("\n") + _T("FROM INFORMATION_SCHEMA.ROUTINES");
 			sql = sql + _T("\n") + _T("WHERE `ROUTINE_SCHEMA` = DATABASE() AND `ROUTINE_TYPE` = 'FUNCTION'");
 			sql = sql + _T("\n") + _T("ORDER BY `ROUTINE_NAME` ASC;");
@@ -310,7 +369,7 @@ inline _tstring GetFunctionParamInfo(DB_CLASS dbClass)
 	switch( dbClass )
 	{
 		case DB_CLASS::DB_MSSQL:
-			sql = _T("SELECT param.object_id, param.func_name AS func_name, param.parameter_id, (CASE param.is_output WHEN 1 THEN (CASE WHEN (param.name IS NULL OR param.name = '') THEN 0 ELSE 2 END) ELSE 1 END) AS param_mode, ");
+			sql = _T("SELECT param.object_id AS object_id, param.func_name AS func_name, param.parameter_id, (CASE param.is_output WHEN 1 THEN (CASE WHEN (param.name IS NULL OR param.name = '') THEN 0 ELSE 2 END) ELSE 1 END) AS param_mode, ");
 			sql = sql + _T("param.name AS param_name, UPPER(TYPE_NAME(param.user_type_id)) AS datatype, param.max_length, ");
 			sql = sql + _T("(UPPER(TYPE_NAME(param.user_type_id)) + (CASE WHEN TYPE_NAME(param.user_type_id) = 'varchar' OR TYPE_NAME(param.user_type_id) = 'char' THEN '(' ");
 			sql = sql + _T("+ (CASE WHEN param.max_length = -1 THEN 'MAX' ELSE CAST(param.max_length AS VARCHAR) END) + ')' WHEN TYPE_NAME(param.user_type_id) = 'nvarchar' ");

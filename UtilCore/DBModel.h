@@ -58,6 +58,7 @@ class TABLE_INFO
 {
 public:
 	int32	ObjectId;										// MSSQL 테이블 고유번호
+	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];		// MSSQL 스키마 명
 	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN];		// 테이블 명
 	TCHAR	tszTableComment[DATABASE_WVARCHAR_MAX];			// 테이블 주석
 	int64	AutoIncrementValue;								// Identity 생성된 마지막 값
@@ -135,6 +136,7 @@ class PROCEDURE_INFO
 {
 public:
 	int32	ObjectId;												// MSSQL 저장프로시저 고유번호
+	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];				// MSSQL 스키마 명
 	TCHAR   tszProcName[DATABASE_OBJECT_NAME_STRLEN];				// 저장프로시저 명
 	TCHAR	tszProcComment[DATABASE_WVARCHAR_MAX];					// 저장프로시저 주석
 	TCHAR   tszProcText[DATABASE_OBJECT_CONTENTTEXT_STRLEN];		// 저장프로시저 내용
@@ -164,6 +166,7 @@ class FUNCTION_INFO
 {
 public:
 	int32	ObjectId;												// MSSQL 함수 고유번호
+	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];				// MSSQL 스키마 명
 	TCHAR   tszFuncName[DATABASE_OBJECT_NAME_STRLEN];				// 함수 명
 	TCHAR	tszFuncComment[DATABASE_WVARCHAR_MAX];					// 함수 주석
 	TCHAR   tszFuncText[DATABASE_OBJECT_CONTENTTEXT_STRLEN];		// 함수 내용
@@ -303,6 +306,7 @@ public:
 
 public:
 	int32						_objectId = 0;
+	_tstring					_schemaName;
 	_tstring					_name;
 	_tstring					_desc;
 	_tstring					_auto_increment_value;
@@ -333,6 +337,7 @@ public:
 
 public:
 	int32						_objectId = 0;
+	_tstring					_schemaName;
 	_tstring					_name;
 	_tstring					_desc;
 	_tstring					_fullBody;
@@ -362,6 +367,7 @@ public:
 
 public:
 	int32						_objectId = 0;
+	_tstring					_schemaName;
 	_tstring					_name;
 	_tstring					_desc;
 	_tstring					_fullBody;

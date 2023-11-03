@@ -9,7 +9,7 @@
 
 namespace SP
 {
-	class GetDBTables : public CDBBind<0, 6>
+	class GetDBTables : public CDBBind<0, 7>
 	{
 	public:
 		GetDBTables(DB_CLASS dbClass, CBaseODBC& conn) : CDBBind(conn, GetTableInfo(dbClass))
@@ -19,11 +19,11 @@ namespace SP
 		{
 			BindCol(0, value);
 		}
-		template<int32 N> void Out_TableName(OUT TCHAR(&value)[N])
+		template<int32 N> void Out_SchemaName(OUT TCHAR(&value)[N])
 		{
 			BindCol(1, value);
 		}
-		template<int32 N> void Out_TableComment(OUT TCHAR(&value)[N])
+		template<int32 N> void Out_TableName(OUT TCHAR(&value)[N])
 		{
 			BindCol(2, value);
 		}
@@ -31,13 +31,17 @@ namespace SP
 		{
 			BindCol(3, value);
 		}
-		template<int32 N> void Out_CreateDate(OUT TCHAR(&value)[N])
+		template<int32 N> void Out_TableComment(OUT TCHAR(&value)[N])
 		{
 			BindCol(4, value);
 		}
-		template<int32 N> void Out_ModifyDate(OUT TCHAR(&value)[N])
+		template<int32 N> void Out_CreateDate(OUT TCHAR(&value)[N])
 		{
 			BindCol(5, value);
+		}
+		template<int32 N> void Out_ModifyDate(OUT TCHAR(&value)[N])
+		{
+			BindCol(6, value);
 		}
 	};
 
@@ -217,7 +221,7 @@ namespace SP
 		}
 	};
 
-	class GetDBStoredProcedures : public CDBBind<0, 6>
+	class GetDBStoredProcedures : public CDBBind<0, 7>
 	{
 	public:
 		GetDBStoredProcedures(DB_CLASS dbClass, CBaseODBC& conn) : CDBBind(conn, GetStoredProcedureInfo(dbClass))
@@ -227,25 +231,29 @@ namespace SP
 		{
 			BindCol(0, value);
 		}
-		template<int32 N> void Out_SPName(OUT TCHAR(&value)[N])
+		template<int32 N> void Out_SchemaName(OUT TCHAR(&value)[N])
 		{
 			BindCol(1, value);
 		}
-		template<int32 N> void Out_SPComment(OUT TCHAR(&value)[N])
+		template<int32 N> void Out_SPName(OUT TCHAR(&value)[N])
 		{
 			BindCol(2, value);
 		}
+		template<int32 N> void Out_SPComment(OUT TCHAR(&value)[N])
+		{
+			BindCol(3, value);
+		}
 		void Out_Body(OUT TCHAR* value, int32 len)
 		{
-			BindCol(3, value, len);
+			BindCol(4, value, len);
 		}
 		template<int32 N> void Out_CreateDate(OUT TCHAR(&value)[N])
 		{
-			BindCol(4, value);
+			BindCol(5, value);
 		}
 		template<int32 N> void Out_ModifyDate(OUT TCHAR(&value)[N])
 		{
-			BindCol(5, value);
+			BindCol(6, value);
 		}
 	};
 
@@ -293,7 +301,7 @@ namespace SP
 		}
 	};
 
-	class GetDBFunctions : public CDBBind<0, 6>
+	class GetDBFunctions : public CDBBind<0, 7>
 	{
 	public:
 		GetDBFunctions(DB_CLASS dbClass, CBaseODBC& conn) : CDBBind(conn, GetFunctionInfo(dbClass))
@@ -303,25 +311,29 @@ namespace SP
 		{
 			BindCol(0, value);
 		}
-		template<int32 N> void Out_FCName(OUT TCHAR(&value)[N])
+		template<int32 N> void Out_SchemaName(OUT TCHAR(&value)[N])
 		{
 			BindCol(1, value);
 		}
-		template<int32 N> void Out_FCComment(OUT TCHAR(&value)[N])
+		template<int32 N> void Out_FCName(OUT TCHAR(&value)[N])
 		{
 			BindCol(2, value);
 		}
+		template<int32 N> void Out_FCComment(OUT TCHAR(&value)[N])
+		{
+			BindCol(3, value);
+		}
 		void Out_Body(OUT TCHAR* value, int32 len)
 		{
-			BindCol(3, value, len);
+			BindCol(4, value, len);
 		}
 		template<int32 N> void Out_CreateDate(OUT TCHAR(&value)[N])
 		{
-			BindCol(4, value);
+			BindCol(5, value);
 		}
 		template<int32 N> void Out_ModifyDate(OUT TCHAR(&value)[N])
 		{
-			BindCol(5, value);
+			BindCol(6, value);
 		}
 	};
 
@@ -482,6 +494,12 @@ void CDBSynchronizer::PrintDBSchema()
 	sql = GetForeignKeyInfo(_dbClass);
 	DBModel::Helpers::LogFileWrite(_dbClass, _T("[외래키 명세]"), sql, true);
 
+	sql = GetDefaultConstInfo(_dbClass);
+	DBModel::Helpers::LogFileWrite(_dbClass, _T("[기본값 제약 명세]"), sql, true);
+
+	sql = GetCheckConstInfo(_dbClass);
+	DBModel::Helpers::LogFileWrite(_dbClass, _T("[체크 제약 명세]"), sql, true);
+
 	sql = GetTriggerInfo(_dbClass);
 	DBModel::Helpers::LogFileWrite(_dbClass, _T("[트리거 명세]"), sql, true);
 
@@ -511,6 +529,7 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 	for( CXMLNode& table : tables )
 	{
 		DBModel::TableRef t = MakeShared<DBModel::Table>();
+		t->_schemaName = table.GetStringAttr(_T("schemaname"));
 		t->_name = table.GetStringAttr(_T("name"));
 		t->_desc = table.GetStringAttr(_T("desc"));
 		t->_auto_increment_value = table.GetStringAttr(_T("auto_increment_value"));
@@ -616,6 +635,7 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 	for( CXMLNode& procedure : procedures )
 	{
 		DBModel::ProcedureRef p = MakeShared<DBModel::Procedure>();
+		p->_schemaName = procedure.GetStringAttr(_T("schemaname"));
 		p->_name = procedure.GetStringAttr(_T("name"));
 		p->_desc = procedure.GetStringAttr(_T("desc"));
 		p->_body = procedure.FindChild(_T("body")).GetStringValue();
@@ -637,10 +657,11 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 	CVector<CXMLNode> functions = root.FindChildren(_T("Function"));
 	for( CXMLNode& function : functions )
 	{
-		DBModel::FunctionRef p = MakeShared<DBModel::Function>();
-		p->_name = function.GetStringAttr(_T("name"));
-		p->_desc = function.GetStringAttr(_T("desc"));
-		p->_body = function.FindChild(_T("body")).GetStringValue();
+		DBModel::FunctionRef f = MakeShared<DBModel::Function>();
+		f->_schemaName = function.GetStringAttr(_T("schemaname"));
+		f->_name = function.GetStringAttr(_T("name"));
+		f->_desc = function.GetStringAttr(_T("desc"));
+		f->_body = function.FindChild(_T("body")).GetStringValue();
 
 		CVector<CXMLNode> params = function.FindChildren(_T("Param"));
 		for( CXMLNode& param : params )
@@ -651,9 +672,9 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 			funcParam->_name = param.GetStringAttr(_T("name"));
 			funcParam->_desc = param.GetStringAttr(_T("desc"));
 			funcParam->_datatypedesc = param.GetStringAttr(_T("type"));
-			p->_parameters.push_back(funcParam);
+			f->_parameters.push_back(funcParam);
 		}
-		_xmlFunctions.push_back(p);
+		_xmlFunctions.push_back(f);
 	}
 
 	CVector<CXMLNode> removedTables = root.FindChildren(_T("RemovedTable"));
@@ -682,6 +703,7 @@ bool CDBSynchronizer::DBToCreateXml(const TCHAR* path)
 	for( DBModel::TableRef& dbTable : _dbTables )
 	{
 		_tXmlNodeType* table = doc.allocate_node(rapidxml::node_type::node_element, _T("Table"));
+		table->append_attribute(doc.allocate_attribute(_T("schemaname"), dbTable->_schemaName.c_str()));
 		table->append_attribute(doc.allocate_attribute(_T("name"), dbTable->_name.c_str()));
 		table->append_attribute(doc.allocate_attribute(_T("desc"), dbTable->_desc.c_str()));
 		table->append_attribute(doc.allocate_attribute(_T("auto_increment_value"), dbTable->_auto_increment_value.c_str()));
@@ -769,6 +791,7 @@ bool CDBSynchronizer::DBToCreateXml(const TCHAR* path)
 	for( DBModel::ProcedureRef& dbProcedure : _dbProcedures )
 	{
 		_tXmlNodeType* procedure = doc.allocate_node(rapidxml::node_type::node_element, _T("Procedure"));
+		procedure->append_attribute(doc.allocate_attribute(_T("schemaname"), dbProcedure->_schemaName.c_str()));
 		procedure->append_attribute(doc.allocate_attribute(_T("name"), dbProcedure->_name.c_str()));
 		procedure->append_attribute(doc.allocate_attribute(_T("desc"), dbProcedure->_desc.c_str()));
 		for( DBModel::ProcParamRef& dbProcParam : dbProcedure->_parameters )
@@ -792,6 +815,7 @@ bool CDBSynchronizer::DBToCreateXml(const TCHAR* path)
 	for( DBModel::FunctionRef& dbFunction : _dbFunctions )
 	{
 		_tXmlNodeType* function = doc.allocate_node(rapidxml::node_type::node_element, _T("Function"));
+		function->append_attribute(doc.allocate_attribute(_T("schemaname"), dbFunction->_schemaName.c_str()));
 		function->append_attribute(doc.allocate_attribute(_T("name"), dbFunction->_name.c_str()));
 		function->append_attribute(doc.allocate_attribute(_T("desc"), dbFunction->_desc.c_str()));
 		for( DBModel::FuncParamRef& dbFuncParam : dbFunction->_parameters )
@@ -825,17 +849,19 @@ bool CDBSynchronizer::DBToCreateXml(const TCHAR* path)
 bool CDBSynchronizer::GatherDBTables()
 {
 	int32 objectId;
-	int64 auto_increment_value;
+	TCHAR tszSchemaName[101] = {0, };
 	TCHAR tszTableName[101] = {0, };
+	int64 auto_increment_value;
 	TCHAR tszTableComment[4000] = {0, };
 	TCHAR tszCreateDate[DATETIME_STRLEN] = {0, };
 	TCHAR tszModifyDate[DATETIME_STRLEN] = {0, };
 
 	SP::GetDBTables getDBTables(_dbClass, _dbConn);
 	getDBTables.Out_ObjectId(OUT objectId);
+	getDBTables.Out_SchemaName(OUT tszSchemaName);
 	getDBTables.Out_TableName(OUT tszTableName);
-	getDBTables.Out_TableComment(OUT tszTableComment);
 	getDBTables.Out_AutoIncrementValue(OUT auto_increment_value);
+	getDBTables.Out_TableComment(OUT tszTableComment);
 	getDBTables.Out_CreateDate(OUT tszCreateDate);
 	getDBTables.Out_ModifyDate(OUT tszModifyDate);
 
@@ -846,6 +872,7 @@ bool CDBSynchronizer::GatherDBTables()
 	{
 		DBModel::TableRef tableRef = MakeShared<DBModel::Table>();
 		tableRef->_objectId = objectId;
+		tableRef->_schemaName = tszSchemaName;
 		tableRef->_name = tszTableName;
 		tableRef->_desc = tszTableComment;
 		tableRef->_auto_increment_value = DBModel::Helpers::Format(_T("%lld"), auto_increment_value);
@@ -1122,6 +1149,7 @@ bool CDBSynchronizer::GatherDBTrigger()
 bool CDBSynchronizer::GatherDBStoredProcedures()
 {
 	int32 objectId;
+	TCHAR tszSchemaName[101] = {0, };
 	TCHAR tszProcName[101] = {0, };
 	TCHAR tszProcComment[4000] = {0, };
 	TCHAR tszCreateDate[DATETIME_STRLEN] = {0, };
@@ -1132,6 +1160,7 @@ bool CDBSynchronizer::GatherDBStoredProcedures()
 
 	SP::GetDBStoredProcedures getDBStoredProcedures(_dbClass, _dbConn);
 	getDBStoredProcedures.Out_ObjectId(OUT objectId);
+	getDBStoredProcedures.Out_SchemaName(OUT tszSchemaName);
 	getDBStoredProcedures.Out_SPName(OUT tszProcName);
 	getDBStoredProcedures.Out_SPComment(OUT tszProcComment);
 	getDBStoredProcedures.Out_Body(OUT &body[0], DATABASE_OBJECT_CONTENTTEXT_STRLEN);
@@ -1145,6 +1174,7 @@ bool CDBSynchronizer::GatherDBStoredProcedures()
 	{
 		DBModel::ProcedureRef procRef = MakeShared<DBModel::Procedure>();
 		procRef->_objectId = objectId;
+		procRef->_schemaName = tszSchemaName;
 		procRef->_name = tszProcName;
 		procRef->_desc = tszProcComment;
 		procRef->_fullBody = _tstring(body.begin(), std::find(body.begin(), body.end(), 0));
@@ -1238,6 +1268,7 @@ bool CDBSynchronizer::GatherDBStoredProcedureParams()
 bool CDBSynchronizer::GatherDBFunctions()
 {
 	int32 objectId;
+	TCHAR tszSchemaName[101] = {0, };
 	TCHAR tszFuncName[101] = {0, };
 	TCHAR tszFuncComment[4000] = {0, };
 	TCHAR tszCreateDate[DATETIME_STRLEN] = {0, };
@@ -1248,6 +1279,7 @@ bool CDBSynchronizer::GatherDBFunctions()
 
 	SP::GetDBFunctions getDBFunctions(_dbClass, _dbConn);
 	getDBFunctions.Out_ObjectId(OUT objectId);
+	getDBFunctions.Out_SchemaName(OUT tszSchemaName);
 	getDBFunctions.Out_FCName(OUT tszFuncName);
 	getDBFunctions.Out_FCComment(OUT tszFuncComment);
 	getDBFunctions.Out_Body(OUT &body[0], DATABASE_OBJECT_CONTENTTEXT_STRLEN);
@@ -1261,6 +1293,7 @@ bool CDBSynchronizer::GatherDBFunctions()
 	{
 		DBModel::FunctionRef funcRef = MakeShared<DBModel::Function>();
 		funcRef->_objectId = objectId;
+		funcRef->_schemaName = tszSchemaName;
 		funcRef->_name = tszFuncName;
 		funcRef->_desc = tszFuncComment;
 		funcRef->_fullBody = _tstring(body.begin(), std::find(body.begin(), body.end(), 0));

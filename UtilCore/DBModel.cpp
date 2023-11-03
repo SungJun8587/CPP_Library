@@ -943,6 +943,8 @@ void Helpers::LogFileWrite(DB_CLASS dbClass, _tstring title, _tstring sql, bool 
 {
 	_tstring message;
 
+	if( sql.size() < 1 ) return;
+
 	switch( dbClass )
 	{
 		case DB_CLASS::DB_MSSQL:
