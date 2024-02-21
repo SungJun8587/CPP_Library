@@ -65,11 +65,11 @@ public:
 	CDBColAttrMgr(void) {
 	}
 
-	template<typename DataType>
-	CDBColAttr& operator()(DataType& data)
+	template<typename EDataType>
+	CDBColAttr& operator()(EDataType& data)
 	{
-		m_dbColAttr.SetColAttr(odbc_col_attr<DataType>::target_type);
-		m_dbColAttr.SetValue(&data, sizeof(DataType));
+		m_dbColAttr.SetColAttr(odbc_col_attr<EDataType>::target_type);
+		m_dbColAttr.SetValue(&data, sizeof(EDataType));
 		return m_dbColAttr;
 	}
 

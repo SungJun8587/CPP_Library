@@ -11,7 +11,7 @@
 // Construction/Destruction 
 //***************************************************************************
 
-CBaseODBC::CBaseODBC(const DB_CLASS dbClass, const bool bLoadExcelFile /*= false*/)
+CBaseODBC::CBaseODBC(const EDBClass dbClass, const bool bLoadExcelFile /*= false*/)
 	: m_hEnv(NULL), m_hConn(NULL), m_hStmt(NULL), m_DbClass(dbClass), m_nParamNum(0), m_nColNum(0), m_nFetchedRows(0)
 	, m_bLoadExcelFile(bLoadExcelFile)
 {
@@ -20,7 +20,7 @@ CBaseODBC::CBaseODBC(const DB_CLASS dbClass, const bool bLoadExcelFile /*= false
 	memset(m_tszLastError, 0, sizeof(m_tszLastError));
 }
 
-CBaseODBC::CBaseODBC(const DB_CLASS dbClass, const TCHAR* ptszDSN, const bool bLoadExcelFile /*= false*/)
+CBaseODBC::CBaseODBC(const EDBClass dbClass, const TCHAR* ptszDSN, const bool bLoadExcelFile /*= false*/)
 	: m_hEnv(NULL), m_hConn(NULL), m_hStmt(NULL), m_nParamNum(0), m_nColNum(0), m_nFetchedRows(0)
 	, m_bLoadExcelFile(bLoadExcelFile)
 {
@@ -99,6 +99,19 @@ void CBaseODBC::ClearStmt(void)
 	}
 
 	_tcsncpy_s(m_tszQueryInfo, SQL_MAX_MESSAGE_LENGTH, _T(""), _TRUNCATE);
+	m_nParamNum = 0;
+	m_nColNum = 0;
+}
+
+//***************************************************************************
+//
+void CBaseODBC::FreeStmt(void)
+{
+	if( m_hStmt )
+	{
+		SQLFreeStmt(m_hStmt, SQL_UNBIND);
+	}
+
 	m_nParamNum = 0;
 	m_nColNum = 0;
 }
@@ -299,6 +312,8 @@ bool CBaseODBC::Execute()
 //	
 bool CBaseODBC::ExecDirect(const TCHAR* ptszQueryInfo)
 {
+	ClearStmt();
+
 	SQLRETURN nRet;
 
 	if( !m_hConn ) return false;
@@ -636,7 +651,7 @@ bool CBaseODBC::DescribeCol(int32 iColNum, COL_DESCRIPTION& ColDescription)
 
 #ifdef _UNICODE	
 	nRet = SQLDescribeCol(m_hStmt, iColNum, ColDescription.tszColName, DATABASE_COLUMN_NAME_STRLEN, &ColDescription.NameLength,
-						  &ColDescription.DataType, (SQLULEN*)&ColDescription.dwColSize, &ColDescription.DigitSize, &ColDescription.Nullable);
+						  &ColDescription.EDataType, (SQLULEN*)&ColDescription.dwColSize, &ColDescription.DigitSize, &ColDescription.Nullable);
 #else
 	nRet = SQLDescribeCol(m_hStmt, iColNum, (SQLCHAR*)ColDescription.tszColName, DATABASE_COLUMN_NAME_STRLEN, &ColDescription.NameLength,
 						  &ColDescription.DataType, (SQLULEN*)&ColDescription.dwColSize, &ColDescription.DigitSize, &ColDescription.Nullable);

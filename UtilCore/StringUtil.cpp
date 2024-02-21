@@ -826,6 +826,48 @@ DWORD Utf8ToAnsi_String(std::string& ansi, const char* utf8, const size_t utf8_s
 
 	return error;
 }
+
+//***************************************************************************
+//
+std::wstring WStringToString(const std::string& src)
+{
+	std::wstring dest;
+	USES_CONVERSION;
+	dest = std::wstring(A2W(src.c_str()));
+	return dest;
+}
+
+//***************************************************************************
+// wstring -> string
+std::string StringToWString(const std::wstring& src)
+{
+	std::string dest;
+	USES_CONVERSION;
+	dest = std::string(W2A(src.c_str()));
+	return dest;
+}
+
+//***************************************************************************
+//
+_tstring TStringToString(const std::string& src)
+{
+#ifdef _UNICODE
+	return WStringToString(src);
+#else
+	return src;
+#endif
+}
+
+//***************************************************************************
+//
+std::string StringToTString(const _tstring& src)
+{
+#ifdef _UNICODE
+	return StringToWString(src);
+#else
+	return src;
+#endif
+}
 #endif
 
 //***************************************************************************

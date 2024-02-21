@@ -107,7 +107,7 @@ __inline _tstring replaceAll(const _tstring& message, const _tstring& pattern, c
 
 //***************************************************************************
 //
-__inline _tstring format_arg_list(const TCHAR* ptszFmt, va_list args)
+__inline _tstring string_format_arg_list(const TCHAR* ptszFmt, va_list args)
 {
 	if( !ptszFmt ) return _T("");
 
@@ -132,6 +132,34 @@ __inline _tstring format_arg_list(const TCHAR* ptszFmt, va_list args)
 	return s;
 }
 
+//***************************************************************************
+//
+template<typename ... Args>
+inline _tstring string_format(const TCHAR* ptszFmt, Args ... args)
+{
+	if( !ptszFmt ) return _T("");
+
+	__int32 result = -1, length = 256;
+	TCHAR* ptszBuffer = 0;
+
+	while( result == -1 )
+	{
+		if( ptszBuffer ) delete[] ptszBuffer;
+		ptszBuffer = new TCHAR[length + 1];
+		memset(ptszBuffer, 0, length + 1);
+
+#pragma warning(push)
+#pragma warning(disable:4996)
+		result = _sntprintf_s(ptszBuffer, length + 1, length, ptszFmt, args ...);
+#pragma warning(pop)
+		length *= 2;
+	}
+	_tstring s(ptszBuffer);
+	delete[] ptszBuffer;
+
+	return s;
+}
+
 template<typename T>
 T random(T minimum, T maximum)
 {
@@ -141,8 +169,8 @@ T random(T minimum, T maximum)
 	return distribution(engine);
 }
 
-void		GetDBDSNString(TCHAR* ptszDSN, const DB_CLASS dbClass, const TCHAR* ptszDBHost, const unsigned int nPort, const TCHAR* ptszDBUserId, const TCHAR* ptszDBPasswd, const TCHAR* ptszDBName);
-DB_CLASS	GetInt8ToDBClass(uint8 num);
+void		GetDBDSNString(TCHAR* ptszDSN, const EDBClass dbClass, const TCHAR* ptszDBHost, const unsigned int nPort, const TCHAR* ptszDBUserId, const TCHAR* ptszDBPasswd, const TCHAR* ptszDBName);
+EDBClass	GetInt8ToDBClass(uint8 num);
 uint32		GetUInt32(const char* pszText);
 uint64		GetUInt64(const char* pszText);
 uint32		GetUInt32(const wchar_t* pwszText);

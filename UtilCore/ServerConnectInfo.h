@@ -82,7 +82,7 @@ class CDBNode
 {
 public:
 	CDBNode(void)
-		: m_nID(0), m_dbClass(DB_CLASS::DB_NONE), m_nPort(0)
+		: m_nID(0), m_dbClass(EDBClass::NONE), m_nPort(0)
 	{
 		_tmemset(m_tszDSN, 0, DATABASE_DSN_STRLEN);
 		_tmemset(m_tszDBHost, 0, DATABASE_SERVER_NAME_STRLEN);
@@ -91,7 +91,7 @@ public:
 		_tmemset(m_tszDBPasswd, 0, DATABASE_DSN_USER_PASSWORD_STRLEN);
 	}
 
-	void Init(DB_CLASS dbClass, const TCHAR* ptszDBHost, const unsigned int nPort, const TCHAR* ptszDBUserId, const TCHAR* ptszDBPasswd, const TCHAR* ptszDBName)
+	void Init(EDBClass dbClass, const TCHAR* ptszDBHost, const unsigned int nPort, const TCHAR* ptszDBUserId, const TCHAR* ptszDBPasswd, const TCHAR* ptszDBName)
 	{
 		m_dbClass = dbClass;
 		_tcsncpy_s(m_tszDBHost, _countof(m_tszDBHost), ptszDBHost, _TRUNCATE);
@@ -126,22 +126,22 @@ public:
 		return SerializeT(writer);
 	};
 
-	DB_CLASS ConvertDBClassToInt(int dbClass)
+	EDBClass ConvertDBClassToInt(int dbClass)
 	{
 		switch( dbClass )
 		{
 			case 1:
-				return DB_CLASS::DB_MSSQL;
+				return EDBClass::MSSQL;
 				break;
 			case 2:
-				return DB_CLASS::DB_MYSQL;
+				return EDBClass::MYSQL;
 				break;
 			case 3:
-				return DB_CLASS::DB_ORACLE;
+				return EDBClass::ORACLE;
 				break;
 		}
 
-		return DB_CLASS::DB_NONE;
+		return EDBClass::NONE;
 	}
 
 private:
@@ -179,7 +179,7 @@ private:
 public:
 	int16			m_nID;
 
-	DB_CLASS        m_dbClass;
+	EDBClass        m_dbClass;
 	TCHAR			m_tszDSN[DATABASE_DSN_STRLEN];
 	TCHAR			m_tszDBHost[DATABASE_SERVER_NAME_STRLEN];
 	uint16			m_nPort;

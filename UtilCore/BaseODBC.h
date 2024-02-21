@@ -18,7 +18,7 @@ typedef	struct _COL_DESCRIPTION
 {
 	TCHAR tszColName[128];
 	short NameLength;
-	short DataType;
+	short EDataType;
 	DWORD dwColSize;
 	short DigitSize;
 	short Nullable;
@@ -30,8 +30,8 @@ typedef	struct _COL_DESCRIPTION
 class CBaseODBC
 {
 public:
-	CBaseODBC(const DB_CLASS dbClass = DB_CLASS::DB_NONE, const bool bLoadExcelFile = false);
-	CBaseODBC(const DB_CLASS dbClass, const TCHAR* ptszDSN, const bool bLoadExcelFile = false);
+	CBaseODBC(const EDBClass dbClass = EDBClass::NONE, const bool bLoadExcelFile = false);
+	CBaseODBC(const EDBClass dbClass, const TCHAR* ptszDSN, const bool bLoadExcelFile = false);
 	~CBaseODBC();
 
 	bool		Connect();
@@ -42,7 +42,8 @@ public:
 	}
 	bool        DBMSInfo(TCHAR* ptszServerName, TCHAR* ptszDBMSName, TCHAR* ptszDBMSVersion);
 	void		ClearStmt(void);
-	DB_CLASS    GetDBClass() { return m_DbClass; }
+	void		FreeStmt(void);
+	EDBClass    GetDBClass() { return m_DbClass; }
 
 	//***************************************************************************
 	// 바인딩 관련
@@ -111,7 +112,7 @@ private:
 	SQLHDBC		m_hConn;
 	SQLHSTMT	m_hStmt;
 
-	DB_CLASS        m_DbClass;
+	EDBClass        m_DbClass;
 	bool			m_bLoadExcelFile;
 	int16			m_nParamNum;
 	int16			m_nColNum;

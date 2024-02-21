@@ -9,15 +9,15 @@
 
 //***************************************************************************
 //
-void GetDBDSNString(TCHAR* ptszDSN, const DB_CLASS dbClass, const TCHAR* ptszDBHost, const unsigned int nPort, const TCHAR* ptszDBUserId, const TCHAR* ptszDBPasswd, const TCHAR* ptszDBName)
+void GetDBDSNString(TCHAR* ptszDSN, const EDBClass dbClass, const TCHAR* ptszDBHost, const unsigned int nPort, const TCHAR* ptszDBUserId, const TCHAR* ptszDBPasswd, const TCHAR* ptszDBName)
 {
 	switch( dbClass )
 	{
-		case DB_CLASS::DB_MSSQL:
+		case EDBClass::MSSQL:
 			_sntprintf_s(ptszDSN, DATABASE_DSN_STRLEN, _TRUNCATE, _T("DRIVER={SQL Server};SERVER=%s,%u;Database=%s;UID=%s;PWD=%s"),
 						 ptszDBHost, nPort, ptszDBName, ptszDBUserId, ptszDBPasswd);
 			break;
-		case DB_CLASS::DB_MYSQL:
+		case EDBClass::MYSQL:
 #ifdef _UNICODE	
 			_sntprintf_s(ptszDSN, DATABASE_DSN_STRLEN, _TRUNCATE, _T("DRIVER={MySQL ODBC 8.1 UNICODE Driver};SERVER=%s,Port=%u;Database=%s;Uid=%s;Pwd=%s;MULTI_HOST=1;"),
 						 ptszDBHost, nPort, ptszDBName, ptszDBUserId, ptszDBPasswd);
@@ -26,7 +26,7 @@ void GetDBDSNString(TCHAR* ptszDSN, const DB_CLASS dbClass, const TCHAR* ptszDBH
 						 m_tszDBHost, m_nPort, m_tszDBName, m_tszDBUserId, m_tszDBPasswd);
 #endif
 			break;
-		case DB_CLASS::DB_ORACLE:
+		case EDBClass::ORACLE:
 			_sntprintf_s(ptszDSN, DATABASE_DSN_STRLEN, _TRUNCATE, _T("DRIVER=Microsoft ODBC for Oracle};SERVER=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=%s)(PORT=%u))(CONNECT_DATA=(SID=%s)));Uid=%s;Pwd=%s"),
 						 ptszDBHost, nPort, ptszDBName, ptszDBUserId, ptszDBPasswd);
 	}
@@ -34,21 +34,21 @@ void GetDBDSNString(TCHAR* ptszDSN, const DB_CLASS dbClass, const TCHAR* ptszDBH
 
 //***************************************************************************
 //
-DB_CLASS GetInt8ToDBClass(uint8 num)
+EDBClass GetInt8ToDBClass(uint8 num)
 {
 	switch( num )
 	{
 		case 1:
-			return DB_CLASS::DB_MSSQL;
+			return EDBClass::MSSQL;
 			break;
 		case 2:
-			return DB_CLASS::DB_MYSQL;
+			return EDBClass::MYSQL;
 			break;
 		case 3:
-			return DB_CLASS::DB_ORACLE;
+			return EDBClass::ORACLE;
 			break;
 		default:
-			return DB_CLASS::DB_NONE;
+			return EDBClass::NONE;
 			break;
 	}
 }

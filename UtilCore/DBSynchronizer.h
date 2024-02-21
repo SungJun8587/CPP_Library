@@ -29,6 +29,10 @@
 #include <DBModel.h> 
 #endif
 
+#ifndef __DBSYNCBIND_H__
+#include <DBSyncBind.h> 
+#endif
+
 #include "rapidxml.hpp"
 #include "rapidxml_print.hpp"
 
@@ -88,6 +92,7 @@ public:
 	bool		GatherDBTables();
 	bool		GatherDBTableColumns();
 	bool		GatherDBIndexes();
+	bool		GatherDBIndexOptions();
 	bool		GatherDBForeignKeys();
 	bool		GatherDBTrigger();
 
@@ -109,7 +114,16 @@ public:
 		_dbConn.BindCol(idx + 1, value, iLength, let);
 	}
 
-	DB_CLASS GetDBClass() { return _dbClass; }
+	EDBClass GetDBClass() { return _dbClass; }
+
+	bool		GetDBSystemInfo(int32& system_count, std::unique_ptr<DBModel::DB_SYSTEMINFO[]>& pDBSystemInfo);
+	bool		GetDBSystemDataTypeInfo(int& datatype_count, std::unique_ptr<DBModel::DB_SYSTEM_DATATYPE[]>& pDBSystemDataType);
+
+	// MSSQL 저장프로시저, 함수, 트리거 생성 쿼리 얻어오기 관련 함수 
+	_tstring	MSSQLDBHelpText(const EDBObjectType dbObject, const TCHAR* ptszObjectName);
+
+	// MSSQL 테이블, 컬럼 명 수정
+	bool		MSSQLRenameObject(const TCHAR* ptszObjectName, const TCHAR* ptszChgObjectName, const EMSSQLRenameObjectType renameObjectType = EMSSQLRenameObjectType::NONE);
 
 	// MSSQL 테이블, 컬럼 코멘트 보기/추가/수정/삭제 관련 함수
 	_tstring	MSSQLGetTableColumnComment(const TCHAR* ptszTableName, const TCHAR* ptszColumnName);
@@ -129,13 +143,19 @@ public:
 	bool		MSSQLUpdateExtendedProperty(const stExtendedProperty extendedProperty);
 	bool		MSSQLDropExtendedProperty(const stExtendedProperty extendedProperty);
 
-	// MSSQL 저장프로시저, 함수, 트리거 생성 쿼리 얻어오기 관련 함수 
-	_tstring	MSSQLDBHelpText(const DB_OBJECT dbObject, const TCHAR* ptszObjectName);
 
+	// MYSQL 테이블, 컬럼 생성 쿼리 얻어오기 관련 함수
+	_tstring	MYSQLDBShowTable(const TCHAR* ptszTableName);
+
+	// MYSQL 저장프로시저/함수/트리거/이벤트 생성 쿼리 얻어오기 관련 함수
+	_tstring	MYSQLDBShowObject(const EDBObjectType dbObject, const TCHAR* ptszObjectName);
+
+	// MYSQL 테이블, 컬럼 명 수정
+	bool		MYSQLRenameObject(const TCHAR* ptszTableName, const TCHAR* ptszChgName, const TCHAR* ptszColumnName = _T(""), const TCHAR* ptszDataTypeDesc = _T(""), bool bIsNullable = false, const TCHAR* ptszDefaultDefinition = _T(""), bool bIsIdentity = false, const TCHAR* ptszCharacterSet = _T(""), const TCHAR* ptszCollation = _T(""), const TCHAR* ptszComment = _T(""));
 
 	// MYSQL 테이블, 컬럼 코멘트 보기/추가/수정/삭제 관련 함수
 	_tstring	MYSQLGetTableColumnComment(const TCHAR* ptszTableName, const TCHAR* ptszColumnName);
-	bool		MYSQLProcessTableColumnComment(const TCHAR* ptszTableName, const TCHAR* ptszColumnName, const TCHAR* ptszColumnOption, const TCHAR* ptszDescription);
+	bool		MYSQLProcessTableColumnComment(const TCHAR* ptszTableName, const TCHAR* ptszColumnName = _T(""), const TCHAR* ptszDataTypeDesc = _T(""), bool bIsNullable = false, const TCHAR* ptszDefaultDefinition = _T(""), bool bIsIdentity = false, const TCHAR* ptszCharacterSet = _T(""), const TCHAR* ptszCollation = _T(""), const TCHAR* ptszComment = _T(""));
 
 	// MYSQL 저장프로시저 코멘트 보기/추가/수정/삭제 관련 함수
 	_tstring	MYSQLGetProcedureComment(const TCHAR* ptszProcName);
@@ -144,10 +164,6 @@ public:
 	// MYSQL 함수 코멘트 보기/추가/수정/삭제 관련 함수
 	_tstring	MYSQLGetFunctionComment(const TCHAR* ptszFuncName);
 	bool		MYSQLProcessFunctionComment(const TCHAR* ptszFuncName, const TCHAR* ptszDescription);
-
-	// MYSQL 테이블, 컬럼 생성 쿼리 얻어오기 관련 함수
-	_tstring	MYSQLDBShowTable(const TCHAR* ptszTableName);
-	_tstring	MYSQLDBShowObject(const DB_OBJECT dbObject, const TCHAR* ptszObjectName);
 
 private:
 	void		CompareDBModel();
@@ -159,7 +175,7 @@ private:
 	void		ExecuteUpdateQueries();
 
 private:
-	DB_CLASS	_dbClass;
+	EDBClass	_dbClass;
 	CBaseODBC&	_dbConn;
 
 	CVector<DBModel::TableRef>			_xmlTables;

@@ -75,11 +75,11 @@ class CDBParamAttrMgr
 public:
 	CDBParamAttrMgr(void) {}
 
-	template<typename DataType>
-	CDBParamAttr& operator()(DataType& data)
+	template<typename EDataType>
+	CDBParamAttr& operator()(EDataType& data)
 	{
-		m_dbParamAttr.SetParamAttr(odbc_param_attr<DataType>::c_data_type, odbc_param_attr<DataType>::sql_data_type, odbc_param_attr<DataType>::param_size);
-		m_dbParamAttr.SetValue(&data, sizeof(DataType));
+		m_dbParamAttr.SetParamAttr(odbc_param_attr<EDataType>::c_data_type, odbc_param_attr<EDataType>::sql_data_type, odbc_param_attr<EDataType>::param_size);
+		m_dbParamAttr.SetValue(&data, sizeof(EDataType));
 
 		return m_dbParamAttr;
 	}

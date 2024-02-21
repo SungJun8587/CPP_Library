@@ -105,36 +105,36 @@ public:
 	bool Remove(const _tstring& strKey) const;
 	bool Remove(uint32 ui32ArrayIndex) const;
 
-	template< typename DataType >
-	bool Add(TCHAR* ptszNodePath, DataType data);
+	template< typename EDataType >
+	bool Add(TCHAR* ptszNodePath, EDataType data);
 
-	template< typename DataType >
-	bool Update(TCHAR* ptszNodePath, DataType data);
+	template< typename EDataType >
+	bool Update(TCHAR* ptszNodePath, EDataType data);
 
-	template< typename DataType >
-	_tstring SerializeToJson(const DataType& data, bool bIsPretty = true);
+	template< typename EDataType >
+	_tstring SerializeToJson(const EDataType& data, bool bIsPretty = true);
 
-	template< typename DataType >
-	DataType DeserializeViaDom(const TCHAR* const json);
+	template< typename EDataType >
+	EDataType DeserializeViaDom(const TCHAR* const json);
 
-	template< typename DataType >
-	DataType DeserializeViaDom(const _tstring& json);
+	template< typename EDataType >
+	EDataType DeserializeViaDom(const _tstring& json);
 
 #if __cplusplus >= 201703L
-	template< typename DataType >
-	void SerializeToJson(const DataType& data, const std::filesystem::path& path, bool bIsPretty = true);
+	template< typename EDataType >
+	void SerializeToJson(const EDataType& data, const std::filesystem::path& path, bool bIsPretty = true);
 
-	template< typename DataType >
-	DataType DeserializeViaDom(const std::filesystem::path& path);
+	template< typename EDataType >
+	EDataType DeserializeViaDom(const std::filesystem::path& path);
 
-	template< typename DataType >
-	DataType DeserializeViaSax(const TCHAR* const json);
+	template< typename EDataType >
+	EDataType DeserializeViaSax(const TCHAR* const json);
 
-	template< typename DataType >
-	DataType DeserializeViaSax(const _tstring& json);
+	template< typename EDataType >
+	EDataType DeserializeViaSax(const _tstring& json);
 
-	template< typename DataType >
-	DataType DeserializeViaSax(const std::filesystem::path& path);
+	template< typename EDataType >
+	EDataType DeserializeViaSax(const std::filesystem::path& path);
 #endif
 
 	void	Print_DebugInfo(const TCHAR* ptszFormat, ...);
@@ -142,11 +142,11 @@ public:
 private:
 	CJSONParser(_tDocument* pDoc, _tValue* pValue);
 
-	template<typename DataType, typename _CONVERT_FUNC, typename _DEF_VAL>
-	DataType ConvertToNumber(_CONVERT_FUNC pFunc, _DEF_VAL tDefValue) const;
+	template<typename EDataType, typename _CONVERT_FUNC, typename _DEF_VAL>
+	EDataType ConvertToNumber(_CONVERT_FUNC pFunc, _DEF_VAL tDefValue) const;
 
-	template< typename DataType >
-	DataType Deserialize(_tStringStream& stream);
+	template< typename EDataType >
+	EDataType Deserialize(_tStringStream& stream);
 
 private:
 	bool	m_bIsDebugPrint;

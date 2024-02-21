@@ -11,17 +11,17 @@
 
 //***************************************************************************
 //
-enum class DB_CLASS : unsigned char
+enum class EDBClass : unsigned char
 {
-	DB_NONE = 0,
-	DB_MSSQL = 1,
-	DB_MYSQL,
-	DB_ORACLE
+	NONE = 0,
+	MSSQL = 1,
+	MYSQL,
+	ORACLE
 };
 
 //***************************************************************************
 //
-enum class DB_RETURN_TYPE : short
+enum class EDBReturnType : short
 {
 	INVALID = -1,
 	OK = 0,
@@ -31,14 +31,141 @@ enum class DB_RETURN_TYPE : short
 
 //***************************************************************************
 //
-enum class DB_OBJECT : unsigned char
+enum class EDBObjectType : unsigned char
 {
 	TABLE = 1,
 	PROCEDURE,
 	FUNCTION,
 	TRIGGERS,
-	EVENTS
+	EVENTS,
+	COLUMN = 6,
+	PARAMETER = 7
 };
+
+enum class EParameterMode
+{
+	PARAM_RETURN = 0,
+	PARAM_IN = 1,
+	PARAM_OUT = 2
+};
+
+enum class EIndexKind
+{
+	NONE = 0,
+	CLUSTERED = 1,
+	NONCLUSTERED = 2
+};
+
+enum class EIndexType
+{
+	NONE = 0,
+	PRIMARYKEY = 1,
+	UNIQUE = 2,
+	INDEX = 3,
+	FULLTEXT = 4,
+	SPATIAL = 5
+};
+
+enum class EIndexSort
+{
+	ASC = 1,
+	DESC = 2
+};
+
+enum class EMSSQLRenameObjectType : unsigned char
+{
+	NONE = 0,
+	COLUMN,
+	DATABASE,
+	INDEX,
+	OBJECT,
+	STATISTICS,
+	USERDATATYPE
+};
+
+inline const TCHAR* ToString(EDBClass v)
+{
+	switch( v )
+	{
+		case EDBClass::MSSQL:		return _T("MSSQL");
+		case EDBClass::MYSQL:		return _T("MYSQL");
+		case EDBClass::ORACLE:		return _T("ORACLE");
+		default:					return _T("NONE");
+	}
+}
+
+inline const TCHAR* ToString(EDBObjectType v)
+{
+	switch( v )
+	{
+		case EDBObjectType::TABLE:			return _T("TABLE");
+		case EDBObjectType::PROCEDURE:		return _T("PROCEDURE");
+		case EDBObjectType::FUNCTION:		return _T("FUNCTION");
+		case EDBObjectType::TRIGGERS:		return _T("TRIGGERS");
+		case EDBObjectType::EVENTS:			return _T("EVENTS");
+		case EDBObjectType::COLUMN:			return _T("COLUMN");
+		case EDBObjectType::PARAMETER:		return _T("PARAMETER");
+		default:							return _T("");
+	}
+}
+
+inline const TCHAR* ToString(EParameterMode v)
+{
+	switch( v )
+	{
+		case EParameterMode::PARAM_RETURN:	return _T("RET");
+		case EParameterMode::PARAM_IN:		return _T("IN");
+		case EParameterMode::PARAM_OUT:		return _T("OUT");
+		default:							return _T("");
+	}
+}
+
+inline const TCHAR* ToString(EIndexKind v)
+{
+	switch( v )
+	{
+		case EIndexKind::CLUSTERED:			return _T("CLUSTERED");
+		case EIndexKind::NONCLUSTERED:		return _T("NONCLUSTERED");
+		default:							return _T("NONE");
+	}
+}
+
+inline const TCHAR* ToString(EIndexType v)
+{
+	switch( v )
+	{
+		case EIndexType::PRIMARYKEY:	return _T("PRIMARY KEY");
+		case EIndexType::UNIQUE:		return _T("UNIQUE");
+		case EIndexType::INDEX:			return _T("INDEX");
+		case EIndexType::FULLTEXT:		return _T("FULLTEXT");
+		case EIndexType::SPATIAL:		return _T("SPATIAL");
+		default:						return _T("NONE");
+	}
+}
+
+inline const TCHAR* ToString(EIndexSort v)
+{
+	switch( v )
+	{
+		case EIndexSort::ASC:			return _T("ASC");
+		case EIndexSort::DESC:			return _T("DESC");
+		default:						return _T("");
+	}
+}
+
+inline const TCHAR* ToString(EMSSQLRenameObjectType v)
+{
+	switch( v )
+	{
+		case EMSSQLRenameObjectType::COLUMN:		return _T("COLUMN");
+		case EMSSQLRenameObjectType::DATABASE:		return _T("DATABASE");
+		case EMSSQLRenameObjectType::INDEX:			return _T("INDEX");
+		case EMSSQLRenameObjectType::OBJECT:		return _T("OBJECT");
+		case EMSSQLRenameObjectType::STATISTICS:	return _T("STATISTICS");
+		case EMSSQLRenameObjectType::USERDATATYPE:	return _T("USERDATATYPE");
+		default:									return _T("NONE");
+	}
+}
 
 //***************************************************************************
 //***************************************************************************
@@ -128,12 +255,12 @@ enum class DB_OBJECT : unsigned char
 #define DATABASE_DSN_USER_ID_STRLEN					32
 #define DATABASE_DSN_USER_PASSWORD_STRLEN			32
 
-#define DATABASE_CHARACTERSET_STRLEN				20
+#define DATABASE_CHARACTERSET_STRLEN				50
 #define DATABASE_TABLE_NAME_STRLEN					128
 #define DATABASE_COLUMN_NAME_STRLEN					128
 #define DATABASE_OBJECT_NAME_STRLEN					128
 #define DATABASE_DATATYPEDESC_STRLEN				128
-
+#define DATABASE_BASE_STRLEN						260
 #define DATABASE_SCHEDULE_TIME_STRLEN				8
 
 #define DATABASE_DEFAULT_LOGIN_TIMEOUT				15	// Login Timeout(sec)

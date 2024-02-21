@@ -159,6 +159,9 @@
       <Filter>DB</Filter>
     </ClInclude>
     <ClInclude Include="ServerConnectInfo.h" />
+    <ClInclude Include="BaseSQL.h">
+      <Filter>DB</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CustomAllocator.cpp">

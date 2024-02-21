@@ -47,6 +47,11 @@ DWORD	Utf8ToUnicode_String(std::wstring& unicode, const char* utf8, const size_t
 
 DWORD	AnsiToUtf8_String(std::string& utf8, const char* ansi, const size_t ansi_size);
 DWORD	Utf8ToAnsi_String(std::string& ansi, const char* utf8, const size_t utf8_size);
+
+wstring WStringToString(const std::string& src);
+string	StringToWString(const std::wstring& src);
+_tstring TStringToString(const std::string& src);
+string StringToTString(const _tstring& src);
 #endif
 
 // Window FullPath MaxLen = 260

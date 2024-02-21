@@ -1,7 +1,7 @@
 //***************************************************************************
 //	
-template<typename DataType, typename _CONVERT_FUNC, typename _DEF_VAL>
-DataType CJSONParser::ConvertToNumber(_CONVERT_FUNC pFunc, _DEF_VAL tDefValue) const
+template<typename EDataType, typename _CONVERT_FUNC, typename _DEF_VAL>
+EDataType CJSONParser::ConvertToNumber(_CONVERT_FUNC pFunc, _DEF_VAL tDefValue) const
 {
     if( true == m_pValue->IsString() )
     {
@@ -9,31 +9,31 @@ DataType CJSONParser::ConvertToNumber(_CONVERT_FUNC pFunc, _DEF_VAL tDefValue) c
     }
     else if( true == m_pValue->IsInt() )
     {
-        return (DataType)m_pValue->GetInt();
+        return (EDataType)m_pValue->GetInt();
     }
     else if( true == m_pValue->IsInt64() )
     {
-        return (DataType)m_pValue->GetInt64();
+        return (EDataType)m_pValue->GetInt64();
     }
     else if( true == m_pValue->IsUint() )
     {
-        return (DataType)m_pValue->GetUint();
+        return (EDataType)m_pValue->GetUint();
     }
     else if( true == m_pValue->IsUint64() )
     {
-        return (DataType)m_pValue->GetUint64();
+        return (EDataType)m_pValue->GetUint64();
     }
     else if( true == m_pValue->IsFloat() )
     {
-        return (DataType)m_pValue->GetFloat();
+        return (EDataType)m_pValue->GetFloat();
     }
     else if( true == m_pValue->IsDouble() )
     {
-        return (DataType)m_pValue->GetDouble();
+        return (EDataType)m_pValue->GetDouble();
     }
     else if( true == m_pValue->IsBool() )
     {
-        return (DataType)m_pValue->GetBool();
+        return (EDataType)m_pValue->GetBool();
     }
     else
     {
@@ -43,8 +43,8 @@ DataType CJSONParser::ConvertToNumber(_CONVERT_FUNC pFunc, _DEF_VAL tDefValue) c
 
 //***************************************************************************
 //	
-template< typename DataType >
-bool CJSONParser::Add(TCHAR* ptszNodePath, DataType data)
+template< typename EDataType >
+bool CJSONParser::Add(TCHAR* ptszNodePath, EDataType data)
 {
 	_tValue* value;
 	if( (value = _tPointer(ptszNodePath).Get(*m_pDocument)) == 0 )
@@ -58,8 +58,8 @@ bool CJSONParser::Add(TCHAR* ptszNodePath, DataType data)
 
 //***************************************************************************
 //	
-template< typename DataType >
-bool CJSONParser::Update(TCHAR* ptszNodePath, DataType data)
+template< typename EDataType >
+bool CJSONParser::Update(TCHAR* ptszNodePath, EDataType data)
 {
 	_tValue* value;
 	if( (value = _tPointer(ptszNodePath).Get(*m_pDocument)) == 0 )
@@ -73,8 +73,8 @@ bool CJSONParser::Update(TCHAR* ptszNodePath, DataType data)
 
 //***************************************************************************
 //	
-template< typename DataType >
-_tstring CJSONParser::SerializeToJson(const DataType& data, bool bIsPretty)
+template< typename EDataType >
+_tstring CJSONParser::SerializeToJson(const EDataType& data, bool bIsPretty)
 {
 	_tStringBuffer buffer;
 	buffer.Clear();
@@ -105,8 +105,8 @@ _tstring CJSONParser::SerializeToJson(const DataType& data, bool bIsPretty)
 
 //***************************************************************************
 //
-template< typename DataType >
-DataType CJSONParser::Deserialize(_tStringStream& stream)
+template< typename EDataType >
+EDataType CJSONParser::Deserialize(_tStringStream& stream)
 {
 	_tDocument document;
 	document.ParseStream(stream);
@@ -117,10 +117,10 @@ DataType CJSONParser::Deserialize(_tStringStream& stream)
 	}
 
 	static_assert(
-		std::is_default_constructible<DataType>::value,
+		std::is_default_constructible<EDataType>::value,
 		"The container must have a default constructor.");
 
-	DataType container;
+	EDataType container;
 	dom_deserializer::from_json(document, container);
 
 	return container;
@@ -128,28 +128,28 @@ DataType CJSONParser::Deserialize(_tStringStream& stream)
 
 //***************************************************************************
 //
-template< typename DataType >
-DataType CJSONParser::DeserializeViaDom(const TCHAR* const json)
+template< typename EDataType >
+EDataType CJSONParser::DeserializeViaDom(const TCHAR* const json)
 {
 	_tStringStream string_stream{ json };
 
-	return Deserialize<DataType>(string_stream);
+	return Deserialize<EDataType>(string_stream);
 }
 
 //***************************************************************************
 //
-template< typename DataType >
-DataType CJSONParser::DeserializeViaDom(const _tstring& json)
+template< typename EDataType >
+EDataType CJSONParser::DeserializeViaDom(const _tstring& json)
 {
-	return DeserializeViaDom<DataType>(json.c_str());
+	return DeserializeViaDom<EDataType>(json.c_str());
 }
 
 #if __cplusplus >= 201703L
 
 //***************************************************************************
 //
-template< typename DataType >
-void CJSONParser::SerializeToJson(const DataType& data, const std::filesystem::path& path, bool bIsPretty)
+template< typename EDataType >
+void CJSONParser::SerializeToJson(const EDataType& data, const std::filesystem::path& path, bool bIsPretty)
 {
 	_tofstream file_stream{ path };
 
@@ -185,37 +185,37 @@ void CJSONParser::SerializeToJson(const DataType& data, const std::filesystem::p
 
 //***************************************************************************
 //
-template< typename DataType >
-DataType CJSONParser::DeserializeViaDom(const std::filesystem::path& path)
+template< typename EDataType >
+EDataType CJSONParser::DeserializeViaDom(const std::filesystem::path& path)
 {
 	_tofstream file_stream{ path };
 	_tStreamWrapper stream_wrapper{ file_stream };
 
-	return Deserialize<DataType>(stream_wrapper);
+	return Deserialize<EDataType>(stream_wrapper);
 }
 
 //***************************************************************************
 //
-template< typename DataType >
-DataType CJSONParser::DeserializeViaSax(const TCHAR* const json)
+template< typename EDataType >
+EDataType CJSONParser::DeserializeViaSax(const TCHAR* const json)
 {
-	return sax_deserializer::detail::from_json<DataType>(json);
+	return sax_deserializer::detail::from_json<EDataType>(json);
 }
 
 //***************************************************************************
 //
-template< typename DataType >
-DataType CJSONParser::DeserializeViaSax(const _tstring& json)
+template< typename EDataType >
+EDataType CJSONParser::DeserializeViaSax(const _tstring& json)
 {
-	return sax_deserializer::detail::from_json<DataType>(json.c_str());
+	return sax_deserializer::detail::from_json<EDataType>(json.c_str());
 }
 
 //***************************************************************************
 //
-template< typename DataType >
-DataType CJSONParser::DeserializeViaSax(const std::filesystem::path& path)
+template< typename EDataType >
+EDataType CJSONParser::DeserializeViaSax(const std::filesystem::path& path)
 {
-	return sax_deserializer::detail::from_json<DataType>(path);
+	return sax_deserializer::detail::from_json<EDataType>(path);
 }
 
 #endif

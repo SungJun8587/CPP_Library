@@ -68,11 +68,11 @@ class CMySQLParamAttrMgr
 public:
 	CMySQLParamAttrMgr(void) {}
 
-	template<typename DataType>
-	CMySQLParamAttr& operator()(DataType& data)
+	template<typename EDataType>
+	CMySQLParamAttr& operator()(EDataType& data)
 	{
-		m_dbParamAttr.SetParamAttr(mysql_param_attr<DataType>::target_type, mysql_param_attr<DataType>::is_unsigned);
-		m_dbParamAttr.SetValue(&data, sizeof(DataType));
+		m_dbParamAttr.SetParamAttr(mysql_param_attr<EDataType>::target_type, mysql_param_attr<EDataType>::is_unsigned);
+		m_dbParamAttr.SetValue(&data, sizeof(EDataType));
 		return m_dbParamAttr;
 	}
 

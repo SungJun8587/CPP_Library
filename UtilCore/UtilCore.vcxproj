@@ -27,6 +27,7 @@
     <ClInclude Include="BaseMySQL.h" />
     <ClInclude Include="BaseODBC.h" />
     <ClInclude Include="BaseRedefineDataType.h" />
+    <ClInclude Include="BaseSQL.h" />
     <ClInclude Include="CalculatedElapsedTime.h" />
     <ClInclude Include="ClusteredMap.h" />
     <ClInclude Include="CommonUtil.h" />
