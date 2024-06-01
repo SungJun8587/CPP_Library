@@ -17,8 +17,16 @@
 #include <BaseRedefineDataType.h> 
 #endif
 
-#ifndef __BASESQL_H__
-#include <BaseSQL.h> 
+#ifndef __DBSQLQUEQY_H__
+#include <DBSQLQuery.h> 
+#endif
+
+#ifndef __DBMSSQLQUEQY_H__
+#include <DBMSSQLQuery.h> 
+#endif
+
+#ifndef __DBMYSQLQUEQY_H__
+#include <DBMYSQLQuery.h> 
 #endif
 
 #ifndef __BASEODBC_H__
@@ -38,7 +46,7 @@ namespace SP
 	class GetDBTables : public CDBBind<0, 10>
 	{
 	public:
-		GetDBTables(EDBClass dbClass, CBaseODBC& conn) : CDBBind(conn, GetTableInfo(dbClass))
+		GetDBTables(EDBClass dbClass, CBaseODBC& conn) : CDBBind(conn, GetTableInfoQuery(dbClass))
 		{
 		}
 		void Out_ObjectId(OUT int32& value)
@@ -86,7 +94,7 @@ namespace SP
 	class GetDBTableColumns : public CDBBind<0, 19>
 	{
 	public:
-		GetDBTableColumns(EDBClass dbClass, CBaseODBC& conn) : CDBBind(conn, GetTableColumnInfo(dbClass))
+		GetDBTableColumns(EDBClass dbClass, CBaseODBC& conn) : CDBBind(conn, GetTableColumnInfoQuery(dbClass))
 		{
 		}
 		void Out_ObjectId(OUT int32& value)
@@ -167,10 +175,10 @@ namespace SP
 		}
 	};
 
-	class GetDBIndexes : public CDBBind<0, 12>
+	class GetDBIndexes : public CDBBind<0, 13>
 	{
 	public:
-		GetDBIndexes(EDBClass dbClass, CBaseODBC& conn) : CDBBind(conn, GetIndexInfo(dbClass))
+		GetDBIndexes(EDBClass dbClass, CBaseODBC& conn) : CDBBind(conn, GetIndexInfoQuery(dbClass))
 		{
 		}
 		void Out_ObjectId(OUT int32& value)
@@ -209,24 +217,28 @@ namespace SP
 		{
 			BindCol(8, value);
 		}
-		void Out_ColumnSeq(OUT int32& value)
+		void Out_IsSystemNamed(OUT BOOL& value)
 		{
 			BindCol(9, value);
 		}
-		template<int32 N> void Out_ColumnName(OUT TCHAR(&value)[N])
+		void Out_ColumnSeq(OUT int32& value)
 		{
 			BindCol(10, value);
 		}
-		void Out_ColumnSort(OUT int8& value)
+		template<int32 N> void Out_ColumnName(OUT TCHAR(&value)[N])
 		{
 			BindCol(11, value);
 		}
+		void Out_ColumnSort(OUT int8& value)
+		{
+			BindCol(12, value);
+		}
 	};
 
-	class GetDBIndexOptions : public CDBBind<0, 22>
+	class GetDBIndexOptions : public CDBBind<0, 24>
 	{
 	public:
-		GetDBIndexOptions(EDBClass dbClass, CBaseODBC& conn) : CDBBind(conn, GetIndexOptionInfo(dbClass))
+		GetDBIndexOptions(EDBClass dbClass, CBaseODBC& conn) : CDBBind(conn, GetIndexOptionInfoQuery(dbClass))
 		{
 		}
 		void Out_ObjectId(OUT int32& value)
@@ -285,39 +297,29 @@ namespace SP
 		{
 			BindCol(13, value);
 		}
-		void Out_StatisticsNoRecompute(OUT BOOL& value)
+		void Out_CompressionDelay(OUT int32& value)
 		{
 			BindCol(14, value);
 		}
-		void Out_DataCompression(OUT int8& value)
+		void Out_OptimizeForSequentialKey(OUT BOOL& value)
 		{
 			BindCol(15, value);
 		}
-		template<int32 N> void Out_DataCompressionDesc(OUT TCHAR(&value)[N])
+		void Out_StatisticsNoRecompute(OUT BOOL& value)
 		{
 			BindCol(16, value);
 		}
-		template<int32 N> void Out_DataSpaceName(OUT TCHAR(&value)[N])
+		void Out_StatisticsIncremental(OUT BOOL& value)
 		{
 			BindCol(17, value);
 		}
-		template<int32 N> void Out_DataSpaceTypeDesc(OUT TCHAR(&value)[N])
+		void Out_DataCompression(OUT int8& value)
 		{
 			BindCol(18, value);
 		}
-
-		/*
-		template<int32 N> void Out_OptimizeForSequentialKey(OUT TCHAR(&value)[N])
+		template<int32 N> void Out_DataCompressionDesc(OUT TCHAR(&value)[N])
 		{
-			BindCol(15, value);
-		}
-		void Out_Resumable(OUT BOOL& value)
-		{
-			BindCol(16, value);
-		}
-		void Out_MaxDop(OUT int16& value)
-		{
-			BindCol(17, value);
+			BindCol(19, value);
 		}
 		void Out_XmlCompression(OUT BOOL& value)
 		{
@@ -327,13 +329,20 @@ namespace SP
 		{
 			BindCol(21, value);
 		}
-		*/
+		template<int32 N> void Out_FileGroupOrPartitionScheme(OUT TCHAR(&value)[N])
+		{
+			BindCol(22, value);
+		}
+		template<int32 N> void Out_FileGroupOrPartitionSchemeName(OUT TCHAR(&value)[N])
+		{
+			BindCol(23, value);
+		}
 	};
 
 	class GetDBForeignKeys : public CDBBind<0, 10>
 	{
 	public:
-		GetDBForeignKeys(EDBClass dbClass, CBaseODBC& conn) : CDBBind(conn, GetForeignKeyInfo(dbClass))
+		GetDBForeignKeys(EDBClass dbClass, CBaseODBC& conn) : CDBBind(conn, GetForeignKeyInfoQuery(dbClass))
 		{
 		}
 		void Out_ObjectId(OUT int32& value)
@@ -381,7 +390,7 @@ namespace SP
 	class GetDBTriggers : public CDBBind<0, 4>
 	{
 	public:
-		GetDBTriggers(EDBClass dbClass, CBaseODBC& conn) : CDBBind(conn, GetTriggerInfo(dbClass))
+		GetDBTriggers(EDBClass dbClass, CBaseODBC& conn) : CDBBind(conn, GetTriggerInfoQuery(dbClass))
 		{
 		}
 		void Out_ObjectId(OUT int32& value)
@@ -405,7 +414,7 @@ namespace SP
 	class GetDBStoredProcedures : public CDBBind<0, 6>
 	{
 	public:
-		GetDBStoredProcedures(EDBClass dbClass, CBaseODBC& conn) : CDBBind(conn, GetStoredProcedureInfo(dbClass))
+		GetDBStoredProcedures(EDBClass dbClass, CBaseODBC& conn) : CDBBind(conn, GetProcedureInfoQuery(dbClass))
 		{
 		}
 		void Out_ObjectId(OUT int32& value)
@@ -437,7 +446,7 @@ namespace SP
 	class GetDBStoredProcedureParams : public CDBBind<0, 12>
 	{
 	public:
-		GetDBStoredProcedureParams(EDBClass dbClass, CBaseODBC& conn) : CDBBind(conn, GetStoredProcedureParamInfo(dbClass))
+		GetDBStoredProcedureParams(EDBClass dbClass, CBaseODBC& conn) : CDBBind(conn, GetProcedureParamInfoQuery(dbClass))
 		{
 		}
 		void Out_ObjectId(OUT int32& value)
@@ -493,7 +502,7 @@ namespace SP
 	class GetDBFunctions : public CDBBind<0, 6>
 	{
 	public:
-		GetDBFunctions(EDBClass dbClass, CBaseODBC& conn) : CDBBind(conn, GetFunctionInfo(dbClass))
+		GetDBFunctions(EDBClass dbClass, CBaseODBC& conn) : CDBBind(conn, GetFunctionInfoQuery(dbClass))
 		{
 		}
 		void Out_ObjectId(OUT int32& value)
@@ -525,7 +534,7 @@ namespace SP
 	class GetDBFunctionParams : public CDBBind<0, 12>
 	{
 	public:
-		GetDBFunctionParams(EDBClass dbClass, CBaseODBC& conn) : CDBBind(conn, GetFunctionParamInfo(dbClass))
+		GetDBFunctionParams(EDBClass dbClass, CBaseODBC& conn) : CDBBind(conn, GetFunctionParamInfoQuery(dbClass))
 		{
 		}
 		void Out_ObjectId(OUT int32& value)

@@ -44,37 +44,43 @@ void CDBSynchronizer::PrintDBSchema()
 {
 	_tstring query;
 
-	query = GetTableInfo(_dbClass);
+	query = GetTableInfoQuery(_dbClass);
 	DBModel::Helpers::LogFileWrite(_dbClass, _T("[테이블 명세]"), query, false);
 
-	query = GetTableColumnInfo(_dbClass);
+	query = GetTableColumnInfoQuery(_dbClass);
 	DBModel::Helpers::LogFileWrite(_dbClass, _T("[테이블 컬럼 명세]"), query, true);
 
-	query = GetIndexInfo(_dbClass);
+	query = GetIndexInfoQuery(_dbClass);
 	DBModel::Helpers::LogFileWrite(_dbClass, _T("[인덱스 명세]"), query, true);
 
-	query = GetForeignKeyInfo(_dbClass);
+	query = GetIndexOptionInfoQuery(_dbClass);
+	DBModel::Helpers::LogFileWrite(_dbClass, _T("[인덱스 옵션 명세]"), query, true);
+
+	query = GetPartitionInfoQuery(_dbClass);
+	DBModel::Helpers::LogFileWrite(_dbClass, _T("[파티션 명세]"), query, true);
+
+	query = GetForeignKeyInfoQuery(_dbClass);
 	DBModel::Helpers::LogFileWrite(_dbClass, _T("[외래키 명세]"), query, true);
 
-	query = GetDefaultConstInfo(_dbClass);
+	query = GetDefaultConstInfoQuery(_dbClass);
 	DBModel::Helpers::LogFileWrite(_dbClass, _T("[기본값 제약 명세]"), query, true);
 
-	query = GetCheckConstInfo(_dbClass);
+	query = GetCheckConstInfoQuery(_dbClass);
 	DBModel::Helpers::LogFileWrite(_dbClass, _T("[체크 제약 명세]"), query, true);
 
-	query = GetTriggerInfo(_dbClass);
+	query = GetTriggerInfoQuery(_dbClass);
 	DBModel::Helpers::LogFileWrite(_dbClass, _T("[트리거 명세]"), query, true);
 
-	query = GetStoredProcedureInfo(_dbClass);
+	query = GetProcedureInfoQuery(_dbClass);
 	DBModel::Helpers::LogFileWrite(_dbClass, _T("[저장프로시저 명세]"), query, true);
 
-	query = GetStoredProcedureParamInfo(_dbClass);
+	query = GetProcedureParamInfoQuery(_dbClass);
 	DBModel::Helpers::LogFileWrite(_dbClass, _T("[저장프로시저 파라미터 명세]"), query, true);
 
-	query = GetFunctionInfo(_dbClass);
+	query = GetFunctionInfoQuery(_dbClass);
 	DBModel::Helpers::LogFileWrite(_dbClass, _T("[함수 명세]"), query, true);
 
-	query = GetFunctionParamInfo(_dbClass);
+	query = GetFunctionParamInfoQuery(_dbClass);
 	DBModel::Helpers::LogFileWrite(_dbClass, _T("[함수 파라미터 명세]"), query, true);
 }
 
@@ -106,10 +112,10 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 			c->_desc = column.GetStringAttr(_T("desc"));
 			c->_datatypedesc = column.GetStringAttr(_T("type"));
 
-			DBModel::EDataType columnType = DBModel::Helpers::StringToDataType(c->_datatypedesc.c_str(), OUT c->_maxLength);
-			ASSERT_CRASH(columnType != DBModel::EDataType::NONE);
+			EDataType columnType = StringToDBDataType(c->_datatypedesc.c_str(), OUT c->_maxLength);
+			ASSERT_CRASH(columnType != EDataType::NONE);
 
-			c->_datatype = DBModel::Helpers::DataTypeToString(columnType);
+			c->_datatype = _tstring(ToString(columnType));
 			c->_nullable = !column.GetBoolAttr(_T("notnull"), false);
 
 			const TCHAR* identityStr = column.GetStringAttr(_T("identity"));
@@ -135,13 +141,14 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 			i->_name = index.GetStringAttr(_T("name"));
 
 			const TCHAR* kindStr = index.GetStringAttr(_T("kind"));
-			i->_kind = DBModel::Helpers::StringToIndexKind(kindStr);
+			i->_kind = StringToDBIndexKind(kindStr);
 
 			const TCHAR* typeStr = index.GetStringAttr(_T("type"));
-			i->_type = DBModel::Helpers::StringToIndexType(typeStr);
+			i->_type = StringToDBIndexType(typeStr);
 
 			i->_primaryKey = index.FindChild(_T("PrimaryKey")).IsValid();
 			i->_uniqueKey = index.FindChild(_T("UniqueKey")).IsValid();
+			i->_systemNamed = index.FindChild(_T("SystemNamed")).IsValid();
 
 			CVector<CXMLNode> columns = index.FindChildren(_T("Column"));
 			for( CXMLNode& column : columns )
@@ -207,7 +214,7 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 		{
 			DBModel::ProcParamRef procParam = MakeShared<DBModel::ProcParam>();
 			procParam->_paramId = param.GetStringAttr(_T("seq"));
-			procParam->_paramMode = DBModel::Helpers::StringToParamMode(param.GetStringAttr(_T("mode")));
+			procParam->_paramMode = StringToDBParamMode(param.GetStringAttr(_T("mode")));
 			procParam->_name = param.GetStringAttr(_T("name"));
 			procParam->_desc = param.GetStringAttr(_T("desc"));
 			procParam->_datatypedesc = param.GetStringAttr(_T("type"));
@@ -230,7 +237,7 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 		{
 			DBModel::FuncParamRef funcParam = MakeShared<DBModel::FuncParam>();
 			funcParam->_paramId = param.GetStringAttr(_T("seq"));
-			funcParam->_paramMode = DBModel::Helpers::StringToParamMode(param.GetStringAttr(_T("mode")));
+			funcParam->_paramMode = StringToDBParamMode(param.GetStringAttr(_T("mode")));
 			funcParam->_name = param.GetStringAttr(_T("name"));
 			funcParam->_desc = param.GetStringAttr(_T("desc"));
 			funcParam->_datatypedesc = param.GetStringAttr(_T("type"));
@@ -294,6 +301,7 @@ bool CDBSynchronizer::DBToCreateXml(const TCHAR* path)
 
 			if( dbIndex->_primaryKey ) index->append_node(doc.allocate_node(rapidxml::node_type::node_element, _T("PrimaryKey")));
 			if( dbIndex->_uniqueKey ) index->append_node(doc.allocate_node(rapidxml::node_type::node_element, _T("UniqueKey")));
+			if( dbIndex->_systemNamed ) index->append_node(doc.allocate_node(rapidxml::node_type::node_element, _T("SystemNamed")));
 
 			for( DBModel::IndexColumnRef& dbIndexColumn : dbIndex->_columns )
 			{
@@ -348,7 +356,7 @@ bool CDBSynchronizer::DBToCreateXml(const TCHAR* path)
 		{
 			_tXmlNodeType* procParam = doc.allocate_node(rapidxml::node_type::node_element, _T("Param"));
 			procParam->append_attribute(doc.allocate_attribute(_T("seq"), dbProcParam->_paramId.c_str()));
-			procParam->append_attribute(doc.allocate_attribute(_T("mode"), doc.allocate_string(dbProcParam->GetParameterModeText().c_str())));
+			procParam->append_attribute(doc.allocate_attribute(_T("mode"), doc.allocate_string(ToString(dbProcParam->_paramMode))));
 			procParam->append_attribute(doc.allocate_attribute(_T("name"), dbProcParam->_name.c_str()));
 			procParam->append_attribute(doc.allocate_attribute(_T("type"), dbProcParam->_datatypedesc.c_str()));
 			procParam->append_attribute(doc.allocate_attribute(_T("desc"), dbProcParam->_desc.c_str()));
@@ -372,7 +380,7 @@ bool CDBSynchronizer::DBToCreateXml(const TCHAR* path)
 		{
 			_tXmlNodeType* funcParam = doc.allocate_node(rapidxml::node_type::node_element, _T("Param"));
 			funcParam->append_attribute(doc.allocate_attribute(_T("seq"), dbFuncParam->_paramId.c_str()));
-			funcParam->append_attribute(doc.allocate_attribute(_T("mode"), doc.allocate_string(dbFuncParam->GetParameterModeText().c_str())));
+			funcParam->append_attribute(doc.allocate_attribute(_T("mode"), doc.allocate_string(ToString(dbFuncParam->_paramMode))));
 			funcParam->append_attribute(doc.allocate_attribute(_T("name"), dbFuncParam->_name.c_str()));
 			funcParam->append_attribute(doc.allocate_attribute(_T("type"), dbFuncParam->_datatypedesc.c_str()));
 			funcParam->append_attribute(doc.allocate_attribute(_T("desc"), dbFuncParam->_desc.c_str()));
@@ -431,7 +439,7 @@ bool CDBSynchronizer::GatherDBTables()
 		tableRef->_schemaName = tszSchemaName;
 		tableRef->_name = tszTableName;
 		tableRef->_desc = tszTableComment;
-		tableRef->_auto_increment_value = DBModel::Helpers::Format(_T("%lld"), auto_increment_value);
+		tableRef->_auto_increment_value = tstring_format(_T("%lld"), auto_increment_value);
 		tableRef->_storageEngine = tszStorageEngine;
 		tableRef->_characterset = tszCharacterSet;
 		tableRef->_collation = tszCollation;
@@ -512,7 +520,7 @@ bool CDBSynchronizer::GatherDBTableColumns()
 			{
 				columnRef->_schemaName = (*findTable)->_schemaName;
 				columnRef->_tableName = (*findTable)->_name;
-				columnRef->_seq = DBModel::Helpers::Format(_T("%d"), seq);
+				columnRef->_seq = tstring_format(_T("%d"), seq);
 				columnRef->_name = tszColumnName;
 				columnRef->_datatype = tszDataType;
 				columnRef->_maxLength = (_tcsicmp(columnRef->_datatype.c_str(), _T("nvarchar")) == 0 || _tcsicmp(columnRef->_datatype.c_str(), _T("nchar")) == 0 ? maxLength / 2 : maxLength);
@@ -521,7 +529,7 @@ bool CDBSynchronizer::GatherDBTableColumns()
 				columnRef->_datatypedesc = tszDataTypeDesc;
 				columnRef->_nullable = isNullable;
 				columnRef->_identity = isIdentity;
-				if( columnRef->_identity ) columnRef->_identitydesc = DBModel::Helpers::Format(_T("%lld,%lld"), columnRef->_seedValue, columnRef->_incrementValue);
+				if( columnRef->_identity ) columnRef->_identitydesc = tstring_format(_T("%lld,%lld"), columnRef->_seedValue, columnRef->_incrementValue);
 				columnRef->_seedValue = (isIdentity ? seedValue : 0);
 				columnRef->_incrementValue = (isIdentity ? incValue : 0);
 				columnRef->_defaultDefinition = tszDefaultDefinition;
@@ -554,6 +562,7 @@ bool CDBSynchronizer::GatherDBIndexes()
 	int8	indexType;
 	BOOL	isPrimaryKey;
 	BOOL	isUnique;
+	BOOL	isSystemNamed;
 	int32	columnSeq;
 	TCHAR	tszColumnName[DATABASE_COLUMN_NAME_STRLEN] = {0, };
 	int8	columnSort;
@@ -568,6 +577,7 @@ bool CDBSynchronizer::GatherDBIndexes()
 	getDBIndexes.Out_IndexType(OUT indexType);
 	getDBIndexes.Out_IsPrimaryKey(OUT isPrimaryKey);
 	getDBIndexes.Out_IsUnique(OUT isUnique);
+	getDBIndexes.Out_IsSystemNamed(OUT isSystemNamed);
 	getDBIndexes.Out_ColumnSeq(OUT columnSeq);
 	getDBIndexes.Out_ColumnName(OUT tszColumnName);
 	getDBIndexes.Out_ColumnSort(OUT columnSort);
@@ -599,6 +609,7 @@ bool CDBSynchronizer::GatherDBIndexes()
 				indexRef->_type = static_cast<EIndexType>(indexType);
 				indexRef->_primaryKey = isPrimaryKey;
 				indexRef->_uniqueKey = isUnique;
+				indexRef->_systemNamed = isSystemNamed;
 			}
 			indexes.push_back(indexRef);
 			findIndex = indexes.end() - 1;
@@ -606,7 +617,7 @@ bool CDBSynchronizer::GatherDBIndexes()
 
 		DBModel::IndexColumnRef indexColumnRef = MakeShared<DBModel::IndexColumn>();
 		{
-			indexColumnRef->_seq = DBModel::Helpers::Format(_T("%d"), columnSeq);
+			indexColumnRef->_seq = tstring_format(_T("%d"), columnSeq);
 			indexColumnRef->_name = tszColumnName;
 			indexColumnRef->_sort = static_cast<EIndexSort>(columnSort);
 		};		
@@ -633,12 +644,17 @@ bool CDBSynchronizer::GatherDBIndexOptions()
 	BOOL	allowRowLocks;
 	BOOL	allowPageLocks;
 	BOOL	hasFilter;
-	TCHAR	tszFilterDefinition[DATABASE_BASE_STRLEN] = { 0, };
+	TCHAR	tszFilterDefinition[DATABASE_WVARCHAR_MAX] = { 0, };
+	int32	compressionDelay;
+	BOOL	optimizeForSequentialKey;
 	BOOL	statisticsNoRecompute;
+	BOOL    statisticsIncremental;
 	int8	dataCompression;
 	TCHAR	tszDataCompressionDesc[DATABASE_BASE_STRLEN] = { 0, };
-	TCHAR	tszDataSpaceName[DATABASE_BASE_STRLEN] = { 0, };
-	TCHAR	tszDataSpaceTypeDesc[DATABASE_BASE_STRLEN] = { 0, };
+	BOOL	xmlCompression;
+	TCHAR	tszXmlCompressionDesc[DATABASE_BASE_STRLEN] = { 0, };
+	TCHAR	tszFileGroupOrPartitionScheme[DATABASE_OBJECT_TYPE_DESC_STRLEN] = { 0, };
+	TCHAR	tszFileGroupOrPartitionSchemeName[DATABASE_OBJECT_NAME_STRLEN] = { 0, };
 
 	SP::GetDBIndexOptions getDBIndexOptions(_dbClass, _dbConn);
 	getDBIndexOptions.Out_ObjectId(OUT objectId);
@@ -655,11 +671,16 @@ bool CDBSynchronizer::GatherDBIndexOptions()
 	getDBIndexOptions.Out_AllowPageLocks(OUT allowPageLocks);
 	getDBIndexOptions.Out_HasFilter(OUT hasFilter);
 	getDBIndexOptions.Out_FilterDefinition(OUT tszFilterDefinition);
+	getDBIndexOptions.Out_CompressionDelay(OUT compressionDelay);
+	getDBIndexOptions.Out_OptimizeForSequentialKey(OUT optimizeForSequentialKey);
 	getDBIndexOptions.Out_StatisticsNoRecompute(OUT statisticsNoRecompute);
+	getDBIndexOptions.Out_StatisticsIncremental(OUT statisticsIncremental);
 	getDBIndexOptions.Out_DataCompression(OUT dataCompression);
 	getDBIndexOptions.Out_DataCompressionDesc(OUT tszDataCompressionDesc);
-	getDBIndexOptions.Out_DataSpaceName(OUT tszDataSpaceName);
-	getDBIndexOptions.Out_DataSpaceTypeDesc(OUT tszDataSpaceTypeDesc);
+	getDBIndexOptions.Out_XmlCompression(OUT xmlCompression);
+	getDBIndexOptions.Out_XmlCompressionDesc(OUT tszXmlCompressionDesc);
+	getDBIndexOptions.Out_FileGroupOrPartitionScheme(OUT tszFileGroupOrPartitionScheme);
+	getDBIndexOptions.Out_FileGroupOrPartitionSchemeName(OUT tszFileGroupOrPartitionSchemeName);
 
 	if( getDBIndexOptions.ExecDirect() == false )
 		return false;
@@ -693,11 +714,14 @@ bool CDBSynchronizer::GatherDBIndexOptions()
 				indexOptionRef->_allowPageLocks = allowPageLocks;
 				indexOptionRef->_hasFilter = hasFilter;
 				indexOptionRef->_filterDefinition = tszFilterDefinition;
+				indexOptionRef->_compressionDelay = compressionDelay;
+				indexOptionRef->_optimizeForSequentialKey = optimizeForSequentialKey;
 				indexOptionRef->_statisticsNoRecompute = statisticsNoRecompute;
+				indexOptionRef->_statisticsIncremental = statisticsIncremental;
 				indexOptionRef->_dataCompression = dataCompression;
 				indexOptionRef->_dataCompressionDesc = tszDataCompressionDesc;
-				indexOptionRef->_dataSpaceName = tszDataSpaceName;
-				indexOptionRef->_dataSpaceTypeDesc = tszDataSpaceTypeDesc;
+				indexOptionRef->_fileGroupOrPartitionScheme = tszFileGroupOrPartitionScheme;
+				indexOptionRef->_fileGroupOrPartitionSchemeName = tszFileGroupOrPartitionSchemeName;
 			}
 			indexOptions.push_back(indexOptionRef);
 			findIndexOption = indexOptions.end() - 1;
@@ -810,12 +834,14 @@ bool CDBSynchronizer::GatherDBTrigger()
 		_dbTriggers.push_back(triggerRef);
 	}
 
+	CDBQueryProcess dbQuery(_dbConn);
+
 	for( auto iter = _dbTriggers.begin(); iter != _dbTriggers.end(); iter++ )
 	{
 		DBModel::TriggerRef iterTriggerRef = *iter;
 		if( _dbClass == EDBClass::MSSQL )
-			iterTriggerRef->_fullBody = MSSQLDBHelpText(EDBObjectType::TRIGGERS, iterTriggerRef->_triggerName.c_str());
-		else iterTriggerRef->_fullBody = MYSQLDBShowObject(EDBObjectType::TRIGGERS, iterTriggerRef->_triggerName.c_str());
+			iterTriggerRef->_fullBody = dbQuery.MSSQLHelpText(EDBObjectType::TRIGGERS, iterTriggerRef->_triggerName.c_str());
+		else iterTriggerRef->_fullBody = dbQuery.MYSQLShowObject(EDBObjectType::TRIGGERS, iterTriggerRef->_triggerName.c_str());
 	}
 
 	return true;
@@ -861,12 +887,14 @@ bool CDBSynchronizer::GatherDBStoredProcedures()
 		tszProcComment[0] = _T('\0');
 	}
 
+	CDBQueryProcess dbQuery(_dbConn);
+
 	if( _dbClass == EDBClass::MSSQL )
 	{
 		for( auto iter = _dbProcedures.begin(); iter != _dbProcedures.end(); iter++ )
 		{
 			DBModel::ProcedureRef iterProcRef = *iter;
-			iterProcRef->_fullBody = MSSQLDBHelpText(EDBObjectType::PROCEDURE, iterProcRef->_name.c_str());
+			iterProcRef->_fullBody = dbQuery.MSSQLHelpText(EDBObjectType::PROCEDURE, iterProcRef->_name.c_str());
 		}
 	}
 	else if( _dbClass == EDBClass::MYSQL )
@@ -874,7 +902,7 @@ bool CDBSynchronizer::GatherDBStoredProcedures()
 		for( auto iter = _dbProcedures.begin(); iter != _dbProcedures.end(); iter++ )
 		{
 			DBModel::ProcedureRef iterProcRef = *iter;
-			iterProcRef->_fullBody = MYSQLDBShowObject(EDBObjectType::PROCEDURE, iterProcRef->_name.c_str());
+			iterProcRef->_fullBody = dbQuery.MYSQLShowObject(EDBObjectType::PROCEDURE, iterProcRef->_name.c_str());
 		}
 	}
 
@@ -932,7 +960,7 @@ bool CDBSynchronizer::GatherDBStoredProcedureParams()
 		{
 			DBModel::ProcParamRef procParamRef = MakeShared<DBModel::ProcParam>();
 			{
-				procParamRef->_paramId = DBModel::Helpers::Format(_T("%d"), paramId);;
+				procParamRef->_paramId = tstring_format(_T("%d"), paramId);;
 				procParamRef->_paramMode = static_cast<EParameterMode>(paramMode);
 				procParamRef->_name = tszParamName;
 				procParamRef->_datatype = tszDataType;
@@ -993,12 +1021,14 @@ bool CDBSynchronizer::GatherDBFunctions()
 		tszFuncComment[0] = _T('\0');
 	}
 
+	CDBQueryProcess dbQuery(_dbConn);
+
 	if( _dbClass == EDBClass::MSSQL )
 	{
 		for( auto iter = _dbFunctions.begin(); iter != _dbFunctions.end(); iter++ )
 		{
 			DBModel::FunctionRef iterFuncRef = *iter;
-			iterFuncRef->_fullBody = MSSQLDBHelpText(EDBObjectType::FUNCTION, iterFuncRef->_name.c_str());
+			iterFuncRef->_fullBody = dbQuery.MSSQLHelpText(EDBObjectType::FUNCTION, iterFuncRef->_name.c_str());
 		}
 	}
 	else if( _dbClass == EDBClass::MYSQL )
@@ -1006,7 +1036,7 @@ bool CDBSynchronizer::GatherDBFunctions()
 		for( auto iter = _dbFunctions.begin(); iter != _dbFunctions.end(); iter++ )
 		{
 			DBModel::FunctionRef iterFuncRef = *iter;
-			iterFuncRef->_fullBody = MYSQLDBShowObject(EDBObjectType::FUNCTION, iterFuncRef->_name.c_str());
+			iterFuncRef->_fullBody = dbQuery.MYSQLShowObject(EDBObjectType::FUNCTION, iterFuncRef->_name.c_str());
 		}
 	}
 
@@ -1064,7 +1094,7 @@ bool CDBSynchronizer::GatherDBFunctionParams()
 		{
 			DBModel::FuncParamRef funcParamRef = MakeShared<DBModel::FuncParam>();
 			{
-				funcParamRef->_paramId = DBModel::Helpers::Format(_T("%d"), paramId);;
+				funcParamRef->_paramId = tstring_format(_T("%d"), paramId);;
 				funcParamRef->_paramMode = static_cast<EParameterMode>(paramMode);
 				funcParamRef->_name = tszParamName;
 				funcParamRef->_datatype = tszDataType;
@@ -1081,790 +1111,6 @@ bool CDBSynchronizer::GatherDBFunctionParams()
 
 		tszParamComment[0] = _T('\0');
 	}
-
-	return true;
-}
-
-//***************************************************************************
-//
-bool CDBSynchronizer::GetDBSystemInfo(int32& system_count, std::unique_ptr<DBModel::DB_SYSTEMINFO[]>& pDBSystemInfo)  
-{
-	_tstring query;
-
-	int32	iBaseSize = DATABASE_DATATYPEDESC_STRLEN;
-	int32	iCharSetSize = DATABASE_CHARACTERSET_STRLEN;
-
-	if( _dbClass == EDBClass::MSSQL )
-		query = _T("SELECT COUNT(*) AS [system_count] FROM sys.databases WHERE name = DB_NAME();");
-	else if( _dbClass == EDBClass::MYSQL )
-		query = _T("SELECT COUNT(*) AS `system_count` FROM INFORMATION_SCHEMA.SCHEMATA WHERE `SCHEMA_NAME` = DATABASE();");
-	
-	query = query + _T("\r\n") + GetDBSystemQuery(_dbClass);
-
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
-
-	_dbConn.BindCol(system_count);
-
-	if( _dbConn.Fetch() == false ) return false;
-
-	if( system_count == 0 ) return false;
-
-	if( _dbConn.MoreResults() != SQL_SUCCESS ) return false;
-
-	pDBSystemInfo = unique_ptr<DBModel::DB_SYSTEMINFO[]>(new DBModel::DB_SYSTEMINFO[system_count]);
-
-	_dbConn.FreeStmt();
-	_dbConn.AllSets(sizeof(DBModel::DB_SYSTEMINFO), system_count);
-
-	_dbConn.BindCol(pDBSystemInfo[0].tszVersion, iBaseSize);
-	_dbConn.BindCol(pDBSystemInfo[0].tszCharacterSet, iCharSetSize);
-	_dbConn.BindCol(pDBSystemInfo[0].tszCollation, iCharSetSize);
-
-	if( _dbConn.Fetch() == false ) return false;
-
-	return true;
-}
-
-//***************************************************************************
-//  
-bool CDBSynchronizer::GetDBSystemDataTypeInfo(int& datatype_count, std::unique_ptr<DBModel::DB_SYSTEM_DATATYPE[]>& pDBSystemDataType)
-{
-	_tstring query;
-
-	int32	iDataTypeSize = DATABASE_DATATYPEDESC_STRLEN;
-	int32	iCharSetSize = DATABASE_CHARACTERSET_STRLEN;
-
-	if( _dbClass != EDBClass::MSSQL ) return false;
-
-	query = _T("SELECT COUNT(*) AS [datatype_count] FROM sys.types WHERE system_type_id = user_type_id;");
-	query = query + _T("\r\n") + GetDBSystemDataTypeQuery(_dbClass);
-
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
-
-	_dbConn.BindCol(datatype_count);
-
-	if( _dbConn.Fetch() == false ) return false;
-
-	if( datatype_count == 0 ) return false;
-
-	if( _dbConn.MoreResults() != SQL_SUCCESS ) return false;
-
-	pDBSystemDataType = unique_ptr<DBModel::DB_SYSTEM_DATATYPE[]>(new DBModel::DB_SYSTEM_DATATYPE[datatype_count]);
-
-	_dbConn.FreeStmt();
-	_dbConn.AllSets(sizeof(DBModel::DB_SYSTEM_DATATYPE), datatype_count);
-
-	_dbConn.BindCol(pDBSystemDataType[0].SystemTypeId);
-	_dbConn.BindCol(pDBSystemDataType[0].tszDataType, iDataTypeSize);
-	_dbConn.BindCol(pDBSystemDataType[0].MaxLength);
-	_dbConn.BindCol(pDBSystemDataType[0].Precision);
-	_dbConn.BindCol(pDBSystemDataType[0].Scale);
-	_dbConn.BindCol(pDBSystemDataType[0].tszCollation, iCharSetSize);
-	_dbConn.BindCol(pDBSystemDataType[0].IsNullable);
-
-	if( _dbConn.Fetch() == false ) return false;
-
-	return true;
-}
-
-//***************************************************************************
-//  
-_tstring CDBSynchronizer::MSSQLDBHelpText(const EDBObjectType dbObject, const TCHAR* ptszObjectName)
-{
-	_tstring query;
-	_tstring body;
-
-	int32	iBuffSize = DATABASE_WVARCHAR_MAX;
-	TCHAR	tszText[DATABASE_WVARCHAR_MAX] = { 0, };
-
-	SQLLEN		sdwObjectName(SQL_NTS);
-
-	if( _dbClass != EDBClass::MSSQL ) return body;
-	if( ptszObjectName == nullptr || _tcslen(ptszObjectName) < 1 ) return body;
-
-	// EXEC sp_helptext [ObjectName]
-	//	ObjectName : [PROCEDURE|FUNCTION|TRIGGERS|EVENTS|VIEW] NAME
-	query = GetMSSQLHelpText(dbObject);
-	if( _dbConn.PrepareQuery(query.c_str()) == false ) return body;
-
-	_dbConn.BindParamInput(1, ptszObjectName, sdwObjectName);
-	_dbConn.BindCol(tszText, iBuffSize);
-
-	if( _dbConn.Execute() == false ) return body;
-
-	while( _dbConn.Fetch() )
-	{
-		body.append(tszText);
-	}
-
-	return body;
-}
-
-//***************************************************************************
-//
-bool CDBSynchronizer::MSSQLRenameObject(const TCHAR* ptszObjectName, const TCHAR* ptszChgObjectName, const EMSSQLRenameObjectType renameObjectType)
-{
-	_tstring query;
-
-	if( _dbClass != EDBClass::MSSQL ) return false;
-	if( ptszObjectName == nullptr || _tcslen(ptszObjectName) < 1 ) return false;
-
-	query = GetMSSQLRenameObject(ptszObjectName, ptszChgObjectName, renameObjectType);
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
-
-	return true;
-}
-
-//***************************************************************************
-//
-_tstring CDBSynchronizer::MSSQLGetTableColumnComment(const TCHAR* ptszTableName, const TCHAR* ptszColumnName)
-{
-	_tstring ret;
-
-	int32		iBuffSize = DATABASE_WVARCHAR_MAX;
-	TCHAR		tszDescription[DATABASE_WVARCHAR_MAX] = {0, };
-
-	if( _dbClass != EDBClass::MSSQL ) return ret;
-	if( ptszTableName == nullptr || _tcslen(ptszTableName) < 1 ) return ret;
-
-	stExtendedProperty extendedProperty;
-
-	extendedProperty._propertyName = _T("MS_Description");
-	extendedProperty._level0_object_type = _T("SCHEMA");
-	extendedProperty._level0_object_name = _T("dbo");
-	extendedProperty._level1_object_type = _T("TABLE");
-	extendedProperty._level1_object_name = ptszTableName;
-	extendedProperty._level2_object_type = _T("");
-	extendedProperty._level2_object_name = _T("");
-	if( ptszColumnName != nullptr && _tcslen(ptszColumnName) > 0 )
-	{
-		extendedProperty._level2_object_type = _T("COLUMN");
-		extendedProperty._level2_object_name = ptszColumnName;
-	}
-
-	return MSSQLGetExtendedProperty(extendedProperty);
-}
-
-//***************************************************************************
-//
-bool CDBSynchronizer::MSSQLProcessTableColumnComment(const TCHAR* ptszTableName, const TCHAR* ptszColumnName, const TCHAR* ptszDescription)
-{
-	if( _dbClass != EDBClass::MSSQL ) return false;
-	if( ptszTableName == nullptr || _tcslen(ptszTableName) < 1 ) return false;
-
-	stExtendedProperty extendedProperty;
-
-	extendedProperty._propertyName = _T("MS_Description");
-	extendedProperty._propertyValue = ptszDescription;
-	extendedProperty._level0_object_type = _T("SCHEMA");
-	extendedProperty._level0_object_name = _T("dbo");
-	extendedProperty._level1_object_type = _T("TABLE");
-	extendedProperty._level1_object_name = ptszTableName;
-	extendedProperty._level2_object_type = _T("COLUMN");
-	extendedProperty._level2_object_name = ptszColumnName;
-
-	_tstring comment = MSSQLGetTableColumnComment(ptszTableName, ptszColumnName);
-	if( ptszDescription != nullptr && _tcslen(ptszDescription) > 0 )
-	{ 
-		if( comment.c_str() != nullptr && comment.size() > 0 )
-		{
-			//	- EXEC sp_updateextendedproperty [속성명], [속성값], [level0type], [level0name], [level1type], [level1name], [level2type], [level2name]
-			//		Ex)
-			//			- 테이블 주석 수정 : sp_updateextendedproperty 'MS_Description', '테이블 설명', 'SCHEMA', 'dbo', 'TABLE', '테이블명'
-			//			- 컬럼 주석 수정   : sp_updateextendedproperty 'MS_Description', '컬럼 설명', 'SCHEMA', 'dbo', 'TABLE', '테이블명', 'COLUMN' , '컬럼명'
-			return MSSQLUpdateExtendedProperty(extendedProperty);
-		}
-		else
-		{
-			//	- EXEC sp_addextendedproperty [속성명], [속성값], [level0type], [level0name], [level1type], [level1name], [level2type], [level2name]
-			//		Ex)
-			//			- 테이블 주석 추가 : sp_addextendedproperty 'MS_Description', '테이블 설명', 'SCHEMA', 'dbo', 'TABLE', '테이블명'
-			//			- 컬럼 주석 추가   : sp_addextendedproperty 'MS_Description', '컬럼 설명', 'SCHEMA', 'dbo', 'TABLE', '테이블명', 'COLUMN' , '컬럼명'
-			return MSSQLAddExtendedProperty(extendedProperty);
-		}
-	}
-	else
-	{
-		if( comment.c_str() != nullptr && comment.size() > 0 )
-		{
-			//	- EXEC sp_dropextendedproperty [속성명], [level0type], [level0name], [level1type], [level1name], [level2type], [level2name]
-			//		Ex)
-			//			- 테이블 주석 삭제 : sp_dropextendedproperty 'MS_Description', 'SCHEMA', 'dbo', 'TABLE', '테이블명'
-			//			- 컬럼 주석 삭제   : sp_dropextendedproperty 'MS_Description', 'SCHEMA', 'dbo', 'TABLE', '테이블명', 'COLUMN' , '컬럼명'
-			return MSSQLDropExtendedProperty(extendedProperty);
-		}
-	}
-
-	return true;
-}
-
-//***************************************************************************
-//
-_tstring CDBSynchronizer::MSSQLGetProcedureParamComment(const TCHAR* ptszProcName, const TCHAR* ptszProcParam)
-{
-	_tstring ret;
-
-	int32 iBuffSize = DATABASE_WVARCHAR_MAX;
-	TCHAR tszDescription[DATABASE_WVARCHAR_MAX] = {0, };
-
-	if( _dbClass != EDBClass::MSSQL ) return ret;
-	if( ptszProcName == nullptr || _tcslen(ptszProcName) < 1 ) return ret;
-
-	stExtendedProperty extendedProperty;
-
-	extendedProperty._propertyName = _T("MS_Description");
-	extendedProperty._level0_object_type = _T("SCHEMA");
-	extendedProperty._level0_object_name = _T("dbo");
-	extendedProperty._level1_object_type = _T("PROCEDURE");
-	extendedProperty._level1_object_name = ptszProcName;
-	extendedProperty._level2_object_type = _T("");
-	extendedProperty._level2_object_name = _T("");
-	if( ptszProcParam != nullptr && _tcslen(ptszProcParam) > 0 )
-	{
-		extendedProperty._level2_object_type = _T("PARAMETER");
-		extendedProperty._level2_object_name = ptszProcParam;
-	}
-
-	return MSSQLGetExtendedProperty(extendedProperty);
-}
-
-//***************************************************************************
-//
-bool CDBSynchronizer::MSSQLProcessProcedureParamComment(const TCHAR* ptszProcName, const TCHAR* ptszProcParam, const TCHAR* ptszDescription)
-{
-	if( _dbClass != EDBClass::MSSQL ) return false;
-	if( ptszProcName == nullptr || _tcslen(ptszProcName) < 1 ) return false;
-
-	stExtendedProperty extendedProperty;
-
-	extendedProperty._propertyName = _T("MS_Description");
-	extendedProperty._propertyValue = ptszDescription;
-	extendedProperty._level0_object_type = _T("SCHEMA");
-	extendedProperty._level0_object_name = _T("dbo");
-	extendedProperty._level1_object_type = _T("PROCEDURE");
-	extendedProperty._level1_object_name = ptszProcName;
-	extendedProperty._level2_object_type = _T("PARAMETER");
-	extendedProperty._level2_object_name = ptszProcParam;
-
-	_tstring comment = MSSQLGetProcedureParamComment(ptszProcName, ptszProcParam);
-	if( ptszDescription != nullptr && _tcslen(ptszDescription) > 0 )
-	{
-		if( comment.c_str() != nullptr && comment.size() > 0 )
-		{
-			//	- EXEC sp_updateextendedproperty [속성명], [속성값], [level0type], [level0name], [level1type], [level1name], [level2type], [level2name]
-			//		Ex)
-			//			- 프로시저 주석 수정 : sp_updateextendedproperty 'MS_Description', '프로시저 설명', 'SCHEMA', 'dbo', 'PROCEDURE', '프로시저명'
-			//			- 파라미터 주석 수정   : sp_updateextendedproperty 'MS_Description', '파라미터 설명', 'SCHEMA', 'dbo', 'PROCEDURE', '프로시저명', 'PARAMETER' , '파라미터명'
-			return MSSQLUpdateExtendedProperty(extendedProperty);
-		}
-		else
-		{
-			//	- EXEC sp_addextendedproperty [속성명], [속성값], [level0type], [level0name], [level1type], [level1name], [level2type], [level2name]
-			//		Ex)
-			//			- 프로시저 주석 추가 : sp_addextendedproperty 'MS_Description', '프로시저 설명', 'SCHEMA', 'dbo', 'PROCEDURE', '프로시저명'
-			//			- 파라미터 주석 추가   : sp_addextendedproperty 'MS_Description', '파라미터 설명', 'SCHEMA', 'dbo', 'PROCEDURE', '프로시저명', 'PARAMETER' , '파라미터명'
-			return MSSQLAddExtendedProperty(extendedProperty);
-		}
-	}
-	else
-	{
-		if( comment.c_str() != nullptr && comment.size() > 0 )
-		{
-			//	- EXEC sp_dropextendedproperty [속성명], [level0type], [level0name], [level1type], [level1name], [level2type], [level2name]
-			//		Ex)
-			//			- 프로시저 주석 삭제 : sp_dropextendedproperty 'MS_Description', 'SCHEMA', 'dbo', 'PROCEDURE', '프로시저명'
-			//			- 파라미터 주석 삭제   : sp_dropextendedproperty 'MS_Description', 'SCHEMA', 'dbo', 'PROCEDURE', '프로시저명', 'PARAMETER' , '파라미터명'
-			return MSSQLDropExtendedProperty(extendedProperty);
-		}
-	}
-
-	return true;
-}
-
-//***************************************************************************
-//
-_tstring CDBSynchronizer::MSSQLGetFunctionParamComment(const TCHAR* ptszFuncName, const TCHAR* ptszFuncParam)
-{
-	_tstring ret;
-
-	int32 iBuffSize = DATABASE_WVARCHAR_MAX;
-	TCHAR tszDescription[DATABASE_WVARCHAR_MAX] = {0, };
-
-	if( _dbClass != EDBClass::MSSQL ) return ret;
-	if( ptszFuncName == nullptr || _tcslen(ptszFuncName) < 1 ) return ret;
-
-	stExtendedProperty extendedProperty;
-
-	extendedProperty._propertyName = _T("MS_Description");
-	extendedProperty._level0_object_type = _T("SCHEMA");
-	extendedProperty._level0_object_name = _T("dbo");
-	extendedProperty._level1_object_type = _T("FUNCTION");
-	extendedProperty._level1_object_name = ptszFuncName;
-	extendedProperty._level2_object_type = _T("");
-	extendedProperty._level2_object_name = _T("");
-	if( ptszFuncParam != nullptr && _tcslen(ptszFuncParam) > 0 )
-	{
-		extendedProperty._level2_object_type = _T("PARAMETER");
-		extendedProperty._level2_object_name = ptszFuncParam;
-	}
-
-	return MSSQLGetExtendedProperty(extendedProperty);
-}
-
-//***************************************************************************
-//
-bool CDBSynchronizer::MSSQLProcessFunctionParamComment(const TCHAR* ptszFuncName, const TCHAR* ptszFuncParam, const TCHAR* ptszDescription)
-{
-	if( _dbClass != EDBClass::MSSQL ) return false;
-	if( ptszFuncName == nullptr || _tcslen(ptszFuncName) < 1 ) return false;
-
-	stExtendedProperty extendedProperty;
-
-	extendedProperty._propertyName = _T("MS_Description");
-	extendedProperty._propertyValue = ptszDescription;
-	extendedProperty._level0_object_type = _T("SCHEMA");
-	extendedProperty._level0_object_name = _T("dbo");
-	extendedProperty._level1_object_type = _T("FUNCTION");
-	extendedProperty._level1_object_name = ptszFuncName;
-	extendedProperty._level2_object_type = _T("PARAMETER");
-	extendedProperty._level2_object_name = ptszFuncParam;
-
-	_tstring comment = MSSQLGetFunctionParamComment(ptszFuncName, ptszFuncParam);
-	if( ptszDescription != nullptr && _tcslen(ptszDescription) > 0 )
-	{
-		if( comment.c_str() != nullptr && comment.size() > 0 )
-		{
-			//	- EXEC sp_updateextendedproperty [속성명], [속성값], [level0type], [level0name], [level1type], [level1name], [level2type], [level2name]
-			//		Ex)
-			//			- 함수 주석 수정 : sp_updateextendedproperty 'MS_Description', '함수 설명', 'SCHEMA', 'dbo', 'FUNCTION', '함수명'
-			//			- 파라미터 주석 수정   : sp_updateextendedproperty 'MS_Description', '파라미터 설명', 'SCHEMA', 'dbo', 'FUNCTION', '함수명', 'PARAMETER' , '파라미터명'
-			return MSSQLUpdateExtendedProperty(extendedProperty);
-		}
-		else
-		{
-			//	- EXEC sp_addextendedproperty [속성명], [속성값], [level0type], [level0name], [level1type], [level1name], [level2type], [level2name]
-			//		Ex)
-			//			- 함수 주석 추가 : sp_addextendedproperty 'MS_Description', '함수 설명', 'SCHEMA', 'dbo', 'FUNCTION', '함수명'
-			//			- 파라미터 주석 추가   : sp_addextendedproperty 'MS_Description', '파라미터 설명', 'SCHEMA', 'dbo', 'FUNCTION', '함수명', 'PARAMETER' , '파라미터명'
-			return MSSQLAddExtendedProperty(extendedProperty);
-		}
-	}
-	else
-	{
-		if( comment.c_str() != nullptr && comment.size() > 0 )
-		{
-			//	- EXEC sp_dropextendedproperty [속성명], [level0type], [level0name], [level1type], [level1name], [level2type], [level2name]
-			//		Ex)
-			//			- 함수 주석 삭제 : sp_dropextendedproperty 'MS_Description', 'SCHEMA', 'dbo', 'FUNCTION', '함수명'
-			//			- 파라미터 주석 삭제   : sp_dropextendedproperty 'MS_Description', 'SCHEMA', 'dbo', 'FUNCTION', '함수명', 'PARAMETER' , '파라미터명'
-			return MSSQLDropExtendedProperty(extendedProperty);
-		}
-	}
-
-	return true;
-}
-
-//***************************************************************************
-//
-_tstring CDBSynchronizer::MSSQLGetExtendedProperty(const stExtendedProperty extendedProperty)
-{
-	_tstring query;
-	_tstring ret;
-
-	int32		iBuffSize = DATABASE_WVARCHAR_MAX;
-	TCHAR		tszDescription[DATABASE_WVARCHAR_MAX] = {0, };
-
-	SQLLEN		sdwPropertyName(SQL_NTS), sdwLevel0_object_type(SQL_NTS), sdwLevel0_object_name(SQL_NTS);
-	SQLLEN		sdwLevel1_object_type(SQL_NTS), sdwLevel1_object_name(SQL_NTS);
-	SQLLEN		sdwLevel2_object_type(SQL_NTS), sdwLevel2_object_name(SQL_NTS);
-
-	if( _dbClass != EDBClass::MSSQL ) return ret;
-	if( extendedProperty._level2_object_type.size() < 1 ) sdwLevel2_object_type = SQL_NULL_DATA;
-	if( extendedProperty._level2_object_name.size() < 1 ) sdwLevel2_object_name = SQL_NULL_DATA;
-
-	query = _T("SELECT CAST(fn.[value] AS NVARCHAR(4000)) AS comment ");
-	query = query + _T("\n") + _T("FROM sys.fn_listextendedproperty(?, ?, ?, ?, ?, ?, ?) AS fn");
-	if( _dbConn.PrepareQuery(query.c_str()) == false ) return ret;
-
-	_dbConn.BindParamInput(1, extendedProperty._propertyName.c_str(), sdwPropertyName);
-	_dbConn.BindParamInput(2, extendedProperty._level0_object_type.c_str(), sdwLevel0_object_type);
-	_dbConn.BindParamInput(3, extendedProperty._level0_object_name.c_str(), sdwLevel0_object_name);
-	_dbConn.BindParamInput(4, extendedProperty._level1_object_type.c_str(), sdwLevel1_object_type);
-	_dbConn.BindParamInput(5, extendedProperty._level1_object_name.c_str(), sdwLevel1_object_name);
-	_dbConn.BindParamInput(6, extendedProperty._level2_object_type.c_str(), sdwLevel2_object_type);
-	_dbConn.BindParamInput(7, extendedProperty._level2_object_name.c_str(), sdwLevel2_object_name);
-
-	_dbConn.BindCol(tszDescription, iBuffSize);
-
-	if( _dbConn.Execute() == false ) return ret;
-	if( _dbConn.Fetch() == false ) return ret;
-
-	// 결과 레코드가 1개인 경우에만 성공 처리
-	int64 iRowCount = _dbConn.RowCount();
-	if( iRowCount != 1 ) return ret;
-
-	if( tszDescription != nullptr && _tcslen(tszDescription) > 0 )
-	{
-		ret.resize(iBuffSize);
-		ret.assign(tszDescription);
-	}
-
-	return ret;
-}
-
-//***************************************************************************
-//
-bool CDBSynchronizer::MSSQLAddExtendedProperty(const stExtendedProperty extendedProperty)
-{
-	_tstring query;
-
-	if( _dbClass != EDBClass::MSSQL ) return false;
-	if( extendedProperty._propertyName.size() == 0 || extendedProperty._propertyValue.size() == 0 ) return false;
-	if( extendedProperty._level0_object_type.size() == 0 || extendedProperty._level0_object_name.size() == 0 ) return false;
-	if( extendedProperty._level1_object_type.size() == 0 || extendedProperty._level1_object_name.size() == 0 ) return false;
-
-	if( extendedProperty._level2_object_type.size() > 0 && extendedProperty._level2_object_name.size() > 0 )
-	{
-		query = _T("EXEC sp_addextendedproperty ?, ?, ?, ?, ?, ?, ?, ?");
-		if( _dbConn.PrepareQuery(query.c_str()) == false ) return false;
-
-		_dbConn.BindParamInput(extendedProperty._propertyName.c_str());
-		_dbConn.BindParamInput(extendedProperty._propertyValue.c_str());
-		_dbConn.BindParamInput(extendedProperty._level0_object_type.c_str());
-		_dbConn.BindParamInput(extendedProperty._level0_object_name.c_str());
-		_dbConn.BindParamInput(extendedProperty._level1_object_type.c_str());
-		_dbConn.BindParamInput(extendedProperty._level1_object_name.c_str());
-		_dbConn.BindParamInput(extendedProperty._level2_object_type.c_str());
-		_dbConn.BindParamInput(extendedProperty._level2_object_name.c_str());
-	}
-	else
-	{
-		query = _T("EXEC sp_addextendedproperty ?, ?, ?, ?, ?, ?");
-		if( _dbConn.PrepareQuery(query.c_str()) == false ) return false;
-
-		_dbConn.BindParamInput(extendedProperty._propertyName.c_str());
-		_dbConn.BindParamInput(extendedProperty._propertyValue.c_str());
-		_dbConn.BindParamInput(extendedProperty._level0_object_type.c_str());
-		_dbConn.BindParamInput(extendedProperty._level0_object_name.c_str());
-		_dbConn.BindParamInput(extendedProperty._level1_object_type.c_str());
-		_dbConn.BindParamInput(extendedProperty._level1_object_name.c_str());
-	}
-
-	if( _dbConn.Execute() == false )
-		return false;
-
-	return true;
-}
-
-//***************************************************************************
-//
-bool CDBSynchronizer::MSSQLUpdateExtendedProperty(const stExtendedProperty extendedProperty)
-{
-	_tstring query;
-
-	if( _dbClass != EDBClass::MSSQL ) return false;
-	if( extendedProperty._propertyName.size() == 0 || extendedProperty._propertyValue.size() == 0 ) return false;
-	if( extendedProperty._level0_object_type.size() == 0 || extendedProperty._level0_object_name.size() == 0 ) return false;
-	if( extendedProperty._level1_object_type.size() == 0 || extendedProperty._level1_object_name.size() == 0 ) return false;
-
-	if( extendedProperty._level2_object_type.size() > 0 && extendedProperty._level2_object_name.size() > 0 )
-	{
-		query = _T("EXEC sp_updateextendedproperty ?, ?, ?, ?, ?, ?, ?, ?");
-		if( _dbConn.PrepareQuery(query.c_str()) == false ) return false;
-
-		_dbConn.BindParamInput(extendedProperty._propertyName.c_str());
-		_dbConn.BindParamInput(extendedProperty._propertyValue.c_str());
-		_dbConn.BindParamInput(extendedProperty._level0_object_type.c_str());
-		_dbConn.BindParamInput(extendedProperty._level0_object_name.c_str());
-		_dbConn.BindParamInput(extendedProperty._level1_object_type.c_str());
-		_dbConn.BindParamInput(extendedProperty._level1_object_name.c_str());
-		_dbConn.BindParamInput(extendedProperty._level2_object_type.c_str());
-		_dbConn.BindParamInput(extendedProperty._level2_object_name.c_str());
-	}
-	else
-	{
-		query = _T("EXEC sp_updateextendedproperty ?, ?, ?, ?, ?, ?");
-		if( _dbConn.PrepareQuery(query.c_str()) == false ) return false;
-
-		_dbConn.BindParamInput(extendedProperty._propertyName.c_str());
-		_dbConn.BindParamInput(extendedProperty._propertyValue.c_str());
-		_dbConn.BindParamInput(extendedProperty._level0_object_type.c_str());
-		_dbConn.BindParamInput(extendedProperty._level0_object_name.c_str());
-		_dbConn.BindParamInput(extendedProperty._level1_object_type.c_str());
-		_dbConn.BindParamInput(extendedProperty._level1_object_name.c_str());
-	}
-
-	if( _dbConn.Execute() == false )
-		return false;
-
-	return true;
-}
-
-//***************************************************************************
-//
-bool CDBSynchronizer::MSSQLDropExtendedProperty(const stExtendedProperty extendedProperty)
-{
-	_tstring query;
-
-	if( _dbClass != EDBClass::MSSQL ) return false;
-	if( extendedProperty._propertyName.size() == 0 ) return false;
-	if( extendedProperty._level0_object_type.size() == 0 || extendedProperty._level0_object_name.size() == 0 ) return false;
-	if( extendedProperty._level1_object_type.size() == 0 || extendedProperty._level1_object_name.size() == 0 ) return false;
-
-	if( extendedProperty._level2_object_type.size() > 0 && extendedProperty._level2_object_name.size() > 0 )
-	{
-		query = _T("EXEC sp_dropextendedproperty ?, ?, ?, ?, ?, ?, ?");
-		if( _dbConn.PrepareQuery(query.c_str()) == false ) return false;
-
-		_dbConn.BindParamInput(extendedProperty._propertyName.c_str());
-		_dbConn.BindParamInput(extendedProperty._level0_object_type.c_str());
-		_dbConn.BindParamInput(extendedProperty._level0_object_name.c_str());
-		_dbConn.BindParamInput(extendedProperty._level1_object_type.c_str());
-		_dbConn.BindParamInput(extendedProperty._level1_object_name.c_str());
-		_dbConn.BindParamInput(extendedProperty._level2_object_type.c_str());
-		_dbConn.BindParamInput(extendedProperty._level2_object_name.c_str());
-	}
-	else
-	{
-		query = _T("EXEC sp_dropextendedproperty ?, ?, ?, ?, ?");
-		if( _dbConn.PrepareQuery(query.c_str()) == false ) return false;
-
-		_dbConn.BindParamInput(extendedProperty._propertyName.c_str());
-		_dbConn.BindParamInput(extendedProperty._level0_object_type.c_str());
-		_dbConn.BindParamInput(extendedProperty._level0_object_name.c_str());
-		_dbConn.BindParamInput(extendedProperty._level1_object_type.c_str());
-		_dbConn.BindParamInput(extendedProperty._level1_object_name.c_str());
-	}
-
-	if( _dbConn.Execute() == false )
-		return false;
-
-	return true;
-}
-
-//***************************************************************************
-//
-_tstring CDBSynchronizer::MYSQLDBShowTable(const TCHAR* ptszTableName)
-{
-	_tstring query;
-	_tstring body;
-
-	int32	iNameSize = DATABASE_OBJECT_NAME_STRLEN;
-	int32   iBodySize = DATABASE_WVARCHAR_MAX;
-	TCHAR	tszName[DATABASE_OBJECT_NAME_STRLEN] = { 0, };
-	TCHAR	tszBody[DATABASE_WVARCHAR_MAX] = { 0, };
-
-	if( _dbClass != EDBClass::MYSQL ) return body;
-	if( ptszTableName == nullptr || _tcslen(ptszTableName) < 1 ) return body;
-
-	query = GetMYSQLShowObject(EDBObjectType::TABLE, ptszTableName);
-	if( _dbConn.PrepareQuery(query.c_str()) == false ) return body;
-
-	_dbConn.BindCol(tszName, iNameSize);
-	_dbConn.BindCol(tszBody, iBodySize);
-
-	if( _dbConn.Execute() == false ) return body;
-	
-	while( _dbConn.Fetch() )
-	{
-		body.append(tszBody);
-	}
-
-	return body;
-}
-
-//***************************************************************************
-//
-_tstring CDBSynchronizer::MYSQLDBShowObject(const EDBObjectType dbObject, const TCHAR* ptszObjectName)
-{
-	_tstring query;
-	_tstring body;
-
-	int32	iNameSize = DATABASE_OBJECT_NAME_STRLEN;
-	int32	iBaseSize = DATABASE_BASE_STRLEN;
-	int32   iBodySize = DATABASE_WVARCHAR_MAX;
-	TCHAR	tszName[DATABASE_OBJECT_NAME_STRLEN] = { 0, };
-	TCHAR	tszSqlmode[DATABASE_BASE_STRLEN] = { 0, };
-	TCHAR	tszBody[DATABASE_WVARCHAR_MAX] = { 0, };
-	TCHAR	tszCharacterSetClient[DATABASE_BASE_STRLEN] = { 0, };
-	TCHAR	tszCollationConnection[DATABASE_BASE_STRLEN] = { 0, };
-	TCHAR	tszDatabaseCollation[DATABASE_BASE_STRLEN] = { 0, };
-
-	if( _dbClass != EDBClass::MYSQL ) return body;
-	if( ptszObjectName == nullptr || _tcslen(ptszObjectName) < 1 ) return body;
-
-	query = GetMYSQLShowObject(dbObject, ptszObjectName);
-	if( _dbConn.PrepareQuery(query.c_str()) == false ) return body;
-
-	_dbConn.BindCol(tszName, iNameSize);
-	_dbConn.BindCol(tszSqlmode, iBaseSize);
-	_dbConn.BindCol(tszBody, iBodySize);
-	_dbConn.BindCol(tszCharacterSetClient, iBaseSize);
-	_dbConn.BindCol(tszCollationConnection, iBaseSize);
-	_dbConn.BindCol(tszDatabaseCollation, iBaseSize);
-
-	if( _dbConn.Execute() == false ) return body;
-
-	while( _dbConn.Fetch() )
-	{
-		body.append(tszBody);
-	}
-
-	return body;
-}
-
-//***************************************************************************
-//
-bool CDBSynchronizer::MYSQLRenameObject(const TCHAR* ptszTableName, const TCHAR* ptszChgName, const TCHAR* ptszColumnName, const TCHAR* ptszDataTypeDesc, bool bIsNullable, const TCHAR* ptszDefaultDefinition, bool bIsIdentity, const TCHAR* ptszCharacterSet, const TCHAR* ptszCollation, const TCHAR* ptszComment)
-{
-	if( _dbClass != EDBClass::MYSQL ) return false;
-
-	_tstring query = GetMYSQLRenameObject(ptszTableName, ptszChgName, ptszColumnName, ptszDataTypeDesc, bIsNullable, ptszDefaultDefinition, bIsIdentity, ptszCharacterSet, ptszCollation, ptszComment);
-
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
-
-	return true;
-}
-
-//***************************************************************************
-// Ex)
-//	SELECT `TABLE_COMMENT` AS `tableComment` FROM INFORMATION_SCHEMA.TABLES WHERE `TABLE_SCHEMA` = DATABASE() AND `TABLE_NAME` = 'tbl_table1';
-//	SELECT `COLUMN_COMMENT` AS `columncomment` FROM INFORMATION_SCHEMA.COLUMNS WHERE `TABLE_SCHEMA` = DATABASE() AND `TABLE_NAME` = 'tbl_table1' AND `COLUMN_NAME` = 'Id';
-_tstring CDBSynchronizer::MYSQLGetTableColumnComment(const TCHAR* ptszTableName, const TCHAR* ptszColumnName)
-{
-	_tstring query;
-	_tstring ret;
-
-	int32		iBuffSize = DATABASE_WVARCHAR_MAX;
-	TCHAR		tszDescription[DATABASE_WVARCHAR_MAX] = {0, };
-
-	if( _dbClass != EDBClass::MYSQL ) return ret;
-	if( ptszTableName == nullptr || _tcslen(ptszTableName) < 1 ) return ret;
-
-	query = MYSQLGetTableColumnCommentQuery(ptszTableName, ptszColumnName);
-	if( _dbConn.PrepareQuery(query.c_str()) == false ) return ret;
-
-	_dbConn.BindCol(tszDescription, iBuffSize);
-
-	if( _dbConn.Execute() == false ) return ret;
-	if( _dbConn.Fetch() == false ) return ret;
-
-	// 결과 레코드가 1개인 경우에만 성공 처리
-	int64 iRowCount = _dbConn.RowCount();
-	if( iRowCount != 1 ) return ret;
-
-	ret.resize(iBuffSize);
-	ret.assign(tszDescription);
-
-	return ret;
-}
-
-//***************************************************************************
-// Ex)
-//	ALTER TABLE `tbl_table1` COMMENT '테스트 테이블';
-//  ALTER TABLE `tbl_table1` MODIFY `Id` VARCHAR(50) NOT NULL COMMENT '아이디';
-bool CDBSynchronizer::MYSQLProcessTableColumnComment(const TCHAR* ptszTableName, const TCHAR* ptszColumnName, const TCHAR* ptszDataTypeDesc, bool bIsNullable, const TCHAR* ptszDefaultDefinition, bool bIsIdentity, const TCHAR* ptszCharacterSet, const TCHAR* ptszCollation, const TCHAR* ptszSetComment)
-{
-	if( _dbClass != EDBClass::MYSQL ) return false;
-	if( ptszTableName == nullptr || _tcslen(ptszTableName) < 1 ) return false;
-
-	_tstring query = MYSQLProcessTableColumnCommentQuery(ptszTableName, ptszSetComment, ptszColumnName, ptszDataTypeDesc, bIsNullable, ptszDefaultDefinition, bIsIdentity, ptszCharacterSet, ptszCollation);
-
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
-
-	return true;
-}
-
-//***************************************************************************
-// Ex)
-//	SELECT `ROUTINE_COMMENT` AS `procComment` FROM INFORMATION_SCHEMA.ROUTINES WHERE `ROUTINE_SCHEMA` = DATABASE() AND `ROUTINE_TYPE` = 'PROCEDURE' AND `ROUTINE_NAME` = 'sp_procedure1';
-_tstring CDBSynchronizer::MYSQLGetProcedureComment(const TCHAR* ptszProcName)
-{
-	_tstring query;
-	_tstring ret;
-
-	int32		iBuffSize = DATABASE_WVARCHAR_MAX;
-	TCHAR		tszDescription[DATABASE_WVARCHAR_MAX] = {0, };
-
-	if( _dbClass != EDBClass::MYSQL ) return ret;
-	if( ptszProcName == nullptr || _tcslen(ptszProcName) < 1 ) return ret;
-
-	query = MYSQLGetProcedureCommentQuery(ptszProcName);
-	if( _dbConn.PrepareQuery(query.c_str()) == false ) return ret;
-
-	_dbConn.BindCol(tszDescription, iBuffSize);
-
-	if( _dbConn.Execute() == false ) return ret;
-	if( _dbConn.Fetch() == false ) return ret;
-
-	// 결과 레코드가 1개인 경우에만 성공 처리
-	int64 iRowCount = _dbConn.RowCount();
-	if( iRowCount != 1 ) return ret;
-
-	ret.resize(iBuffSize);
-	ret.assign(tszDescription);
-
-	return ret;
-}
-
-//***************************************************************************
-// Ex)
-//	ALTER PROCEDURE `sp_procedure1` COMMENT '테스트 저장프로시저';
-bool CDBSynchronizer::MYSQLProcessProcedureComment(const TCHAR* ptszProcName, const TCHAR* ptszComment)
-{
-	if( _dbClass != EDBClass::MYSQL ) return false;
-	if( ptszProcName == nullptr || _tcslen(ptszProcName) < 1 ) return false;
-
-	_tstring query = MYSQLProcessProcedureCommentQuery(ptszProcName, ptszComment);
-
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
-
-	return true;
-}
-
-//***************************************************************************
-// Ex)
-//	SELECT `ROUTINE_COMMENT` AS `funcComment` FROM INFORMATION_SCHEMA.ROUTINES WHERE `ROUTINE_SCHEMA` = DATABASE() AND `ROUTINE_TYPE` = 'FUNCTION' AND `ROUTINE_NAME` = 'sp_function1';
-_tstring CDBSynchronizer::MYSQLGetFunctionComment(const TCHAR* ptszFuncName)
-{
-	_tstring query;
-	_tstring ret;
-
-	int32		iBuffSize = DATABASE_WVARCHAR_MAX;
-	TCHAR		tszDescription[DATABASE_WVARCHAR_MAX] = {0, };
-
-	if( _dbClass != EDBClass::MYSQL ) return ret;
-	if( ptszFuncName == nullptr || _tcslen(ptszFuncName) < 1 ) return ret;
-
-	query = MYSQLGetFunctionCommentQuery(ptszFuncName);
-	if( _dbConn.PrepareQuery(query.c_str()) == false ) return ret;
-
-	_dbConn.BindCol(tszDescription, iBuffSize);
-
-	if( _dbConn.Execute() == false ) return ret;
-	if( _dbConn.Fetch() == false ) return ret;
-
-	// 결과 레코드가 1개인 경우에만 성공 처리
-	int64 iRowCount = _dbConn.RowCount();
-	if( iRowCount != 1 ) return ret;
-
-	ret.resize(iBuffSize);
-	ret.assign(tszDescription);
-
-	return ret;
-}
-
-//***************************************************************************
-// Ex)
-//	ALTER FUNCTION `sp_function1` COMMENT '테스트 함수';
-bool CDBSynchronizer::MYSQLProcessFunctionComment(const TCHAR* ptszFuncName, const TCHAR* ptszComment)
-{
-	if( _dbClass != EDBClass::MYSQL ) return false;
-	if( ptszFuncName == nullptr || _tcslen(ptszFuncName) < 1 ) return false;
-
-	_tstring query = MYSQLProcessFunctionCommentQuery(ptszFuncName, ptszComment);
-
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
 
 	return true;
 }
@@ -2003,7 +1249,7 @@ void CDBSynchronizer::CompareTables(DBModel::TableRef dbTable, DBModel::TableRef
 
 		if( xmlColumn->_nullable == false && xmlColumn->_defaultDefinition.empty() == false )
 		{
-			_updateQueries[UpdateStep::AddColumn].push_back(DBModel::Helpers::Format(_T("SET NOCOUNT ON; UPDATE [dbo].[%s] SET [%s] = %s WHERE [%s] IS NULL"),
+			_updateQueries[UpdateStep::AddColumn].push_back(tstring_format(_T("SET NOCOUNT ON; UPDATE [dbo].[%s] SET [%s] = %s WHERE [%s] IS NULL"),
 															dbTable->_name.c_str(), xmlColumn->_name.c_str(), xmlColumn->_defaultDefinition.c_str(), xmlColumn->_name.c_str()));
 		}
 
@@ -2135,7 +1381,7 @@ void CDBSynchronizer::CompareColumns(DBModel::TableRef dbTable, DBModel::ColumnR
 	{
 		if( xmlColumn->_defaultDefinition.empty() == false )
 		{
-			_updateQueries[UpdateStep::AlterColumn].push_back(DBModel::Helpers::Format(
+			_updateQueries[UpdateStep::AlterColumn].push_back(tstring_format(
 				_T("SET NOCOUNT ON; UPDATE [dbo].[%s] SET [%s] = %s WHERE [%s] IS NULL"),
 				dbTable->_name.c_str(),
 				xmlColumn->_name.c_str(),

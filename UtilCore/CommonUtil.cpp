@@ -19,10 +19,10 @@ void GetDBDSNString(TCHAR* ptszDSN, const EDBClass dbClass, const TCHAR* ptszDBH
 			break;
 		case EDBClass::MYSQL:
 #ifdef _UNICODE	
-			_sntprintf_s(ptszDSN, DATABASE_DSN_STRLEN, _TRUNCATE, _T("DRIVER={MySQL ODBC 8.1 UNICODE Driver};SERVER=%s,Port=%u;Database=%s;Uid=%s;Pwd=%s;MULTI_HOST=1;"),
+			_sntprintf_s(ptszDSN, DATABASE_DSN_STRLEN, _TRUNCATE, _T("DRIVER={MySQL ODBC 8.1 UNICODE Driver};SERVER=%s,Port=%u;Database=%s;Uid=%s;Pwd=%s;MULTI_HOST=1;MULTI_STATEMENTS=1"),
 						 ptszDBHost, nPort, ptszDBName, ptszDBUserId, ptszDBPasswd);
 #else
-			_sntprintf_s(ptszDSN, DATABASE_DSN_STRLEN, _TRUNCATE, _T("DRIVER={MySQL ODBC 8.1 ANSI Driver};SERVER=%s,Port=%u;Database=%s;Uid=%s;Pwd=%s;MULTI_HOST=1;"),
+			_sntprintf_s(ptszDSN, DATABASE_DSN_STRLEN, _TRUNCATE, _T("DRIVER={MySQL ODBC 8.1 ANSI Driver};SERVER=%s,Port=%u;Database=%s;Uid=%s;Pwd=%s;MULTI_HOST=1;MULTI_STATEMENTS=1"),
 						 m_tszDBHost, m_nPort, m_tszDBName, m_tszDBUserId, m_tszDBPasswd);
 #endif
 			break;

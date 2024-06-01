@@ -102,7 +102,7 @@ size_t	StrReverseFind(const TCHAR* ptszSource, const TCHAR tcCompare);
 size_t	StrReverseFind(const TCHAR* ptszSource, const TCHAR* ptszCompare);
 
 void	TrimLeft(TCHAR* ptszSource);
-void	TrimLeft(TCHAR* ptszSource, int nDataLength);
+void	TrimLeft(TCHAR* ptszSource, size_t nDataLength);
 void	TrimLeft(TCHAR* ptszSource, TCHAR cToken);
 void	TrimLeft(TCHAR* ptszSource, TCHAR* ptszToken);
 bool	TrimLeft(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource);

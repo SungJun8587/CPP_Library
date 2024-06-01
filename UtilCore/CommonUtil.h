@@ -15,6 +15,10 @@ using namespace std;
 #include <functional>
 #include <random>
 
+#ifndef __DBENUM_H__
+#include <DBEnum.h> 
+#endif
+
 namespace SYSTEM
 {
 	inline DWORD CoreCount(void)
@@ -107,7 +111,62 @@ __inline _tstring replaceAll(const _tstring& message, const _tstring& pattern, c
 
 //***************************************************************************
 //
-__inline _tstring string_format_arg_list(const TCHAR* ptszFmt, va_list args)
+__inline string string_format_arg_list(const char* pszFmt, va_list args)
+{
+	if( !pszFmt ) return "";
+
+	__int32 result = -1, length = 256;
+	char* pszBuffer = 0;
+
+	while( result == -1 )
+	{
+		if( pszBuffer ) delete[] pszBuffer;
+		pszBuffer = new char[length + 1];
+		memset(pszBuffer, 0, length + 1);
+
+#pragma warning(push)
+#pragma warning(disable:4996)
+		result = vsnprintf(pszBuffer, length, pszFmt, args);
+#pragma warning(pop)
+		length *= 2;
+	}
+	string s(pszBuffer);
+	delete[] pszBuffer;
+
+	return s;
+}
+
+//***************************************************************************
+//
+template<typename ... Args>
+inline string string_format(const char* pszFmt, Args ... args)
+{
+	if( !pszFmt ) return "";
+
+	__int32 result = -1, length = 256;
+	char* pszBuffer = 0;
+
+	while( result == -1 )
+	{
+		if( pszBuffer ) delete[] pszBuffer;
+		pszBuffer = new char[length + 1];
+		memset(pszBuffer, 0, length + 1);
+
+#pragma warning(push)
+#pragma warning(disable:4996)
+		result = _snprintf_s(pszBuffer, length + 1, length, pszFmt, args ...);
+#pragma warning(pop)
+		length *= 2;
+	}
+	string s(pszBuffer);
+	delete[] pszBuffer;
+
+	return s;
+}
+
+//***************************************************************************
+//
+__inline _tstring tstring_format_arg_list(const TCHAR* ptszFmt, va_list args)
 {
 	if( !ptszFmt ) return _T("");
 
@@ -135,7 +194,7 @@ __inline _tstring string_format_arg_list(const TCHAR* ptszFmt, va_list args)
 //***************************************************************************
 //
 template<typename ... Args>
-inline _tstring string_format(const TCHAR* ptszFmt, Args ... args)
+inline _tstring tstring_format(const TCHAR* ptszFmt, Args ... args)
 {
 	if( !ptszFmt ) return _T("");
 
