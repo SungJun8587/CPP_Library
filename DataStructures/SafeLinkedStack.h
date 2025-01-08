@@ -8,7 +8,6 @@
 #define __SAFELINKEDSTACK_H__
 
 #include <BaseLinkedStack.h>
-#include <RWLock.h>
 
 //***************************************************************************
 //
@@ -29,7 +28,7 @@ public:
 #endif
 
 private:
-	CRWLock		m_RWLock;
+	std::shared_mutex	_mutex;
 };
 
 //***************************************************************************
@@ -37,13 +36,9 @@ private:
 template<class TYPE>
 int CSafeLinkedStack<TYPE>::Push(const TYPE Element)
 {
-	int nRet;
+	std::unique_lock lockGuard(_mutex);
 
-	m_RWLock.ExclusiveLock();
-	{
-		nRet = CBaseLinkedStack<TYPE>::Push(Element);
-	}
-	m_RWLock.ExclusiveUnLock();
+	int nRet = CBaseLinkedStack<TYPE>::Push(Element);
 
 	return nRet;
 }
@@ -53,13 +48,9 @@ int CSafeLinkedStack<TYPE>::Push(const TYPE Element)
 template<class TYPE>
 int CSafeLinkedStack<TYPE>::Pop(TYPE &Element)
 {
-	int nRet;
+	std::unique_lock lockGuard(_mutex);
 
-	m_RWLock.ExclusiveLock();
-	{
-		nRet = CBaseLinkedStack<TYPE>::Pop(Element);
-	}
-	m_RWLock.ExclusiveUnLock();
+	int nRet = CBaseLinkedStack<TYPE>::Pop(Element);
 
 	return nRet;
 }
@@ -69,13 +60,9 @@ int CSafeLinkedStack<TYPE>::Pop(TYPE &Element)
 template<class TYPE>
 TYPE CSafeLinkedStack<TYPE>::Peek()
 {
-	TYPE Element;
+	std::shared_lock lockGuard(_mutex);
 
-	m_RWLock.SharedLock();
-	{
-		Element = CBaseLinkedStack<TYPE>::Peek();
-	}
-	m_RWLock.SharedUnLock();
+	TYPE Element = CBaseLinkedStack<TYPE>::Peek();
 
 	return Element;
 }
@@ -83,15 +70,11 @@ TYPE CSafeLinkedStack<TYPE>::Peek()
 //***************************************************************************
 //
 template<class TYPE>
-int CSafeLinkedStack<TYPE>::IsEmpty()
+bool CSafeLinkedStack<TYPE>::IsEmpty()
 {
-	bool bRet;
+	std::shared_lock lockGuard(_mutex);
 
-	m_RWLock.SharedLock();
-	{
-		bRet = CBaseLinkedStack<TYPE>::IsEmpty();
-	}
-	m_RWLock.SharedUnLock();
+	bool bRet = CBaseLinkedStack<TYPE>::IsEmpty();
 
 	return bRet;
 }
@@ -101,13 +84,9 @@ int CSafeLinkedStack<TYPE>::IsEmpty()
 template<class TYPE>
 int CSafeLinkedStack<TYPE>::GetSize()
 {
-	int nRet;
-
-	m_RWLock.SharedLock();
-	{
-		nRet = CBaseLinkedStack<TYPE>::GetSize();
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+	
+	int nRet = CBaseLinkedStack<TYPE>::GetSize();
 
 	return nRet;
 }
@@ -118,11 +97,9 @@ int CSafeLinkedStack<TYPE>::GetSize()
 template<class TYPE> 
 void CSafeLinkedStack<TYPE>::Printing(wostream &StreamBuffer)
 {
-	m_RWLock.SharedLock();
-	{
-		CBaseLinkedStack<TYPE>::Printing(StreamBuffer);
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+	
+	CBaseLinkedStack<TYPE>::Printing(StreamBuffer);
 }
 #else
 //***************************************************************************
@@ -130,11 +107,9 @@ void CSafeLinkedStack<TYPE>::Printing(wostream &StreamBuffer)
 template<class TYPE> 
 void CSafeLinkedStack<TYPE>::Printing(ostream &StreamBuffer)
 {
-	m_RWLock.SharedLock();
-	{
-		CBaseLinkedStack<TYPE>::Printing(StreamBuffer);
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+	
+	CBaseLinkedStack<TYPE>::Printing(StreamBuffer);
 }
 #endif
 

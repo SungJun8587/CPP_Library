@@ -74,11 +74,14 @@ bool CServerConfig::Init(const TCHAR* tszServerInfo)
 
 			m_DBNodeVec[i].m_nID = static_cast<int16>(node[_T("ID")]);
 			m_DBNodeVec[i].m_dbClass = GetInt8ToDBClass(static_cast<int8>(node[_T("DBClass")]));
+			_tcsncpy_s(m_DBNodeVec[i].m_tszDSNDriver, DATABASE_DSN_DRIVER_STRLEN, ((_tstring)node[_T("DSNDriver")]).c_str(), _TRUNCATE);
 			_tcsncpy_s(m_DBNodeVec[i].m_tszDBHost, IP_STRLEN, ((_tstring)node[_T("IP")]).c_str(), _TRUNCATE);
 			m_DBNodeVec[i].m_nPort = static_cast<int32>(node[_T("Port")]);
 			_tcsncpy_s(m_DBNodeVec[i].m_tszDBUserId, DATABASE_DSN_USER_ID_STRLEN, ((_tstring)node[_T("UID")]).c_str(), _TRUNCATE);
 			_tcsncpy_s(m_DBNodeVec[i].m_tszDBPasswd, DATABASE_DSN_USER_PASSWORD_STRLEN, ((_tstring)node[_T("PWD")]).c_str(), _TRUNCATE);
 			_tcsncpy_s(m_DBNodeVec[i].m_tszDBName, DATABASE_NAME_STRLEN, ((_tstring)node[_T("DBName")]).c_str(), _TRUNCATE);
+			
+			GetDBDSNString(m_DBNodeVec[i].m_tszDSN, m_DBNodeVec[i].m_dbClass, m_DBNodeVec[i].m_tszDSNDriver, m_DBNodeVec[i].m_tszDBHost, m_DBNodeVec[i].m_nPort, m_DBNodeVec[i].m_tszDBUserId, m_DBNodeVec[i].m_tszDBPasswd, m_DBNodeVec[i].m_tszDBName);
 		}
 	}
 
@@ -108,22 +111,23 @@ void CServerConfig::PrintServerSettingInfo()
 	LOG_INFO(_T("--------------- Connect ServerNode size : %d ---------------"), static_cast<int>(m_ServerNodeVec.size()));
 	for( uint32 i = 0; i < m_ServerNodeVec.size(); i++ )
 	{
-		LOG_INFO(_T("nID : %d"), m_ServerNodeVec[i].m_nID);
-		LOG_INFO(_T("tszServerName : %s"), m_ServerNodeVec[i].m_tszServerName);
-		LOG_INFO(_T("tszIP : %s"), m_ServerNodeVec[i].m_tszIP);
-		LOG_INFO(_T("nPort : %d"), m_ServerNodeVec[i].m_nPort);
+		LOG_INFO(_T("ID : %d"), m_ServerNodeVec[i].m_nID);
+		LOG_INFO(_T("ServerName : %s"), m_ServerNodeVec[i].m_tszServerName);
+		LOG_INFO(_T("IP : %s"), m_ServerNodeVec[i].m_tszIP);
+		LOG_INFO(_T("Port : %d"), m_ServerNodeVec[i].m_nPort);
 		LOG_INFO(_T("------------------------------"));
 	}
 
 	LOG_INFO(_T("--------------- Connect DBNode size : %d ---------------"), static_cast<int>(m_DBNodeVec.size()));
 	for( uint32 i = 0; i < m_DBNodeVec.size(); i++ )
 	{
-		LOG_INFO(_T("nID : %d"), m_DBNodeVec[i].m_nID);
-		LOG_INFO(_T("tszDBHost : %s"), m_DBNodeVec[i].m_tszDBHost);
-		LOG_INFO(_T("nPort : %d"), m_DBNodeVec[i].m_nPort);
-		LOG_INFO(_T("tszDBName : %s"), m_DBNodeVec[i].m_tszDBName);
-		LOG_INFO(_T("tszDBUserId : %s"), m_DBNodeVec[i].m_tszDBUserId);
-		LOG_INFO(_T("tszDBPasswd : %s"), m_DBNodeVec[i].m_tszDBPasswd);
+		LOG_INFO(_T("ID : %d"), m_DBNodeVec[i].m_nID);
+		LOG_INFO(_T("DSNDriver : %s"), m_DBNodeVec[i].m_tszDSNDriver);
+		LOG_INFO(_T("DBHost : %s"), m_DBNodeVec[i].m_tszDBHost);
+		LOG_INFO(_T("Port : %d"), m_DBNodeVec[i].m_nPort);
+		LOG_INFO(_T("DBName : %s"), m_DBNodeVec[i].m_tszDBName);
+		LOG_INFO(_T("DBUserId : %s"), m_DBNodeVec[i].m_tszDBUserId);
+		LOG_INFO(_T("DBPasswd : %s"), m_DBNodeVec[i].m_tszDBPasswd);
 		LOG_INFO(_T("------------------------------"));
 	}
 

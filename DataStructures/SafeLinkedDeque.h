@@ -8,7 +8,6 @@
 #define __SAFELINKEDQUEUE_H__
 
 #include <BaseLinkedDeque.h>
-#include <RWLock.h>
 
 //***************************************************************************
 //
@@ -32,7 +31,7 @@ public:
 #endif
 
 private:
-	CRWLock		m_RWLock;
+	std::shared_mutex	_mutex;
 };
 
 //***************************************************************************
@@ -40,13 +39,9 @@ private:
 template<class TYPE>
 int CSafeLinkedDeque<TYPE>::PushFront(const TYPE Element)
 {
-	int nRet;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nRet = CBaseLinkedDeque<TYPE>::PushFront(Element);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nRet = CBaseLinkedDeque<TYPE>::PushFront(Element);
 
 	return nRet;
 }
@@ -56,13 +51,9 @@ int CSafeLinkedDeque<TYPE>::PushFront(const TYPE Element)
 template<class TYPE>
 int CSafeLinkedDeque<TYPE>::PopFront(TYPE &Element)
 {
-	int nRet;
+	std::unique_lock lockGuard(_mutex);
 
-	m_RWLock.ExclusiveLock();
-	{
-		nRet = CBaseLinkedDeque<TYPE>::PopFront(Element);
-	}
-	m_RWLock.ExclusiveUnLock();
+	int nRet = CBaseLinkedDeque<TYPE>::PopFront(Element);
 
 	return nRet;
 }
@@ -72,13 +63,9 @@ int CSafeLinkedDeque<TYPE>::PopFront(TYPE &Element)
 template<class TYPE>
 int CSafeLinkedDeque<TYPE>::PushBack(const TYPE Element)
 {
-	int nRet;
+	std::unique_lock lockGuard(_mutex);
 
-	m_RWLock.ExclusiveLock();
-	{
-		nRet = CBaseLinkedDeque<TYPE>::PushBack(Element);
-	}
-	m_RWLock.ExclusiveUnLock();
+	int nRet = CBaseLinkedDeque<TYPE>::PushBack(Element);
 
 	return nRet;
 }
@@ -88,13 +75,9 @@ int CSafeLinkedDeque<TYPE>::PushBack(const TYPE Element)
 template<class TYPE>
 int CSafeLinkedDeque<TYPE>::PopBack(TYPE &Element)
 {
-	int nRet;
+	std::unique_lock lockGuard(_mutex);
 
-	m_RWLock.ExclusiveLock();
-	{
-		nRet = CBaseLinkedDeque<TYPE>::PopBack(Element);
-	}
-	m_RWLock.ExclusiveUnLock();
+	int nRet = CBaseLinkedDeque<TYPE>::PopBack(Element);
 
 	return nRet;
 }
@@ -102,15 +85,11 @@ int CSafeLinkedDeque<TYPE>::PopBack(TYPE &Element)
 //***************************************************************************
 //
 template<class TYPE>
-int CSafeLinkedDeque<TYPE>::IsEmpty()
+bool CSafeLinkedDeque<TYPE>::IsEmpty()
 {
-	bool bRet;
-
-	m_RWLock.SharedLock();
-	{
-		bRet = CBaseLinkedDeque<TYPE>::IsEmpty();
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+		
+	bool bRet = CBaseLinkedDeque<TYPE>::IsEmpty();
 
 	return bRet;
 }
@@ -120,13 +99,9 @@ int CSafeLinkedDeque<TYPE>::IsEmpty()
 template<class TYPE>
 int CSafeLinkedDeque<TYPE>::GetSize()
 {
-	int nRet;
+	std::shared_lock lockGuard(_mutex);
 
-	m_RWLock.SharedLock();
-	{
-		nRet = CBaseLinkedDeque<TYPE>::GetSize();
-	}
-	m_RWLock.SharedUnLock();
+	int nRet = CBaseLinkedDeque<TYPE>::GetSize();
 
 	return nRet;
 }
@@ -137,11 +112,9 @@ int CSafeLinkedDeque<TYPE>::GetSize()
 template<class TYPE>
 void CSafeLinkedDeque<TYPE>::Printing(wostream &StreamBuffer)
 {
-	m_RWLock.SharedLock();
-	{
-		CBaseLinkedDeque<TYPE>::Printing(StreamBuffer);
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+
+	CBaseLinkedDeque<TYPE>::Printing(StreamBuffer);
 }
 #else
 //***************************************************************************
@@ -149,11 +122,9 @@ void CSafeLinkedDeque<TYPE>::Printing(wostream &StreamBuffer)
 template<class TYPE>
 void CSafeLinkedDeque<TYPE>::Printing(ostream &StreamBuffer)
 {
-	m_RWLock.SharedLock();
-	{
-		CBaseLinkedDeque<TYPE>::Printing(StreamBuffer);
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+
+	CBaseLinkedDeque<TYPE>::Printing(StreamBuffer);
 }
 #endif
 

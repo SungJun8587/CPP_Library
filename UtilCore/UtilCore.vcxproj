@@ -19,112 +19,128 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="AdoDB.h" />
     <ClInclude Include="BaseDefine.h" />
-    <ClInclude Include="BaseFile.h" />
     <ClInclude Include="BaseGlobal.h" />
     <ClInclude Include="BaseMacro.h" />
-    <ClInclude Include="BaseMySQL.h" />
-    <ClInclude Include="BaseODBC.h" />
     <ClInclude Include="BaseRedefineDataType.h" />
-    <ClInclude Include="BaseSQL.h" />
-    <ClInclude Include="CalculatedElapsedTime.h" />
-    <ClInclude Include="ClusteredMap.h" />
-    <ClInclude Include="CommonUtil.h" />
-    <ClInclude Include="Containers.h" />
-    <ClInclude Include="CriticalSection.h" />
-    <ClInclude Include="CustomAllocator.h" />
-    <ClInclude Include="DateTimeUtil.h" />
-    <ClInclude Include="DBAsyncSrv.h" />
-    <ClInclude Include="DBBind.h" />
-    <ClInclude Include="DBModel.h" />
-    <ClInclude Include="DBSynchronizer.h" />
-    <ClInclude Include="Endian.h" />
-    <ClInclude Include="EventLog.h" />
-    <ClInclude Include="JSONBase.h" />
-    <ClInclude Include="JSONParser.h" />
-    <ClInclude Include="LockGuard.h" />
-    <ClInclude Include="Log.h" />
-    <ClInclude Include="MemBuffer.h" />
-    <ClInclude Include="Memory.h" />
-    <ClInclude Include="MemoryPool.h" />
-    <ClInclude Include="MySQLAsyncSrv.h" />
-    <ClInclude Include="MySQLConnPool.h" />
-    <ClInclude Include="ObjectPool.h" />
-    <ClInclude Include="OdbcAsyncSrv.h" />
-    <ClInclude Include="OdbcConnPool.h" />
-    <ClInclude Include="OrderedMap.h" />
+    <ClInclude Include="BaseTLS.h" />
+    <ClInclude Include="DB\AdoDB.h" />
+    <ClInclude Include="DB\BaseODBC.h" />
+    <ClInclude Include="DB\DBAsyncSrv.h" />
+    <ClInclude Include="DB\DBBind.h" />
+    <ClInclude Include="DB\DBCommon.h" />
+    <ClInclude Include="DB\DBEnum.h" />
+    <ClInclude Include="DB\DBModel.h" />
+    <ClInclude Include="DB\DBMSSQLQuery.h" />
+    <ClInclude Include="DB\DBMYSQLQuery.h" />
+    <ClInclude Include="DB\DBORACLEQuery.h" />
+    <ClInclude Include="DB\DBQueryProcess.h" />
+    <ClInclude Include="DB\DBSQLQuery.h" />
+    <ClInclude Include="DB\DBSyncBind.h" />
+    <ClInclude Include="DB\DBSynchronizer.h" />
+    <ClInclude Include="DB\MySQL\BaseMySQL.h" />
+    <ClInclude Include="DB\MySQL\MySQLAsyncSrv.h" />
+    <ClInclude Include="DB\MySQL\MySQLConnPool.h" />
+    <ClInclude Include="DB\OdbcAsyncSrv.h" />
+    <ClInclude Include="DB\OdbcConnPool.h" />
+    <ClInclude Include="DB\RedisConn.h" />
+    <ClInclude Include="JSON\JSONBase.h" />
+    <ClInclude Include="JSON\JSONParser.h" />
+    <ClInclude Include="Memory\ClusteredMap.h" />
+    <ClInclude Include="Memory\Containers.h" />
+    <ClInclude Include="Memory\CustomAllocator.h" />
+    <ClInclude Include="Memory\MemBuffer.h" />
+    <ClInclude Include="Memory\Memory.h" />
+    <ClInclude Include="Memory\MemoryPool.h" />
+    <ClInclude Include="Memory\ObjectPool.h" />
+    <ClInclude Include="Memory\OrderedMap.h" />
+    <ClInclude Include="Memory\Singleton.h" />
+    <ClInclude Include="Memory\Stream.h" />
+    <ClInclude Include="Memory\UnOrderedMap.h" />
     <ClInclude Include="pch.h" />
-    <ClInclude Include="Regular.h" />
-    <ClInclude Include="RWLock.h" />
     <ClInclude Include="ServerConfig.h" />
     <ClInclude Include="ServerConnectInfo.h" />
     <ClInclude Include="ServiceSvr.h" />
-    <ClInclude Include="ShellUtil.h" />
-    <ClInclude Include="Singleton.h" />
-    <ClInclude Include="Stream.h" />
-    <ClInclude Include="StringUtil.h" />
-    <ClInclude Include="Thread.h" />
-    <ClInclude Include="ThreadManager.h" />
-    <ClInclude Include="UnOrderedMap.h" />
+    <ClInclude Include="Thread\CriticalSection.h" />
+    <ClInclude Include="Thread\DeadLockProfiler.h" />
+    <ClInclude Include="Thread\LockGuard.h" />
+    <ClInclude Include="Thread\SpinLock.h" />
+    <ClInclude Include="Thread\SRWLock.h" />
+    <ClInclude Include="Thread\ThreadManager.h" />
     <ClInclude Include="UtilCore.h" />
-    <ClInclude Include="WebUtil.h" />
-    <ClInclude Include="XMLParser.h" />
+    <ClInclude Include="Util\BaseFile.h" />
+    <ClInclude Include="Util\CalculatedElapsedTime.h" />
+    <ClInclude Include="Util\CommonUtil.h" />
+    <ClInclude Include="Util\ConvertCharset.h" />
+    <ClInclude Include="Util\DateTimeUtil.h" />
+    <ClInclude Include="Util\Endian.h" />
+    <ClInclude Include="Util\EventLog.h" />
+    <ClInclude Include="Util\FileUtil.h" />
+    <ClInclude Include="Util\Log.h" />
+    <ClInclude Include="Util\Regular.h" />
+    <ClInclude Include="Util\ShellUtil.h" />
+    <ClInclude Include="Util\StringUtil.h" />
+    <ClInclude Include="Util\WebUtil.h" />
+    <ClInclude Include="XML\XMLParser.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="AdoDB.cpp" />
-    <ClCompile Include="BaseFile.cpp" />
     <ClCompile Include="BaseGlobal.cpp" />
-    <ClCompile Include="BaseMySQL.cpp" />
-    <ClCompile Include="BaseODBC.cpp" />
-    <ClCompile Include="ClusteredMap.cpp" />
-    <ClCompile Include="CommonUtil.cpp" />
-    <ClCompile Include="CustomAllocator.cpp" />
-    <ClCompile Include="DateTimeUtil.cpp" />
-    <ClCompile Include="DBBind.cpp" />
-    <ClCompile Include="DBModel.cpp" />
-    <ClCompile Include="DBSynchronizer.cpp" />
-    <ClCompile Include="Endian.cpp" />
-    <ClCompile Include="EventLog.cpp" />
-    <ClCompile Include="JSONBase.cpp" />
-    <ClCompile Include="JSONParser.cpp" />
-    <ClCompile Include="Log.cpp" />
-    <ClCompile Include="MemBuffer.cpp" />
-    <ClCompile Include="Memory.cpp" />
-    <ClCompile Include="MemoryPool.cpp" />
-    <ClCompile Include="MySQLAsyncSrv.cpp" />
-    <ClCompile Include="MySQLConnPool.cpp" />
-    <ClCompile Include="OdbcAsyncSrv.cpp" />
-    <ClCompile Include="OdbcConnPool.cpp" />
-    <ClCompile Include="OrderedMap.cpp" />
-    <ClCompile Include="Regular.cpp" />
-    <ClCompile Include="RWLock.cpp" />
+    <ClCompile Include="BaseTLS.cpp" />
+    <ClCompile Include="DB\AdoDB.cpp" />
+    <ClCompile Include="DB\BaseODBC.cpp" />
+    <ClCompile Include="DB\DBBind.cpp" />
+    <ClCompile Include="DB\DBModel.cpp" />
+    <ClCompile Include="DB\DBQueryProcess.cpp" />
+    <ClCompile Include="DB\DBSynchronizer.cpp" />
+    <ClCompile Include="DB\MySQL\BaseMySQL.cpp" />
+    <ClCompile Include="DB\MySQL\MySQLAsyncSrv.cpp" />
+    <ClCompile Include="DB\MySQL\MySQLConnPool.cpp" />
+    <ClCompile Include="DB\OdbcAsyncSrv.cpp" />
+    <ClCompile Include="DB\OdbcConnPool.cpp" />
+    <ClCompile Include="JSON\JSONBase.cpp" />
+    <ClCompile Include="JSON\JSONParser.cpp" />
+    <ClCompile Include="Memory\ClusteredMap.cpp" />
+    <ClCompile Include="Memory\CustomAllocator.cpp" />
+    <ClCompile Include="Memory\MemBuffer.cpp" />
+    <ClCompile Include="Memory\Memory.cpp" />
+    <ClCompile Include="Memory\MemoryPool.cpp" />
+    <ClCompile Include="Memory\Stream.cpp" />
     <ClCompile Include="ServerConfig.cpp" />
     <ClCompile Include="ServiceSvr.cpp" />
-    <ClCompile Include="ShellUtil.cpp" />
-    <ClCompile Include="Stream.cpp" />
-    <ClCompile Include="StringUtil.cpp" />
-    <ClCompile Include="Thread.cpp" />
-    <ClCompile Include="ThreadManager.cpp" />
-    <ClCompile Include="UnOrderedMap.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="WebUtil.cpp" />
-    <ClCompile Include="XMLParser.cpp" />
+    <ClCompile Include="Thread\DeadLockProfiler.cpp" />
+    <ClCompile Include="Thread\SpinLock.cpp" />
+    <ClCompile Include="Thread\SRWLock.cpp" />
+    <ClCompile Include="Thread\ThreadManager.cpp" />
+    <ClCompile Include="Util\BaseFile.cpp" />
+    <ClCompile Include="Util\CommonUtil.cpp" />
+    <ClCompile Include="Util\ConvertCharset.cpp" />
+    <ClCompile Include="Util\DateTimeUtil.cpp" />
+    <ClCompile Include="Util\Endian.cpp" />
+    <ClCompile Include="Util\EventLog.cpp" />
+    <ClCompile Include="Util\FileUtil.cpp" />
+    <ClCompile Include="Util\Log.cpp" />
+    <ClCompile Include="Util\Regular.cpp" />
+    <ClCompile Include="Util\ShellUtil.cpp" />
+    <ClCompile Include="Util\StringUtil.cpp" />
+    <ClCompile Include="Util\WebUtil.cpp" />
+    <ClCompile Include="XML\XMLParser.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="BaseMySQL.inl" />
-    <None Include="BaseODBC.inl" />
-    <None Include="DB_ColAttr.inl" />
-    <None Include="DB_Error.inl" />
-    <None Include="DB_ParamAttr.inl" />
-    <None Include="JSONParser.inl" />
-    <None Include="MySQL_ParamAttr.inl" />
-    <None Include="Singleton.inl" />
+    <None Include="DB\BaseODBC.inl" />
+    <None Include="DB\DB_ColAttr.inl" />
+    <None Include="DB\DB_Error.inl" />
+    <None Include="DB\DB_ParamAttr.inl" />
+    <None Include="DB\MySQL\MySQL_ParamAttr.inl" />
+    <None Include="JSON\JSONParser.inl" />
+    <None Include="Memory\OrderedMap.inl" />
+    <None Include="Memory\Singleton.inl" />
+    <None Include="Memory\UnOrderedMap.inl" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -180,8 +196,8 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <OutDir>$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(Platform)\$(Configuration)\</IntDir>
+    <OutDir>bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>bin\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)32D</TargetName>
     <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\JSON-Utilities-master\source;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.33-winx64\include;E:\GitHub\CPP\Library\ExternalLib\cryptopp-CRYPTOPP_8_9_0;$(ProjectDir);$(IncludePath)</IncludePath>
     <LibraryPath>E:\GitHub\CPP\Library\ExternalLib\Bin\Win32\Debug;$(LibraryPath)</LibraryPath>
@@ -189,8 +205,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <OutDir>$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(Platform)\$(Configuration)\</IntDir>
+    <OutDir>bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>bin\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)64D</TargetName>
     <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\JSON-Utilities-master\source;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.33-winx64\include;E:\GitHub\CPP\Library\ExternalLib\cryptopp-CRYPTOPP_8_9_0;$(ProjectDir);$(IncludePath)</IncludePath>
     <LibraryPath>E:\GitHub\CPP\Library\ExternalLib\Bin\x64\Debug;$(LibraryPath)</LibraryPath>
@@ -198,8 +214,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <OutDir>$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(Platform)\$(Configuration)\</IntDir>
+    <OutDir>bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>bin\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)32</TargetName>
     <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\JSON-Utilities-master\source;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.33-winx64\include;E:\GitHub\CPP\Library\ExternalLib\cryptopp-CRYPTOPP_8_9_0;$(ProjectDir);$(IncludePath)</IncludePath>
     <LibraryPath>E:\GitHub\CPP\Library\ExternalLib\Bin\Win32\Release;E:\GitHub\CPP\Library\ExternalLib\Bin\Win32\Release-Patch;$(LibraryPath)</LibraryPath>
@@ -207,8 +223,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <OutDir>$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(Platform)\$(Configuration)\</IntDir>
+    <OutDir>bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>bin\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)64</TargetName>
     <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\JSON-Utilities-master\source;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.33-winx64\include;$(ProjectDir);E:\GitHub\CPP\Library\ExternalLib\cryptopp-CRYPTOPP_8_9_0;$(IncludePath)</IncludePath>
     <LibraryPath>E:\GitHub\CPP\Library\ExternalLib\Bin\x64\Release;E:\GitHub\CPP\Library\ExternalLib\Bin\x64\Release-Patch;$(LibraryPath)</LibraryPath>

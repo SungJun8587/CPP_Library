@@ -10,28 +10,28 @@
 class CServiceSvr
 {
 public:
-	CServiceSvr(const TCHAR* tszAppName, const TCHAR* tszServiceName, const TCHAR* tszDisplayName, const TCHAR* tszServiceDesc);
+	CServiceSvr(const TCHAR* ptszAppName, const TCHAR* ptszServiceName, const TCHAR* ptszDisplayName, const TCHAR* ptszServiceDesc);
 	virtual	~CServiceSvr(void);
 
-	virtual void	Main(const int32& nArgCnt, TCHAR** pptszArgVec) = 0;
-	virtual	bool	Init(char* pszArgv = nullptr) = 0;
+	void Main(const int32& nArgCnt, TCHAR** pptszArgVec);
+	virtual	bool	Init(const TCHAR* ptszArgv = nullptr);
 	virtual	bool	Start(void) = 0;
 	virtual bool	Running(void) = 0;
 	virtual	bool	Stop(void) = 0;
 	virtual	bool	Cleanup(void) = 0;
-	virtual void	serviceMain(DWORD dwArgc, LPTSTR* lpszArgv) = 0;
 
-	void	StartService(TCHAR* tszMachineName, TCHAR* tszServiceName, DWORD dwArgc, LPTSTR* lpszArgv);
-	void	StopService(TCHAR* tszMachineName, TCHAR* tszServiceName);
-	DWORD	GetServiceState(TCHAR* tszMachineName, TCHAR* tszServiceName);
+	void	StartService(TCHAR* ptszMachineName, TCHAR* ptszServiceName, DWORD dwArgc, LPTSTR* lptszArgv);
+	void	StopService(TCHAR* ptszMachineName, TCHAR* ptszServiceName);
+	DWORD	GetServiceState(TCHAR* ptszMachineName, TCHAR* ptszServiceName);
 
-	BOOL ServiceStop(void)	{ return ( m_hSvrStopEvent && SetEvent(m_hSvrStopEvent) ); }
-	bool IsSvrStopped(void)	{ return ::WaitForSingleObject(m_hSvrStopEvent, 0) == WAIT_OBJECT_0; }
+	BOOL ServiceStop(void) { return (m_hSvrStopEvent && SetEvent(m_hSvrStopEvent)); }
+	bool IsSvrStopped(void) { return ::WaitForSingleObject(m_hSvrStopEvent, 0) == WAIT_OBJECT_0; }
 
 protected:
-	void InstallService(void);
-	void UninstallService(void);
+	void installService(void);
+	void uninstallService(void);
 
+	void serviceMain(DWORD dwArgc, LPTSTR* lpszArgv);
 	void serviceCtrl(DWORD dwCtrlCode);
 	BOOL controlHandler(DWORD dwCtrlType);
 
@@ -42,14 +42,10 @@ protected:
 public:
 	static	shared_ptr<CServiceSvr>	sm_spSvrInstancePtr;
 
-	static void SetSvrInstance(shared_ptr<CServiceSvr>& spSvrInstancePtr) {
-		sm_spSvrInstancePtr = spSvrInstancePtr;
-	}
-	static shared_ptr<CServiceSvr>& GetSvrInstance(void) {
-		return sm_spSvrInstancePtr;
-	}
+	static void SetSvrInstance(shared_ptr<CServiceSvr>& spSvrInstancePtr) { sm_spSvrInstancePtr = spSvrInstancePtr; }
+	static shared_ptr<CServiceSvr>& GetSvrInstance(void) { return sm_spSvrInstancePtr; }
 
-	static void WINAPI ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv);
+	static void WINAPI ServiceMain(DWORD dwArgc, LPTSTR* lpszArgv);
 	static void WINAPI ServiceCtrl(DWORD dwCtrlCode);
 	static BOOL WINAPI ControlHandler(DWORD dwCtrlType);
 

@@ -11,10 +11,6 @@
 #include "SortedArrayList.h"
 #endif
 
-#ifndef __RWLOCK_H__
-#include "RWLock.h"
-#endif
-
 template<class TYPE>
 class CSafeArrayList : public CSortedArrayList<TYPE>
 {
@@ -58,7 +54,7 @@ public:
 	BOOL operator >= (const CSafeArrayList &x);
 
 private:
-	CRWLock		m_RWLock;
+	std::shared_mutex	_mutex;
 };
 
 //***************************************************************************
@@ -66,11 +62,9 @@ private:
 template<class TYPE>
 CSafeArrayList<TYPE>::CSafeArrayList(const CSafeArrayList& Type)
 {
-	m_RWLock.ExclusiveLock();
-	{
-		CSortedArrayList<TYPE>::CSortedArrayList(Type);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+
+	CSortedArrayList<TYPE>::CSortedArrayList(Type);
 }
 
 //***************************************************************************
@@ -78,13 +72,9 @@ CSafeArrayList<TYPE>::CSafeArrayList(const CSafeArrayList& Type)
 template<class TYPE>
 inline BOOL CSafeArrayList<TYPE>::operator < (const CSafeArrayList &x)
 {
-	BOOL bReturn;
+	std::shared_lock lockGuard(_mutex);
 
-	m_RWLock.SharedLock();
-	{
-		bReturn = CSortedArrayList<TYPE>::operator < (x);
-	}
-	m_RWLock.SharedUnLock();
+	BOOL bReturn = CSortedArrayList<TYPE>::operator < (x);
 
 	return bReturn;
 }
@@ -94,13 +84,9 @@ inline BOOL CSafeArrayList<TYPE>::operator < (const CSafeArrayList &x)
 template<class TYPE>
 inline BOOL CSafeArrayList<TYPE>::operator <= (const CSafeArrayList &x)
 {
-	BOOL bReturn;
+	std::shared_lock lockGuard(_mutex);
 
-	m_RWLock.SharedLock();
-	{
-		bReturn = CSortedArrayList<TYPE>::operator <= (x);
-	}
-	m_RWLock.SharedUnLock();
+	BOOL bReturn = CSortedArrayList<TYPE>::operator <= (x);
 
 	return bReturn;
 }
@@ -110,13 +96,9 @@ inline BOOL CSafeArrayList<TYPE>::operator <= (const CSafeArrayList &x)
 template<class TYPE>
 inline BOOL CSafeArrayList<TYPE>::operator == (const CSafeArrayList &x)
 {
-	BOOL bReturn;
+	std::shared_lock lockGuard(_mutex);
 
-	m_RWLock.SharedLock();
-	{
-		bReturn = CSortedArrayList<TYPE>::operator == (x);
-	}
-	m_RWLock.SharedUnLock();
+	BOOL bReturn = CSortedArrayList<TYPE>::operator == (x);
 
 	return bReturn;
 }
@@ -126,13 +108,9 @@ inline BOOL CSafeArrayList<TYPE>::operator == (const CSafeArrayList &x)
 template<class TYPE>
 inline BOOL CSafeArrayList<TYPE>::operator != (const CSafeArrayList &x)
 {
-	BOOL bReturn;
+	std::shared_lock lockGuard(_mutex);
 
-	m_RWLock.SharedLock();
-	{
-		bReturn = CSortedArrayList<TYPE>::operator != (x);
-	}
-	m_RWLock.SharedUnLock();
+	BOOL bReturn = CSortedArrayList<TYPE>::operator != (x);
 
 	return bReturn;
 }
@@ -142,13 +120,9 @@ inline BOOL CSafeArrayList<TYPE>::operator != (const CSafeArrayList &x)
 template<class TYPE>
 inline BOOL CSafeArrayList<TYPE>::operator > (const CSafeArrayList &x)
 {
-	BOOL bReturn;
+	std::shared_lock lockGuard(_mutex);
 
-	m_RWLock.SharedLock();
-	{
-		bReturn = CSortedArrayList<TYPE>::operator > (x);
-	}
-	m_RWLock.SharedUnLock();
+	BOOL bReturn = CSortedArrayList<TYPE>::operator > (x);
 
 	return bReturn;
 }
@@ -158,13 +132,9 @@ inline BOOL CSafeArrayList<TYPE>::operator > (const CSafeArrayList &x)
 template<class TYPE>
 inline BOOL CSafeArrayList<TYPE>::operator >= (const CSafeArrayList &x)
 {
-	BOOL bReturn;
+	std::shared_lock lockGuard(_mutex);
 
-	m_RWLock.SharedLock();
-	{
-		bReturn = CSortedArrayList<TYPE>::operator >= (x);
-	}
-	m_RWLock.SharedUnLock();
+	BOOL bReturn = CSortedArrayList<TYPE>::operator >= (x);
 
 	return bReturn;
 }
@@ -174,11 +144,9 @@ inline BOOL CSafeArrayList<TYPE>::operator >= (const CSafeArrayList &x)
 template<class TYPE>
 inline CSafeArrayList< TYPE >& CSafeArrayList<TYPE>::operator = (const CSafeArrayList &x)
 {
-	m_RWLock.ExclusiveLock();
-	{
-		CSortedArrayList<TYPE>::Copy(x);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+
+	CSortedArrayList<TYPE>::Copy(x);
 
 	return *this;
 }
@@ -188,11 +156,9 @@ inline CSafeArrayList< TYPE >& CSafeArrayList<TYPE>::operator = (const CSafeArra
 template<class TYPE>
 void CSafeArrayList<TYPE>::SetListSize(int nNewSize)
 {
-	m_RWLock.ExclusiveLock();
-	{
-		CSortedArrayList<TYPE>::SetListSize(nNewSize);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+
+	CSortedArrayList<TYPE>::SetListSize(nNewSize);
 }
 
 //***************************************************************************
@@ -200,11 +166,9 @@ void CSafeArrayList<TYPE>::SetListSize(int nNewSize)
 template<class TYPE>
 void CSafeArrayList<TYPE>::RemoveAll(void)
 {
-	m_RWLock.ExclusiveLock();
-	{
-		CSortedArrayList<TYPE>::RemoveAll();
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+
+	CSortedArrayList<TYPE>::RemoveAll();
 }
 
 //***************************************************************************
@@ -212,13 +176,9 @@ void CSafeArrayList<TYPE>::RemoveAll(void)
 template<class TYPE>
 int CSafeArrayList<TYPE>::sInsert(const TYPE& Type)
 {
-	int nResult;
+	std::unique_lock lockGuard(_mutex);
 
-	m_RWLock.ExclusiveLock();
-	{
-		nResult = CSortedArrayList<TYPE>::sInsert(Type);
-	}
-	m_RWLock.ExclusiveUnLock();
+	int nResult = CSortedArrayList<TYPE>::sInsert(Type);
 
 	return nResult;
 }
@@ -228,13 +188,9 @@ int CSafeArrayList<TYPE>::sInsert(const TYPE& Type)
 template<class TYPE>
 int CSafeArrayList<TYPE>::dInsert(const TYPE& Type)
 {
-	int nResult;
+	std::unique_lock lockGuard(_mutex);
 
-	m_RWLock.ExclusiveLock();
-	{
-		nResult = CSortedArrayList<TYPE>::dInsert(Type);
-	}
-	m_RWLock.ExclusiveUnLock();
+	int nResult = CSortedArrayList<TYPE>::dInsert(Type);
 
 	return nResult;
 }
@@ -244,13 +200,9 @@ int CSafeArrayList<TYPE>::dInsert(const TYPE& Type)
 template<class TYPE>
 int CSafeArrayList<TYPE>::Set(TYPE Type, int i)
 {
-	int nResult;
+	std::unique_lock lockGuard(_mutex);
 
-	m_RWLock.ExclusiveLock();
-	{
-		nResult = CSortedArrayList<TYPE>::Set(Type, i);
-	}
-	m_RWLock.ExclusiveUnLock();
+	int nResult = CSortedArrayList<TYPE>::Set(Type, i);
 
 	return nResult;
 }
@@ -260,13 +212,9 @@ int CSafeArrayList<TYPE>::Set(TYPE Type, int i)
 template<class TYPE>
 TYPE CSafeArrayList<TYPE>::Get(int i)
 {
-	TYPE TypeData;
+	std::shared_lock lockGuard(_mutex);
 
-	m_RWLock.SharedLock();
-	{
-		TypeData = CSortedArrayList<TYPE>::Get(i);
-	}
-	m_RWLock.SharedUnLock();
+	TYPE TypeData = CSortedArrayList<TYPE>::Get(i);
 
 	return TypeData;
 }
@@ -276,13 +224,9 @@ TYPE CSafeArrayList<TYPE>::Get(int i)
 template<class TYPE>
 TYPE* CSafeArrayList<TYPE>::GetPtr(int i)
 {
-	TYPE *pTypeData;
+	std::shared_lock lockGuard(_mutex);
 
-	m_RWLock.SharedLock();
-	{
-		pTypeData = CSortedArrayList<TYPE>::GetPtr(i);
-	}
-	m_RWLock.SharedUnLock();
+	TYPE* pTypeData = CSortedArrayList<TYPE>::GetPtr(i);
 
 	return pTypeData;
 }
@@ -292,13 +236,11 @@ TYPE* CSafeArrayList<TYPE>::GetPtr(int i)
 template<class TYPE>
 TYPE* CSafeArrayList<TYPE>::GetListPtr()
 {
+	std::shared_lock lockGuard(_mutex);
+
 	TYPE **pTypeData;
 
-	m_RWLock.SharedLock();
-	{
-		pTypeData = CSortedArrayList<TYPE>::GetListPtr();
-	}
-	m_RWLock.SharedUnLock();
+	TYPE** pTypeData = CSortedArrayList<TYPE>::GetListPtr();
 
 	return pTypeData;
 }
@@ -308,16 +250,12 @@ TYPE* CSafeArrayList<TYPE>::GetListPtr()
 template<class TYPE>
 TYPE& CSafeArrayList<TYPE>::operator[] (int i) const
 {
-	TYPE TypeData;
-
-	if( !(i >= 0 && i < m_nMaxSize) )
+	if( !(i >= 0 && i < this->m_nMaxSize) )
 		RaiseException(STATUS_PTR_INDEX_INVALID, 0, 0, 0);
 
-	m_RWLock.SharedLock();
-	{
-		TypeData = CSortedArrayList<TYPE>::operator[] (i);
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+
+	TYPE TypeData = CSortedArrayList<TYPE>::operator[] (i);
 
 	return TypeData;
 }
@@ -327,16 +265,12 @@ TYPE& CSafeArrayList<TYPE>::operator[] (int i) const
 template<class TYPE>
 TYPE* CSafeArrayList<TYPE>::operator[] (int i)
 {
-	TYPE *pTypeData;
-
-	if( !(i >= 0 && i < m_nMaxSize) )
+	if( !(i >= 0 && i < this->m_nMaxSize) )
 		RaiseException(STATUS_PTR_INDEX_INVALID, 0, 0, 0);
 
-	m_RWLock.SharedLock();
-	{
-		pTypeData = CSortedArrayList<TYPE>::operator[] (i);
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+
+	TYPE* pTypeData = CSortedArrayList<TYPE>::operator[] (i);
 
 	return pTypeData;
 }
@@ -346,13 +280,9 @@ TYPE* CSafeArrayList<TYPE>::operator[] (int i)
 template<class TYPE>
 int CSafeArrayList<TYPE>::GetMaxSize() const
 {
-	int nMaxSize;
+	std::shared_lock lockGuard(_mutex);
 
-	m_RWLock.SharedLock();
-	{
-		nMaxSize = CSortedArrayList<TYPE>::GetMaxSize();
-	}
-	m_RWLock.SharedUnLock();
+	int nMaxSize = CSortedArrayList<TYPE>::GetMaxSize();
 
 	return nMaxSize;
 }
@@ -362,13 +292,9 @@ int CSafeArrayList<TYPE>::GetMaxSize() const
 template<class TYPE>
 int CSafeArrayList<TYPE>::GetListSize() const
 {
-	int nListSize;
+	std::shared_lock lockGuard(_mutex);
 
-	m_RWLock.SharedLock();
-	{
-		nListSize = CSortedArrayList<TYPE>::GetListSize();
-	}
-	m_RWLock.SharedUnLock();
+	int nListSize = CSortedArrayList<TYPE>::GetListSize();
 
 	return nListSize;
 }
@@ -378,13 +304,9 @@ int CSafeArrayList<TYPE>::GetListSize() const
 template<class TYPE>
 int CSafeArrayList<TYPE>::Delete(TYPE type)
 {
-	int nReturn;
+	std::unique_lock lockGuard(_mutex);
 
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CSortedArrayList<TYPE>::Delete(type);
-	}
-	m_RWLock.ExclusiveUnLock();
+	int nReturn = CSortedArrayList<TYPE>::Delete(type);
 
 	return nReturn;
 }
@@ -394,13 +316,9 @@ int CSafeArrayList<TYPE>::Delete(TYPE type)
 template<class TYPE>
 int CSafeArrayList<TYPE>::DeleteAllDup(TYPE type)
 {
-	int nReturn;
+	std::unique_lock lockGuard(_mutex);
 
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CSortedArrayList<TYPE>::DeleteAllDup(type);
-	}
-	m_RWLock.ExclusiveUnLock();
+	int nReturn = CSortedArrayList<TYPE>::DeleteAllDup(type);
 
 	return nReturn;
 }
@@ -410,13 +328,9 @@ int CSafeArrayList<TYPE>::DeleteAllDup(TYPE type)
 template<class TYPE>
 int CSafeArrayList<TYPE>::DeleteIndex(int nIndex)
 {
-	int nReturn;
+	std::unique_lock lockGuard(_mutex);
 
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CSortedArrayList<TYPE>::DeleteIndex(nIndex);
-	}
-	m_RWLock.ExclusiveUnLock();
+	int nReturn = CSortedArrayList<TYPE>::DeleteIndex(nIndex);
 
 	return nReturn;
 }
@@ -426,13 +340,9 @@ int CSafeArrayList<TYPE>::DeleteIndex(int nIndex)
 template<class TYPE>
 int CSafeArrayList<TYPE>::Distinguish()
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CSortedArrayList<TYPE>::Distinguish();
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nReturn = CSortedArrayList<TYPE>::Distinguish();
 
 	return nReturn;
 }
@@ -442,11 +352,9 @@ int CSafeArrayList<TYPE>::Distinguish()
 template<class TYPE>
 void CSafeArrayList<TYPE>::DataSort(int nType, int nMethod)
 {
-	m_RWLock.ExclusiveLock();
-	{
-		CSortedArrayList<TYPE>::DataSort(nType, nMethod);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+
+	CSortedArrayList<TYPE>::DataSort(nType, nMethod);
 }
 
 #endif // ndef __SAFEARRAYLIST_H__

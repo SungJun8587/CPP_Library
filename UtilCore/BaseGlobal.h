@@ -9,9 +9,16 @@
 
 #pragma once
 
-#include "Memory.h"
+#ifdef __MEMORY_H__
+	extern class CMemory*	gpMemory;
+#endif
 
-extern class CMemory*			gpMemory;
-extern class CLogManager*		gpLogmanager;
+#ifdef __THREADMANAGER_H__	
+	extern class CThreadManager*	gpThreadManager;
+#endif
+
+#ifdef __SPINLOCK_H__
+	extern class CDeadLockProfiler* gpDeadLockProfiler;
+#endif
 
 #endif // ndef __BASEGLOBAL_H__

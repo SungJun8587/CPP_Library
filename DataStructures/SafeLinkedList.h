@@ -11,10 +11,6 @@
 #include <BaseLinkedList.h>
 #endif
 
-#ifndef __RWLOCK_H__
-#include <RwLock.h>
-#endif
-
 //***************************************************************************
 //
 template<class TYPE> class CSafeLinkedList : public CBaseLinkedList<TYPE>
@@ -57,20 +53,16 @@ private:
 	int Compare(const BYTE *pBCompee, const BYTE *pBComper, const DWORD dwSize);
 
 private:
-	CRWLock		m_RWLock;
+	std::shared_mutex	_mutex;
 };
 
 //***************************************************************************
 //	
 template<class TYPE> int CSafeLinkedList<TYPE>::Add(const TYPE &Element)
 {
-	int nReturn;
+	std::unique_lock lockGuard(_mutex);
 
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseLinkedList<TYPE>::Add(Element);
-	}
-	m_RWLock.ExclusiveUnLock();
+	int nReturn = CBaseLinkedList<TYPE>::Add(Element);
 
 	return nReturn;
 }
@@ -79,13 +71,9 @@ template<class TYPE> int CSafeLinkedList<TYPE>::Add(const TYPE &Element)
 //	
 template<class TYPE> int CSafeLinkedList<TYPE>::AddIndex(const TYPE &Element, const DWORD dwIndex)
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseLinkedList<TYPE>::AddIndex(Element, dwIndex);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nReturn = CBaseLinkedList<TYPE>::AddIndex(Element, dwIndex);
 
 	return nReturn;
 }
@@ -94,13 +82,9 @@ template<class TYPE> int CSafeLinkedList<TYPE>::AddIndex(const TYPE &Element, co
 //	
 template<class TYPE> int CSafeLinkedList<TYPE>::AddFirst(const TYPE &Element)
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseLinkedList<TYPE>::AddFirst(Element);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nReturn = CBaseLinkedList<TYPE>::AddFirst(Element);
 
 	return nReturn;
 }
@@ -109,13 +93,9 @@ template<class TYPE> int CSafeLinkedList<TYPE>::AddFirst(const TYPE &Element)
 //	
 template<class TYPE> int CSafeLinkedList<TYPE>::AddLast(const TYPE &Element)
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseLinkedList<TYPE>::AddLast(Element);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nReturn = CBaseLinkedList<TYPE>::AddLast(Element);
 
 	return nReturn;
 }
@@ -124,13 +104,9 @@ template<class TYPE> int CSafeLinkedList<TYPE>::AddLast(const TYPE &Element)
 //	
 template<class TYPE> int CSafeLinkedList<TYPE>::AddBeforeCurrent(const TYPE &Element)
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseLinkedList<TYPE>::AddBeforeCurrent(Element);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nReturn = CBaseLinkedList<TYPE>::AddBeforeCurrent(Element);
 
 	return nReturn;
 }
@@ -139,13 +115,9 @@ template<class TYPE> int CSafeLinkedList<TYPE>::AddBeforeCurrent(const TYPE &Ele
 //	
 template<class TYPE> int CSafeLinkedList<TYPE>::AddAfterCurrent(const TYPE &Element)
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseLinkedList<TYPE>::AddAfterCurrent(Element);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nReturn = CBaseLinkedList<TYPE>::AddAfterCurrent(Element);
 
 	return nReturn;
 }
@@ -154,13 +126,9 @@ template<class TYPE> int CSafeLinkedList<TYPE>::AddAfterCurrent(const TYPE &Elem
 //	
 template<class TYPE> int CSafeLinkedList<TYPE>::UpdateIndex(const DWORD dwIndex, const TYPE &Element)
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseLinkedList<TYPE>::UpdateIndex(dwIndex, Element);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nReturn = CBaseLinkedList<TYPE>::UpdateIndex(dwIndex, Element);
 
 	return nReturn;
 }
@@ -169,29 +137,20 @@ template<class TYPE> int CSafeLinkedList<TYPE>::UpdateIndex(const DWORD dwIndex,
 //	
 template<class TYPE> int CSafeLinkedList<TYPE>::UpdateCurrent(const TYPE &Element)
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseLinkedList<TYPE>::UpdateCurrent(Element);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nReturn = CBaseLinkedList<TYPE>::UpdateCurrent(Element);
 
 	return nReturn;
 }
-
 
 //***************************************************************************
 //	
 template<class TYPE> int CSafeLinkedList<TYPE>::Subtract(const TYPE &Element)
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseLinkedList<TYPE>::Subtract(Element);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nReturn = CBaseLinkedList<TYPE>::Subtract(Element);
 
 	return nReturn;
 }
@@ -200,13 +159,9 @@ template<class TYPE> int CSafeLinkedList<TYPE>::Subtract(const TYPE &Element)
 //	
 template<class TYPE> int CSafeLinkedList<TYPE>::SubtractAllDup(const TYPE &Element)
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseLinkedList<TYPE>::SubtractAllDup(Element);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nReturn = CBaseLinkedList<TYPE>::SubtractAllDup(Element);
 
 	return nReturn;
 }
@@ -215,13 +170,9 @@ template<class TYPE> int CSafeLinkedList<TYPE>::SubtractAllDup(const TYPE &Eleme
 //	
 template<class TYPE> int CSafeLinkedList<TYPE>::SubtractIndex(const DWORD dwIndex)
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseLinkedList<TYPE>::SubtractIndex(dwIndex);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nReturn = CBaseLinkedList<TYPE>::SubtractIndex(dwIndex);
 
 	return nReturn;
 }
@@ -230,13 +181,9 @@ template<class TYPE> int CSafeLinkedList<TYPE>::SubtractIndex(const DWORD dwInde
 //	
 template<class TYPE> int CSafeLinkedList<TYPE>::SubtractFirst()
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseLinkedList<TYPE>::SubtractFirst();
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nReturn = CBaseLinkedList<TYPE>::SubtractFirst();
 
 	return nReturn;
 }
@@ -245,13 +192,9 @@ template<class TYPE> int CSafeLinkedList<TYPE>::SubtractFirst()
 //	
 template<class TYPE> int CSafeLinkedList<TYPE>::SubtractLast()
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseLinkedList<TYPE>::SubtractLast();
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nReturn = CBaseLinkedList<TYPE>::SubtractLast();
 
 	return nReturn;
 }
@@ -260,13 +203,9 @@ template<class TYPE> int CSafeLinkedList<TYPE>::SubtractLast()
 //	
 template<class TYPE> int CSafeLinkedList<TYPE>::SubtractCurrent()
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseLinkedList<TYPE>::SubtractCurrent();
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nReturn = CBaseLinkedList<TYPE>::SubtractCurrent();
 
 	return nReturn;
 }
@@ -275,13 +214,9 @@ template<class TYPE> int CSafeLinkedList<TYPE>::SubtractCurrent()
 //	
 template<class TYPE> TYPE *CSafeLinkedList<TYPE>::MoveFirst()
 {
-	TYPE *pTemp;
+	std::shared_lock lockGuard(_mutex);
 
-	m_RWLock.SharedLock();
-	{
-		pTemp = CBaseLinkedList<TYPE>::MoveFirst();
-	}
-	m_RWLock.SharedUnLock();
+	TYPE* pTemp = CBaseLinkedList<TYPE>::MoveFirst();
 
 	return pTemp;
 }
@@ -290,13 +225,9 @@ template<class TYPE> TYPE *CSafeLinkedList<TYPE>::MoveFirst()
 //	
 template<class TYPE> TYPE *CSafeLinkedList<TYPE>::MoveLast()
 {
-	TYPE *pTemp;
-
-	m_RWLock.SharedLock();
-	{
-		pTemp = CBaseLinkedList<TYPE>::MoveLast();
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+	
+	TYPE* pTemp = CBaseLinkedList<TYPE>::MoveLast();
 
 	return pTemp;
 }
@@ -305,13 +236,9 @@ template<class TYPE> TYPE *CSafeLinkedList<TYPE>::MoveLast()
 //	
 template<class TYPE> TYPE *CSafeLinkedList<TYPE>::MovePrev()
 {
-	TYPE *pTemp;
+	std::shared_lock lockGuard(_mutex);
 
-	m_RWLock.SharedLock();
-	{
-		pTemp = CBaseLinkedList<TYPE>::MovePrev();
-	}
-	m_RWLock.SharedUnLock();
+	TYPE* pTemp = CBaseLinkedList<TYPE>::MovePrev();
 
 	return pTemp;
 }
@@ -320,13 +247,9 @@ template<class TYPE> TYPE *CSafeLinkedList<TYPE>::MovePrev()
 //	
 template<class TYPE> TYPE *CSafeLinkedList<TYPE>::MoveNext()
 {
-	TYPE *pTemp;
-
-	m_RWLock.SharedLock();
-	{
-		pTemp = CBaseLinkedList<TYPE>::MoveNext();
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+	
+	TYPE* pTemp = CBaseLinkedList<TYPE>::MoveNext();
 
 	return pTemp;
 }
@@ -335,13 +258,9 @@ template<class TYPE> TYPE *CSafeLinkedList<TYPE>::MoveNext()
 //	
 template<class TYPE> TYPE* CSafeLinkedList<TYPE>::MoveIndex(const DWORD dwIndex)
 {
-	TYPE *pTemp;
-
-	m_RWLock.SharedLock();
-	{
-		pTemp = CBaseLinkedList<TYPE>::GetCurrent(dwIndex);
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+	
+	TYPE* pTemp = CBaseLinkedList<TYPE>::GetCurrent(dwIndex);
 
 	return pTemp;
 }
@@ -350,13 +269,9 @@ template<class TYPE> TYPE* CSafeLinkedList<TYPE>::MoveIndex(const DWORD dwIndex)
 //	
 template<class TYPE> TYPE *CSafeLinkedList<TYPE>::GetCurrent()
 {
-	TYPE *pTemp;
-
-	m_RWLock.SharedLock();
-	{
-		pTemp = CBaseLinkedList<TYPE>::GetCurrent();
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+	
+	TYPE* pTemp = CBaseLinkedList<TYPE>::GetCurrent();
 
 	return pTemp;
 }
@@ -365,13 +280,9 @@ template<class TYPE> TYPE *CSafeLinkedList<TYPE>::GetCurrent()
 //	
 template<class TYPE> TYPE CSafeLinkedList<TYPE>::At(const DWORD dwIndex)
 {
-	TYPE Temp;
-
-	m_RWLock.SharedLock();
-	{
-		Temp = CBaseLinkedList<TYPE>::At(dwIndex);
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+	
+	TYPE Temp = CBaseLinkedList<TYPE>::At(dwIndex);
 
 	return Temp;
 }
@@ -380,13 +291,9 @@ template<class TYPE> TYPE CSafeLinkedList<TYPE>::At(const DWORD dwIndex)
 //	
 template<class TYPE> int CSafeLinkedList<TYPE>::GetCount()
 {
-	DWORD dwCount;
-
-	m_RWLock.SharedLock();
-	{
-		dwCount = CBaseLinkedList<TYPE>::GetCount();
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+	
+	DWORD dwCount = CBaseLinkedList<TYPE>::GetCount();
 
 	return dwCount;
 }
@@ -395,13 +302,9 @@ template<class TYPE> int CSafeLinkedList<TYPE>::GetCount()
 //	
 template<class TYPE> int CSafeLinkedList<TYPE>::Reset()
 {
-	int nReturn;
+	std::unique_lock lockGuard(_mutex);
 
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseLinkedList<TYPE>::Reset();
-	}
-	m_RWLock.ExclusiveUnLock();
+	int nReturn = CBaseLinkedList<TYPE>::Reset();
 
 	return nReturn;
 }
@@ -411,22 +314,18 @@ template<class TYPE> int CSafeLinkedList<TYPE>::Reset()
 //
 template<class TYPE> void CSafeLinkedList<TYPE>::Printing(wostream &StreamBuffer)
 {
-	m_RWLock.SharedLock();
-	{
-		CBaseLinkedList<TYPE>::Printing(StreamBuffer);
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+
+	CBaseLinkedList<TYPE>::Printing(StreamBuffer);
 }
 #else
 //***************************************************************************
 //
 template<class TYPE> void CSafeLinkedList<TYPE>::Printing(ostream &StreamBuffer)
 {
-	m_RWLock.SharedLock();
-	{
-		CBaseLinkedList<TYPE>::Printing(StreamBuffer);
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+
+	CBaseLinkedList<TYPE>::Printing(StreamBuffer);
 }
 #endif
 
@@ -434,13 +333,9 @@ template<class TYPE> void CSafeLinkedList<TYPE>::Printing(ostream &StreamBuffer)
 //	
 template<class TYPE> int CSafeLinkedList<TYPE>::Compare(const BYTE *pBCompee, const BYTE *pBComper, const DWORD dwSize)
 {
-	int nReturn;
-
-	m_RWLock.SharedLock();
-	{
-		nReturn = CBaseLinkedList<TYPE>::Compare(pBCompee, pBComper, dwSize);
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+	
+	int nReturn = CBaseLinkedList<TYPE>::Compare(pBCompee, pBComper, dwSize);
 
 	return nReturn;
 }

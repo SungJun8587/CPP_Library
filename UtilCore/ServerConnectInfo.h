@@ -85,22 +85,24 @@ public:
 		: m_nID(0), m_dbClass(EDBClass::NONE), m_nPort(0)
 	{
 		_tmemset(m_tszDSN, 0, DATABASE_DSN_STRLEN);
+		_tmemset(m_tszDSNDriver, 0, DATABASE_DSN_DRIVER_STRLEN);
 		_tmemset(m_tszDBHost, 0, DATABASE_SERVER_NAME_STRLEN);
 		_tmemset(m_tszDBName, 0, DATABASE_NAME_STRLEN);
 		_tmemset(m_tszDBUserId, 0, DATABASE_DSN_USER_ID_STRLEN);
 		_tmemset(m_tszDBPasswd, 0, DATABASE_DSN_USER_PASSWORD_STRLEN);
 	}
 
-	void Init(EDBClass dbClass, const TCHAR* ptszDBHost, const unsigned int nPort, const TCHAR* ptszDBUserId, const TCHAR* ptszDBPasswd, const TCHAR* ptszDBName)
+	void Init(EDBClass dbClass, const TCHAR* ptszDSNDriver, const TCHAR* ptszDBHost, const unsigned int nPort, const TCHAR* ptszDBUserId, const TCHAR* ptszDBPasswd, const TCHAR* ptszDBName)
 	{
 		m_dbClass = dbClass;
+		_tcsncpy_s(m_tszDSNDriver, _countof(m_tszDSNDriver), ptszDSNDriver, _TRUNCATE);
 		_tcsncpy_s(m_tszDBHost, _countof(m_tszDBHost), ptszDBHost, _TRUNCATE);
 		m_nPort = nPort;
 		_tcsncpy_s(m_tszDBUserId, _countof(m_tszDBUserId), ptszDBUserId, _TRUNCATE);
 		_tcsncpy_s(m_tszDBPasswd, _countof(m_tszDBPasswd), ptszDBPasswd, _TRUNCATE);
 		_tcsncpy_s(m_tszDBName, _countof(m_tszDBName), ptszDBName, _TRUNCATE);
 
-		GetDBDSNString(m_tszDSN, m_dbClass, m_tszDBHost, m_nPort, m_tszDBUserId, m_tszDBPasswd, m_tszDBName);
+		GetDBDSNString(m_tszDSN, m_dbClass, m_tszDSNDriver, m_tszDBHost, m_nPort, m_tszDBUserId, m_tszDBPasswd, m_tszDBName);
 	}
 
 	virtual bool Deserialize(const _tValue& obj)
@@ -108,10 +110,13 @@ public:
 		m_nID = obj[_T("ID")].GetInt();
 		m_dbClass = ConvertDBClassToInt(obj[_T("DBClass")].GetInt());
 		m_nPort = obj[_T("Port")].GetInt();
+		_tcsncpy_s(m_tszDSNDriver, _countof(m_tszDSNDriver), obj[_T("DSNDriver")].GetString(), _TRUNCATE);
 		_tcsncpy_s(m_tszDBHost, _countof(m_tszDBHost), obj[_T("DBHost")].GetString(), _TRUNCATE);
 		_tcsncpy_s(m_tszDBName, _countof(m_tszDBName), obj[_T("DBName")].GetString(), _TRUNCATE);
 		_tcsncpy_s(m_tszDBUserId, _countof(m_tszDBUserId), obj[_T("DBUserId")].GetString(), _TRUNCATE);
 		_tcsncpy_s(m_tszDBPasswd, _countof(m_tszDBPasswd), obj[_T("DBPasswd")].GetString(), _TRUNCATE);
+
+		GetDBDSNString(m_tszDSN, m_dbClass, m_tszDSNDriver, m_tszDBHost, m_nPort, m_tszDBUserId, m_tszDBPasswd, m_tszDBName);
 
 		return true;
 	};
@@ -156,6 +161,9 @@ private:
 		writer->String(_T("DBClass"));
 		writer->Int(static_cast<int>(m_dbClass));
 
+		writer->String(_T("DSNDriver"));
+		writer->String(m_tszDSNDriver);
+
 		writer->String(_T("DBHost"));
 		writer->String(m_tszDBHost);
 
@@ -181,6 +189,7 @@ public:
 
 	EDBClass        m_dbClass;
 	TCHAR			m_tszDSN[DATABASE_DSN_STRLEN];
+	TCHAR			m_tszDSNDriver[DATABASE_DSN_DRIVER_STRLEN];
 	TCHAR			m_tszDBHost[DATABASE_SERVER_NAME_STRLEN];
 	uint16			m_nPort;
 	TCHAR			m_tszDBName[DATABASE_NAME_STRLEN];

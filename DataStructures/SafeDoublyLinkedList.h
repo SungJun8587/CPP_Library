@@ -11,10 +11,6 @@
 #include <BaseDoublyLinkedList.h>
 #endif
 
-#ifndef __RWLOCK_H__
-#include <RwLock.h>
-#endif
-
 //***************************************************************************
 //
 template<class TYPE> class CSafeDoublyLinkedList : public CBaseDoublyLinkedList<TYPE>
@@ -57,20 +53,16 @@ private:
 	int Compare(const BYTE *pBCompee, const BYTE *pBComper, const DWORD dwSize);
 
 private:
-	CRWLock		m_RWLock;
+	std::shared_mutex	_mutex;
 };
 
 //***************************************************************************
 //	
 template<class TYPE> int CSafeDoublyLinkedList<TYPE>::Add(const TYPE &Element)
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseDoublyLinkedList<TYPE>::Add(Element);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+		
+	int nReturn = CBaseDoublyLinkedList<TYPE>::Add(Element);
 
 	return nReturn;
 }
@@ -79,13 +71,9 @@ template<class TYPE> int CSafeDoublyLinkedList<TYPE>::Add(const TYPE &Element)
 //	
 template<class TYPE> int CSafeDoublyLinkedList<TYPE>::AddIndex(const TYPE &Element, const DWORD dwIndex)
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseDoublyLinkedList<TYPE>::AddIndex(Element, dwIndex);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nReturn = CBaseDoublyLinkedList<TYPE>::AddIndex(Element, dwIndex);
 
 	return nReturn;
 }
@@ -94,13 +82,9 @@ template<class TYPE> int CSafeDoublyLinkedList<TYPE>::AddIndex(const TYPE &Eleme
 //	
 template<class TYPE> int CSafeDoublyLinkedList<TYPE>::AddFirst(const TYPE &Element)
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseDoublyLinkedList<TYPE>::AddFirst(Element);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nReturn = CBaseDoublyLinkedList<TYPE>::AddFirst(Element);
 
 	return nReturn;
 }
@@ -109,13 +93,9 @@ template<class TYPE> int CSafeDoublyLinkedList<TYPE>::AddFirst(const TYPE &Eleme
 //	
 template<class TYPE> int CSafeDoublyLinkedList<TYPE>::AddLast(const TYPE &Element)
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseDoublyLinkedList<TYPE>::AddLast(Element);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nReturn = CBaseDoublyLinkedList<TYPE>::AddLast(Element);
 
 	return nReturn;
 }
@@ -124,13 +104,9 @@ template<class TYPE> int CSafeDoublyLinkedList<TYPE>::AddLast(const TYPE &Elemen
 //	
 template<class TYPE> int CSafeDoublyLinkedList<TYPE>::AddBeforeCurrent(const TYPE &Element)
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseDoublyLinkedList<TYPE>::AddBeforeCurrent(Element);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nReturn = CBaseDoublyLinkedList<TYPE>::AddBeforeCurrent(Element);
 
 	return nReturn;
 }
@@ -139,13 +115,9 @@ template<class TYPE> int CSafeDoublyLinkedList<TYPE>::AddBeforeCurrent(const TYP
 //	
 template<class TYPE> int CSafeDoublyLinkedList<TYPE>::AddAfterCurrent(const TYPE &Element)
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseDoublyLinkedList<TYPE>::AddAfterCurrent(Element);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nReturn = CBaseDoublyLinkedList<TYPE>::AddAfterCurrent(Element);
 
 	return nReturn;
 }
@@ -154,13 +126,9 @@ template<class TYPE> int CSafeDoublyLinkedList<TYPE>::AddAfterCurrent(const TYPE
 //	
 template<class TYPE> int CSafeDoublyLinkedList<TYPE>::UpdateIndex(const DWORD dwIndex, const TYPE &Element)
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseDoublyLinkedList<TYPE>::UpdateIndex(dwIndex, Element);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nReturn = CBaseDoublyLinkedList<TYPE>::UpdateIndex(dwIndex, Element);
 
 	return nReturn;
 }
@@ -169,13 +137,9 @@ template<class TYPE> int CSafeDoublyLinkedList<TYPE>::UpdateIndex(const DWORD dw
 //	
 template<class TYPE> int CSafeDoublyLinkedList<TYPE>::UpdateCurrent(const TYPE &Element)
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseDoublyLinkedList<TYPE>::UpdateCurrent(Element);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nReturn = CBaseDoublyLinkedList<TYPE>::UpdateCurrent(Element);
 
 	return nReturn;
 }
@@ -184,13 +148,9 @@ template<class TYPE> int CSafeDoublyLinkedList<TYPE>::UpdateCurrent(const TYPE &
 //	
 template<class TYPE> int CSafeDoublyLinkedList<TYPE>::Subtract(const TYPE &Element)
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseDoublyLinkedList<TYPE>::Subtract(Element);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nReturn = CBaseDoublyLinkedList<TYPE>::Subtract(Element);
 
 	return nReturn;
 }
@@ -199,13 +159,9 @@ template<class TYPE> int CSafeDoublyLinkedList<TYPE>::Subtract(const TYPE &Eleme
 //	
 template<class TYPE> int CSafeDoublyLinkedList<TYPE>::SubtractAllDup(const TYPE &Element)
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseDoublyLinkedList<TYPE>::SubtractAllDup(Element);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nReturn = CBaseDoublyLinkedList<TYPE>::SubtractAllDup(Element);
 
 	return nReturn;
 }
@@ -214,13 +170,9 @@ template<class TYPE> int CSafeDoublyLinkedList<TYPE>::SubtractAllDup(const TYPE 
 //	
 template<class TYPE> int CSafeDoublyLinkedList<TYPE>::SubtractIndex(const DWORD dwIndex)
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseDoublyLinkedList<TYPE>::SubtractIndex(dwIndex);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nReturn = CBaseDoublyLinkedList<TYPE>::SubtractIndex(dwIndex);
 
 	return nReturn;
 }
@@ -229,13 +181,9 @@ template<class TYPE> int CSafeDoublyLinkedList<TYPE>::SubtractIndex(const DWORD 
 //	
 template<class TYPE> int CSafeDoublyLinkedList<TYPE>::SubtractFirst()
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseDoublyLinkedList<TYPE>::SubtractFirst();
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nReturn = CBaseDoublyLinkedList<TYPE>::SubtractFirst();
 
 	return nReturn;
 }
@@ -244,13 +192,9 @@ template<class TYPE> int CSafeDoublyLinkedList<TYPE>::SubtractFirst()
 //	
 template<class TYPE> int CSafeDoublyLinkedList<TYPE>::SubtractLast()
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseDoublyLinkedList<TYPE>::SubtractLast();
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nReturn = CBaseDoublyLinkedList<TYPE>::SubtractLast();
 
 	return nReturn;
 }
@@ -259,13 +203,9 @@ template<class TYPE> int CSafeDoublyLinkedList<TYPE>::SubtractLast()
 //	
 template<class TYPE> int CSafeDoublyLinkedList<TYPE>::SubtractCurrent()
 {
-	int nReturn;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseDoublyLinkedList<TYPE>::SubtractCurrent();
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nReturn = CBaseDoublyLinkedList<TYPE>::SubtractCurrent();
 
 	return nReturn;
 }
@@ -274,13 +214,9 @@ template<class TYPE> int CSafeDoublyLinkedList<TYPE>::SubtractCurrent()
 //	
 template<class TYPE> TYPE *CSafeDoublyLinkedList<TYPE>::MoveFirst()
 {
-	TYPE *pTemp;
+	std::shared_lock lockGuard(_mutex);
 
-	m_RWLock.SharedLock();
-	{
-		pTemp = CBaseDoublyLinkedList<TYPE>::MoveFirst();
-	}
-	m_RWLock.SharedUnLock();
+	TYPE* pTemp = CBaseDoublyLinkedList<TYPE>::MoveFirst();
 
 	return pTemp;
 }
@@ -289,13 +225,9 @@ template<class TYPE> TYPE *CSafeDoublyLinkedList<TYPE>::MoveFirst()
 //	
 template<class TYPE> TYPE *CSafeDoublyLinkedList<TYPE>::MoveLast()
 {
-	TYPE *pTemp;
-
-	m_RWLock.SharedLock();
-	{
-		pTemp = CBaseDoublyLinkedList<TYPE>::MoveLast();
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+	
+	TYPE* pTemp = CBaseDoublyLinkedList<TYPE>::MoveLast();
 
 	return pTemp;
 }
@@ -304,13 +236,9 @@ template<class TYPE> TYPE *CSafeDoublyLinkedList<TYPE>::MoveLast()
 //	
 template<class TYPE> TYPE *CSafeDoublyLinkedList<TYPE>::MovePrev()
 {
-	TYPE *pTemp;
-
-	m_RWLock.SharedLock();
-	{
-		pTemp = CBaseDoublyLinkedList<TYPE>::MovePrev();
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+	
+	TYPE* pTemp = CBaseDoublyLinkedList<TYPE>::MovePrev();
 
 	return pTemp;
 }
@@ -319,13 +247,9 @@ template<class TYPE> TYPE *CSafeDoublyLinkedList<TYPE>::MovePrev()
 //	
 template<class TYPE> TYPE *CSafeDoublyLinkedList<TYPE>::MoveNext()
 {
-	TYPE *pTemp;
-
-	m_RWLock.SharedLock();
-	{
-		pTemp = CBaseDoublyLinkedList<TYPE>::MoveNext();
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+	
+	TYPE* pTemp = CBaseDoublyLinkedList<TYPE>::MoveNext();
 
 	return pTemp;
 }
@@ -334,13 +258,9 @@ template<class TYPE> TYPE *CSafeDoublyLinkedList<TYPE>::MoveNext()
 //	
 template<class TYPE> TYPE* CSafeDoublyLinkedList<TYPE>::MoveIndex(const DWORD dwIndex)
 {
-	TYPE *pTemp;
+	std::shared_lock lockGuard(_mutex);
 
-	m_RWLock.SharedLock();
-	{
-		pTemp = CBaseDoublyLinkedList<TYPE>::MoveIndex(dwIndex);
-	}
-	m_RWLock.SharedUnLock();
+	TYPE* pTemp = CBaseDoublyLinkedList<TYPE>::MoveIndex(dwIndex);
 
 	return pTemp;
 }
@@ -349,13 +269,9 @@ template<class TYPE> TYPE* CSafeDoublyLinkedList<TYPE>::MoveIndex(const DWORD dw
 //	
 template<class TYPE> TYPE *CSafeDoublyLinkedList<TYPE>::GetCurrent()
 {
-	TYPE *pTemp;
-
-	m_RWLock.SharedLock();
-	{
-		pTemp = CBaseDoublyLinkedList<TYPE>::GetCurrent();
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+	
+	TYPE* pTemp = CBaseDoublyLinkedList<TYPE>::GetCurrent();
 
 	return pTemp;
 }
@@ -364,13 +280,9 @@ template<class TYPE> TYPE *CSafeDoublyLinkedList<TYPE>::GetCurrent()
 //	
 template<class TYPE> TYPE CSafeDoublyLinkedList<TYPE>::At(const DWORD dwIndex)
 {
-	TYPE Temp;
-
-	m_RWLock.SharedLock();
-	{
-		Temp = CBaseDoublyLinkedList<TYPE>::At(dwIndex);
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+	
+	TYPE Temp = CBaseDoublyLinkedList<TYPE>::At(dwIndex);
 
 	return Temp;
 }
@@ -379,13 +291,9 @@ template<class TYPE> TYPE CSafeDoublyLinkedList<TYPE>::At(const DWORD dwIndex)
 //	
 template<class TYPE> int CSafeDoublyLinkedList<TYPE>::GetCount()
 {
-	DWORD dwCount;
-
-	m_RWLock.SharedLock();
-	{
-		dwCount = CBaseDoublyLinkedList<TYPE>::GetCount();
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+	
+	DWORD dwCount = CBaseDoublyLinkedList<TYPE>::GetCount();
 
 	return dwCount;
 }
@@ -394,13 +302,9 @@ template<class TYPE> int CSafeDoublyLinkedList<TYPE>::GetCount()
 //	
 template<class TYPE> int CSafeDoublyLinkedList<TYPE>::Reset()
 {
-	int nReturn;
+	std::unique_lock lockGuard(_mutex);
 
-	m_RWLock.ExclusiveLock();
-	{
-		nReturn = CBaseDoublyLinkedList<TYPE>::Reset();
-	}
-	m_RWLock.ExclusiveUnLock();
+	int nReturn = CBaseDoublyLinkedList<TYPE>::Reset();
 
 	return nReturn;
 }
@@ -410,11 +314,9 @@ template<class TYPE> int CSafeDoublyLinkedList<TYPE>::Reset()
 //	
 template<class TYPE> void CSafeDoublyLinkedList<TYPE>::Printing(wostream &StreamBuffer)
 {
-	m_RWLock.SharedLock();
-	{
-		CBaseDoublyLinkedList<TYPE>::Printing(StreamBuffer);
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+
+	CBaseDoublyLinkedList<TYPE>::Printing(StreamBuffer);
 }
 
 #else
@@ -422,11 +324,9 @@ template<class TYPE> void CSafeDoublyLinkedList<TYPE>::Printing(wostream &Stream
 //
 template<class TYPE> void CSafeDoublyLinkedList<TYPE>::Printing(ostream &StreamBuffer)
 {
-	m_RWLock.SharedLock();
-	{
-		CBaseDoublyLinkedList<TYPE>::Printing(StreamBuffer);
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+
+	CBaseDoublyLinkedList<TYPE>::Printing(StreamBuffer);
 }
 #endif
 
@@ -434,13 +334,9 @@ template<class TYPE> void CSafeDoublyLinkedList<TYPE>::Printing(ostream &StreamB
 //	
 template<class TYPE> int CSafeDoublyLinkedList<TYPE>::Compare(const BYTE *pBCompee, const BYTE *pBComper, const DWORD dwSize)
 {
-	int nReturn;
+	std::shared_lock lockGuard(_mutex);
 
-	m_RWLock.SharedLock();
-	{
-		nReturn = CBaseDoublyLinkedList<TYPE>::Compare(pBCompee, pBComper, dwSize);
-	}
-	m_RWLock.SharedUnLock();
+	int nReturn = CBaseDoublyLinkedList<TYPE>::Compare(pBCompee, pBComper, dwSize);
 
 	return nReturn;
 }

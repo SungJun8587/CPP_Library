@@ -13,7 +13,6 @@
 #define NAMESPACE_END			}
 
 #define SVR									CServiceSvr::GetSvrInstance()
-#define TLS_IDX								CThreadManager::GetTlsValue()
 #define SERVER_CONFIG						CServerConfig::GetSingletonPtr()
 
 #define CRASH								{ char *p = 0; *p = 1; }

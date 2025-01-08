@@ -40,7 +40,7 @@ public:
 	int		Put(TYPE Element);
 
 private:
-	CRWLock		m_RWLock;
+	std::shared_mutex	_mutex;
 };
 
 //***************************************************************************

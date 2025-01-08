@@ -114,12 +114,12 @@ inline CSortedArrayList<TYPE>& CSortedArrayList<TYPE>::operator = (const CSorted
 template<class TYPE>
 inline int CSortedArrayList<TYPE>::Search(TYPE tValue)
 {	// binary search if fail return nearest item
-	int nLow = 0, nHigh = GetMaxSize(), nMid;
+	int nLow = 0, nHigh = this->GetMaxSize(), nMid;
 
 	while( nLow < nHigh )
 	{
 		nMid = (nLow + nHigh) / 2;
-		if( CompareElementsLess(&m_pTypeData[nMid], &tValue) )
+		if( CompareElementsLess(&this->m_pTypeData[nMid], &tValue) )
 		{
 			nLow = nMid + 1;
 		}
@@ -139,9 +139,9 @@ inline int CSortedArrayList<TYPE>::Lookup(TYPE tValue)
 {	// binary search if fail return -1
 	int nRet = Search(tValue);
 
-	if( nRet < GetMaxSize() )
+	if( nRet < this->GetMaxSize() )
 	{
-		if( CompareElements(&m_pTypeData[nRet], &tValue) )
+		if( CompareElements(&this->m_pTypeData[nRet], &tValue) )
 		{
 			return nRet;
 		}
@@ -161,8 +161,8 @@ inline void CSortedArrayList<TYPE>::BubbleSortAsc(int nLow, int nHigh)
 	{
 		for( j = i + 1; j < nHigh; j++ )
 		{
-			if( !CompareElementsLess(&m_pTypeData[i], &m_pTypeData[j]) )
-				Swap(m_pTypeData[i], m_pTypeData[j]);
+			if( !CompareElementsLess(&this->m_pTypeData[i], &this->m_pTypeData[j]) )
+				Swap(this->m_pTypeData[i], this->m_pTypeData[j]);
 		}
 	}
 }
@@ -178,8 +178,8 @@ inline void CSortedArrayList<TYPE>::BubbleSortDesc(int nLow, int nHigh)
 	{
 		for( j = i + 1; j < nHigh; j++ )
 		{
-			if( CompareElementsLess(&m_pTypeData[i], &m_pTypeData[j]) )
-				Swap(m_pTypeData[i], m_pTypeData[j]);
+			if( CompareElementsLess(&this->m_pTypeData[i], &this->m_pTypeData[j]) )
+				Swap(this->m_pTypeData[i], this->m_pTypeData[j]);
 		}
 	}
 }
@@ -193,14 +193,14 @@ inline void CSortedArrayList<TYPE>::InsertionSortAsc(int nLow, int nHigh)
 
 	for( i = nLow + 1; i <= nHigh; i++ )
 	{
-		TYPE tValue = m_pTypeData[i];
+		TYPE tValue = this->m_pTypeData[i];
 
-		for( j = i; j > nLow && !CompareElementsLess(&m_pTypeData[j - 1], &tValue); j-- )
+		for( j = i; j > nLow && !CompareElementsLess(&this->m_pTypeData[j - 1], &tValue); j-- )
 		{
-			Set(m_pTypeData[j - 1], j);
+			this->Set(this->m_pTypeData[j - 1], j);
 		}
 
-		Set(tValue, j);
+		this->Set(tValue, j);
 	}
 }
 
@@ -213,14 +213,14 @@ inline void CSortedArrayList<TYPE>::InsertionSortDesc(int nLow, int nHigh)
 
 	for( i = nLow + 1; i <= nHigh; i++ )
 	{
-		TYPE tValue = m_pTypeData[i];
+		TYPE tValue = this->m_pTypeData[i];
 
-		for( j = i; j > nLow && CompareElementsLess(&m_pTypeData[j - 1], &tValue); j-- )
+		for( j = i; j > nLow && CompareElementsLess(&this->m_pTypeData[j - 1], &tValue); j-- )
 		{
-			Set(m_pTypeData[j - 1], j);
+			this->Set(this->m_pTypeData[j - 1], j);
 		}
 
-		Set(tValue, j);
+		this->Set(tValue, j);
 	}
 }
 
@@ -236,19 +236,19 @@ inline void CSortedArrayList<TYPE>::SelectSortAsc(int nLow, int nHigh)
 	{
 		nIndex = i;
 
-		TYPE tValue = m_pTypeData[i];
+		TYPE tValue = this->m_pTypeData[i];
 
 		for( j = i + 1; j < nHigh; j++ )
 		{
-			if( CompareElementsLess(&m_pTypeData[j], &tValue) )
+			if( CompareElementsLess(&this->m_pTypeData[j], &tValue) )
 			{
-				tValue = m_pTypeData[j];
+				tValue = this->m_pTypeData[j];
 				nIndex = j;
 			}
 		}
 
-		Set(m_pTypeData[i], nIndex);
-		Set(tValue, i);
+		this->Set(this->m_pTypeData[i], nIndex);
+		this->Set(tValue, i);
 	}
 }
 
@@ -264,19 +264,19 @@ inline void CSortedArrayList<TYPE>::SelectSortDesc(int nLow, int nHigh)
 	{
 		nIndex = i;
 
-		TYPE tValue = m_pTypeData[i];
+		TYPE tValue = this->m_pTypeData[i];
 
 		for( j = i + 1; j < nHigh; j++ )
 		{
-			if( !CompareElementsLess(&m_pTypeData[j], &tValue) )
+			if( !CompareElementsLess(&this->m_pTypeData[j], &tValue) )
 			{
-				tValue = m_pTypeData[j];
+				tValue = this->m_pTypeData[j];
 				nIndex = j;
 			}
 		}
 
-		Set(m_pTypeData[i], nIndex);
-		Set(tValue, i);
+		this->Set(this->m_pTypeData[i], nIndex);
+		this->Set(tValue, i);
 	}
 }
 
@@ -297,21 +297,21 @@ inline void CSortedArrayList<TYPE>::QuickSortAsc(int nLow, int nHigh)
 	{
 		nRandomIndex = (int)(rand() % (nHigh - nLow + 1)) + nLow;
 
-		Swap(m_pTypeData[nRandomIndex], m_pTypeData[nLow]);
+		Swap(this->m_pTypeData[nRandomIndex], this->m_pTypeData[nLow]);
 
-		Pivot = m_pTypeData[nHigh];
+		Pivot = this->m_pTypeData[nHigh];
 		i = nLow - 1;
 
 		for( j = nLow; j <= nHigh - 1; j++ )
 		{
-			if( !CompareElementsLess(&Pivot, &m_pTypeData[j]) )
+			if( !CompareElementsLess(&Pivot, &this->m_pTypeData[j]) )
 			{
 				i = i + 1;
-				Swap(m_pTypeData[i], m_pTypeData[j]);
+				Swap(this->m_pTypeData[i], this->m_pTypeData[j]);
 			}
 		}
 
-		Swap(m_pTypeData[i + 1], m_pTypeData[nHigh]);
+		Swap(this->m_pTypeData[i + 1], this->m_pTypeData[nHigh]);
 
 		nPivotIndex = i + 1;
 
@@ -337,21 +337,21 @@ inline void CSortedArrayList<TYPE>::QuickSortDesc(int nLow, int nHigh)
 	{
 		nRandomIndex = (int)(rand() % (nHigh - nLow + 1)) + nLow;
 
-		Swap(m_pTypeData[nRandomIndex], m_pTypeData[nLow]);
+		Swap(this->m_pTypeData[nRandomIndex], this->m_pTypeData[nLow]);
 
-		Pivot = m_pTypeData[nHigh];
+		Pivot = this->m_pTypeData[nHigh];
 		i = nLow - 1;
 
 		for( j = nLow; j <= nHigh - 1; j++ )
 		{
-			if( CompareElementsLess(&Pivot, &m_pTypeData[j]) )
+			if( CompareElementsLess(&Pivot, &this->m_pTypeData[j]) )
 			{
 				i = i + 1;
-				Swap(m_pTypeData[i], m_pTypeData[j]);
+				Swap(this->m_pTypeData[i], this->m_pTypeData[j]);
 			}
 		}
 
-		Swap(m_pTypeData[i + 1], m_pTypeData[nHigh]);
+		Swap(this->m_pTypeData[i + 1], this->m_pTypeData[nHigh]);
 
 		nPivotIndex = i + 1;
 
@@ -374,15 +374,15 @@ inline void CSortedArrayList<TYPE>::ShellSecondSortAsc(int nHigh)
 		{
 			for( j = i + nRound; j < nHigh; j = j + nRound )
 			{
-				TempTypeData = m_pTypeData[j];
+				TempTypeData = this->m_pTypeData[j];
 				k = j;
-				while( k > nRound - 1 && !CompareElementsLess(&m_pTypeData[k - nRound], &TempTypeData) )
+				while( k > nRound - 1 && !CompareElementsLess(&this->m_pTypeData[k - nRound], &TempTypeData) )
 				{
-					Set(m_pTypeData[k - nRound], k);
+					this->Set(this->m_pTypeData[k - nRound], k);
 					k = k - nRound;
 				}
 
-				Set(TempTypeData, k);
+				this->Set(TempTypeData, k);
 			}
 		}
 	}
@@ -403,15 +403,15 @@ inline void CSortedArrayList<TYPE>::ShellSecondSortDesc(int nHigh)
 		{
 			for( j = i + nRound; j < nHigh; j = j + nRound )
 			{
-				TempTypeData = m_pTypeData[j];
+				TempTypeData = this->m_pTypeData[j];
 				k = j;
-				while( k > nRound - 1 && CompareElementsLess(&m_pTypeData[k - nRound], &TempTypeData) )
+				while( k > nRound - 1 && CompareElementsLess(&this->m_pTypeData[k - nRound], &TempTypeData) )
 				{
-					Set(m_pTypeData[k - nRound], k);
+					this->Set(this->m_pTypeData[k - nRound], k);
 					k = k - nRound;
 				}
 
-				Set(TempTypeData, k);
+				this->Set(TempTypeData, k);
 			}
 		}
 	}
@@ -433,15 +433,15 @@ inline void CSortedArrayList<TYPE>::ShellThirdSortAsc(int nHigh)
 		{
 			for( j = i + nRound; j < nHigh; j = j + nRound )
 			{
-				TempTypeData = m_pTypeData[j];
+				TempTypeData = this->m_pTypeData[j];
 				k = j;
-				while( k > nRound - 1 && !CompareElementsLess(&m_pTypeData[k - nRound], &TempTypeData) )
+				while( k > nRound - 1 && !CompareElementsLess(&this->m_pTypeData[k - nRound], &TempTypeData) )
 				{
-					Set(m_pTypeData[k - nRound], k);
+					this->Set(this->m_pTypeData[k - nRound], k);
 					k = k - nRound;
 				}
 
-				Set(TempTypeData, k);
+				this->Set(TempTypeData, k);
 			}
 		}
 	}
@@ -463,15 +463,15 @@ inline void CSortedArrayList<TYPE>::ShellThirdSortDesc(int nHigh)
 		{
 			for( j = i + nRound; j < nHigh; j = j + nRound )
 			{
-				TempTypeData = m_pTypeData[j];
+				TempTypeData = this->m_pTypeData[j];
 				k = j;
-				while( k > nRound - 1 && CompareElementsLess(&m_pTypeData[k - nRound], &TempTypeData) )
+				while( k > nRound - 1 && CompareElementsLess(&this->m_pTypeData[k - nRound], &TempTypeData) )
 				{
-					Set(m_pTypeData[k - nRound], k);
+					this->Set(this->m_pTypeData[k - nRound], k);
 					k = k - nRound;
 				}
 
-				Set(TempTypeData, k);
+				this->Set(TempTypeData, k);
 			}
 		}
 	}
@@ -489,22 +489,22 @@ inline void CSortedArrayList<TYPE>::DataSort(int nType, int nMethod)
 				switch( nMethod )
 				{
 					case 1:
-						BubbleSortAsc(0, GetMaxSize());
+						BubbleSortAsc(0, this->GetMaxSize());
 						break;
 					case 2:
-						InsertionSortAsc(0, GetMaxSize() - 1);
+						InsertionSortAsc(0, this->GetMaxSize() - 1);
 						break;
 					case 3:
-						SelectSortAsc(0, GetMaxSize());
+						SelectSortAsc(0, this->GetMaxSize());
 						break;
 					case 4:
-						QuickSortAsc(0, GetMaxSize() - 1);
+						QuickSortAsc(0, this->GetMaxSize() - 1);
 						break;
 					case 5:
-						ShellSecondSortAsc(GetMaxSize());
+						ShellSecondSortAsc(this->GetMaxSize());
 						break;
 					case 6:
-						ShellThirdSortAsc(GetMaxSize());
+						ShellThirdSortAsc(this->GetMaxSize());
 						break;
 				}
 				break;
@@ -514,22 +514,22 @@ inline void CSortedArrayList<TYPE>::DataSort(int nType, int nMethod)
 				switch( nMethod )
 				{
 					case 1:
-						BubbleSortDesc(0, GetMaxSize());
+						BubbleSortDesc(0, this->GetMaxSize());
 						break;
 					case 2:
-						InsertionSortDesc(0, GetMaxSize() - 1);
+						InsertionSortDesc(0, this->GetMaxSize() - 1);
 						break;
 					case 3:
-						SelectSortDesc(0, GetMaxSize());
+						SelectSortDesc(0, this->GetMaxSize());
 						break;
 					case 4:
-						QuickSortDesc(0, GetMaxSize() - 1);
+						QuickSortDesc(0, this->GetMaxSize() - 1);
 						break;
 					case 5:
-						ShellSecondSortDesc(GetMaxSize());
+						ShellSecondSortDesc(this->GetMaxSize());
 						break;
 					case 6:
-						ShellThirdSortDesc(GetMaxSize());
+						ShellThirdSortDesc(this->GetMaxSize());
 						break;
 				}
 				break;
@@ -544,14 +544,14 @@ inline int CSortedArrayList<TYPE>::AddSorted(TYPE tValue)
 {
 	int nInsertIndex = Search(tValue);
 
-	if( nInsertIndex < GetListSize() )
+	if( nInsertIndex < this->GetListSize() )
 	{
-		Set(tValue, nInsertIndex);
+		this->Set(tValue, nInsertIndex);
 	}
 	else
 	{
-		if( GetMaxSize() <= GetListSize() )
-			nInsertIndex = dInsert(tValue);
+		if( this->GetMaxSize() <= this->GetListSize() )
+			nInsertIndex = this->dInsert(tValue);
 	}
 
 	return nInsertIndex;

@@ -8,7 +8,6 @@
 #define __SAFELINKEDQUEUE_H__
 
 #include <BaseLinkedQueue.h>
-#include <RWLock.h>
 
 //***************************************************************************
 //
@@ -28,7 +27,7 @@ public:
 #endif
 
 private:
-	CRWLock		m_RWLock;
+	std::shared_mutex	_mutex;
 };
 
 //***************************************************************************
@@ -36,13 +35,9 @@ private:
 template<class TYPE>
 int CSafeLinkedQueue<TYPE>::EnQueue(const TYPE Element)
 {
-	int nRet;
+	std::unique_lock lockGuard(_mutex);
 
-	m_RWLock.ExclusiveLock();
-	{
-		nRet = CBaseLinkedQueue<TYPE>::EnQueue(Element);
-	}
-	m_RWLock.ExclusiveUnLock();
+	int nRet = CBaseLinkedQueue<TYPE>::EnQueue(Element);
 
 	return nRet;
 }
@@ -52,13 +47,9 @@ int CSafeLinkedQueue<TYPE>::EnQueue(const TYPE Element)
 template<class TYPE>
 int CSafeLinkedQueue<TYPE>::DeQueue(TYPE &Element)
 {
-	int nRet;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nRet = CBaseLinkedQueue<TYPE>::DeQueue(Element);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nRet = CBaseLinkedQueue<TYPE>::DeQueue(Element);
 
 	return nRet;
 }
@@ -66,15 +57,11 @@ int CSafeLinkedQueue<TYPE>::DeQueue(TYPE &Element)
 //***************************************************************************
 //
 template<class TYPE>
-int CSafeLinkedQueue<TYPE>::IsEmpty()
+bool CSafeLinkedQueue<TYPE>::IsEmpty()
 {
-	bool bRet;
+	std::shared_lock lockGuard(_mutex);
 
-	m_RWLock.SharedLock();
-	{
-		bRet = CBaseLinkedQueue<TYPE>::IsEmpty();
-	}
-	m_RWLock.SharedUnLock();
+	bool bRet = CBaseLinkedQueue<TYPE>::IsEmpty();
 
 	return bRet;
 }
@@ -84,13 +71,9 @@ int CSafeLinkedQueue<TYPE>::IsEmpty()
 template<class TYPE>
 int CSafeLinkedQueue<TYPE>::GetSize()
 {
-	int nRet;
-
-	m_RWLock.SharedLock();
-	{
-		nRet = CBaseLinkedQueue<TYPE>::GetSize();
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+	
+	int nRet = CBaseLinkedQueue<TYPE>::GetSize();
 
 	return nRet;
 }
@@ -101,11 +84,9 @@ int CSafeLinkedQueue<TYPE>::GetSize()
 template<class TYPE>
 void CSafeLinkedQueue<TYPE>::Printing(wostream &StreamBuffer)
 {
-	m_RWLock.SharedLock();
-	{
-		CBaseLinkedQueue<TYPE>::Printing(StreamBuffer);
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+	
+	CBaseLinkedQueue<TYPE>::Printing(StreamBuffer);
 }
 #else
 //***************************************************************************
@@ -113,11 +94,9 @@ void CSafeLinkedQueue<TYPE>::Printing(wostream &StreamBuffer)
 template<class TYPE>
 void CSafeLinkedQueue<TYPE>::Printing(ostream &StreamBuffer)
 {
-	m_RWLock.SharedLock();
-	{
-		CBaseLinkedQueue<TYPE>::Printing(StreamBuffer);
-	}
-	m_RWLock.SharedUnLock();
+	std::shared_lock lockGuard(_mutex);
+	
+	CBaseLinkedQueue<TYPE>::Printing(StreamBuffer);
 }
 #endif
 

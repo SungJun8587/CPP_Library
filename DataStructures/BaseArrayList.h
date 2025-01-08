@@ -129,8 +129,8 @@ inline CBaseArrayList< TYPE >& CBaseArrayList<TYPE>::operator = (const CBaseArra
 template<class TYPE>
 inline BOOL CBaseArrayList<TYPE>::operator < (const CBaseArrayList& x) const
 {
-	register int i;
-	register int nSize(GetMaxSize());
+	int i;
+	int nSize(GetMaxSize());
 
 	if( nSize != x.GetMaxSize() )
 	{
@@ -153,8 +153,8 @@ inline BOOL CBaseArrayList<TYPE>::operator < (const CBaseArrayList& x) const
 template<class TYPE>
 inline BOOL CBaseArrayList<TYPE>::operator <= (const CBaseArrayList& x) const
 {
-	register int i;
-	register int nSize(GetMaxSize());
+	int i;
+	int nSize(GetMaxSize());
 
 	if( nSize != x.GetMaxSize() )
 	{
@@ -178,8 +178,8 @@ inline BOOL CBaseArrayList<TYPE>::operator <= (const CBaseArrayList& x) const
 template<class TYPE>
 inline BOOL CBaseArrayList<TYPE>::operator == (const CBaseArrayList& x) const
 {
-	register int i;
-	register int nSize(GetMaxSize());
+	int i;
+	int nSize(GetMaxSize());
 
 	if( nSize != x.GetMaxSize() )
 	{
@@ -202,8 +202,8 @@ inline BOOL CBaseArrayList<TYPE>::operator == (const CBaseArrayList& x) const
 template<class TYPE>
 inline BOOL CBaseArrayList<TYPE>::operator != (const CBaseArrayList& x) const
 {
-	register int i;
-	register int nSize(GetMaxSize());
+	int i;
+	int nSize(GetMaxSize());
 
 	if( nSize != x.GetMaxSize() )
 	{
@@ -226,8 +226,8 @@ inline BOOL CBaseArrayList<TYPE>::operator != (const CBaseArrayList& x) const
 template<class TYPE>
 inline BOOL CBaseArrayList<TYPE>::operator > (const CBaseArrayList& x) const
 {
-	register int i;
-	register int nSize(GetMaxSize());
+	int i;
+	int nSize(GetMaxSize());
 
 	if( nSize != x.GetMaxSize() )
 	{
@@ -250,8 +250,8 @@ inline BOOL CBaseArrayList<TYPE>::operator > (const CBaseArrayList& x) const
 template<class TYPE>
 inline BOOL CBaseArrayList<TYPE>::operator >= (const CBaseArrayList& x) const
 {
-	register int i;
-	register int nSize(GetMaxSize());
+	int i;
+	int nSize(GetMaxSize());
 
 	if( nSize != x.GetMaxSize() )
 	{
@@ -478,7 +478,7 @@ int CBaseArrayList<TYPE>::DeleteAllDup(TYPE type)
 		}
 	}
 
-	for( i = nCount; i < nMaxSize; i++ )
+	for( int i = nCount; i < nMaxSize; i++ )
 		pTempTypeData[i] = NULL;
 
 	if( m_pTypeData )
@@ -557,7 +557,7 @@ int CBaseArrayList<TYPE>::Distinguish()
 		}
 	}
 
-	for( i = nCount; i < nMaxSize; i++ )
+	for( int i = nCount; i < m_nMaxSize; i++ )
 		pTempTypeData[i] = NULL;
 
 	if( m_pTypeData )

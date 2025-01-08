@@ -8,7 +8,6 @@
 #define __SAFEARRAYQUEUE_H__
 
 #include <BaseArrayQueue.h>
-#include <RWLock.h>
 
 //***************************************************************************
 //
@@ -24,8 +23,8 @@ public:
 	}
 	CSafeArrayQueue(int nSize, int nGrowth)
 	{
-		if( nGrowth > 0 ) m_nGrowth = nGrowth;
-		else m_nGrowth = 0;
+		if( nGrowth > 0 ) this->m_nGrowth = nGrowth;
+		else this->m_nGrowth = 0;
 
 		if( nSize > 0 ) SetSize(nSize);
 	}
@@ -40,7 +39,7 @@ public:
 	int		Put(TYPE Element);
 
 private:
-	CRWLock		m_RWLock;
+	std::shared_mutex	_mutex;
 };
 
 //***************************************************************************
@@ -48,11 +47,9 @@ private:
 template<class TYPE>
 void CSafeArrayQueue<TYPE>::RemoveAll()
 {
-	m_RWLock.ExclusiveLock();
-	{
-		CBaseArrayQueue<TYPE>::RemoveAll();
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+
+	CBaseArrayQueue<TYPE>::RemoveAll();
 }
 
 //***************************************************************************
@@ -60,11 +57,9 @@ void CSafeArrayQueue<TYPE>::RemoveAll()
 template<class TYPE>
 void CSafeArrayQueue<TYPE>::SetSize(int nNewSize)
 {
-	m_RWLock.ExclusiveLock();
-	{
-		CBaseArrayQueue<TYPE>::SetSize(nNewSize);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+
+	CBaseArrayQueue<TYPE>::SetSize(nNewSize);
 }
 
 //***************************************************************************
@@ -72,13 +67,9 @@ void CSafeArrayQueue<TYPE>::SetSize(int nNewSize)
 template<class TYPE>
 int CSafeArrayQueue<TYPE>::GetSize()
 {
-	int nRet;
+	std::shared_lock lockGuard(_mutex);
 
-	m_RWLock.SharedLock();
-	{
-		nRet = CBaseArrayQueue<TYPE>::GetSize();
-	}
-	m_RWLock.SharedUnLock();
+	int nRet = CBaseArrayQueue<TYPE>::GetSize();
 
 	return nRet;
 }
@@ -88,13 +79,9 @@ int CSafeArrayQueue<TYPE>::GetSize()
 template<class TYPE>
 int CSafeArrayQueue<TYPE>::GetCapa()
 {
-	int nRet;
+	std::shared_lock lockGuard(_mutex);
 
-	m_RWLock.SharedLock();
-	{
-		nRet = CBaseArrayQueue<TYPE>::GetCapa();
-	}
-	m_RWLock.SharedUnLock();
+	int nRet = CBaseArrayQueue<TYPE>::GetCapa();
 
 	return nRet;
 }
@@ -104,13 +91,9 @@ int CSafeArrayQueue<TYPE>::GetCapa()
 template<class TYPE>
 int CSafeArrayQueue<TYPE>::GetDataSize()
 {
-	int nRet;
+	std::shared_lock lockGuard(_mutex);
 
-	m_RWLock.SharedLock();
-	{
-		nRet = CBaseArrayQueue<TYPE>::GetDataSize();
-	}
-	m_RWLock.SharedUnLock();
+	int nRet = CBaseArrayQueue<TYPE>::GetDataSize();
 
 	return nRet;
 }
@@ -120,13 +103,9 @@ int CSafeArrayQueue<TYPE>::GetDataSize()
 template<class TYPE>
 int CSafeArrayQueue<TYPE>::Put(TYPE Object)
 {
-	int nRet;
+	std::unique_lock lockGuard(_mutex);
 
-	m_RWLock.ExclusiveLock();
-	{
-		nRet = CBaseArrayQueue<TYPE>::Put(Object);
-	}
-	m_RWLock.ExclusiveUnLock();
+	int nRet = CBaseArrayQueue<TYPE>::Put(Object);
 
 	return nRet;
 }
@@ -136,13 +115,9 @@ int CSafeArrayQueue<TYPE>::Put(TYPE Object)
 template<class TYPE>
 int CSafeArrayQueue<TYPE>::Get(TYPE& Object)
 {
-	int nRet;
-
-	m_RWLock.ExclusiveLock();
-	{
-		nRet = CBaseArrayQueue<TYPE>::Get(Object);
-	}
-	m_RWLock.ExclusiveUnLock();
+	std::unique_lock lockGuard(_mutex);
+	
+	int nRet = CBaseArrayQueue<TYPE>::Get(Object);
 
 	return nRet;
 }

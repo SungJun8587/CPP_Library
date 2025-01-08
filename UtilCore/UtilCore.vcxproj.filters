@@ -10,14 +10,8 @@
     <Filter Include="Log">
       <UniqueIdentifier>{2640575b-d671-4da1-bd58-e4c38250c69c}</UniqueIdentifier>
     </Filter>
-    <Filter Include="MySQL">
-      <UniqueIdentifier>{791383c0-a14a-4107-893b-426fc5aabe50}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Thread">
       <UniqueIdentifier>{3c90139d-1a67-4c52-84f8-0a6386299132}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ETC">
-      <UniqueIdentifier>{f4657ee8-e1e9-42e0-8ca1-b4fd39faf194}</UniqueIdentifier>
     </Filter>
     <Filter Include="JSON">
       <UniqueIdentifier>{1b1e19ef-df63-497f-8a72-4bb97bb272e0}</UniqueIdentifier>
@@ -25,89 +19,74 @@
     <Filter Include="XML">
       <UniqueIdentifier>{82a6342a-a6af-4b20-8359-61a27c9e8261}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Util">
+      <UniqueIdentifier>{f4657ee8-e1e9-42e0-8ca1-b4fd39faf194}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DB\MySQL">
+      <UniqueIdentifier>{791383c0-a14a-4107-893b-426fc5aabe50}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Containers.h">
+    <ClInclude Include="Memory\Containers.h">
       <Filter>Memory</Filter>
     </ClInclude>
-    <ClInclude Include="CustomAllocator.h">
+    <ClInclude Include="Memory\CustomAllocator.h">
       <Filter>Memory</Filter>
     </ClInclude>
-    <ClInclude Include="MemBuffer.h">
+    <ClInclude Include="Memory\MemBuffer.h">
       <Filter>Memory</Filter>
     </ClInclude>
-    <ClInclude Include="Memory.h">
+    <ClInclude Include="Memory\Memory.h">
       <Filter>Memory</Filter>
     </ClInclude>
-    <ClInclude Include="MemoryPool.h">
+    <ClInclude Include="Memory\MemoryPool.h">
       <Filter>Memory</Filter>
     </ClInclude>
-    <ClInclude Include="ObjectPool.h">
+    <ClInclude Include="Memory\ObjectPool.h">
       <Filter>Memory</Filter>
     </ClInclude>
-    <ClInclude Include="BaseODBC.h">
+    <ClInclude Include="DB\BaseODBC.h">
       <Filter>DB</Filter>
     </ClInclude>
-    <ClInclude Include="DBAsyncSrv.h">
+    <ClInclude Include="DB\DBAsyncSrv.h">
       <Filter>DB</Filter>
     </ClInclude>
-    <ClInclude Include="DBBind.h">
+    <ClInclude Include="DB\DBBind.h">
       <Filter>DB</Filter>
     </ClInclude>
-    <ClInclude Include="DBModel.h">
+    <ClInclude Include="DB\DBModel.h">
       <Filter>DB</Filter>
     </ClInclude>
-    <ClInclude Include="DBSynchronizer.h">
+    <ClInclude Include="DB\DBSynchronizer.h">
       <Filter>DB</Filter>
     </ClInclude>
-    <ClInclude Include="OdbcAsyncSrv.h">
+    <ClInclude Include="DB\OdbcAsyncSrv.h">
       <Filter>DB</Filter>
     </ClInclude>
-    <ClInclude Include="OdbcConnPool.h">
+    <ClInclude Include="DB\OdbcConnPool.h">
       <Filter>DB</Filter>
     </ClInclude>
     <ClInclude Include="pch.h" />
-    <ClInclude Include="EventLog.h">
-      <Filter>Log</Filter>
+    <ClInclude Include="DB\MySQL\BaseMySQL.h">
+      <Filter>DB\MySQL</Filter>
     </ClInclude>
-    <ClInclude Include="Log.h">
-      <Filter>Log</Filter>
+    <ClInclude Include="DB\MySQL\MySQLAsyncSrv.h">
+      <Filter>DB\MySQL</Filter>
     </ClInclude>
-    <ClInclude Include="BaseMySQL.h">
-      <Filter>MySQL</Filter>
+    <ClInclude Include="DB\MySQL\MySQLConnPool.h">
+      <Filter>DB\MySQL</Filter>
     </ClInclude>
-    <ClInclude Include="MySQLAsyncSrv.h">
-      <Filter>MySQL</Filter>
-    </ClInclude>
-    <ClInclude Include="MySQLConnPool.h">
-      <Filter>MySQL</Filter>
-    </ClInclude>
-    <ClInclude Include="CriticalSection.h">
-      <Filter>Thread</Filter>
-    </ClInclude>
-    <ClInclude Include="LockGuard.h">
-      <Filter>Thread</Filter>
-    </ClInclude>
-    <ClInclude Include="RWLock.h">
-      <Filter>Thread</Filter>
-    </ClInclude>
-    <ClInclude Include="Thread.h">
-      <Filter>Thread</Filter>
-    </ClInclude>
-    <ClInclude Include="ThreadManager.h">
+    <ClInclude Include="Thread\CriticalSection.h">
       <Filter>Thread</Filter>
     </ClInclude>
     <ClInclude Include="UtilCore.h" />
-    <ClInclude Include="OrderedMap.h">
+    <ClInclude Include="Memory\OrderedMap.h">
       <Filter>Memory</Filter>
     </ClInclude>
-    <ClInclude Include="UnOrderedMap.h">
+    <ClInclude Include="Memory\UnOrderedMap.h">
       <Filter>Memory</Filter>
     </ClInclude>
-    <ClInclude Include="BaseFile.h">
-      <Filter>Log</Filter>
-    </ClInclude>
-    <ClInclude Include="ClusteredMap.h">
+    <ClInclude Include="Memory\ClusteredMap.h">
       <Filter>Memory</Filter>
     </ClInclude>
     <ClInclude Include="BaseDefine.h" />
@@ -116,185 +95,250 @@
     <ClInclude Include="BaseRedefineDataType.h" />
     <ClInclude Include="ServerConfig.h" />
     <ClInclude Include="ServiceSvr.h" />
-    <ClInclude Include="CommonUtil.h">
-      <Filter>ETC</Filter>
-    </ClInclude>
-    <ClInclude Include="CalculatedElapsedTime.h">
-      <Filter>ETC</Filter>
-    </ClInclude>
-    <ClInclude Include="DateTimeUtil.h">
-      <Filter>ETC</Filter>
-    </ClInclude>
-    <ClInclude Include="Endian.h">
-      <Filter>ETC</Filter>
-    </ClInclude>
-    <ClInclude Include="Regular.h">
-      <Filter>ETC</Filter>
-    </ClInclude>
-    <ClInclude Include="ShellUtil.h">
-      <Filter>ETC</Filter>
-    </ClInclude>
-    <ClInclude Include="Stream.h">
-      <Filter>ETC</Filter>
-    </ClInclude>
-    <ClInclude Include="StringUtil.h">
-      <Filter>ETC</Filter>
-    </ClInclude>
-    <ClInclude Include="WebUtil.h">
-      <Filter>ETC</Filter>
-    </ClInclude>
-    <ClInclude Include="JSONBase.h">
+    <ClInclude Include="JSON\JSONBase.h">
       <Filter>JSON</Filter>
     </ClInclude>
-    <ClInclude Include="JSONParser.h">
+    <ClInclude Include="JSON\JSONParser.h">
       <Filter>JSON</Filter>
     </ClInclude>
-    <ClInclude Include="Singleton.h">
-      <Filter>ETC</Filter>
+    <ClInclude Include="Memory\Singleton.h">
+      <Filter>Memory</Filter>
     </ClInclude>
-    <ClInclude Include="XMLParser.h">
+    <ClInclude Include="XML\XMLParser.h">
       <Filter>XML</Filter>
     </ClInclude>
-    <ClInclude Include="AdoDB.h">
+    <ClInclude Include="DB\AdoDB.h">
       <Filter>DB</Filter>
     </ClInclude>
     <ClInclude Include="ServerConnectInfo.h" />
-    <ClInclude Include="BaseSQL.h">
+    <ClInclude Include="Thread\ThreadManager.h">
+      <Filter>Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="BaseTLS.h" />
+    <ClInclude Include="DB\DBMSSQLQuery.h">
       <Filter>DB</Filter>
+    </ClInclude>
+    <ClInclude Include="DB\DBMYSQLQuery.h">
+      <Filter>DB</Filter>
+    </ClInclude>
+    <ClInclude Include="DB\DBORACLEQuery.h">
+      <Filter>DB</Filter>
+    </ClInclude>
+    <ClInclude Include="DB\DBQueryProcess.h">
+      <Filter>DB</Filter>
+    </ClInclude>
+    <ClInclude Include="DB\DBSQLQuery.h">
+      <Filter>DB</Filter>
+    </ClInclude>
+    <ClInclude Include="DB\DBSyncBind.h">
+      <Filter>DB</Filter>
+    </ClInclude>
+    <ClInclude Include="Thread\SpinLock.h">
+      <Filter>Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="Thread\DeadLockProfiler.h">
+      <Filter>Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="DB\DBEnum.h">
+      <Filter>DB</Filter>
+    </ClInclude>
+    <ClInclude Include="DB\DBCommon.h">
+      <Filter>DB</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\BaseFile.h">
+      <Filter>Log</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\CalculatedElapsedTime.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\CommonUtil.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\ConvertCharset.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\DateTimeUtil.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Memory\Stream.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\StringUtil.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\WebUtil.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Thread\SRWLock.h">
+      <Filter>Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\Log.h">
+      <Filter>Log</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\EventLog.h">
+      <Filter>Log</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\Endian.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Thread\LockGuard.h">
+      <Filter>Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\ShellUtil.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\Regular.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="DB\RedisConn.h">
+      <Filter>DB</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\FileUtil.h">
+      <Filter>Util</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="CustomAllocator.cpp">
+    <ClCompile Include="Memory\CustomAllocator.cpp">
       <Filter>Memory</Filter>
     </ClCompile>
-    <ClCompile Include="MemBuffer.cpp">
+    <ClCompile Include="Memory\MemBuffer.cpp">
       <Filter>Memory</Filter>
     </ClCompile>
-    <ClCompile Include="Memory.cpp">
+    <ClCompile Include="Memory\Memory.cpp">
       <Filter>Memory</Filter>
     </ClCompile>
-    <ClCompile Include="MemoryPool.cpp">
+    <ClCompile Include="Memory\MemoryPool.cpp">
       <Filter>Memory</Filter>
     </ClCompile>
-    <ClCompile Include="BaseODBC.cpp">
+    <ClCompile Include="DB\BaseODBC.cpp">
       <Filter>DB</Filter>
     </ClCompile>
-    <ClCompile Include="DBBind.cpp">
+    <ClCompile Include="DB\DBBind.cpp">
       <Filter>DB</Filter>
     </ClCompile>
-    <ClCompile Include="DBModel.cpp">
+    <ClCompile Include="DB\DBModel.cpp">
       <Filter>DB</Filter>
     </ClCompile>
-    <ClCompile Include="DBSynchronizer.cpp">
+    <ClCompile Include="DB\DBSynchronizer.cpp">
       <Filter>DB</Filter>
     </ClCompile>
-    <ClCompile Include="OdbcAsyncSrv.cpp">
+    <ClCompile Include="DB\OdbcAsyncSrv.cpp">
       <Filter>DB</Filter>
     </ClCompile>
-    <ClCompile Include="OdbcConnPool.cpp">
+    <ClCompile Include="DB\OdbcConnPool.cpp">
       <Filter>DB</Filter>
     </ClCompile>
     <ClCompile Include="pch.cpp" />
-    <ClCompile Include="EventLog.cpp">
-      <Filter>Log</Filter>
+    <ClCompile Include="DB\MySQL\BaseMySQL.cpp">
+      <Filter>DB\MySQL</Filter>
     </ClCompile>
-    <ClCompile Include="Log.cpp">
-      <Filter>Log</Filter>
+    <ClCompile Include="DB\MySQL\MySQLAsyncSrv.cpp">
+      <Filter>DB\MySQL</Filter>
     </ClCompile>
-    <ClCompile Include="BaseMySQL.cpp">
-      <Filter>MySQL</Filter>
+    <ClCompile Include="DB\MySQL\MySQLConnPool.cpp">
+      <Filter>DB\MySQL</Filter>
     </ClCompile>
-    <ClCompile Include="MySQLAsyncSrv.cpp">
-      <Filter>MySQL</Filter>
-    </ClCompile>
-    <ClCompile Include="MySQLConnPool.cpp">
-      <Filter>MySQL</Filter>
-    </ClCompile>
-    <ClCompile Include="RWLock.cpp">
-      <Filter>Thread</Filter>
-    </ClCompile>
-    <ClCompile Include="Thread.cpp">
-      <Filter>Thread</Filter>
-    </ClCompile>
-    <ClCompile Include="ThreadManager.cpp">
-      <Filter>Thread</Filter>
-    </ClCompile>
-    <ClCompile Include="OrderedMap.cpp">
-      <Filter>Memory</Filter>
-    </ClCompile>
-    <ClCompile Include="UnOrderedMap.cpp">
-      <Filter>Memory</Filter>
-    </ClCompile>
-    <ClCompile Include="BaseFile.cpp">
-      <Filter>Log</Filter>
-    </ClCompile>
-    <ClCompile Include="ClusteredMap.cpp">
+    <ClCompile Include="Memory\ClusteredMap.cpp">
       <Filter>Memory</Filter>
     </ClCompile>
     <ClCompile Include="BaseGlobal.cpp" />
     <ClCompile Include="ServerConfig.cpp" />
     <ClCompile Include="ServiceSvr.cpp" />
-    <ClCompile Include="CommonUtil.cpp">
-      <Filter>ETC</Filter>
-    </ClCompile>
-    <ClCompile Include="DateTimeUtil.cpp">
-      <Filter>ETC</Filter>
-    </ClCompile>
-    <ClCompile Include="Endian.cpp">
-      <Filter>ETC</Filter>
-    </ClCompile>
-    <ClCompile Include="Regular.cpp">
-      <Filter>ETC</Filter>
-    </ClCompile>
-    <ClCompile Include="ShellUtil.cpp">
-      <Filter>ETC</Filter>
-    </ClCompile>
-    <ClCompile Include="Stream.cpp">
-      <Filter>ETC</Filter>
-    </ClCompile>
-    <ClCompile Include="StringUtil.cpp">
-      <Filter>ETC</Filter>
-    </ClCompile>
-    <ClCompile Include="WebUtil.cpp">
-      <Filter>ETC</Filter>
-    </ClCompile>
-    <ClCompile Include="JSONBase.cpp">
+    <ClCompile Include="JSON\JSONBase.cpp">
       <Filter>JSON</Filter>
     </ClCompile>
-    <ClCompile Include="JSONParser.cpp">
+    <ClCompile Include="JSON\JSONParser.cpp">
       <Filter>JSON</Filter>
     </ClCompile>
-    <ClCompile Include="XMLParser.cpp">
+    <ClCompile Include="XML\XMLParser.cpp">
       <Filter>XML</Filter>
     </ClCompile>
-    <ClCompile Include="AdoDB.cpp">
+    <ClCompile Include="DB\AdoDB.cpp">
       <Filter>DB</Filter>
+    </ClCompile>
+    <ClCompile Include="Thread\ThreadManager.cpp">
+      <Filter>Thread</Filter>
+    </ClCompile>
+    <ClCompile Include="BaseTLS.cpp" />
+    <ClCompile Include="Thread\SpinLock.cpp">
+      <Filter>Thread</Filter>
+    </ClCompile>
+    <ClCompile Include="Thread\DeadLockProfiler.cpp">
+      <Filter>Thread</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\BaseFile.cpp">
+      <Filter>Log</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\CommonUtil.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\ConvertCharset.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\DateTimeUtil.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="DB\DBQueryProcess.cpp">
+      <Filter>DB</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\StringUtil.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\WebUtil.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Memory\Stream.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Thread\SRWLock.cpp">
+      <Filter>Thread</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\Log.cpp">
+      <Filter>Log</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\EventLog.cpp">
+      <Filter>Log</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\Endian.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\ShellUtil.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\Regular.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\FileUtil.cpp">
+      <Filter>Util</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="BaseODBC.inl">
+    <None Include="DB\BaseODBC.inl">
       <Filter>DB</Filter>
     </None>
-    <None Include="DB_ColAttr.inl">
+    <None Include="DB\DB_ColAttr.inl">
       <Filter>DB</Filter>
     </None>
-    <None Include="DB_Error.inl">
+    <None Include="DB\DB_Error.inl">
       <Filter>DB</Filter>
     </None>
-    <None Include="DB_ParamAttr.inl">
+    <None Include="DB\DB_ParamAttr.inl">
       <Filter>DB</Filter>
     </None>
-    <None Include="BaseMySQL.inl">
-      <Filter>MySQL</Filter>
+    <None Include="DB\MySQL\MySQL_ParamAttr.inl">
+      <Filter>DB\MySQL</Filter>
     </None>
-    <None Include="MySQL_ParamAttr.inl">
-      <Filter>MySQL</Filter>
-    </None>
-    <None Include="JSONParser.inl">
+    <None Include="JSON\JSONParser.inl">
       <Filter>JSON</Filter>
     </None>
-    <None Include="Singleton.inl">
-      <Filter>ETC</Filter>
+    <None Include="Memory\Singleton.inl">
+      <Filter>Memory</Filter>
+    </None>
+    <None Include="Memory\OrderedMap.inl">
+      <Filter>Memory</Filter>
+    </None>
+    <None Include="Memory\UnOrderedMap.inl">
+      <Filter>Memory</Filter>
     </None>
   </ItemGroup>
 </Project>
