@@ -26,7 +26,6 @@
 #define SWAP16(s) (((((s) & 0xff) << 8) | (((s) >> 8) & 0xff))) 
 #define SWAP32(l) (((((l) & 0xff000000) >> 24) | (((l) & 0x00ff0000) >> 8) | (((l) & 0x0000ff00) << 8) | (((l) & 0x000000ff) << 24)))  
 
-
 #define	UTF_FILE_IDENTIFIER_BYTE1			0xEF
 #define	UTF_FILE_IDENTIFIER_BYTE2			0xBB
 #define	UTF_FILE_IDENTIFIER_BYTE3			0xBF
@@ -55,7 +54,7 @@ enum class EEncoding
 bool		IsUTF8WithoutBom(const void* pBuffer, const size_t BuffSize);
 
 #ifdef _WIN32
-EEncoding	IsFileType(const TCHAR* ptszFullPath);
+EEncoding	GetFileEncodingType(const TCHAR* ptszFullPath);
 
 bool		ReadFile(CMemBuffer<BYTE>& byteDestination, const TCHAR* ptszFullPath);
 bool		ReadFileMap(CMemBuffer<BYTE>& byteDestination, const TCHAR* ptszFullPath);
@@ -82,6 +81,7 @@ bool		GetFileInformation(const TCHAR* ptszFilePath, LPBY_HANDLE_FILE_INFORMATION
 EEncoding		GetFileEncodingType(const _tstring& filepath);
 _tstring		ReadFile(const _tstring& filepath);
 bool			WriteFile(const _tstring& filepath, const _tstring& content, EEncoding fileType);
+bool			IsExistFile(const _tstring& filepath);
 std::uintmax_t	GetFileSize(const _tstring& filepath);
 
 #endif // ndef __FILEUTIL_H__

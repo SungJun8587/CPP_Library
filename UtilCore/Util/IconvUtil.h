@@ -7,10 +7,6 @@
 #ifndef __ICONVUTIL_H__
 #define __ICONVUTIL_H__
 
-#include <../../Library/ExternalLib/libiconv-for-Windows-master/include/iconv.h>
-
-#pragma comment(lib, LIB_NAME("libiconv"))
-
 namespace Iconv
 {
 	class CIconvUtil
@@ -20,25 +16,51 @@ namespace Iconv
 			~CIconvUtil();
 
 			std::string Convert(const std::string& input) const;
-
-			std::wstring Utf8ToWChar(const std::string& input) const;		// UTF-8 -> WCHAR_T º¯È¯
-			std::string WCharToUtf8(const std::wstring& input) const;		// WCHAR_T -> UTF-8 º¯È¯
+			std::string Convert(const std::wstring& input) const;
+			std::wstring ConvertW(const std::string& input) const;
 
 			//***************************************************************************
-			// Á¤Àû ÇïÆÛ ÇÔ¼ö: ´Ù¾çÇÑ ÀÎÄÚµù °£ º¯È¯ ¼öÇà
-			//	- UTF-8 ¡ê UTF-16BE
-			//	- UTF-8 ¡ê UTF-16LE
-			//	- UTF-8 ¡ê ANSI(¿¹: CP1252, CP949)
+			// ì •ì  í—¬í¼ í•¨ìˆ˜: ë‹¤ì–‘í•œ ì¸ì½”ë”© ê°„ ë³€í™˜ ìˆ˜í–‰
+			//	- UTF-8 -> ANSI(ì˜ˆ: CP949, Windows-1252)
+			//	- ANSI(ì˜ˆ: CP949, Windows-1252) -> UTF-8
 			static std::string ConvertEncoding(const std::string& input, const std::string& fromEncoding, const std::string& toEncoding) 
 			{
 				CIconvUtil converter(fromEncoding, toEncoding);
 				return converter.Convert(input);
 			}
 
+			//***************************************************************************
+			// ì •ì  í—¬í¼ í•¨ìˆ˜: ë‹¤ì–‘í•œ ì¸ì½”ë”© ê°„ ë³€í™˜ ìˆ˜í–‰
+			//	- WCHAR_T -> ANSI(ì˜ˆ: CP949, Windows-1252)
+			//	- WCHAR_T -> UTF-8
+			static std::string ConvertEncoding(const std::wstring& input, const std::string& fromEncoding, const std::string& toEncoding)
+			{
+				CIconvUtil converter(fromEncoding, toEncoding);
+				return converter.Convert(input);
+			}
+
+			//***************************************************************************
+			// ì •ì  í—¬í¼ í•¨ìˆ˜: ë‹¤ì–‘í•œ ì¸ì½”ë”© ê°„ ë³€í™˜ ìˆ˜í–‰
+			//	- ANSI(ì˜ˆ: CP949, Windows-1252) -> WCHAR_T
+			//	- UTF-8 -> WCHAR_T
+			static std::wstring ConvertEncodingW(const std::string& input, const std::string& fromEncoding, const std::string& toEncoding)
+			{
+				CIconvUtil converter(fromEncoding, toEncoding);
+				return converter.ConvertW(input);
+			}
+
+			std::string AnsiToUtf8(const std::string& input) const;			// ANSI -> UTF-8 ë³€í™˜
+			std::string Utf8ToAnsi(const std::string& input) const;			// UTF-8 -> ANSI ë³€í™˜
+
+			std::wstring AnsiToWChar(const std::string& input) const;		// ANSI -> WCHAR_T ë³€í™˜
+			std::string WCharToAnsi(const std::wstring& input) const;		// WCHAR_T -> ANSI ë³€í™˜
+
+			std::wstring Utf8ToWChar(const std::string& input) const;		// UTF-8 -> WCHAR_T ë³€í™˜
+			std::string WCharToUtf8(const std::wstring& input) const;		// WCHAR_T -> UTF-8 ë³€í™˜
 	private:
-		iconv_t		_cd;				// iconv º¯È¯ ÇÚµé
-		std::string _fromEncoding;		// ¿øº» ÀÎÄÚµù
-		std::string _toEncoding;		// ´ë»ó ÀÎÄÚµù
+		iconv_t		_cd;				// iconv ë³€í™˜ í•¸ë“¤
+		std::string _fromEncoding;		// ì›ë³¸ ì¸ì½”ë”©
+		std::string _toEncoding;		// ëŒ€ìƒ ì¸ì½”ë”©
 	};
 }
 

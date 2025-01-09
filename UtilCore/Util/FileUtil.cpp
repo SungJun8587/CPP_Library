@@ -59,7 +59,7 @@ bool IsUTF8WithoutBom(const void* pBuffer, const size_t BuffSize)
 #ifdef _WIN32
 //***************************************************************************
 //
-EEncoding IsFileType(const TCHAR* ptszFullPath)
+EEncoding GetFileEncodingType(const TCHAR* ptszFullPath)
 {
 	BOOL		bReturn = false;
 	DWORD		dwReadSize = 0;
@@ -206,7 +206,7 @@ bool ReadFile(CMemBuffer<TCHAR>& tDestination, const TCHAR* ptszFullPath)
 	dwLength = GetFileSize(ptszFullPath);
 	dwMaxReadSize = dwLength;
 
-	eFileType = IsFileType(ptszFullPath);
+	eFileType = GetFileEncodingType(ptszFullPath);
 
 	hFile = CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile == INVALID_HANDLE_VALUE )
@@ -442,7 +442,7 @@ bool ReadFileMap(CMemBuffer<TCHAR>& tDestination, const TCHAR* ptszFullPath)
 
 	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
 
-	eFileType = IsFileType(ptszFullPath);
+	eFileType = GetFileEncodingType(ptszFullPath);
 
 	hFile = CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, nullptr);
 	if( hFile == INVALID_HANDLE_VALUE )
@@ -507,7 +507,7 @@ bool ReadFileMap(CMemBuffer<TCHAR>& tDestination, const TCHAR* ptszFullPath)
 
 		if( pwszBuffer )
 		{
-			delete [] pwszBuffer;
+			delete[] pwszBuffer;
 			pwszBuffer = nullptr;
 		}
 	}
@@ -551,7 +551,7 @@ bool ReadFileMap(CMemBuffer<TCHAR>& tDestination, const TCHAR* ptszFullPath)
 
 		if( pwszBuffer )
 		{
-			delete [] pwszBuffer;
+			delete[] pwszBuffer;
 			pwszBuffer = nullptr;
 		}
 	}
@@ -605,7 +605,7 @@ bool ReadFile(_tstring& destString, const TCHAR* ptszFullPath)
 	dwLength = GetFileSize(ptszFullPath);
 	dwMaxReadSize = dwLength;
 
-	eFileType = IsFileType(ptszFullPath);
+	eFileType = GetFileEncodingType(ptszFullPath);
 
 	hFile = CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile == INVALID_HANDLE_VALUE )
@@ -657,7 +657,7 @@ bool ReadFile(_tstring& destString, const TCHAR* ptszFullPath)
 			dwLength = dwLength - (sizeof(WORD) + sizeof(BYTE));
 
 			StrBuffer.resize(dwLength + 1);
-			pszBuffer = (char *)StrBuffer.c_str();
+			pszBuffer = (char*)StrBuffer.c_str();
 		}
 		else
 		{
@@ -790,7 +790,7 @@ bool ReadFileMap(_tstring& destString, const TCHAR* ptszFullPath)
 
 	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
 
-	eFileType = IsFileType(ptszFullPath);
+	eFileType = GetFileEncodingType(ptszFullPath);
 
 	hFile = CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, nullptr);
 	if( hFile == INVALID_HANDLE_VALUE )
@@ -852,7 +852,7 @@ bool ReadFileMap(_tstring& destString, const TCHAR* ptszFullPath)
 
 		if( pwszBuffer )
 		{
-			delete [] pwszBuffer;
+			delete[] pwszBuffer;
 			pwszBuffer = nullptr;
 		}
 	}
@@ -900,7 +900,7 @@ bool ReadFileMap(_tstring& destString, const TCHAR* ptszFullPath)
 
 		if( pwszBuffer )
 		{
-			delete [] pwszBuffer;
+			delete[] pwszBuffer;
 			pwszBuffer = nullptr;
 		}
 	}
@@ -1191,7 +1191,7 @@ bool SaveUTF8BOMFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const s
 	DWORD	dwWriteOffset = 0;
 	DWORD	dwWriteSize = 0;
 	char	szChar[4];
-	char*	pszBuffer = nullptr;
+	char* pszBuffer = nullptr;
 
 	HANDLE	hFile;
 
@@ -1418,8 +1418,8 @@ bool GetFileInformation(const TCHAR* ptszFullPath, LPBY_HANDLE_FILE_INFORMATION 
 
 	return bResult;
 }
+#endif
 
-//#else
 //***************************************************************************
 //
 EEncoding GetFileEncodingType(const _tstring& filepath)
@@ -1428,7 +1428,7 @@ EEncoding GetFileEncodingType(const _tstring& filepath)
 
 	constexpr size_t BufferSize = 4096; // 파일 검사 시 읽을 최대 크기
 	std::ifstream file(filepath, std::ios::binary);
-	if( !file ) 
+	if( !file )
 	{
 		return eEncoding;
 	}
@@ -1466,12 +1466,116 @@ EEncoding GetFileEncodingType(const _tstring& filepath)
 //
 _tstring ReadFile(const _tstring& filepath)
 {
-	_tifstream file(filepath, std::ios::binary);
-	if( !file ) 
+	ifstream file(filepath, std::ios::binary);
+	if( !file )
 	{
 		return _T("");
 	}
-	return { std::istreambuf_iterator<TCHAR>(file), std::istreambuf_iterator<TCHAR>() };
+
+	// 파일 내용을 읽음
+	std::vector<char> buffer((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+
+	if( buffer.size() < 2 )
+	{
+		throw std::runtime_error("File too small to contain valid UTF-16 data");
+	}
+
+#ifdef _UNICODE
+	std::wstring result;
+
+	// BOM 확인 및 제거
+	if( buffer.size() >= 2 && static_cast<unsigned char>(buffer[0]) == UNICODE_LE_FILE_IDENTIFIER_BYTE1
+		&& static_cast<unsigned char>(buffer[1]) == UNICODE_LE_FILE_IDENTIFIER_BYTE2 )
+	{
+		// UTF-16LE BOM
+		for( size_t i = 2; i < buffer.size(); i += 2 )
+		{
+			// Little Endian: LSB + MSB
+			wchar_t codeUnit = static_cast<unsigned char>(buffer[i]) | (static_cast<unsigned char>(buffer[i + 1]) << 8);
+			result.push_back(codeUnit);
+		}
+	}
+	else if( buffer.size() >= 2 && static_cast<unsigned char>(buffer[0]) == UNICODE_BE_FILE_IDENTIFIER_BYTE1
+		&& static_cast<unsigned char>(buffer[1]) == UNICODE_BE_FILE_IDENTIFIER_BYTE2 )
+	{
+		for( size_t i = 2; i < buffer.size(); i += 2 )
+		{
+			// Big Endian → Little Endian: MSB + LSB
+			wchar_t codeUnit = (static_cast<unsigned char>(buffer[i]) << 8) | static_cast<unsigned char>(buffer[i + 1]);
+			result.push_back(codeUnit);
+		}
+	}
+	else if( buffer.size() >= 3 && static_cast<unsigned char>(buffer[0]) == UTF_FILE_IDENTIFIER_BYTE1
+		&& static_cast<unsigned char>(buffer[1]) == UTF_FILE_IDENTIFIER_BYTE2
+		&& static_cast<unsigned char>(buffer[2]) == UTF_FILE_IDENTIFIER_BYTE3 )
+	{
+		result = Iconv::CIconvUtil::ConvertEncodingW(std::string(buffer.begin() + 3, buffer.end()), "UTF-8", "WCHAR_T");
+	}
+	else
+	{
+		EEncoding eFileType = GetFileEncodingType(filepath);
+		if( eFileType == EEncoding::UTF8_NOBOM )
+		{
+			result = Iconv::CIconvUtil::ConvertEncodingW(std::string(buffer.begin(), buffer.end()), "UTF-8", "WCHAR_T");
+		}
+		else
+		{
+			result = Iconv::CIconvUtil::ConvertEncodingW(std::string(buffer.begin(), buffer.end()), "CP949", "WCHAR_T");
+		}
+	}
+#else
+	std::string result;
+
+	// BOM 확인 및 제거
+	if( buffer.size() >= 2 && static_cast<unsigned char>(buffer[0]) == UNICODE_LE_FILE_IDENTIFIER_BYTE1
+		&& static_cast<unsigned char>(buffer[1]) == UNICODE_LE_FILE_IDENTIFIER_BYTE2 )
+	{
+		// UTF-16LE BOM
+		std::wstring temp;
+		for( size_t i = 2; i < buffer.size(); i += 2 )
+		{
+			// Little Endian: LSB + MSB
+			wchar_t codeUnit = static_cast<unsigned char>(buffer[i]) | (static_cast<unsigned char>(buffer[i + 1]) << 8);
+			temp.push_back(codeUnit);
+		}
+
+		result = Iconv::CIconvUtil::ConvertEncoding(temp, "WCHAR_T", "CP949");
+	}
+	else if( buffer.size() >= 2 && static_cast<unsigned char>(buffer[0]) == UNICODE_BE_FILE_IDENTIFIER_BYTE1
+		&& static_cast<unsigned char>(buffer[1]) == UNICODE_BE_FILE_IDENTIFIER_BYTE2 )
+	{
+		// UTF - 16BE BOM
+		std::wstring temp;
+		for( size_t i = 2; i < buffer.size(); i += 2 )
+		{
+			// Big Endian → Little Endian: MSB + LSB
+			wchar_t codeUnit = (static_cast<unsigned char>(buffer[i]) << 8) | static_cast<unsigned char>(buffer[i + 1]);
+			temp.push_back(codeUnit);
+		}
+
+		result = Iconv::CIconvUtil::ConvertEncoding(temp, "WCHAR_T", "CP949");
+	}
+	else if( buffer.size() >= 3 && static_cast<unsigned char>(buffer[0]) == UTF_FILE_IDENTIFIER_BYTE1
+		&& static_cast<unsigned char>(buffer[1]) == UTF_FILE_IDENTIFIER_BYTE2
+		&& static_cast<unsigned char>(buffer[2]) == UTF_FILE_IDENTIFIER_BYTE3 )
+	{
+		result = Iconv::CIconvUtil::ConvertEncoding(std::string(buffer.begin() + 3, buffer.end()), "UTF-8", "CP949");
+	}
+	else
+	{
+		EEncoding eFileType = GetFileEncodingType(filepath);
+		if( eFileType == EEncoding::UTF8_NOBOM )
+		{
+			result = Iconv::CIconvUtil::ConvertEncoding(std::string(buffer.begin(), buffer.end()), "UTF-8", "CP949");
+		}
+		else
+		{
+			result = std::string(buffer.begin(), buffer.end());
+		}
+	}
+#endif
+
+	return result;
 }
 
 //***************************************************************************
@@ -1479,7 +1583,7 @@ _tstring ReadFile(const _tstring& filepath)
 bool WriteFile(const _tstring& filepath, const _tstring& content, EEncoding encoding)
 {
 	ofstream file(filepath, std::ios::binary);
-	if( !file ) 
+	if( !file )
 	{
 		return false;
 	}
@@ -1514,18 +1618,18 @@ bool WriteFile(const _tstring& filepath, const _tstring& content, EEncoding enco
 		file.write(reinterpret_cast<const char*>(bom), 3);
 
 		// Write content in UTF-8 with BOM
-		string dest = UnicodeToUtf8(content);
+		string dest = Iconv::CIconvUtil::ConvertEncoding(content, "WCHAR_T", "UTF-8");
 		file.write(dest.c_str(), dest.size());
 	}
 	else if( encoding == EEncoding::UTF8_NOBOM )
 	{
 		// Write content in UTF-8 without BOM
-		string dest = UnicodeToUtf8(content);
+		string dest = Iconv::CIconvUtil::ConvertEncoding(content, "WCHAR_T", "UTF-8");
 		file.write(dest.c_str(), dest.size());
 	}
 	else
 	{
-		string dest = WStringToString(content);
+		string dest = Iconv::CIconvUtil::ConvertEncoding(content, "WCHAR_T", "CP949");
 		file.write(dest.c_str(), dest.size());
 	}
 #else
@@ -1534,7 +1638,7 @@ bool WriteFile(const _tstring& filepath, const _tstring& content, EEncoding enco
 		unsigned char bom[] = { UNICODE_BE_FILE_IDENTIFIER_BYTE1, UNICODE_BE_FILE_IDENTIFIER_BYTE2 };
 		file.write(reinterpret_cast<const char*>(bom), 2);
 
-		wstring dest = StringToWString(content);
+		wstring dest = Iconv::CIconvUtil::ConvertEncodingW(content, "CP949", "WCHAR_T");
 		for( wchar_t ch : dest )
 		{
 			char high = (ch >> 8) & 0xFF;
@@ -1550,7 +1654,7 @@ bool WriteFile(const _tstring& filepath, const _tstring& content, EEncoding enco
 		file.write(reinterpret_cast<const char*>(bom), 2);
 
 		// Write content in UTF-16 LE
-		wstring dest = StringToWString(content);
+		wstring dest = Iconv::CIconvUtil::ConvertEncodingW(content, "CP949", "WCHAR_T");
 		file.write(reinterpret_cast<const char*>(dest.data()), dest.size() * sizeof(wchar_t));
 	}
 	else if( encoding == EEncoding::UTF8_BOM )
@@ -1560,13 +1664,13 @@ bool WriteFile(const _tstring& filepath, const _tstring& content, EEncoding enco
 		file.write(reinterpret_cast<const char*>(bom), 3);
 
 		// Write content in UTF-8 with BOM
-		string dest = AnsiToUtf8(content);
+		string dest = Iconv::CIconvUtil::ConvertEncoding(content, "CP949", "UTF-8");
 		file.write(dest.c_str(), dest.size());
 	}
 	else if( encoding == EEncoding::UTF8_NOBOM )
 	{
 		// Write content in UTF-8 without BOM
-		string dest = AnsiToUtf8(content);
+		string dest = Iconv::CIconvUtil::ConvertEncoding(content, "CP949", "UTF-8");
 		file.write(dest.c_str(), dest.size());
 	}
 	else
@@ -1578,6 +1682,21 @@ bool WriteFile(const _tstring& filepath, const _tstring& content, EEncoding enco
 	file.close();
 
 	return true;
+}
+
+//***************************************************************************
+//
+bool IsExistFile(const _tstring& filepath)
+{
+	try
+	{
+		return std::filesystem::exists(filepath);
+	}
+	catch( const std::filesystem::filesystem_error& e )
+	{
+		std::cerr << "파일 존재 유무 확인 중 오류 발생: " << e.what() << std::endl;
+		return false;
+	}
 }
 
 //***************************************************************************
@@ -1594,4 +1713,4 @@ std::uintmax_t GetFileSize(const _tstring& filepath)
 		return static_cast<std::uintmax_t>(-1);
 	}
 }
-#endif
+
