@@ -107,6 +107,191 @@ void CDBSynchronizer::PrintDBSchema()
 
 //***************************************************************************
 //
+void CDBSynchronizer::DBToSaveExcel(const _tstring path)
+{
+	try
+	{
+		Xlnt::CXlntUtil excel;
+
+		AddExcelTableInfo(excel);
+		AddExcelTableColumnInfo(excel);
+
+		// 저장
+		excel.SaveAs(path);
+	}
+	catch( const std::exception& e ) 
+	{
+		std::cerr << "오류 발생: " << e.what() << std::endl;
+	}
+}
+
+//***************************************************************************
+//
+void CDBSynchronizer::SetExcelTop(Xlnt::CXlntUtil& excel, const std::string& start_cell, const std::string& end_cell)
+{
+	excel.SetRowHeight(1, 20);
+
+	auto borderRange = excel.CreateRange(start_cell, end_cell);
+
+	// 배경색 설정
+	xlnt::fill header_fill;
+	header_fill = xlnt::pattern_fill().type(xlnt::pattern_fill_type::solid);
+	header_fill = header_fill.pattern_fill().foreground(xlnt::color::black());
+	header_fill = header_fill.pattern_fill().background(xlnt::color::black());
+
+	// 테두리 설정
+	xlnt::border cell_border;
+	xlnt::border::border_property outer_prop;
+	outer_prop.style(xlnt::border_style::thin);
+
+	cell_border.side(xlnt::border_side::bottom, outer_prop);
+	cell_border.side(xlnt::border_side::start, outer_prop);
+	cell_border.side(xlnt::border_side::top, outer_prop);
+	cell_border.side(xlnt::border_side::end, outer_prop);
+
+	// 폰트 스타일 설정
+	xlnt::font title_font;
+	title_font.name("Gulim");					// 폰트 패밀리
+	title_font.bold(true);						// 폰트 굵게
+	title_font.size(11);						// 폰트 크기
+	title_font.color(xlnt::color::white());		// 폰트 색깔
+
+	// 정렬 설정
+	xlnt::alignment center_align;
+	center_align.horizontal(xlnt::horizontal_alignment::center);
+	center_align.vertical(xlnt::vertical_alignment::center);
+
+	borderRange.border(cell_border);
+	borderRange.fill(header_fill);
+	borderRange.font(title_font);
+	borderRange.alignment(center_align);
+}
+
+//***************************************************************************
+//
+void CDBSynchronizer::AddExcelTableInfo(Xlnt::CXlntUtil& excel)
+{
+	int32 currentRow = 1;
+
+	// 새로운 Excel 파일 생성 및 시트 추가
+	excel.AddSheet("TABLE");
+	SetExcelTop(excel, "A1", "I1");
+
+	excel.WriteCell(currentRow, 1, "SCHEMA_NAME");
+	excel.WriteCell(currentRow, 2, "TABLE_NAME");
+	excel.WriteCell(currentRow, 3, "IDENTITY");
+	excel.WriteCell(currentRow, 4, "CHARACTER_SET");
+	excel.WriteCell(currentRow, 5, "COLLATION");
+	excel.WriteCell(currentRow, 6, "ENGINE");
+	excel.WriteCell(currentRow, 7, "TABLE_COMMENT");
+	excel.WriteCell(currentRow, 8, "CREATE_DATE");
+	excel.WriteCell(currentRow, 9, "MODIFY_DATE");
+
+	for( DBModel::TableRef& dbTable : _dbTables )
+	{
+		currentRow++;
+		excel.WriteCell(currentRow, 1, dbTable->_schemaName);
+		excel.WriteCell(currentRow, 2, dbTable->_tableName);
+		excel.WriteCell(currentRow, 3, dbTable->_auto_increment_value);
+		excel.WriteCell(currentRow, 4, dbTable->_characterset);
+		excel.WriteCell(currentRow, 5, dbTable->_collation);
+		excel.WriteCell(currentRow, 6, dbTable->_storageEngine);
+		excel.WriteCell(currentRow, 7, dbTable->_tableComment);
+		excel.WriteCell(currentRow, 8, dbTable->_createDate);
+		excel.WriteCell(currentRow, 9, dbTable->_modifyDate);
+		excel.SetRowHeight(currentRow, 16);
+	}
+
+	excel.SetAllCellTextFormat(3);
+
+	excel.SetColumnWidth(1, ExcelColumnWidth::cnSchemaName);
+	excel.SetColumnWidth(2, ExcelColumnWidth::cnObjectName);
+	excel.SetColumnWidth(3, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(4, ExcelColumnWidth::cnCharacterSet);
+	excel.SetColumnWidth(5, ExcelColumnWidth::cnCollation);
+	excel.SetColumnWidth(6, ExcelColumnWidth::cnEngine);
+	excel.SetColumnWidth(7, ExcelColumnWidth::cnComment);
+	excel.SetColumnWidth(8, ExcelColumnWidth::cnDateTime);
+	excel.SetColumnWidth(9, ExcelColumnWidth::cnDateTime);
+}
+
+//***************************************************************************
+//
+void CDBSynchronizer::AddExcelTableColumnInfo(Xlnt::CXlntUtil& excel)
+{
+	int32 currentRow = 1;
+
+	// 새로운 Excel 파일 생성 및 시트 추가
+	excel.AddSheet("TABLE_COLUMN");
+	SetExcelTop(excel, "A1", "Q1");
+
+	excel.WriteCell(currentRow, 1, "SCHEMA_NAME");
+	excel.WriteCell(currentRow, 2, "TABLE_NAME");
+	excel.WriteCell(currentRow, 3, "COLUMN_SEQ");
+	excel.WriteCell(currentRow, 4, "COLUMN_NAME");
+	excel.WriteCell(currentRow, 5, "DATATYPE");
+	excel.WriteCell(currentRow, 6, "MAX_LENGTH");
+	excel.WriteCell(currentRow, 7, "PRECISION");
+	excel.WriteCell(currentRow, 8, "SCALE");
+	excel.WriteCell(currentRow, 9, "DATATYPEDESC");
+	excel.WriteCell(currentRow, 10, "IS_NULLABLE");
+	excel.WriteCell(currentRow, 11, "DEFAULT_DEFINITION");
+	excel.WriteCell(currentRow, 12, "IS_IDENTITY");
+	excel.WriteCell(currentRow, 13, "SEED_VALUE");
+	excel.WriteCell(currentRow, 14, "INC_VALUE");
+	excel.WriteCell(currentRow, 15, "CHARACTER_SET");
+	excel.WriteCell(currentRow, 16, "COLLATION");
+	excel.WriteCell(currentRow, 17, "COLUMN_COMMENT");
+
+	for( DBModel::TableRef& dbTable : _dbTables )
+	{
+		for( DBModel::ColumnRef& dbColumn : dbTable->_columns )
+		{
+			currentRow++;
+			excel.WriteCell(currentRow, 1, dbColumn->_schemaName);
+			excel.WriteCell(currentRow, 2, dbColumn->_tableName);
+			excel.WriteCell(currentRow, 3, dbColumn->_seq);
+			excel.WriteCell(currentRow, 4, dbColumn->_columnName);
+			excel.WriteCell(currentRow, 5, dbColumn->_datatype);
+			excel.WriteCell(currentRow, 6, std::to_string(dbColumn->_maxLength));
+			excel.WriteCell(currentRow, 7, std::to_string(dbColumn->_precision));
+			excel.WriteCell(currentRow, 8, std::to_string(dbColumn->_scale));
+			excel.WriteCell(currentRow, 9, dbColumn->_datatypedesc);
+			excel.WriteCell(currentRow, 10, std::to_string(dbColumn->_nullable));
+			excel.WriteCell(currentRow, 11, dbColumn->_defaultConstraintName);
+			excel.WriteCell(currentRow, 12, dbColumn->_identitydesc);
+			excel.WriteCell(currentRow, 13, std::to_string(dbColumn->_seedValue));
+			excel.WriteCell(currentRow, 14, std::to_string(dbColumn->_incrementValue));
+			excel.WriteCell(currentRow, 15, dbColumn->_characterset);
+			excel.WriteCell(currentRow, 16, dbColumn->_collation);
+			excel.WriteCell(currentRow, 17, dbColumn->_columnComment);
+			excel.SetRowHeight(currentRow, 16);
+		}
+	}
+
+	excel.SetAllCellTextFormat(3);
+
+	excel.SetColumnWidth(1, ExcelColumnWidth::cnSchemaName);
+	excel.SetColumnWidth(2, ExcelColumnWidth::cnObjectName);
+	excel.SetColumnWidth(3, ExcelColumnWidth::cnSequence);
+	excel.SetColumnWidth(4, ExcelColumnWidth::cnColumnName);
+	excel.SetColumnWidth(5, ExcelColumnWidth::cnDataType);
+	excel.SetColumnWidth(6, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(7, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(8, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(9, ExcelColumnWidth::cnDataTypeDesc);
+	excel.SetColumnWidth(10, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(11, ExcelColumnWidth::cnDefaultConstraintValue);
+	excel.SetColumnWidth(12, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(13, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(14, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(15, ExcelColumnWidth::cnCharacterSet);
+	excel.SetColumnWidth(16, ExcelColumnWidth::cnCollation);
+	excel.SetColumnWidth(17, ExcelColumnWidth::cnComment);
+}
+
+//***************************************************************************
+//
 void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 {
 	CXMLNode root;
@@ -1164,6 +1349,7 @@ bool CDBSynchronizer::GatherDBStoredProcedureParams(const TCHAR* ptszProcName)
 {
 	TCHAR   tszDBName[DATABASE_NAME_STRLEN] = { 0, };
 	int32	objectId;
+	TCHAR	tszSchemaName[DATABASE_OBJECT_NAME_STRLEN] = { 0, };
 	TCHAR	tszProcName[DATABASE_OBJECT_NAME_STRLEN] = { 0, };
 	int32	paramId;
 	int8	paramMode;
@@ -1181,6 +1367,7 @@ bool CDBSynchronizer::GatherDBStoredProcedureParams(const TCHAR* ptszProcName)
 	SP::GetDBStoredProcedureParams getDBStoredProcedureParams(_dbClass, _dbConn, ptszProcName);
 	getDBStoredProcedureParams.Out_DBName(OUT tszDBName);
 	getDBStoredProcedureParams.Out_ObjectId(OUT objectId);
+	getDBStoredProcedureParams.Out_SchemaName(OUT tszSchemaName);
 	getDBStoredProcedureParams.Out_SPName(OUT tszProcName);
 	getDBStoredProcedureParams.Out_ParamId(OUT paramId);
 	getDBStoredProcedureParams.Out_ParamMode(OUT paramMode);
@@ -1310,6 +1497,7 @@ bool CDBSynchronizer::GatherDBFunctionParams(const TCHAR* ptszFuncName)
 {
 	TCHAR   tszDBName[DATABASE_NAME_STRLEN] = { 0, };
 	int32	objectId;
+	TCHAR	tszSchemaName[DATABASE_OBJECT_NAME_STRLEN] = { 0, };
 	TCHAR	tszFuncName[DATABASE_OBJECT_NAME_STRLEN] = { 0, };
 	int32	paramId;
 	int8	paramMode;
@@ -1327,6 +1515,7 @@ bool CDBSynchronizer::GatherDBFunctionParams(const TCHAR* ptszFuncName)
 	SP::GetDBFunctionParams getDBFunctionParams(_dbClass, _dbConn, ptszFuncName);
 	getDBFunctionParams.Out_DBName(OUT tszDBName);
 	getDBFunctionParams.Out_ObjectId(OUT objectId);
+	getDBFunctionParams.Out_SchemaName(OUT tszSchemaName);
 	getDBFunctionParams.Out_FCName(OUT tszFuncName);
 	getDBFunctionParams.Out_ParamId(OUT paramId);
 	getDBFunctionParams.Out_ParamMode(OUT paramMode);

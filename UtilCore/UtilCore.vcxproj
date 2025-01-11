@@ -24,6 +24,7 @@
     <ClInclude Include="BaseMacro.h" />
     <ClInclude Include="BaseRedefineDataType.h" />
     <ClInclude Include="BaseTLS.h" />
+    <ClInclude Include="Crypto\CryptoUtil.h" />
     <ClInclude Include="DB\AdoDB.h" />
     <ClInclude Include="DB\BaseODBC.h" />
     <ClInclude Include="DB\DBAsyncSrv.h" />
@@ -44,6 +45,7 @@
     <ClInclude Include="DB\OdbcAsyncSrv.h" />
     <ClInclude Include="DB\OdbcConnPool.h" />
     <ClInclude Include="DB\RedisConn.h" />
+    <ClInclude Include="EXCEL\XlntUtil.h" />
     <ClInclude Include="JSON\JSONBase.h" />
     <ClInclude Include="JSON\JSONParser.h" />
     <ClInclude Include="Memory\ClusteredMap.h" />
@@ -76,6 +78,7 @@
     <ClInclude Include="Util\Endian.h" />
     <ClInclude Include="Util\EventLog.h" />
     <ClInclude Include="Util\FileUtil.h" />
+    <ClInclude Include="Util\IconvUtil.h" />
     <ClInclude Include="Util\Log.h" />
     <ClInclude Include="Util\Regular.h" />
     <ClInclude Include="Util\ShellUtil.h" />
@@ -86,6 +89,7 @@
   <ItemGroup>
     <ClCompile Include="BaseGlobal.cpp" />
     <ClCompile Include="BaseTLS.cpp" />
+    <ClCompile Include="Crypto\CryptoUtil.cpp" />
     <ClCompile Include="DB\AdoDB.cpp" />
     <ClCompile Include="DB\BaseODBC.cpp" />
     <ClCompile Include="DB\DBBind.cpp" />
@@ -97,6 +101,7 @@
     <ClCompile Include="DB\MySQL\MySQLConnPool.cpp" />
     <ClCompile Include="DB\OdbcAsyncSrv.cpp" />
     <ClCompile Include="DB\OdbcConnPool.cpp" />
+    <ClCompile Include="EXCEL\XlntUtil.cpp" />
     <ClCompile Include="JSON\JSONBase.cpp" />
     <ClCompile Include="JSON\JSONParser.cpp" />
     <ClCompile Include="Memory\ClusteredMap.cpp" />
@@ -124,6 +129,7 @@
     <ClCompile Include="Util\Endian.cpp" />
     <ClCompile Include="Util\EventLog.cpp" />
     <ClCompile Include="Util\FileUtil.cpp" />
+    <ClCompile Include="Util\IconvUtil.cpp" />
     <ClCompile Include="Util\Log.cpp" />
     <ClCompile Include="Util\Regular.cpp" />
     <ClCompile Include="Util\ShellUtil.cpp" />
@@ -199,8 +205,8 @@
     <OutDir>bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>bin\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)32D</TargetName>
-    <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\JSON-Utilities-master\source;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.33-winx64\include;E:\GitHub\CPP\Library\ExternalLib\cryptopp-CRYPTOPP_8_9_0;$(ProjectDir);$(IncludePath)</IncludePath>
-    <LibraryPath>E:\GitHub\CPP\Library\ExternalLib\Bin\Win32\Debug;$(LibraryPath)</LibraryPath>
+    <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\JSON-Utilities-master\source;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.40-winx64\include;E:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;E:\GitHub\CPP\Library\ExternalLib\cryptopp-CRYPTOPP_8_9_0;$(ProjectDir);$(IncludePath)</IncludePath>
+    <LibraryPath>E:\GitHub\CPP\Library\ExternalLib\Bin;$(LibraryPath)</LibraryPath>
     <SourcePath>$(SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -208,8 +214,8 @@
     <OutDir>bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>bin\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)64D</TargetName>
-    <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\JSON-Utilities-master\source;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.33-winx64\include;E:\GitHub\CPP\Library\ExternalLib\cryptopp-CRYPTOPP_8_9_0;$(ProjectDir);$(IncludePath)</IncludePath>
-    <LibraryPath>E:\GitHub\CPP\Library\ExternalLib\Bin\x64\Debug;$(LibraryPath)</LibraryPath>
+    <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\JSON-Utilities-master\source;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.40-winx64\include;E:\GitHub\CPP\Library\ExternalLib\libiconv-for-Windows-master\include;E:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;E:\GitHub\CPP\Library\ExternalLib\OpenSSL-Win64\include;$(ProjectDir);$(IncludePath)</IncludePath>
+    <LibraryPath>E:\GitHub\CPP\Library\ExternalLib\Bin;$(LibraryPath)</LibraryPath>
     <SourcePath>$(SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -217,8 +223,8 @@
     <OutDir>bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>bin\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)32</TargetName>
-    <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\JSON-Utilities-master\source;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.33-winx64\include;E:\GitHub\CPP\Library\ExternalLib\cryptopp-CRYPTOPP_8_9_0;$(ProjectDir);$(IncludePath)</IncludePath>
-    <LibraryPath>E:\GitHub\CPP\Library\ExternalLib\Bin\Win32\Release;E:\GitHub\CPP\Library\ExternalLib\Bin\Win32\Release-Patch;$(LibraryPath)</LibraryPath>
+    <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\JSON-Utilities-master\source;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.40-winx64\include;E:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;E:\GitHub\CPP\Library\ExternalLib\cryptopp-CRYPTOPP_8_9_0;$(ProjectDir);$(IncludePath)</IncludePath>
+    <LibraryPath>E:\GitHub\CPP\Library\ExternalLib\Bin;$(LibraryPath)</LibraryPath>
     <SourcePath>$(SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -226,8 +232,8 @@
     <OutDir>bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>bin\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)64</TargetName>
-    <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\JSON-Utilities-master\source;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.33-winx64\include;$(ProjectDir);E:\GitHub\CPP\Library\ExternalLib\cryptopp-CRYPTOPP_8_9_0;$(IncludePath)</IncludePath>
-    <LibraryPath>E:\GitHub\CPP\Library\ExternalLib\Bin\x64\Release;E:\GitHub\CPP\Library\ExternalLib\Bin\x64\Release-Patch;$(LibraryPath)</LibraryPath>
+    <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\JSON-Utilities-master\source;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.40-winx64\include;E:\GitHub\CPP\Library\ExternalLib\libiconv-for-Windows-master\include;E:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;E:\GitHub\CPP\Library\ExternalLib\OpenSSL-Win64\include;$(ProjectDir);$(IncludePath)</IncludePath>
+    <LibraryPath>E:\GitHub\CPP\Library\ExternalLib\Bin;$(LibraryPath)</LibraryPath>
     <SourcePath>$(SourcePath)</SourcePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">

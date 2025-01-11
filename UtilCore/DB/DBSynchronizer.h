@@ -40,6 +40,30 @@
 #include "rapidxml.hpp"
 #include "rapidxml_print.hpp"
 
+namespace ExcelColumnWidth
+{
+	const int cnDefaultWidth = 16;
+	const int cnSchemaName = 18;
+	const int cnObjectName = 30;
+	const int cnColumnName = 25;
+	const int cnSequence = 20;
+	const int cnParamMode = 22;
+	const int cnParamName = 25;
+	const int cnConstraintName = 38;
+	const int cnIndexType = 33;
+	const int cnPartitionName = 25;
+	const int cnConstraintValue = 50;
+	const int cnDefaultConstraintValue = 24;
+	const int cnSystemNamed = 22;
+	const int cnComment = 70;
+	const int cnDataType = 15;
+	const int cnDataTypeDesc = 21;
+	const int cnEngine = 18;
+	const int cnCharacterSet = 20;
+	const int cnCollation = 26;
+	const int cnDateTime = 21;
+}
+
 class CDBSynchronizer
 {
 	enum UpdateStep : uint8
@@ -78,6 +102,8 @@ public:
 	bool		Synchronize(const TCHAR* path);
 	
 	void		PrintDBSchema();
+	void		DBToSaveExcel(const _tstring path);
+
 	void		ParseXmlToDB(const TCHAR* path);
 	bool		DBToCreateXml(const TCHAR* path);
 
@@ -119,6 +145,10 @@ private:
 	void		CompareFunctions();
 
 	void		ExecuteUpdateQueries();
+
+	void        SetExcelTop(Xlnt::CXlntUtil& excel, const std::string& start_cell, const std::string& end_cell);
+	void		AddExcelTableInfo(Xlnt::CXlntUtil& excel);
+	void		AddExcelTableColumnInfo(Xlnt::CXlntUtil& excel);
 
 private:
 	EDBClass	_dbClass;

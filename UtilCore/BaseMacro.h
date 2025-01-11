@@ -56,15 +56,15 @@
 
 #ifdef _WIN64
 #	ifdef _DEBUG
-#		define LIB_NAME(LIB) LIB##"64D.lib"
+#		define LIB_NAME(LIB) "/x64/Debug/"##LIB##"64D.lib"
 #	else
-#		define LIB_NAME(LIB) LIB##"64.lib"
+#		define LIB_NAME(LIB) "/x64/Release/"##LIB##"64.lib"
 #	endif
 #else
 #	ifdef _DEBUG
-#		define LIB_NAME(LIB) LIB##"32D.lib"
+#		define LIB_NAME(LIB) "/Win32/Debug/"##LIB##"32D.lib"
 #	else
-#		define LIB_NAME(LIB) LIB##"32.lib"
+#		define LIB_NAME(LIB) "/Win32/Release/"##LIB##"32.lib"
 #	endif
 #endif
 

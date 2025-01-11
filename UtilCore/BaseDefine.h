@@ -64,7 +64,7 @@
 #define REGISTRY_VALUE_STRLEN						1024
 
 #define STD_DATETIME_STRLEN							32	// 'Thu, 2 Aug 2008 20:47:11 GMT'
-#define DATETIME_STRLEN								20	// '2009-07-30 11:00:00'
+#define DATETIME_STRLEN								24	// '2009-07-30 11:00:00'
 #define DATE_STRLEN									11	// '2009-07-30'
 #define TIME_STRLEN									9	// '11:00:00'
 #define MONTH_ENAME_STRLEN							16  // 'January'

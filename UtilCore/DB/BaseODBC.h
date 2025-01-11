@@ -43,6 +43,7 @@ public:
 	EDBClass    GetDBClass() { return m_DbClass; }
 	bool        DBMSInfo(TCHAR* ptszServerName, TCHAR* ptszDBMSName, TCHAR* ptszDBMSVersion);
 
+	bool		InitStmtHandle(const int64 lQueryTimeOut = DATABASE_DEFAULT_QUERY_TIMEOUT);
 	void		FreeStmt(SQLUSMALLINT Option);
 	void		ClearStmt(void);
 	void		ResetParamStmt(void);
@@ -115,9 +116,6 @@ public:
 	template< typename _TMain >
 	bool		GetData(int32 iColNum, _TMain& tValue);
 	bool		GetData(int32 iColNum, TCHAR* ptszData, int32& iBuffSize);
-
-protected:
-	bool		InitStmtHandle(const int64 lQueryTimeOut=DATABASE_DEFAULT_QUERY_TIMEOUT);
 
 private:
 	SQLHENV		m_hEnv;

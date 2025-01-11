@@ -10,7 +10,7 @@
 #include <mysql.h>
 #include <mysqld_error.h>
 
-#pragma comment (lib, "libmySQL.lib")
+#pragma comment(lib, LIB_NAME("libmySQL"))
 
 #include "MySQL_ParamAttr.inl"
 

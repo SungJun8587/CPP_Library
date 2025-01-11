@@ -7,9 +7,6 @@
     <Filter Include="DB">
       <UniqueIdentifier>{b5a687ae-e78e-4142-ada0-b22f8abf1505}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Log">
-      <UniqueIdentifier>{2640575b-d671-4da1-bd58-e4c38250c69c}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Thread">
       <UniqueIdentifier>{3c90139d-1a67-4c52-84f8-0a6386299132}</UniqueIdentifier>
     </Filter>
@@ -19,11 +16,17 @@
     <Filter Include="XML">
       <UniqueIdentifier>{82a6342a-a6af-4b20-8359-61a27c9e8261}</UniqueIdentifier>
     </Filter>
+    <Filter Include="DB\MySQL">
+      <UniqueIdentifier>{791383c0-a14a-4107-893b-426fc5aabe50}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Util">
       <UniqueIdentifier>{f4657ee8-e1e9-42e0-8ca1-b4fd39faf194}</UniqueIdentifier>
     </Filter>
-    <Filter Include="DB\MySQL">
-      <UniqueIdentifier>{791383c0-a14a-4107-893b-426fc5aabe50}</UniqueIdentifier>
+    <Filter Include="Excel">
+      <UniqueIdentifier>{df211cf1-837f-4aa5-9679-ad5e348671f7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Crypto">
+      <UniqueIdentifier>{5cbdae29-a61d-478c-a2b7-ee5856aeddef}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -145,9 +148,6 @@
     <ClInclude Include="DB\DBCommon.h">
       <Filter>DB</Filter>
     </ClInclude>
-    <ClInclude Include="Util\BaseFile.h">
-      <Filter>Log</Filter>
-    </ClInclude>
     <ClInclude Include="Util\CalculatedElapsedTime.h">
       <Filter>Util</Filter>
     </ClInclude>
@@ -172,12 +172,6 @@
     <ClInclude Include="Thread\SRWLock.h">
       <Filter>Thread</Filter>
     </ClInclude>
-    <ClInclude Include="Util\Log.h">
-      <Filter>Log</Filter>
-    </ClInclude>
-    <ClInclude Include="Util\EventLog.h">
-      <Filter>Log</Filter>
-    </ClInclude>
     <ClInclude Include="Util\Endian.h">
       <Filter>Util</Filter>
     </ClInclude>
@@ -195,6 +189,24 @@
     </ClInclude>
     <ClInclude Include="Util\FileUtil.h">
       <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="EXCEL\XlntUtil.h">
+      <Filter>Excel</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\IconvUtil.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\BaseFile.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\EventLog.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\Log.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Crypto\CryptoUtil.h">
+      <Filter>Crypto</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -266,9 +278,6 @@
     <ClCompile Include="Thread\DeadLockProfiler.cpp">
       <Filter>Thread</Filter>
     </ClCompile>
-    <ClCompile Include="Util\BaseFile.cpp">
-      <Filter>Log</Filter>
-    </ClCompile>
     <ClCompile Include="Util\CommonUtil.cpp">
       <Filter>Util</Filter>
     </ClCompile>
@@ -293,12 +302,6 @@
     <ClCompile Include="Thread\SRWLock.cpp">
       <Filter>Thread</Filter>
     </ClCompile>
-    <ClCompile Include="Util\Log.cpp">
-      <Filter>Log</Filter>
-    </ClCompile>
-    <ClCompile Include="Util\EventLog.cpp">
-      <Filter>Log</Filter>
-    </ClCompile>
     <ClCompile Include="Util\Endian.cpp">
       <Filter>Util</Filter>
     </ClCompile>
@@ -310,6 +313,24 @@
     </ClCompile>
     <ClCompile Include="Util\FileUtil.cpp">
       <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="EXCEL\XlntUtil.cpp">
+      <Filter>Excel</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\IconvUtil.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\BaseFile.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\EventLog.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\Log.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Crypto\CryptoUtil.cpp">
+      <Filter>Crypto</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

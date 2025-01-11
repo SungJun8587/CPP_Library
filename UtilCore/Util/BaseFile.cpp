@@ -119,7 +119,7 @@ DWORD CBaseFile::Write(LPCVOID lpBuffer,        // pointer to data to write to f
 
 	do
 	{
-		DWORD dwDoWrite = min(nMaxWrite, nNumberOfBytesToWrite);
+		DWORD dwDoWrite = nMaxWrite < nNumberOfBytesToWrite ? nMaxWrite : nNumberOfBytesToWrite;	//min(nMaxWrite, nNumberOfBytesToWrite);
 		if( !WriteFile(m_hFile, pBuf, dwDoWrite, &dwCurrent, NULL) )
 			return dwTotal;
 		dwTotal += dwCurrent;
