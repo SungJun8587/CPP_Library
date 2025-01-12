@@ -37,10 +37,8 @@ namespace Xlnt
 	{
 		try
 		{
-			_workbook.create_sheet();
-			_worksheet = _workbook.active_sheet();
-
-			_worksheet.title(sheetName);	// 시트명 변경
+			_worksheet = _workbook.create_sheet();	// 시트 생성
+			_worksheet.title(sheetName);			// 시트명 변경
 		}
 		catch( const std::exception& e )
 		{
@@ -62,6 +60,21 @@ namespace Xlnt
 		}
 	}
 
+	//***************************************************************************
+	// 인덱스에 해당하는 시트 활성화
+	void CXlntUtil::ActiveSheet(const uint32 sheetIndex)
+	{
+		_workbook.active_sheet(sheetIndex);
+	}
+
+	//***************************************************************************
+	// 시트명 변경
+	void CXlntUtil::RenameSheet(const std::string& sheetName)
+	{
+		_worksheet = _workbook.active_sheet();
+		_worksheet.title(sheetName);			// 시트명 변경
+	}
+	
 	//***************************************************************************
 	// 셀 데이터 쓰기
 	void CXlntUtil::WriteCell(const std::string& cell_ref, const std::string& value)

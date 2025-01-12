@@ -173,8 +173,8 @@ void CDBSynchronizer::AddExcelTableInfo(Xlnt::CXlntUtil& excel)
 {
 	int32 currentRow = 1;
 
-	// 새로운 Excel 파일 생성 및 시트 추가
-	excel.AddSheet("TABLE");
+	// 활성화 되어있는 기존 시트명('Sheet1')을 다른 시트명('TABLE')로 변경
+	excel.RenameSheet("TABLE");
 	SetExcelTop(excel, "A1", "I1");
 
 	excel.WriteCell(currentRow, 1, "SCHEMA_NAME");
@@ -221,7 +221,6 @@ void CDBSynchronizer::AddExcelTableColumnInfo(Xlnt::CXlntUtil& excel)
 {
 	int32 currentRow = 1;
 
-	// 새로운 Excel 파일 생성 및 시트 추가
 	excel.AddSheet("TABLE_COLUMN");
 	SetExcelTop(excel, "A1", "Q1");
 

@@ -27,6 +27,8 @@ namespace Xlnt
 
 			void AddSheet(const std::string& sheetName);
 			void RemoveSheet(const std::string& sheetName);
+			void ActiveSheet(const uint32 sheetIndex = 0);
+			void RenameSheet(const std::string& sheetName);
 
 			void WriteCell(const std::string& cell_ref, const std::string& value);
 			void WriteCell(const uint32 row, const uint32 col, const std::string& value);

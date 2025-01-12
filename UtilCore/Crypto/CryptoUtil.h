@@ -24,6 +24,8 @@ namespace Crypto
 			CCryptoUtil(const std::string& key, const std::string& iv);
 			~CCryptoUtil() {};
 
+			bool IsSupported(string name);
+
 			std::string HashMD5(const std::string& data) const;
 
 			std::string EncryptAES(const std::string& plaintext) const;
@@ -34,6 +36,23 @@ namespace Crypto
 
 			std::string EncryptAESGCM(const std::string& plaintext, std::string& tag) const;
 			std::string DecryptAESGCM(const std::string& ciphertext, std::string& tag) const;
+
+		public:
+			//***************************************************************************
+			// 해시 알고리즘 지원 여부 확인(MD5, SHA256, SHA512, SHA1, RIPEMD160
+			static bool IsHashAlgorithmSupported(const std::string& algorithm)
+			{
+				const EVP_MD* md = EVP_get_digestbyname(algorithm.c_str());
+				return md != nullptr;
+			}
+
+			//***************************************************************************
+			// 암호화 알고리즘 지원 여부 확인(AES-128-CBC, AES-192-CBC, AES-256-CBC, SEED-CBC, AES-128-GCM, AES-256-GCM)
+			static bool IsCipherAlgorithmSupported(const std::string& algorithm)
+			{
+				const EVP_CIPHER* cipher = EVP_get_cipherbyname(algorithm.c_str());
+				return cipher != nullptr;
+			}
 
 		private:
 			//***************************************************************************

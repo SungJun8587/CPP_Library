@@ -59,7 +59,7 @@ using namespace std;
 #pragma comment(lib, LIB_NAME("xlnt"))
 #pragma comment(lib, LIB_NAME("libcrypto"))
 #pragma comment(lib, LIB_NAME("libssl"))
-#pragma comment(lib, LIB_NAME("libmySQL"))
+#pragma comment(lib, "libmySQL")
 
 #include <gperftools/tcmalloc.h>
 #include <iconv.h>
