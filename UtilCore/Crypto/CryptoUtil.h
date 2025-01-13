@@ -16,6 +16,9 @@
 #include <BaseRedefineDataType.h>
 #endif
 
+#pragma comment(lib, LIB_NAME("libcrypto"))
+#pragma comment(lib, LIB_NAME("libssl"))
+
 namespace Crypto
 {
 	class CCryptoUtil

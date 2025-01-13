@@ -93,6 +93,8 @@ bool COdbcAsyncSrv::InitOdbc(CVector<CDBNode> DBNodeVec, INT32 nMaxThreadCnt)
 		if( false == _pOdbcConnPools[nIdx]->Init(iter.m_dbClass, iter.m_tszDSN) )
 		{
 			LOG_ERROR(_T("Failed to Initialize COdbcConnPool"));
+
+			Clear();
 			return false;
 		}
 		++nIdx;
@@ -133,7 +135,7 @@ bool COdbcAsyncSrv::RunningThread()
 bool COdbcAsyncSrv::Action()
 {
 	static uint64 cumulateCallCnt = 0;
-	while( !_bStopThread )
+	while( !_bStopThread.load() )
 	{
 		st_DBAsyncRq* pAsyncRq = Pop();	// DB 콜 구조체를 큐에서 가져오기
 		if( pAsyncRq == nullptr )
@@ -183,6 +185,7 @@ bool COdbcAsyncSrv::Action()
 
 		SAFE_DELETE(pAsyncRq);
 	}
+
 	return true;
 }
 

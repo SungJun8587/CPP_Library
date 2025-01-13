@@ -38,6 +38,9 @@ public:
 
 	void StartIoThreads(INT32 nMaxThreadCnt);
 	bool Action();
+	void StopThread() {
+		_bStopThread.store(true);	// 플래그를 설정하여 루프 종료 
+	};
 
 	CMySQLConnPool*	GetAccountOdbcConnPool(void);
 	CMySQLConnPool*	GetMySQLConnPool(uint64 m_nID);
@@ -50,7 +53,6 @@ public:
 	int32								_nDBCount;				// 접속할 Database 개수
 	bool								_bOpen;					// DB 오픈 여부
 	int32								_nMaxThreadCnt;			// 최대 쓰레드 개수
-	bool								_bStopThread;			// 스레드 종료 플래그
 	CMySQLConnPool**					_pMySQLConnPools;		// DB Connection Pool
 
 public:
@@ -58,6 +60,9 @@ public:
 
 protected:
 	void		Clear(void);
+
+private:
+	std::atomic<bool> _bStopThread;								// 스레드 종료 플래그
 };
 
 static std::shared_ptr<CMySQLAsyncSrv> dbAsyncSrv_ = 0;

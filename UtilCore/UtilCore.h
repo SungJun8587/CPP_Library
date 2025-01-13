@@ -55,20 +55,8 @@ using namespace std;
 /***********************************************************************************************/
 
 #pragma comment(lib, LIB_NAME("libtcmalloc_minimal"))
-#pragma comment(lib, LIB_NAME("libiconv"))
-#pragma comment(lib, LIB_NAME("xlnt"))
-#pragma comment(lib, LIB_NAME("libcrypto"))
-#pragma comment(lib, LIB_NAME("libssl"))
-#pragma comment(lib, "libmySQL")
 
 #include <gperftools/tcmalloc.h>
-#include <iconv.h>
-#include <xlnt/xlnt.hpp>
-#include <openssl/evp.h>
-#include <openssl/rand.h>
-#include <openssl/sha.h>
-#include <openssl/md5.h>
-#include <mysql.h>
 
 /***********************************************************************************************/
 

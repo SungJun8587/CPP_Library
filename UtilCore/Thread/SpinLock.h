@@ -19,7 +19,7 @@
 
 #if _DEBUG
     #ifndef __DEADLOCKPROFILER_H__
-    #include <DeadLockProfiler.h>
+    #include <Thread/DeadLockProfiler.h>
     #endif
 #endif
 

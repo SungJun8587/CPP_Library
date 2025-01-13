@@ -7,6 +7,10 @@
 #ifndef __ICONVUTIL_H__
 #define __ICONVUTIL_H__
 
+#include <iconv.h>
+
+#pragma comment(lib, LIB_NAME("libiconv"))
+
 namespace Iconv
 {
 	class CIconvUtil

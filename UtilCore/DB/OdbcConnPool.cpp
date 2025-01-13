@@ -47,6 +47,7 @@ bool COdbcConnPool::Init(const EDBClass dbClass, const TCHAR* ptszDSN)
 		if( !_pOdbcConns[i]->Connect() )
 		{
 			Clear();
+			SAFE_DELETE_ARRAY(_pInUseFlag);
 			return false;
 		}
 	}

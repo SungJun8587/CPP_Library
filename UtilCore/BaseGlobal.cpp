@@ -15,7 +15,7 @@
 	CThreadManager* gpThreadManager = nullptr;
 #endif
 
-#ifdef __SPINLOCK_H__
+#ifdef __DEADLOCKPROFILER_H__
 	CDeadLockProfiler* gpDeadLockProfiler = nullptr;
 #endif
 
@@ -32,7 +32,7 @@ public:
 		gpThreadManager = new CThreadManager();
 #endif	
 
-#ifdef __SPINLOCK_H__
+#ifdef __DEADLOCKPROFILER_H__
 		gpDeadLockProfiler = new CDeadLockProfiler();
 #endif	
 	}
@@ -47,7 +47,7 @@ public:
 		if( gpThreadManager != nullptr ) delete gpThreadManager;
 #endif	
 
-#ifdef __SPINLOCK_H__
+#ifdef __DEADLOCKPROFILER_H__
 		if( gpDeadLockProfiler != nullptr ) delete gpDeadLockProfiler;
 #endif	
 	}

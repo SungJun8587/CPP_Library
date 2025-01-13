@@ -133,7 +133,7 @@ bool CMySQLAsyncSrv::RunningThread()
 bool CMySQLAsyncSrv::Action()
 {
 	static uint64 cumulateCallCnt = 0;
-	while( !_bStopThread )
+	while( !_bStopThread.load() )
 	{
 		st_DBAsyncRq* pAsyncRq = Pop();	// DB 콜 구조체를 큐에서 가져오기
 		if( pAsyncRq == nullptr )

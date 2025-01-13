@@ -17,7 +17,7 @@
 	extern class CThreadManager*	gpThreadManager;
 #endif
 
-#ifdef __SPINLOCK_H__
+#ifdef __DEADLOCKPROFILER_H__
 	extern class CDeadLockProfiler* gpDeadLockProfiler;
 #endif
 

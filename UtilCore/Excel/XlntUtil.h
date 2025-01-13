@@ -13,6 +13,8 @@
 #include <BaseRedefineDataType.h>
 #endif
 
+#pragma comment(lib, LIB_NAME("xlnt"))
+
 namespace Xlnt
 {
 	class CXlntUtil

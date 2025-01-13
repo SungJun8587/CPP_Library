@@ -8,11 +8,11 @@
 #define __ODBCCONNPOOL_H__
 
 #ifndef	__OBJECTPOOL_H__
-#include <ObjectPool.h>
+#include <Memory/ObjectPool.h>
 #endif
 
 #ifndef	__BASEODBC_H__
-#include <BaseODBC.h>
+#include <DB/BaseODBC.h>
 #endif
 
 class COdbcConnPool : public CPoolObj

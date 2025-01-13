@@ -64,5 +64,4 @@ void CThreadManager::InitTLS()
 //
 void CThreadManager::DestroyTLS()
 {
-
 }
