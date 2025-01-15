@@ -21,6 +21,7 @@ bool CDBSynchronizer::Synchronize(const TCHAR* path)
 
 	GatherDBTables();
 	GatherDBTableColumns();
+	GatherDBTableConstraints();
 	if( _dbClass == EDBClass::ORACLE ) GatherDBIdentityColumns();
 	GatherDBIndexes();
 	if( _dbClass == EDBClass::MSSQL ) GatherDBIndexOptions();
@@ -115,6 +116,7 @@ void CDBSynchronizer::DBToSaveExcel(const _tstring path)
 
 		AddExcelTableInfo(excel);
 		AddExcelTableColumnInfo(excel);
+		AddExcelConstraintsInfo(excel);
 
 		// 저장
 		excel.SaveAs(path);
@@ -127,7 +129,7 @@ void CDBSynchronizer::DBToSaveExcel(const _tstring path)
 
 //***************************************************************************
 //
-void CDBSynchronizer::SetExcelTop(Xlnt::CXlntUtil& excel, const std::string& start_cell, const std::string& end_cell)
+void CDBSynchronizer::SetExcelHeaderStyle(Xlnt::CXlntUtil& excel, const std::string& start_cell, const std::string& end_cell)
 {
 	excel.SetRowHeight(1, 20);
 
@@ -175,7 +177,7 @@ void CDBSynchronizer::AddExcelTableInfo(Xlnt::CXlntUtil& excel)
 
 	// 활성화 되어있는 기존 시트명('Sheet1')을 다른 시트명('TABLE')로 변경
 	excel.RenameSheet("TABLE");
-	SetExcelTop(excel, "A1", "I1");
+	SetExcelHeaderStyle(excel, "A1", "I1");
 
 	excel.WriteCell(currentRow, 1, "SCHEMA_NAME");
 	excel.WriteCell(currentRow, 2, "TABLE_NAME");
@@ -222,7 +224,7 @@ void CDBSynchronizer::AddExcelTableColumnInfo(Xlnt::CXlntUtil& excel)
 	int32 currentRow = 1;
 
 	excel.AddSheet("TABLE_COLUMN");
-	SetExcelTop(excel, "A1", "Q1");
+	SetExcelHeaderStyle(excel, "A1", "Q1");
 
 	excel.WriteCell(currentRow, 1, "SCHEMA_NAME");
 	excel.WriteCell(currentRow, 2, "TABLE_NAME");
@@ -287,6 +289,53 @@ void CDBSynchronizer::AddExcelTableColumnInfo(Xlnt::CXlntUtil& excel)
 	excel.SetColumnWidth(15, ExcelColumnWidth::cnCharacterSet);
 	excel.SetColumnWidth(16, ExcelColumnWidth::cnCollation);
 	excel.SetColumnWidth(17, ExcelColumnWidth::cnComment);
+}
+
+//***************************************************************************
+//
+void CDBSynchronizer::AddExcelConstraintsInfo(Xlnt::CXlntUtil& excel)
+{
+	int32 currentRow = 1;
+
+	excel.AddSheet("TABLE_CONSTRAINTS");
+	SetExcelHeaderStyle(excel, "A1", "H1");
+
+	excel.WriteCell(currentRow, 1, "SCHEMA_NAME");
+	excel.WriteCell(currentRow, 2, "TABLE_NAME");
+	excel.WriteCell(currentRow, 3, "CONSTRAINT_NAME");
+	excel.WriteCell(currentRow, 4, "CONSTRAINT_TYPE");
+	excel.WriteCell(currentRow, 5, "CONSTRAINT_TYPE_DESC");
+	excel.WriteCell(currentRow, 6, "CONST_VALUE");
+	excel.WriteCell(currentRow, 7, "IS_SYSTEM_NAMED");
+	excel.WriteCell(currentRow, 8, "IS_STATUS");
+
+	for( DBModel::TableRef& dbTable : _dbTables )
+	{
+		for( DBModel::ConstraintRef& dbConstraint : dbTable->_constraints )
+		{
+			currentRow++;
+			excel.WriteCell(currentRow, 1, dbConstraint->_schemaName);
+			excel.WriteCell(currentRow, 2, dbConstraint->_tableName);
+			excel.WriteCell(currentRow, 3, dbConstraint->_constName);
+			excel.WriteCell(currentRow, 4, dbConstraint->_constType);
+			excel.WriteCell(currentRow, 5, dbConstraint->_constTypeDesc);
+			excel.WriteCell(currentRow, 6, dbConstraint->_constValue);
+			excel.WriteCell(currentRow, 7, std::to_string(dbConstraint->_systemNamed));
+			excel.WriteCell(currentRow, 8, std::to_string(dbConstraint->_status));
+			excel.SetRowHeight(currentRow, 16);
+		}
+	}
+
+	excel.SetAllCellTextFormat(3);
+
+	excel.SetColumnWidth(1, ExcelColumnWidth::cnSchemaName);
+	excel.SetColumnWidth(2, ExcelColumnWidth::cnObjectName);
+	excel.SetColumnWidth(3, ExcelColumnWidth::cnConstraintName);
+	excel.SetColumnWidth(4, ExcelColumnWidth::cnDefaultWidth + 6);
+	excel.SetColumnWidth(5, ExcelColumnWidth::cnDefaultWidth + 14);
+	excel.SetColumnWidth(6, ExcelColumnWidth::cnConstraintValue);
+	excel.SetColumnWidth(7, ExcelColumnWidth::cnSystemNamed);
+	excel.SetColumnWidth(8, ExcelColumnWidth::cnDefaultWidth);
 }
 
 //***************************************************************************
@@ -721,7 +770,7 @@ bool CDBSynchronizer::GatherDBTableColumns(const TCHAR* ptszTableName)
 
 		ASSERT_CRASH(findTable != _dbTables.end());
 		CVector<DBModel::ColumnRef>& columns = (*findTable)->_columns;
-		auto findColumn = std::find_if(columns.begin(), columns.end(), [tszColumnName](DBModel::ColumnRef& column) { return _tcsicmp(column->_tableName.c_str(), tszColumnName) == 0 ? true : false; });
+		auto findColumn = std::find_if(columns.begin(), columns.end(), [tszColumnName](DBModel::ColumnRef& column) { return _tcsicmp(column->_columnName.c_str(), tszColumnName) == 0 ? true : false; });
 		if( findColumn == columns.end() )
 		{
 			DBModel::ColumnRef columnRef = MakeShared<DBModel::Column>(_dbClass);
@@ -752,6 +801,73 @@ bool CDBSynchronizer::GatherDBTableColumns(const TCHAR* ptszTableName)
 		}
 
 		tszColumnComment[0] = _T('\0');
+	}
+
+	return true;
+}
+
+//***************************************************************************
+//
+bool CDBSynchronizer::GatherDBTableConstraints(const TCHAR* ptszTableName)
+{
+	TCHAR   tszDBName[DATABASE_NAME_STRLEN] = { 0, };
+	int32	objectId;
+	TCHAR	tszSchemaName[DATABASE_OBJECT_NAME_STRLEN] = { 0, };
+	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN] = { 0, };
+	TCHAR   tszConstName[DATABASE_OBJECT_NAME_STRLEN] = { 0, };
+	TCHAR   tszConstType[DATABASE_OBJECT_NAME_STRLEN] = { 0, };
+	TCHAR   tszConstTypeDesc[DATABASE_OBJECT_NAME_STRLEN] = { 0, };
+	TCHAR   tszConstValue[DATABASE_WVARCHAR_MAX] = { 0, };
+	BOOL	isSystemNamed;
+	BOOL	isStatus;
+	TCHAR   tszSortValue[DATABASE_OBJECT_NAME_STRLEN] = { 0, };
+
+	SP::GetDBConstraints getDBConstraints(_dbClass, _dbConn, ptszTableName);
+	getDBConstraints.Out_DBName(OUT tszDBName);
+	getDBConstraints.Out_ObjectId(OUT objectId);
+	getDBConstraints.Out_SchemaName(OUT tszSchemaName);
+	getDBConstraints.Out_TableName(OUT tszTableName);
+	getDBConstraints.Out_ConstName(OUT tszConstName);
+	getDBConstraints.Out_ConstType(OUT tszConstType);
+	getDBConstraints.Out_ConstTypeDesc(OUT tszConstTypeDesc);
+	getDBConstraints.Out_ConstValue(OUT tszConstValue);
+	getDBConstraints.Out_IsSystemNamed(OUT isSystemNamed);
+	getDBConstraints.Out_IsStatus(OUT isStatus);
+	getDBConstraints.Out_SortValue(OUT tszSortValue);
+
+	if( getDBConstraints.ExecDirect() == false )
+		return false;
+
+	while( getDBConstraints.Fetch() )
+	{
+		auto findTable = std::find_if(_dbTables.begin(), _dbTables.end(), [=](const DBModel::TableRef& table)
+		{
+			if( _dbClass == EDBClass::MSSQL ) return table->_objectId == objectId;
+			else return _tcsicmp(table->_tableName.c_str(), tszTableName) == 0 ? true : false;
+
+			return false;
+		});
+
+		ASSERT_CRASH(findTable != _dbTables.end());
+		CVector<DBModel::ConstraintRef>& constraints = (*findTable)->_constraints;
+		auto findConstraint = std::find_if(constraints.begin(), constraints.end(), [tszConstName](DBModel::ConstraintRef& constraint) { return _tcsicmp(constraint->_constName.c_str(), tszConstName) == 0 ? true : false; });
+		if( findConstraint == constraints.end() )
+		{
+			DBModel::ConstraintRef constraintRef = MakeShared<DBModel::Constraint>(_dbClass);
+			{
+				constraintRef->_schemaName = (*findTable)->_schemaName;
+				constraintRef->_tableName = (*findTable)->_tableName;
+				constraintRef->_constName = tszConstName;
+				constraintRef->_constType = tszConstType;
+				constraintRef->_constTypeDesc = tszConstTypeDesc;
+				constraintRef->_constValue = tszConstValue;
+				constraintRef->_systemNamed = isSystemNamed;
+				constraintRef->_status = isStatus;
+				constraintRef->_sortValue = tszSortValue;
+			}
+			constraints.push_back(constraintRef);
+			findConstraint = constraints.end() - 1;
+		}
 	}
 
 	return true;
@@ -895,7 +1011,7 @@ bool CDBSynchronizer::GatherDBIndexes(const TCHAR* ptszTableName)
 		});
 		ASSERT_CRASH(findTable != _dbTables.end());
 		CVector<DBModel::IndexRef>& indexes = (*findTable)->_indexes;
-		auto findIndex = std::find_if(indexes.begin(), indexes.end(), [tszIndexName](DBModel::IndexRef& index) { return _tcsicmp(index->_tableName.c_str(), tszIndexName) == 0 ? true : false; });
+		auto findIndex = std::find_if(indexes.begin(), indexes.end(), [tszIndexName](DBModel::IndexRef& index) { return _tcsicmp(index->_indexName.c_str(), tszIndexName) == 0 ? true : false; });
 		if( findIndex == indexes.end() )
 		{
 			DBModel::IndexRef indexRef = MakeShared<DBModel::Index>(_dbClass);
@@ -998,7 +1114,7 @@ bool CDBSynchronizer::GatherDBIndexOptions(const TCHAR* ptszTableName)
 		});
 		ASSERT_CRASH(findTable != _dbTables.end());
 		CVector<DBModel::IndexOptionRef>& indexOptions = (*findTable)->_indexOptions;
-		auto findIndexOption = std::find_if(indexOptions.begin(), indexOptions.end(), [tszIndexName](DBModel::IndexOptionRef& indexOption) { return _tcsicmp(indexOption->_tableName.c_str(), tszIndexName) == 0 ? true : false; });
+		auto findIndexOption = std::find_if(indexOptions.begin(), indexOptions.end(), [tszIndexName](DBModel::IndexOptionRef& indexOption) { return _tcsicmp(indexOption->_indexName.c_str(), tszIndexName) == 0 ? true : false; });
 		if( findIndexOption == indexOptions.end() )
 		{
 			DBModel::IndexOptionRef indexOptionRef = MakeShared<DBModel::IndexOption>();
@@ -1080,17 +1196,17 @@ bool CDBSynchronizer::GatherDBForeignKeys(const TCHAR* ptszTableName)
 		auto findReferenceKey = std::find_if(referenceKeys.begin(), referenceKeys.end(), [tszForeignKeyName](DBModel::ForeignKeyRef& referenceKey) { return _tcsicmp(referenceKey->_foreignKeyName.c_str(), tszForeignKeyName) == 0 ? true : false; });
 		if( findReferenceKey == referenceKeys.end() )
 		{
-			DBModel::ForeignKeyRef ForeignKeyRef = MakeShared<DBModel::ForeignKey>(_dbClass);
+			DBModel::ForeignKeyRef foreignKeyRef = MakeShared<DBModel::ForeignKey>(_dbClass);
 			{
-				ForeignKeyRef->_schemaName = (*findTable)->_schemaName;
-				ForeignKeyRef->_tableName = (*findTable)->_tableName;
-				ForeignKeyRef->_foreignKeyName = tszForeignKeyName;
-				ForeignKeyRef->_foreignKeyTableName = tszForeignKeyTableName;
-				ForeignKeyRef->_referenceKeyTableName = tszReferenceKeyTableName;
-				ForeignKeyRef->_updateRule = tszUpdateRule;
-				ForeignKeyRef->_deleteRule = tszDeleteRule;
+				foreignKeyRef->_schemaName = (*findTable)->_schemaName;
+				foreignKeyRef->_tableName = (*findTable)->_tableName;
+				foreignKeyRef->_foreignKeyName = tszForeignKeyName;
+				foreignKeyRef->_foreignKeyTableName = tszForeignKeyTableName;
+				foreignKeyRef->_referenceKeyTableName = tszReferenceKeyTableName;
+				foreignKeyRef->_updateRule = tszUpdateRule;
+				foreignKeyRef->_deleteRule = tszDeleteRule;
 			}
-			referenceKeys.push_back(ForeignKeyRef);
+			referenceKeys.push_back(foreignKeyRef);
 			findReferenceKey = referenceKeys.end() - 1;
 		}
 
@@ -1151,17 +1267,17 @@ bool CDBSynchronizer::GatherDBDefaultConstraints(const TCHAR* ptszTableName)
 		auto findDefaultConstraint = std::find_if(defaultConstraints.begin(), defaultConstraints.end(), [tszDefaultConstName](DBModel::DefaultConstraintRef& defaultConstraint) { return _tcsicmp(defaultConstraint->_defaultConstName.c_str(), tszDefaultConstName) == 0 ? true : false; });
 		if( findDefaultConstraint == defaultConstraints.end() )
 		{
-			DBModel::DefaultConstraintRef DefaultConstraintRef = MakeShared<DBModel::DefaultConstraint>(_dbClass);
+			DBModel::DefaultConstraintRef defaultConstraintRef = MakeShared<DBModel::DefaultConstraint>(_dbClass);
 			{
-				DefaultConstraintRef->_schemaName = (*findTable)->_schemaName;
-				DefaultConstraintRef->_tableName = (*findTable)->_tableName;
-				DefaultConstraintRef->_defaultConstName = tszDefaultConstName;
-				DefaultConstraintRef->_columnName = tszColumnName;
-				DefaultConstraintRef->_defaultValue = tszDefaultValue;
-				DefaultConstraintRef->_systemNamed = isSystemNamed;
+				defaultConstraintRef->_schemaName = (*findTable)->_schemaName;
+				defaultConstraintRef->_tableName = (*findTable)->_tableName;
+				defaultConstraintRef->_defaultConstName = tszDefaultConstName;
+				defaultConstraintRef->_columnName = tszColumnName;
+				defaultConstraintRef->_defaultValue = tszDefaultValue;
+				defaultConstraintRef->_systemNamed = isSystemNamed;
 			}
 
-			defaultConstraints.push_back(DefaultConstraintRef);
+			defaultConstraints.push_back(defaultConstraintRef);
 			findDefaultConstraint = defaultConstraints.end() - 1;
 		}
 	}
@@ -1208,15 +1324,15 @@ bool CDBSynchronizer::GatherDBCheckConstraints(const TCHAR* ptszTableName)
 		auto findCheckConstraint = std::find_if(checkConstraints.begin(), checkConstraints.end(), [tszCheckConstName](DBModel::CheckConstraintRef& checkConstraint) { return _tcsicmp(checkConstraint->_checkConstName.c_str(), tszCheckConstName) == 0 ? true : false; });
 		if( findCheckConstraint == checkConstraints.end() )
 		{
-			DBModel::CheckConstraintRef CheckConstraintRef = MakeShared<DBModel::CheckConstraint>(_dbClass);
+			DBModel::CheckConstraintRef checkConstraintRef = MakeShared<DBModel::CheckConstraint>(_dbClass);
 			{
-				CheckConstraintRef->_schemaName = (*findTable)->_schemaName;
-				CheckConstraintRef->_tableName = (*findTable)->_tableName;
-				CheckConstraintRef->_checkConstName = tszCheckConstName;
-				CheckConstraintRef->_checkValue = tszCheckValue;
-				CheckConstraintRef->_systemNamed = isSystemNamed;
+				checkConstraintRef->_schemaName = (*findTable)->_schemaName;
+				checkConstraintRef->_tableName = (*findTable)->_tableName;
+				checkConstraintRef->_checkConstName = tszCheckConstName;
+				checkConstraintRef->_checkValue = tszCheckValue;
+				checkConstraintRef->_systemNamed = isSystemNamed;
 			}
-			checkConstraints.push_back(CheckConstraintRef);
+			checkConstraints.push_back(checkConstraintRef);
 			findCheckConstraint = checkConstraints.end() - 1;
 		}
 	}

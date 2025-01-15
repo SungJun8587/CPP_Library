@@ -12,6 +12,7 @@
 NAMESPACE_BEGIN(DBModel)
 
 USING_SHARED_PTR(Column);
+USING_SHARED_PTR(Constraint);
 USING_SHARED_PTR(IdentityColumn);
 USING_SHARED_PTR(IndexColumn);
 USING_SHARED_PTR(Index);
@@ -61,6 +62,24 @@ public:
 
 	DB_SYSTEM_INFO				_dbSystemInfo;
 	ORACLEDBTableIdentityColumn* _pORACLEDBTableIdentityCols;
+};
+
+class Constraint
+{
+public:
+	Constraint(EDBClass dbClass) { _dbClass = dbClass; };
+
+public:
+	EDBClass			_dbClass;
+	_tstring			_schemaName;
+	_tstring			_tableName;
+	_tstring			_constName;
+	_tstring			_constType;
+	_tstring			_constTypeDesc;
+	_tstring			_constValue;
+	bool				_systemNamed = false;
+	bool				_status = false;
+	_tstring			_sortValue;
 };
 
 class IdentityColumn
@@ -252,6 +271,7 @@ public:
 	_tstring					_modifyDate;
 
 	CVector<ColumnRef>				_columns;
+	CVector<ConstraintRef>			_constraints;
 	CVector<IdentityColumnRef>		_identityColumns;
 	CVector<IndexRef>				_indexes;
 	CVector<IndexOptionRef>			_indexOptions;

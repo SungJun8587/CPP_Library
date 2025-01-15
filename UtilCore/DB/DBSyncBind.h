@@ -192,6 +192,58 @@ namespace SP
 		}
 	};
 
+	class GetDBConstraints : public CDBBind<0, 11>
+	{
+	public:
+		GetDBConstraints(EDBClass dbClass, CBaseODBC& conn, const TCHAR* ptszTableName) : CDBBind(conn, GetConstraintsInfoQuery(dbClass, ptszTableName))
+		{
+		}
+		template<int32 N> void Out_DBName(OUT TCHAR(&value)[N])
+		{
+			BindCol(0, value);
+		}
+		void Out_ObjectId(OUT int32& value)
+		{
+			BindCol(1, value);
+		}
+		template<int32 N> void Out_SchemaName(OUT TCHAR(&value)[N])
+		{
+			BindCol(2, value);
+		}
+		template<int32 N> void Out_TableName(OUT TCHAR(&value)[N])
+		{
+			BindCol(3, value);
+		}
+		template<int32 N> void Out_ConstName(OUT TCHAR(&value)[N])
+		{
+			BindCol(4, value);
+		}
+		template<int32 N> void Out_ConstType(OUT TCHAR(&value)[N])
+		{
+			BindCol(5, value);
+		}
+		template<int32 N> void Out_ConstTypeDesc(OUT TCHAR(&value)[N])
+		{
+			BindCol(6, value);
+		}
+		template<int32 N> void Out_ConstValue(OUT TCHAR(&value)[N])
+		{
+			BindCol(7, value);
+		}
+		void Out_IsSystemNamed(OUT BOOL& value)
+		{
+			BindCol(8, value);
+		}
+		void Out_IsStatus(OUT BOOL& value)
+		{
+			BindCol(9, value);
+		}
+		template<int32 N> void Out_SortValue(OUT TCHAR(&value)[N])
+		{
+			BindCol(10, value);
+		}
+	};
+
 	class GetDBIdentityColumns : public CDBBind<0, 20>
 	{
 	public:

@@ -635,7 +635,7 @@ inline _tstring MYSQLGetConstraintsInfoQuery(_tstring tableName = _T(""))
 	_tstring query = _T("");
 
 	query = query + "SELECT const.`TABLE_SCHEMA` AS `db_name`, '' AS `schema_name`, 0 AS `object_id`, const.`TABLE_NAME` AS `table_name`, const.`CONSTRAINT_NAME` AS `const_name`, ";
-	query = query + "const.`CONSTRAINT_TYPE` AS `const_type`, '' AS `const_type_desc`, ckconst.`CHECK_CLAUSE` AS `const_value`, 0 AS `is_system_named`, ";
+	query = query + "const.`CONSTRAINT_TYPE` AS `const_type`, '' AS `const_type_desc`, ckconst.`CHECK_CLAUSE` AS `const_value`, 0 AS `is_system_named`, 0 AS `is_status`, ";
 	query = query + "(CASE const.`CONSTRAINT_TYPE` WHEN 'PRIMARY KEY' THEN 1 WHEN 'UNIQUE' THEN 2 WHEN 'FOREIGN KEY' THEN 3 WHEN 'CHECK' THEN 5 END) AS `sort_value`";
 	query = query + "\n" + "FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS AS const";
 	query = query + "\n" + "LEFT OUTER JOIN INFORMATION_SCHEMA.CHECK_CONSTRAINTS AS ckconst";

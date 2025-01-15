@@ -106,6 +106,23 @@ public:
 
 //***************************************************************************
 //
+class CONSTRAINT_INFO
+{
+public:
+	int32	ObjectId;												// MSSQL 테이블 고유번호
+	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];				// MSSQL 스키마 명
+	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN];				// 테이블 명
+	TCHAR   tszConstName[DATABASE_OBJECT_NAME_STRLEN];				// 제약조건 명
+	TCHAR   tszConstType[DATABASE_OBJECT_NAME_STRLEN];				// 제약조건 타입
+	TCHAR   tszConstTypeDesc[DATABASE_OBJECT_NAME_STRLEN];			// 제약조건 타입 설명
+	TCHAR   tszConstValue[DATABASE_WVARCHAR_MAX];					// 제약조건 정의값
+	bool	IsSystemNamed;											// 시스템이 인덱스명을 할당했는지 여부(true/false : 유/무)
+	bool	IsStatus;												// 제약 조건의 시행 상태. ORACLE만 사용(true/false : 제약 조건의 활성(ENABLED)/제약 조건의 비활성(DISABLED))
+	TCHAR   tszSortValue[DATABASE_OBJECT_NAME_STRLEN];				// 정렬 값
+};
+
+//***************************************************************************
+//
 class INDEX_INFO
 {
 public:

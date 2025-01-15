@@ -1017,7 +1017,7 @@ inline _tstring MSSQLGetConstraintsInfoQuery(_tstring tableName = _T(""))
 
 	if( tableName != "" )
 	{
-		query = query + "SELECT DB_NAME() AS db_name, object_id, OBJECT_SCHEMA_NAME(const.parent_object_id) AS schema_name, OBJECT_NAME(const.parent_object_id) AS table_name, const.name AS const_name, const.type AS const_type, const.type_desc AS const_type_desc, const.const_value AS const_value, const.is_system_named AS is_system_named, ";
+		query = query + "SELECT DB_NAME() AS db_name, const.parent_object_id AS object_id, OBJECT_SCHEMA_NAME(const.parent_object_id) AS schema_name, OBJECT_NAME(const.parent_object_id) AS table_name, const.name AS const_name, const.type AS const_type, const.type_desc AS const_type_desc, const.const_value AS const_value, const.is_system_named AS is_system_named, 0 AS is_status, ";
 		query = query + "(CASE const.type WHEN 'PK' THEN 1 WHEN 'UQ' THEN 2 WHEN 'F' THEN 3 WHEN 'D' THEN 4 WHEN 'C' THEN 5 END) AS sort_value";
 		query = query + "\n" + "FROM";
 		query = query + "\n" + "(";
@@ -1041,7 +1041,7 @@ inline _tstring MSSQLGetConstraintsInfoQuery(_tstring tableName = _T(""))
 	}
 	else
 	{
-		query = query + "SELECT DB_NAME() AS db_name, object_id, OBJECT_SCHEMA_NAME(const.parent_object_id) AS schema_name, OBJECT_NAME(const.parent_object_id) AS table_name, const.name AS const_name, const.type AS const_type, const.type_desc AS const_type_desc, const.const_value AS const_value, const.is_system_named AS is_system_named, ";
+		query = query + "SELECT DB_NAME() AS db_name, const.parent_object_id AS object_id, OBJECT_SCHEMA_NAME(const.parent_object_id) AS schema_name, OBJECT_NAME(const.parent_object_id) AS table_name, const.name AS const_name, const.type AS const_type, const.type_desc AS const_type_desc, const.const_value AS const_value, const.is_system_named AS is_system_named, 0 AS is_status, ";
 		query = query + "(CASE const.type WHEN 'PK' THEN 1 WHEN 'UQ' THEN 2 WHEN 'F' THEN 3 WHEN 'D' THEN 4 WHEN 'C' THEN 5 END) AS sort_value";
 		query = query + "\n" + "FROM";
 		query = query + "\n" + "(";

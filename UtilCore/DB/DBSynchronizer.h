@@ -109,6 +109,7 @@ public:
 
 	bool		GatherDBTables(const TCHAR* ptszTableName = _T(""));
 	bool		GatherDBTableColumns(const TCHAR* ptszTableName = _T(""));
+	bool		GatherDBTableConstraints(const TCHAR* ptszTableName = _T(""));
 	bool		GatherDBIdentityColumns(const TCHAR* ptszTableName = _T(""));
 	bool		GatherDBIndexes(const TCHAR* ptszTableName = _T(""));
 	bool		GatherDBIndexOptions(const TCHAR* ptszTableName = _T(""));
@@ -146,9 +147,10 @@ private:
 
 	void		ExecuteUpdateQueries();
 
-	void        SetExcelTop(Xlnt::CXlntUtil& excel, const std::string& start_cell, const std::string& end_cell);
+	void        SetExcelHeaderStyle(Xlnt::CXlntUtil& excel, const std::string& start_cell, const std::string& end_cell);
 	void		AddExcelTableInfo(Xlnt::CXlntUtil& excel);
 	void		AddExcelTableColumnInfo(Xlnt::CXlntUtil& excel);
+	void		AddExcelConstraintsInfo(Xlnt::CXlntUtil& excel);
 
 private:
 	EDBClass	_dbClass;
