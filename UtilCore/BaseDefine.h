@@ -102,7 +102,8 @@
 #define DATABASE_TABLE_NAME_STRLEN					128
 #define DATABASE_COLUMN_NAME_STRLEN					128
 #define DATABASE_OBJECT_NAME_STRLEN					128
-#define DATABASE_OBJECT_TYPE_DESC_STRLEN			60
+#define DATABASE_OBJECT_TYPE_STRLEN					3
+#define DATABASE_OBJECT_TYPE_DESC_STRLEN			61
 #define DATABASE_DATATYPEDESC_STRLEN				128
 #define DATABASE_BASE_STRLEN						260
 #define DATABASE_SCHEDULE_TIME_STRLEN				8
@@ -136,8 +137,8 @@
 #define DEADLOCK_STAMP_FREQ				(5*1000)			// Dead Lock 인지 체크 주기 (5 sec.)
 #define DEADLOCK_STAMP_CNT				10					// DEADLOCK_STAMP_FREQ(5초)주기로 10번 체크하여 Count가 0이 되면 서버 강제종료(30 sec.)
 
-//#define _CONSOLE_LOG
-#define _FILE_LOG
+#define _CONSOLE_LOG
+//#define _FILE_LOG
 
 //End************************************************************************
 //***************************************************************************

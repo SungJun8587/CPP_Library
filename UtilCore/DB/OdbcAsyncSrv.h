@@ -40,13 +40,13 @@ public:
 	bool Action();
 	void StopThread() {
 		_bStopThread.store(true);	// 플래그를 설정하여 루프 종료 
+		_cva.notify_all();			// 모든 대기 스레드를 깨움
 	};
 
 	COdbcConnPool* GetAccountOdbcConnPool(void);
 	COdbcConnPool* GetOdbcConnPool(uint64 m_nID);
 	COdbcConnPool* GetLogOdbcConnPool();
 
-	std::shared_mutex	_mutex;									// 큐 lock
 	std::queue<st_DBAsyncRq*>			_queueDBAsyncRq;		// DB 요청 구조체 큐
 	COMMAND_MAP							_mapCommand;			// 맵 핸들러
 
@@ -62,7 +62,9 @@ protected:
 	void		Clear(void);
 
 private:
-	std::atomic<bool> _bStopThread;								// 스레드 종료 플래그
+	std::atomic<bool>			_bStopThread;					// 스레드 종료 플래그
+	std::shared_mutex			_mutex;							// 큐 lock
+	std::condition_variable_any _cva;							// shared_mutex와 함께 사용하는 조건 변수
 };
 
 static std::shared_ptr<COdbcAsyncSrv> OdbcAsyncSrv_ = 0;

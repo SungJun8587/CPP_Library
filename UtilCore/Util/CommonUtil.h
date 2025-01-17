@@ -320,6 +320,21 @@ _tstring to_tstring(T value)
 #endif
 }
 
+//***************************************************************************
+//
+__inline _tstring addCommas(int64 number)
+{
+	_tstring numStr = to_tstring(number);
+	int insertPosition = static_cast<int>(numStr.length() - 3);
+
+	while( insertPosition > 0 )
+	{
+		numStr.insert(insertPosition, _T(","));
+		insertPosition -= 3;
+	}
+	return numStr;
+}
+
 void		GetDBDSNString(TCHAR* ptszDSN, const EDBClass dbClass, const TCHAR* ptszDSNDriver, const TCHAR* ptszDBHost, const unsigned int nPort, const TCHAR* ptszDBUserId, const TCHAR* ptszDBPasswd, const TCHAR* ptszDBName);
 EDBClass	GetInt8ToDBClass(uint8 num);
 uint32		GetUInt32(const char* pszText);

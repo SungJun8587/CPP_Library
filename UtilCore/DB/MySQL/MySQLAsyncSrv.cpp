@@ -187,26 +187,36 @@ bool CMySQLAsyncSrv::Action()
 }
 
 //***************************************************************************
-//
+// 큐에서 데이터를 추가하는 함수(쓰기 잠금)
 int CMySQLAsyncSrv::Push(st_DBAsyncRq* pAsyncRq)
 {
-	std::unique_lock lockGuard(_mutex);
+	std::unique_lock<std::shared_mutex> lockGuard(_mutex);
+
+	// 종료 요청 시 0 반환
+	if( _bStopThread ) return 0;
 
 	_queueDBAsyncRq.push(pAsyncRq);
 
-	return static_cast<int>(_queueDBAsyncRq.size());
+	int queueSize = static_cast<int>(_queueDBAsyncRq.size());
+
+	_cva.notify_all();		// 소비자 알림
+
+	return queueSize;
 }
 
 //***************************************************************************
-//
+// 큐에서 데이터를 꺼내는 함수(쓰기 잠금)
 st_DBAsyncRq* CMySQLAsyncSrv::Pop()
 {
 	static int queueCount = 2;
 
-	std::unique_lock lockGuard(_mutex);
+	std::unique_lock<std::shared_mutex> lockGuard(_mutex);
 
-	if( 0 == _queueDBAsyncRq.size() )
-		return NULL;
+	// 큐가 비어 있으면 대기
+	_cva.wait(lockGuard, [this]() { return !_queueDBAsyncRq.empty() || _bStopThread; });
+
+	// 종료 요청 시 nullptr 반환
+	if( _bStopThread ) return nullptr;
 
 	st_DBAsyncRq* pAsyncRq = _queueDBAsyncRq.front();
 	_queueDBAsyncRq.pop();
@@ -219,6 +229,8 @@ st_DBAsyncRq* CMySQLAsyncSrv::Pop()
 		queueCount = (int)_queueDBAsyncRq.size();
 		LOG_WARNING(_T("Async DB Call Queue size... : [%d]"), static_cast<int>(_queueDBAsyncRq.size()));
 	}
+
+	_cva.notify_all();		// 생산자에게 알림
 
 	return pAsyncRq;
 }
