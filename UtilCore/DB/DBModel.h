@@ -192,11 +192,15 @@ public:
 	_tstring				_schemaName;
 	_tstring				_tableName;
 	_tstring				_foreignKeyName;
+	bool					_isDisabled = false;
+	bool					_isNotTrusted = false;
 	_tstring				_updateRule;
 	_tstring				_deleteRule;
+	bool					_systemNamed = false;
 
 	_tstring				_foreignKeyTableName;
 	CVector<IndexColumnRef>	_foreignKeyColumns;
+	_tstring				_referenceKeySchemaName;
 	_tstring				_referenceKeyTableName;
 	CVector<IndexColumnRef>	_referenceKeyColumns;
 };
@@ -285,13 +289,13 @@ class ProcParam
 public:
 	_tstring			_paramId;
 	EParameterMode		_paramMode;
-	_tstring			_tableName;
+	_tstring			_paramName;
 	_tstring			_datatype;
 	uint64				_maxLength = 0;
 	uint8				_precision = 0;
 	uint8				_scale = 0;
 	_tstring			_datatypedesc;
-	_tstring			_tableComment;
+	_tstring			_paramComment;
 };
 
 class Procedure
@@ -303,8 +307,8 @@ public:
 public:
 	int32						_objectId = 0;
 	_tstring					_schemaName;
-	_tstring					_tableName;
-	_tstring					_tableComment;
+	_tstring					_procName;
+	_tstring					_procComment;
 	_tstring					_fullBody;
 	_tstring					_body;
 	_tstring					_createDate;
@@ -317,13 +321,13 @@ class FuncParam
 public:
 	_tstring			_paramId;
 	EParameterMode		_paramMode;
-	_tstring			_tableName;
+	_tstring			_paramName;
 	_tstring			_datatype;
 	uint64				_maxLength = 0;
 	uint8				_precision = 0;
 	uint8				_scale = 0;
 	_tstring			_datatypedesc;
-	_tstring			_tableComment;
+	_tstring			_paramComment;
 };
 
 class Function
@@ -335,8 +339,8 @@ public:
 public:
 	int32						_objectId = 0;
 	_tstring					_schemaName;
-	_tstring					_tableName;
-	_tstring					_tableComment;
+	_tstring					_funcName;
+	_tstring					_funcComment;
 	_tstring					_fullBody;
 	_tstring					_body;
 	_tstring					_createDate;

@@ -149,8 +149,11 @@ public:
 	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];				// MSSQL 스키마 명
 	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN];				// 테이블 명
 	TCHAR   tszForeignKeyName[DATABASE_OBJECT_NAME_STRLEN];			// 외래키 명
+	bool	IsDisabled;												// FOREIGN KEY 제약 조건 사용 여부(0/1 : 사용가능/사용불가능)
+	bool	IsNotTrusted;											// 시스템에서 데이터의 일괄성(FOREIGN KEY 제약 조건)에 대한 확인 여부(0/1 : 확인/미확인)
 	TCHAR	tszForeignKeyTableName[DATABASE_TABLE_NAME_STRLEN];		// 외래키 테이블 명
 	TCHAR	tszForeignKeyColumnName[DATABASE_COLUMN_NAME_STRLEN];	// 외래키 컬럼 명
+	TCHAR   tszReferenceKeySchemaName[DATABASE_OBJECT_NAME_STRLEN];	// 참조키 스키마 명
 	TCHAR	tszReferenceKeyTableName[DATABASE_TABLE_NAME_STRLEN];	// 참조키 테이블 명
 	TCHAR	tszReferenceKeyColumnName[DATABASE_COLUMN_NAME_STRLEN];	// 참조키 컬럼 명
 	TCHAR   tszUpdateReferentialAction[60];							// 업데이트 발생할 때 외래키에 대해 선언된 참조 작업(NO_ACTION/CASCADE/RESTRICT/SET NULL/SET DEFAULT)

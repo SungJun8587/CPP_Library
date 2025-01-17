@@ -1045,7 +1045,7 @@ _tstring Procedure::CreateQuery()
 //
 _tstring Procedure::DropQuery()
 {
-	return tstring_tcformat(_T("DROP PROCEDURE IF EXISTS %s"), _tableName.c_str());
+	return tstring_tcformat(_T("DROP PROCEDURE IF EXISTS %s"), _procName.c_str());
 }
 
 //***************************************************************************
@@ -1059,7 +1059,7 @@ _tstring Function::CreateQuery()
 //
 _tstring Function::DropQuery()
 {
-	return tstring_tcformat(_T("DROP FUNCTION IF EXISTS %s"), _tableName.c_str());
+	return tstring_tcformat(_T("DROP FUNCTION IF EXISTS %s"), _funcName.c_str());
 }
 
 //***************************************************************************

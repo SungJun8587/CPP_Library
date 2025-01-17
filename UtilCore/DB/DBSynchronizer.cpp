@@ -117,6 +117,8 @@ void CDBSynchronizer::DBToSaveExcel(const _tstring path)
 		AddExcelTableInfo(excel);
 		AddExcelTableColumnInfo(excel);
 		AddExcelConstraintsInfo(excel);
+		AddExcelIndexInfo(excel);
+		AddExcelForeignKeyInfo(excel);
 
 		// 저장
 		excel.SaveAs(path);
@@ -129,7 +131,7 @@ void CDBSynchronizer::DBToSaveExcel(const _tstring path)
 
 //***************************************************************************
 //
-void CDBSynchronizer::SetExcelHeaderStyle(Xlnt::CXlntUtil& excel, const std::string& start_cell, const std::string& end_cell)
+void CDBSynchronizer::ToHeaderStyle(Xlnt::CXlntUtil& excel, const std::string& start_cell, const std::string& end_cell)
 {
 	excel.SetRowHeight(1, 20);
 
@@ -155,7 +157,7 @@ void CDBSynchronizer::SetExcelHeaderStyle(Xlnt::CXlntUtil& excel, const std::str
 	xlnt::font title_font;
 	title_font.name("Gulim");					// 폰트 패밀리
 	title_font.bold(true);						// 폰트 굵게
-	title_font.size(11);						// 폰트 크기
+	title_font.size(10);						// 폰트 크기
 	title_font.color(xlnt::color::white());		// 폰트 색깔
 
 	// 정렬 설정
@@ -177,7 +179,7 @@ void CDBSynchronizer::AddExcelTableInfo(Xlnt::CXlntUtil& excel)
 
 	// 활성화 되어있는 기존 시트명('Sheet1')을 다른 시트명('TABLE')로 변경
 	excel.RenameSheet("TABLE");
-	SetExcelHeaderStyle(excel, "A1", "I1");
+	ToHeaderStyle(excel, "A1", "I1");
 
 	excel.WriteCell(currentRow, 1, "SCHEMA_NAME");
 	excel.WriteCell(currentRow, 2, "TABLE_NAME");
@@ -224,7 +226,7 @@ void CDBSynchronizer::AddExcelTableColumnInfo(Xlnt::CXlntUtil& excel)
 	int32 currentRow = 1;
 
 	excel.AddSheet("TABLE_COLUMN");
-	SetExcelHeaderStyle(excel, "A1", "Q1");
+	ToHeaderStyle(excel, "A1", "Q1");
 
 	excel.WriteCell(currentRow, 1, "SCHEMA_NAME");
 	excel.WriteCell(currentRow, 2, "TABLE_NAME");
@@ -298,7 +300,7 @@ void CDBSynchronizer::AddExcelConstraintsInfo(Xlnt::CXlntUtil& excel)
 	int32 currentRow = 1;
 
 	excel.AddSheet("TABLE_CONSTRAINTS");
-	SetExcelHeaderStyle(excel, "A1", "H1");
+	ToHeaderStyle(excel, "A1", "H1");
 
 	excel.WriteCell(currentRow, 1, "SCHEMA_NAME");
 	excel.WriteCell(currentRow, 2, "TABLE_NAME");
@@ -336,6 +338,128 @@ void CDBSynchronizer::AddExcelConstraintsInfo(Xlnt::CXlntUtil& excel)
 	excel.SetColumnWidth(6, ExcelColumnWidth::cnConstraintValue);
 	excel.SetColumnWidth(7, ExcelColumnWidth::cnSystemNamed);
 	excel.SetColumnWidth(8, ExcelColumnWidth::cnDefaultWidth);
+}
+
+//***************************************************************************
+//
+void CDBSynchronizer::AddExcelIndexInfo(Xlnt::CXlntUtil& excel)
+{
+	int32 currentRow = 1;
+
+	excel.AddSheet("TABLE_INDEX");
+	ToHeaderStyle(excel, "A1", "J1");
+
+	excel.WriteCell(currentRow, 1, "SCHEMA_NAME");
+	excel.WriteCell(currentRow, 2, "TABLE_NAME");
+	excel.WriteCell(currentRow, 3, "INDEX_NAME");
+	excel.WriteCell(currentRow, 4, "INDEX_TYPE");
+	excel.WriteCell(currentRow, 5, "IS_PRIMARYKEY");
+	excel.WriteCell(currentRow, 6, "IS_UNIQUE");
+	excel.WriteCell(currentRow, 7, "IS_SYSTEM_NAMED");
+	excel.WriteCell(currentRow, 8, "COLUMN_SEQ");
+	excel.WriteCell(currentRow, 9, "COLUMN_NAME");
+	excel.WriteCell(currentRow, 10, "COLUMN_SORT");
+
+	for( DBModel::TableRef& dbTable : _dbTables )
+	{
+		for( DBModel::IndexRef& dbIndex : dbTable->_indexes )
+		{
+			for( DBModel::IndexColumnRef& dbIndexColumn : dbIndex->_columns )
+			{
+				currentRow++;
+				excel.WriteCell(currentRow, 1, dbIndex->_schemaName);
+				excel.WriteCell(currentRow, 2, dbIndex->_tableName);
+				excel.WriteCell(currentRow, 3, dbIndex->_indexName);
+				excel.WriteCell(currentRow, 4, dbIndex->_type);
+				excel.WriteCell(currentRow, 5, std::to_string(dbIndex->_primaryKey));
+				excel.WriteCell(currentRow, 6, std::to_string(dbIndex->_uniqueKey));
+				excel.WriteCell(currentRow, 7, std::to_string(dbIndex->_systemNamed));
+				excel.WriteCell(currentRow, 8, dbIndexColumn->_seq);
+				excel.WriteCell(currentRow, 9, dbIndexColumn->_columnName);
+				excel.WriteCell(currentRow, 10, ToString(dbIndexColumn->_sort));
+				excel.SetRowHeight(currentRow, 16);
+			}
+		}
+	}
+
+	excel.SetAllCellTextFormat(3);
+
+	excel.SetColumnWidth(1, ExcelColumnWidth::cnSchemaName);
+	excel.SetColumnWidth(2, ExcelColumnWidth::cnObjectName);
+	excel.SetColumnWidth(3, ExcelColumnWidth::cnConstraintName);
+	excel.SetColumnWidth(4, ExcelColumnWidth::cnIndexType);
+	excel.SetColumnWidth(5, ExcelColumnWidth::cnDefaultWidth + 2);
+	excel.SetColumnWidth(6, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(7, ExcelColumnWidth::cnSystemNamed);
+	excel.SetColumnWidth(8, ExcelColumnWidth::cnSequence);
+	excel.SetColumnWidth(9, ExcelColumnWidth::cnColumnName);
+	excel.SetColumnWidth(10, ExcelColumnWidth::cnDefaultWidth);
+}
+
+//***************************************************************************
+//
+void CDBSynchronizer::AddExcelForeignKeyInfo(Xlnt::CXlntUtil& excel)
+{
+	int32 currentRow = 1;
+
+	excel.AddSheet("TABLE_FOREIGNKEY");
+	ToHeaderStyle(excel, "A1", "M1");
+
+	excel.WriteCell(currentRow, 1, "SCHEMA_NAME");
+	excel.WriteCell(currentRow, 2, "TABLE_NAME");
+	excel.WriteCell(currentRow, 3, "FOREIGNKEY_NAME");
+	excel.WriteCell(currentRow, 4, "IS_DISABLED");
+	excel.WriteCell(currentRow, 5, "IS_NOT_TRUSTED");
+	excel.WriteCell(currentRow, 6, "FKEY_TABLE_NAME");
+	excel.WriteCell(currentRow, 7, "FKEY_COLUMN_NAME");
+	excel.WriteCell(currentRow, 8, "RKEY_SCHEMA_NAME");
+	excel.WriteCell(currentRow, 9, "RKEY_TABLE_NAME");
+	excel.WriteCell(currentRow, 10, "RKEY_COLUMN_NAME");
+	excel.WriteCell(currentRow, 11, "UPDATE_RULE");
+	excel.WriteCell(currentRow, 12, "DELETE_RULE");
+	excel.WriteCell(currentRow, 13, "IS_SYSTEM_NAMED");
+
+	for( DBModel::TableRef& dbTable : _dbTables )
+	{
+		for( DBModel::ForeignKeyRef& dbForeignKey : dbTable->_foreignKeys )
+		{
+			int columnIndex = 0;
+			for( DBModel::IndexColumnRef& dbForeignKeyColumn : dbForeignKey->_foreignKeyColumns )
+			{
+				currentRow++;
+				excel.WriteCell(currentRow, 1, dbForeignKey->_schemaName);
+				excel.WriteCell(currentRow, 2, dbForeignKey->_tableName);
+				excel.WriteCell(currentRow, 3, dbForeignKey->_foreignKeyName);
+				excel.WriteCell(currentRow, 4, std::to_string(dbForeignKey->_isDisabled));
+				excel.WriteCell(currentRow, 5, std::to_string(dbForeignKey->_isNotTrusted));
+				excel.WriteCell(currentRow, 6, dbForeignKey->_foreignKeyTableName);
+				excel.WriteCell(currentRow, 7, dbForeignKeyColumn->_columnName);
+				excel.WriteCell(currentRow, 8, dbForeignKey->_referenceKeySchemaName);
+				excel.WriteCell(currentRow, 9, dbForeignKey->_referenceKeyTableName);
+				excel.WriteCell(currentRow, 10, dbForeignKey->_referenceKeyColumns[columnIndex++]->_columnName);
+				excel.WriteCell(currentRow, 11, dbForeignKey->_updateRule);
+				excel.WriteCell(currentRow, 12, dbForeignKey->_deleteRule);
+				excel.WriteCell(currentRow, 13, std::to_string(dbForeignKey->_systemNamed));
+				excel.SetRowHeight(currentRow, 16);
+			}
+		}
+	}
+
+	excel.SetAllCellTextFormat(3);
+
+	excel.SetColumnWidth(1, ExcelColumnWidth::cnSchemaName);
+	excel.SetColumnWidth(2, ExcelColumnWidth::cnObjectName);
+	excel.SetColumnWidth(3, ExcelColumnWidth::cnConstraintName);
+	excel.SetColumnWidth(4, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(5, ExcelColumnWidth::cnDefaultWidth + 2);
+	excel.SetColumnWidth(6, ExcelColumnWidth::cnObjectName);
+	excel.SetColumnWidth(7, ExcelColumnWidth::cnColumnName);
+	excel.SetColumnWidth(8, ExcelColumnWidth::cnSchemaName + 4);
+	excel.SetColumnWidth(9, ExcelColumnWidth::cnObjectName);
+	excel.SetColumnWidth(10, ExcelColumnWidth::cnColumnName);
+	excel.SetColumnWidth(11, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(12, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(13, ExcelColumnWidth::cnSystemNamed);
 }
 
 //***************************************************************************
@@ -459,8 +583,8 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 	{
 		DBModel::ProcedureRef p = MakeShared<DBModel::Procedure>();
 		p->_schemaName = procedure.GetStringAttr(_T("schemaname"));
-		p->_tableName = procedure.GetStringAttr(_T("name"));
-		p->_tableComment = procedure.GetStringAttr(_T("desc"));
+		p->_procName = procedure.GetStringAttr(_T("name"));
+		p->_procComment = procedure.GetStringAttr(_T("desc"));
 		p->_body = procedure.FindChild(_T("body")).GetStringValue();
 
 		CVector<CXMLNode> params = procedure.FindChildren(_T("Param"));
@@ -469,8 +593,8 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 			DBModel::ProcParamRef procParam = MakeShared<DBModel::ProcParam>();
 			procParam->_paramId = param.GetStringAttr(_T("seq"));
 			procParam->_paramMode = StringToDBParamMode(param.GetStringAttr(_T("mode")));
-			procParam->_tableName = param.GetStringAttr(_T("name"));
-			procParam->_tableComment = param.GetStringAttr(_T("desc"));
+			procParam->_paramName = param.GetStringAttr(_T("name"));
+			procParam->_paramComment = param.GetStringAttr(_T("desc"));
 			procParam->_datatypedesc = param.GetStringAttr(_T("type"));
 			p->_parameters.push_back(procParam);
 		}
@@ -482,8 +606,8 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 	{
 		DBModel::FunctionRef f = MakeShared<DBModel::Function>();
 		f->_schemaName = function.GetStringAttr(_T("schemaname"));
-		f->_tableName = function.GetStringAttr(_T("name"));
-		f->_tableComment = function.GetStringAttr(_T("desc"));
+		f->_funcName = function.GetStringAttr(_T("name"));
+		f->_funcComment = function.GetStringAttr(_T("desc"));
 		f->_body = function.FindChild(_T("body")).GetStringValue();
 
 		CVector<CXMLNode> params = function.FindChildren(_T("Param"));
@@ -492,8 +616,8 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 			DBModel::FuncParamRef funcParam = MakeShared<DBModel::FuncParam>();
 			funcParam->_paramId = param.GetStringAttr(_T("seq"));
 			funcParam->_paramMode = StringToDBParamMode(param.GetStringAttr(_T("mode")));
-			funcParam->_tableName = param.GetStringAttr(_T("name"));
-			funcParam->_tableComment = param.GetStringAttr(_T("desc"));
+			funcParam->_paramName = param.GetStringAttr(_T("name"));
+			funcParam->_paramComment = param.GetStringAttr(_T("desc"));
 			funcParam->_datatypedesc = param.GetStringAttr(_T("type"));
 			f->_parameters.push_back(funcParam);
 		}
@@ -603,16 +727,16 @@ bool CDBSynchronizer::DBToCreateXml(const TCHAR* path)
 	{
 		_tXmlNodeType* procedure = doc.allocate_node(rapidxml::node_type::node_element, _T("Procedure"));
 		procedure->append_attribute(doc.allocate_attribute(_T("schemaname"), dbProcedure->_schemaName.c_str()));
-		procedure->append_attribute(doc.allocate_attribute(_T("name"), dbProcedure->_tableName.c_str()));
-		procedure->append_attribute(doc.allocate_attribute(_T("desc"), dbProcedure->_tableComment.c_str()));
+		procedure->append_attribute(doc.allocate_attribute(_T("name"), dbProcedure->_procName.c_str()));
+		procedure->append_attribute(doc.allocate_attribute(_T("desc"), dbProcedure->_procComment.c_str()));
 		for( DBModel::ProcParamRef& dbProcParam : dbProcedure->_parameters )
 		{
 			_tXmlNodeType* procParam = doc.allocate_node(rapidxml::node_type::node_element, _T("Param"));
 			procParam->append_attribute(doc.allocate_attribute(_T("seq"), dbProcParam->_paramId.c_str()));
 			procParam->append_attribute(doc.allocate_attribute(_T("mode"), doc.allocate_string(ToString(dbProcParam->_paramMode))));
-			procParam->append_attribute(doc.allocate_attribute(_T("name"), dbProcParam->_tableName.c_str()));
+			procParam->append_attribute(doc.allocate_attribute(_T("name"), dbProcParam->_paramName.c_str()));
 			procParam->append_attribute(doc.allocate_attribute(_T("type"), dbProcParam->_datatypedesc.c_str()));
-			procParam->append_attribute(doc.allocate_attribute(_T("desc"), dbProcParam->_tableComment.c_str()));
+			procParam->append_attribute(doc.allocate_attribute(_T("desc"), dbProcParam->_paramComment.c_str()));
 			procedure->append_node(procParam);
 		}
 
@@ -627,16 +751,16 @@ bool CDBSynchronizer::DBToCreateXml(const TCHAR* path)
 	{
 		_tXmlNodeType* function = doc.allocate_node(rapidxml::node_type::node_element, _T("Function"));
 		function->append_attribute(doc.allocate_attribute(_T("schemaname"), dbFunction->_schemaName.c_str()));
-		function->append_attribute(doc.allocate_attribute(_T("name"), dbFunction->_tableName.c_str()));
-		function->append_attribute(doc.allocate_attribute(_T("desc"), dbFunction->_tableComment.c_str()));
+		function->append_attribute(doc.allocate_attribute(_T("name"), dbFunction->_funcName.c_str()));
+		function->append_attribute(doc.allocate_attribute(_T("desc"), dbFunction->_funcComment.c_str()));
 		for( DBModel::FuncParamRef& dbFuncParam : dbFunction->_parameters )
 		{
 			_tXmlNodeType* funcParam = doc.allocate_node(rapidxml::node_type::node_element, _T("Param"));
 			funcParam->append_attribute(doc.allocate_attribute(_T("seq"), dbFuncParam->_paramId.c_str()));
 			funcParam->append_attribute(doc.allocate_attribute(_T("mode"), doc.allocate_string(ToString(dbFuncParam->_paramMode))));
-			funcParam->append_attribute(doc.allocate_attribute(_T("name"), dbFuncParam->_tableName.c_str()));
+			funcParam->append_attribute(doc.allocate_attribute(_T("name"), dbFuncParam->_paramName.c_str()));
 			funcParam->append_attribute(doc.allocate_attribute(_T("type"), dbFuncParam->_datatypedesc.c_str()));
-			funcParam->append_attribute(doc.allocate_attribute(_T("desc"), dbFuncParam->_tableComment.c_str()));
+			funcParam->append_attribute(doc.allocate_attribute(_T("desc"), dbFuncParam->_paramComment.c_str()));
 			function->append_node(funcParam);
 		}
 
@@ -1158,12 +1282,16 @@ bool CDBSynchronizer::GatherDBForeignKeys(const TCHAR* ptszTableName)
 	TCHAR	tszSchemaName[DATABASE_OBJECT_NAME_STRLEN] = { 0, };
 	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN] = { 0, };
 	TCHAR	tszForeignKeyName[DATABASE_OBJECT_NAME_STRLEN] = { 0, };
+	BOOL	isDisabled;
+	BOOL	isNotTrusted;
 	TCHAR	tszForeignKeyTableName[DATABASE_TABLE_NAME_STRLEN] = { 0, };
 	TCHAR	tszForeignKeyColumnName[DATABASE_COLUMN_NAME_STRLEN] = { 0, };
+	TCHAR	tszReferenceKeySchemaName[DATABASE_OBJECT_NAME_STRLEN] = { 0, };
 	TCHAR	tszReferenceKeyTableName[DATABASE_TABLE_NAME_STRLEN] = { 0, };
 	TCHAR	tszReferenceKeyColumnName[DATABASE_COLUMN_NAME_STRLEN] = { 0, };
 	TCHAR	tszUpdateRule[101] = { 0, };
 	TCHAR	tszDeleteRule[101] = { 0, };
+	BOOL	isSystemNamed;
 
 	SP::GetDBForeignKeys getDBForeignKeys(_dbClass, _dbConn, ptszTableName);
 	getDBForeignKeys.Out_DBName(OUT tszDBName);
@@ -1171,12 +1299,16 @@ bool CDBSynchronizer::GatherDBForeignKeys(const TCHAR* ptszTableName)
 	getDBForeignKeys.Out_SchemaName(OUT tszSchemaName);
 	getDBForeignKeys.Out_TableName(OUT tszTableName);
 	getDBForeignKeys.Out_ForeignKeyName(OUT tszForeignKeyName);
+	getDBForeignKeys.Out_IsDisabled(OUT isDisabled);
+	getDBForeignKeys.Out_IsNotTrusted(OUT isNotTrusted);
 	getDBForeignKeys.Out_ForeignKeyTableName(OUT tszForeignKeyTableName);
 	getDBForeignKeys.Out_ForeignKeyColumnName(OUT tszForeignKeyColumnName);
+	getDBForeignKeys.Out_ReferenceKeySchemaName(OUT tszReferenceKeySchemaName);
 	getDBForeignKeys.Out_ReferenceKeyTableName(OUT tszReferenceKeyTableName);
 	getDBForeignKeys.Out_ReferenceKeyColumnName(OUT tszReferenceKeyColumnName);
 	getDBForeignKeys.Out_UpdateRule(OUT tszUpdateRule);
 	getDBForeignKeys.Out_DeleteRule(OUT tszDeleteRule);
+	getDBForeignKeys.Out_IsSystemNamed(OUT isSystemNamed);
 
 	if( getDBForeignKeys.ExecDirect() == false )
 		return false;
@@ -1201,10 +1333,14 @@ bool CDBSynchronizer::GatherDBForeignKeys(const TCHAR* ptszTableName)
 				foreignKeyRef->_schemaName = (*findTable)->_schemaName;
 				foreignKeyRef->_tableName = (*findTable)->_tableName;
 				foreignKeyRef->_foreignKeyName = tszForeignKeyName;
+				foreignKeyRef->_isDisabled = isDisabled;
+				foreignKeyRef->_isNotTrusted = isNotTrusted;
 				foreignKeyRef->_foreignKeyTableName = tszForeignKeyTableName;
+				foreignKeyRef->_referenceKeySchemaName = tszReferenceKeySchemaName;
 				foreignKeyRef->_referenceKeyTableName = tszReferenceKeyTableName;
 				foreignKeyRef->_updateRule = tszUpdateRule;
 				foreignKeyRef->_deleteRule = tszDeleteRule;
+				foreignKeyRef->_systemNamed = isSystemNamed;
 			}
 			referenceKeys.push_back(foreignKeyRef);
 			findReferenceKey = referenceKeys.end() - 1;
@@ -1376,7 +1512,10 @@ bool CDBSynchronizer::GatherDBTrigger(const TCHAR* ptszTableName)
 	{
 		DBModel::TriggerRef iterTriggerRef = *iter;
 		if( _dbClass == EDBClass::MSSQL )
-			iterTriggerRef->_fullBody = dbQuery.MSSQLHelpText(EDBObjectType::TRIGGERS, iterTriggerRef->_triggerName.c_str());
+		{
+			_tstring triggerName = iterTriggerRef->_schemaName + _T(".") + iterTriggerRef->_triggerName;
+			iterTriggerRef->_fullBody = dbQuery.MSSQLHelpText(EDBObjectType::TRIGGERS, triggerName.c_str());
+		}
 		else if( _dbClass == EDBClass::MYSQL )
 			iterTriggerRef->_fullBody = dbQuery.MYSQLShowObject(EDBObjectType::TRIGGERS, iterTriggerRef->_triggerName.c_str());
 		else if( _dbClass == EDBClass::ORACLE )
@@ -1418,8 +1557,8 @@ bool CDBSynchronizer::GatherDBStoredProcedures(const TCHAR* ptszProcName)
 		DBModel::ProcedureRef procRef = MakeShared<DBModel::Procedure>();
 		procRef->_objectId = objectId;
 		procRef->_schemaName = tszSchemaName;
-		procRef->_tableName = tszProcName;
-		procRef->_tableComment = tszProcComment;
+		procRef->_procName = tszProcName;
+		procRef->_procComment = tszProcComment;
 		procRef->_fullBody = _tstring(body.begin(), std::find(body.begin(), body.end(), 0));
 		procRef->_createDate = tszCreateDate;
 		procRef->_modifyDate = tszModifyDate;
@@ -1435,7 +1574,8 @@ bool CDBSynchronizer::GatherDBStoredProcedures(const TCHAR* ptszProcName)
 		for( auto iter = _dbProcedures.begin(); iter != _dbProcedures.end(); iter++ )
 		{
 			DBModel::ProcedureRef iterProcRef = *iter;
-			iterProcRef->_fullBody = dbQuery.MSSQLHelpText(EDBObjectType::PROCEDURE, iterProcRef->_tableName.c_str());
+			_tstring procName = iterProcRef->_schemaName + _T(".") + iterProcRef->_procName;
+			iterProcRef->_fullBody = dbQuery.MSSQLHelpText(EDBObjectType::PROCEDURE, procName.c_str());
 		}
 	}
 	else if( _dbClass == EDBClass::MYSQL )
@@ -1443,7 +1583,7 @@ bool CDBSynchronizer::GatherDBStoredProcedures(const TCHAR* ptszProcName)
 		for( auto iter = _dbProcedures.begin(); iter != _dbProcedures.end(); iter++ )
 		{
 			DBModel::ProcedureRef iterProcRef = *iter;
-			iterProcRef->_fullBody = dbQuery.MYSQLShowObject(EDBObjectType::PROCEDURE, iterProcRef->_tableName.c_str());
+			iterProcRef->_fullBody = dbQuery.MYSQLShowObject(EDBObjectType::PROCEDURE, iterProcRef->_procName.c_str());
 		}
 	}
 	else if( _dbClass == EDBClass::ORACLE )
@@ -1451,7 +1591,7 @@ bool CDBSynchronizer::GatherDBStoredProcedures(const TCHAR* ptszProcName)
 		for( auto iter = _dbProcedures.begin(); iter != _dbProcedures.end(); iter++ )
 		{
 			DBModel::ProcedureRef iterProcRef = *iter;
-			iterProcRef->_fullBody = dbQuery.ORACLEGetUserSource(EDBObjectType::PROCEDURE, iterProcRef->_tableName.c_str());
+			iterProcRef->_fullBody = dbQuery.ORACLEGetUserSource(EDBObjectType::PROCEDURE, iterProcRef->_procName.c_str());
 		}
 	}
 
@@ -1502,26 +1642,26 @@ bool CDBSynchronizer::GatherDBStoredProcedureParams(const TCHAR* ptszProcName)
 		auto findProc = std::find_if(_dbProcedures.begin(), _dbProcedures.end(), [=](const DBModel::ProcedureRef& proc)
 		{
 			if( _dbClass == EDBClass::MSSQL ) return proc->_objectId == objectId;
-			else if( _dbClass == EDBClass::MYSQL ) return _tcsicmp(proc->_tableName.c_str(), tszProcName) == 0 ? true : false;
+			else if( _dbClass == EDBClass::MYSQL ) return _tcsicmp(proc->_procName.c_str(), tszProcName) == 0 ? true : false;
 
 			return false;
 		});
 		ASSERT_CRASH(findProc != _dbProcedures.end());
 		CVector<DBModel::ProcParamRef>& procParams = (*findProc)->_parameters;
-		auto findProcParam = std::find_if(procParams.begin(), procParams.end(), [tszParamName](DBModel::ProcParamRef& procParam) { return _tcsicmp(procParam->_tableName.c_str(), tszParamName) == 0 ? true : false; });
+		auto findProcParam = std::find_if(procParams.begin(), procParams.end(), [tszParamName](DBModel::ProcParamRef& procParam) { return _tcsicmp(procParam->_paramName.c_str(), tszParamName) == 0 ? true : false; });
 		if( findProcParam == procParams.end() )
 		{
 			DBModel::ProcParamRef procParamRef = MakeShared<DBModel::ProcParam>();
 			{
 				procParamRef->_paramId = tstring_tcformat(_T("%d"), paramId);;
 				procParamRef->_paramMode = static_cast<EParameterMode>(paramMode);
-				procParamRef->_tableName = tszParamName;
+				procParamRef->_paramName = tszParamName;
 				procParamRef->_datatype = tszDataType;
 				procParamRef->_maxLength = (_tcsicmp(procParamRef->_datatype.c_str(), _T("nvarchar")) == 0 || _tcsicmp(procParamRef->_datatype.c_str(), _T("nchar")) == 0 ? maxLength / 2 : maxLength);
 				procParamRef->_precision = precision;
 				procParamRef->_scale = scale;
 				procParamRef->_datatypedesc = tszDataTypeDesc;
-				procParamRef->_tableComment = tszParamComment;
+				procParamRef->_paramComment = tszParamComment;
 			}
 
 			procParams.push_back(procParamRef);
@@ -1566,8 +1706,8 @@ bool CDBSynchronizer::GatherDBFunctions(const TCHAR* ptszFuncName)
 		DBModel::FunctionRef funcRef = MakeShared<DBModel::Function>();
 		funcRef->_objectId = objectId;
 		funcRef->_schemaName = tszSchemaName;
-		funcRef->_tableName = tszFuncName;
-		funcRef->_tableComment = tszFuncComment;
+		funcRef->_funcName = tszFuncName;
+		funcRef->_funcComment = tszFuncComment;
 		funcRef->_fullBody = _tstring(body.begin(), std::find(body.begin(), body.end(), 0));
 		funcRef->_createDate = tszCreateDate;
 		funcRef->_modifyDate = tszModifyDate;
@@ -1583,7 +1723,8 @@ bool CDBSynchronizer::GatherDBFunctions(const TCHAR* ptszFuncName)
 		for( auto iter = _dbFunctions.begin(); iter != _dbFunctions.end(); iter++ )
 		{
 			DBModel::FunctionRef iterFuncRef = *iter;
-			iterFuncRef->_fullBody = dbQuery.MSSQLHelpText(EDBObjectType::FUNCTION, iterFuncRef->_tableName.c_str());
+			_tstring funcName = iterFuncRef->_schemaName + _T(".") + iterFuncRef->_funcName;
+			iterFuncRef->_fullBody = dbQuery.MSSQLHelpText(EDBObjectType::FUNCTION, funcName.c_str());
 		}
 	}
 	else if( _dbClass == EDBClass::MYSQL )
@@ -1591,7 +1732,7 @@ bool CDBSynchronizer::GatherDBFunctions(const TCHAR* ptszFuncName)
 		for( auto iter = _dbFunctions.begin(); iter != _dbFunctions.end(); iter++ )
 		{
 			DBModel::FunctionRef iterFuncRef = *iter;
-			iterFuncRef->_fullBody = dbQuery.MYSQLShowObject(EDBObjectType::FUNCTION, iterFuncRef->_tableName.c_str());
+			iterFuncRef->_fullBody = dbQuery.MYSQLShowObject(EDBObjectType::FUNCTION, iterFuncRef->_funcName.c_str());
 		}
 	}
 	else if( _dbClass == EDBClass::ORACLE )
@@ -1599,7 +1740,7 @@ bool CDBSynchronizer::GatherDBFunctions(const TCHAR* ptszFuncName)
 		for( auto iter = _dbFunctions.begin(); iter != _dbFunctions.end(); iter++ )
 		{
 			DBModel::FunctionRef iterFuncRef = *iter;
-			iterFuncRef->_fullBody = dbQuery.ORACLEGetUserSource(EDBObjectType::FUNCTION, iterFuncRef->_tableName.c_str());
+			iterFuncRef->_fullBody = dbQuery.ORACLEGetUserSource(EDBObjectType::FUNCTION, iterFuncRef->_funcName.c_str());
 		}
 	}
 
@@ -1650,26 +1791,26 @@ bool CDBSynchronizer::GatherDBFunctionParams(const TCHAR* ptszFuncName)
 		auto findFunc = std::find_if(_dbFunctions.begin(), _dbFunctions.end(), [=](const DBModel::FunctionRef& func)
 		{
 			if( _dbClass == EDBClass::MSSQL ) return func->_objectId == objectId;
-			else if( _dbClass == EDBClass::MYSQL ) return _tcsicmp(func->_tableName.c_str(), tszFuncName) == 0 ? true : false;
+			else if( _dbClass == EDBClass::MYSQL ) return _tcsicmp(func->_funcName.c_str(), tszFuncName) == 0 ? true : false;
 
 			return false;
 		});
 		ASSERT_CRASH(findFunc != _dbFunctions.end());
 		CVector<DBModel::FuncParamRef>& funcParams = (*findFunc)->_parameters;
-		auto findFuncParam = std::find_if(funcParams.begin(), funcParams.end(), [tszParamName](DBModel::FuncParamRef& funcParam) { return _tcsicmp(funcParam->_tableName.c_str(), tszParamName) == 0 ? true : false; });
+		auto findFuncParam = std::find_if(funcParams.begin(), funcParams.end(), [tszParamName](DBModel::FuncParamRef& funcParam) { return _tcsicmp(funcParam->_paramName.c_str(), tszParamName) == 0 ? true : false; });
 		if( findFuncParam == funcParams.end() )
 		{
 			DBModel::FuncParamRef funcParamRef = MakeShared<DBModel::FuncParam>();
 			{
 				funcParamRef->_paramId = tstring_tcformat(_T("%d"), paramId);;
 				funcParamRef->_paramMode = static_cast<EParameterMode>(paramMode);
-				funcParamRef->_tableName = tszParamName;
+				funcParamRef->_paramName = tszParamName;
 				funcParamRef->_datatype = tszDataType;
 				funcParamRef->_maxLength = (_tcsicmp(funcParamRef->_datatype.c_str(), _T("nvarchar")) == 0 || _tcsicmp(funcParamRef->_datatype.c_str(), _T("nchar")) == 0 ? maxLength / 2 : maxLength);
 				funcParamRef->_precision = precision;
 				funcParamRef->_scale = scale;
 				funcParamRef->_datatypedesc = tszDataTypeDesc;
-				funcParamRef->_tableComment = tszParamComment;
+				funcParamRef->_paramComment = tszParamComment;
 			}
 
 			funcParams.push_back(funcParamRef);
@@ -1981,19 +2122,19 @@ void CDBSynchronizer::CompareStoredProcedures()
 	// XML에 있는 프로시저 목록을 갖고 온다.
 	CMap<_tstring, DBModel::ProcedureRef> xmlProceduresMap;
 	for( DBModel::ProcedureRef& xmlProcedure : _xmlProcedures )
-		xmlProceduresMap[xmlProcedure->_tableName] = xmlProcedure;
+		xmlProceduresMap[xmlProcedure->_procName] = xmlProcedure;
 
 	// DB에 실존하는 테이블 프로시저들을 돌면서 XML에 정의된 프로시저들과 비교한다.
 	for( DBModel::ProcedureRef& dbProcedure : _dbProcedures )
 	{
-		auto findProcedure = xmlProceduresMap.find(dbProcedure->_tableName);
+		auto findProcedure = xmlProceduresMap.find(dbProcedure->_procName);
 		if( findProcedure != xmlProceduresMap.end() )
 		{
 			DBModel::ProcedureRef xmlProcedure = findProcedure->second;
 			_tstring xmlBody = xmlProcedure->CreateQuery();
 			if( DBModel::Helpers::RemoveWhiteSpace(dbProcedure->_fullBody) != DBModel::Helpers::RemoveWhiteSpace(xmlBody) )
 			{
-				LOG_INFO(_T("Updating Procedure : %s"), dbProcedure->_tableName.c_str());
+				LOG_INFO(_T("Updating Procedure : %s"), dbProcedure->_procName.c_str());
 				_updateQueries[UpdateStep::DropStoredProcecure].push_back(xmlProcedure->DropQuery());
 				_updateQueries[UpdateStep::CreateStoredProcecure].push_back(xmlProcedure->CreateQuery());
 			}
@@ -2016,19 +2157,19 @@ void CDBSynchronizer::CompareFunctions()
 	// XML에 있는 프로시저 목록을 갖고 온다.
 	CMap<_tstring, DBModel::FunctionRef> xmlFunctionsMap;
 	for( DBModel::FunctionRef& xmlFunction : _xmlFunctions )
-		xmlFunctionsMap[xmlFunction->_tableName] = xmlFunction;
+		xmlFunctionsMap[xmlFunction->_funcName] = xmlFunction;
 
 	// DB에 실존하는 테이블 프로시저들을 돌면서 XML에 정의된 프로시저들과 비교한다.
 	for( DBModel::FunctionRef& dbFunction : _dbFunctions )
 	{
-		auto findFunction = xmlFunctionsMap.find(dbFunction->_tableName);
+		auto findFunction = xmlFunctionsMap.find(dbFunction->_funcName);
 		if( findFunction != xmlFunctionsMap.end() )
 		{
 			DBModel::FunctionRef xmlFunction = findFunction->second;
 			_tstring xmlBody = xmlFunction->CreateQuery();
 			if( DBModel::Helpers::RemoveWhiteSpace(dbFunction->_fullBody) != DBModel::Helpers::RemoveWhiteSpace(xmlBody) )
 			{
-				LOG_INFO(_T("Updating Procedure : %s"), dbFunction->_tableName.c_str());
+				LOG_INFO(_T("Updating Procedure : %s"), dbFunction->_funcName.c_str());
 				_updateQueries[UpdateStep::DropFunction].push_back(xmlFunction->DropQuery());
 				_updateQueries[UpdateStep::CreateFunction].push_back(xmlFunction->CreateQuery());
 			}

@@ -147,10 +147,13 @@ private:
 
 	void		ExecuteUpdateQueries();
 
-	void        SetExcelHeaderStyle(Xlnt::CXlntUtil& excel, const std::string& start_cell, const std::string& end_cell);
+	void        ToHeaderStyle(Xlnt::CXlntUtil& excel, const std::string& start_cell, const std::string& end_cell);
+
 	void		AddExcelTableInfo(Xlnt::CXlntUtil& excel);
 	void		AddExcelTableColumnInfo(Xlnt::CXlntUtil& excel);
 	void		AddExcelConstraintsInfo(Xlnt::CXlntUtil& excel);
+	void		AddExcelIndexInfo(Xlnt::CXlntUtil& excel);
+	void		AddExcelForeignKeyInfo(Xlnt::CXlntUtil& excel);
 
 private:
 	EDBClass	_dbClass;

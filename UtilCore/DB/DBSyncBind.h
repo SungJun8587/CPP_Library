@@ -504,7 +504,7 @@ namespace SP
 		}
 	};
 
-	class GetDBForeignKeys : public CDBBind<0, 11>
+	class GetDBForeignKeys : public CDBBind<0, 15>
 	{
 	public:
 		GetDBForeignKeys(EDBClass dbClass, CBaseODBC& conn, const TCHAR* ptszTableName) : CDBBind(conn, GetForeignKeyInfoQuery(dbClass, ptszTableName))
@@ -530,29 +530,45 @@ namespace SP
 		{
 			BindCol(4, value);
 		}
-		template<int32 N> void Out_ForeignKeyTableName(OUT TCHAR(&value)[N])
+		void Out_IsDisabled(OUT BOOL& value)
 		{
 			BindCol(5, value);
 		}
-		template<int32 N> void Out_ForeignKeyColumnName(OUT TCHAR(&value)[N])
+		void Out_IsNotTrusted(OUT BOOL& value)
 		{
 			BindCol(6, value);
 		}
-		template<int32 N> void Out_ReferenceKeyTableName(OUT TCHAR(&value)[N])
+		template<int32 N> void Out_ForeignKeyTableName(OUT TCHAR(&value)[N])
 		{
 			BindCol(7, value);
 		}
-		template<int32 N> void Out_ReferenceKeyColumnName(OUT TCHAR(&value)[N])
+		template<int32 N> void Out_ForeignKeyColumnName(OUT TCHAR(&value)[N])
 		{
 			BindCol(8, value);
 		}
-		template<int32 N> void Out_UpdateRule(OUT TCHAR(&value)[N])
+		template<int32 N> void Out_ReferenceKeySchemaName(OUT TCHAR(&value)[N])
 		{
 			BindCol(9, value);
 		}
-		template<int32 N> void Out_DeleteRule(OUT TCHAR(&value)[N])
+		template<int32 N> void Out_ReferenceKeyTableName(OUT TCHAR(&value)[N])
 		{
 			BindCol(10, value);
+		}
+		template<int32 N> void Out_ReferenceKeyColumnName(OUT TCHAR(&value)[N])
+		{
+			BindCol(11, value);
+		}
+		template<int32 N> void Out_UpdateRule(OUT TCHAR(&value)[N])
+		{
+			BindCol(12, value);
+		}
+		template<int32 N> void Out_DeleteRule(OUT TCHAR(&value)[N])
+		{
+			BindCol(13, value);
+		}
+		void Out_IsSystemNamed(OUT BOOL& value)
+		{
+			BindCol(14, value);
 		}
 	};
 
