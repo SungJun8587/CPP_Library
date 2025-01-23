@@ -750,7 +750,7 @@ namespace SP
 		{
 			BindCol(7, value);
 		}
-		void Out_MaxLength(OUT uint64& value)
+		void Out_MaxLength(OUT int64& value)
 		{
 			BindCol(8, value);
 		}
@@ -846,7 +846,7 @@ namespace SP
 		{
 			BindCol(7, value);
 		}
-		void Out_MaxLength(OUT uint64& value)
+		void Out_MaxLength(OUT int64& value)
 		{
 			BindCol(8, value);
 		}

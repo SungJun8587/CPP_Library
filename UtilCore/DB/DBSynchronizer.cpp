@@ -119,6 +119,17 @@ void CDBSynchronizer::DBToSaveExcel(const _tstring path)
 		AddExcelConstraintsInfo(excel);
 		AddExcelIndexInfo(excel);
 		AddExcelForeignKeyInfo(excel);
+		AddExcelCheckConstraintsInfo(excel);
+		
+		if( _dbClass == EDBClass::MSSQL )
+		{
+			AddExcelMSSQLTableIndexOptionInfo(excel);
+			AddExcelMSSQLDefaultConstraintsInfo(excel);
+		}
+		else if( _dbClass == EDBClass::ORACLE )
+		{
+			AddExcelORACLEIdentityColumnInfo(excel);
+		}
 
 		// 저장
 		excel.SaveAs(path);
@@ -272,8 +283,6 @@ void CDBSynchronizer::AddExcelTableColumnInfo(Xlnt::CXlntUtil& excel)
 		}
 	}
 
-	excel.SetAllCellTextFormat(3);
-
 	excel.SetColumnWidth(1, ExcelColumnWidth::cnSchemaName);
 	excel.SetColumnWidth(2, ExcelColumnWidth::cnObjectName);
 	excel.SetColumnWidth(3, ExcelColumnWidth::cnSequence);
@@ -328,8 +337,6 @@ void CDBSynchronizer::AddExcelConstraintsInfo(Xlnt::CXlntUtil& excel)
 		}
 	}
 
-	excel.SetAllCellTextFormat(3);
-
 	excel.SetColumnWidth(1, ExcelColumnWidth::cnSchemaName);
 	excel.SetColumnWidth(2, ExcelColumnWidth::cnObjectName);
 	excel.SetColumnWidth(3, ExcelColumnWidth::cnConstraintName);
@@ -381,8 +388,6 @@ void CDBSynchronizer::AddExcelIndexInfo(Xlnt::CXlntUtil& excel)
 			}
 		}
 	}
-
-	excel.SetAllCellTextFormat(3);
 
 	excel.SetColumnWidth(1, ExcelColumnWidth::cnSchemaName);
 	excel.SetColumnWidth(2, ExcelColumnWidth::cnObjectName);
@@ -445,8 +450,6 @@ void CDBSynchronizer::AddExcelForeignKeyInfo(Xlnt::CXlntUtil& excel)
 		}
 	}
 
-	excel.SetAllCellTextFormat(3);
-
 	excel.SetColumnWidth(1, ExcelColumnWidth::cnSchemaName);
 	excel.SetColumnWidth(2, ExcelColumnWidth::cnObjectName);
 	excel.SetColumnWidth(3, ExcelColumnWidth::cnConstraintName);
@@ -460,6 +463,254 @@ void CDBSynchronizer::AddExcelForeignKeyInfo(Xlnt::CXlntUtil& excel)
 	excel.SetColumnWidth(11, ExcelColumnWidth::cnDefaultWidth);
 	excel.SetColumnWidth(12, ExcelColumnWidth::cnDefaultWidth);
 	excel.SetColumnWidth(13, ExcelColumnWidth::cnSystemNamed);
+}
+
+//***************************************************************************
+//
+void CDBSynchronizer::AddExcelCheckConstraintsInfo(Xlnt::CXlntUtil& excel)
+{
+	int32 currentRow = 1;
+
+	excel.AddSheet("TABLE_CHECK_CONSTRAINT");
+	ToHeaderStyle(excel, "A1", "E1");
+
+	excel.WriteCell(currentRow, 1, "SCHEMA_NAME");
+	excel.WriteCell(currentRow, 2, "TABLE_NAME");
+	excel.WriteCell(currentRow, 3, "CONST_NAME");
+	excel.WriteCell(currentRow, 4, "CHECK_VALUE");
+	excel.WriteCell(currentRow, 5, "IS_SYSTEM_NAMED");
+
+	for( DBModel::TableRef& dbTable : _dbTables )
+	{
+		for( DBModel::CheckConstraintRef& dbCheckConstraint : dbTable->_checkConstraints )
+		{
+			currentRow++;
+			excel.WriteCell(currentRow, 1, dbCheckConstraint->_schemaName);
+			excel.WriteCell(currentRow, 2, dbCheckConstraint->_tableName);
+			excel.WriteCell(currentRow, 3, dbCheckConstraint->_checkConstName);
+			excel.WriteCell(currentRow, 4, dbCheckConstraint->_checkValue);
+			excel.WriteCell(currentRow, 5, std::to_string(dbCheckConstraint->_systemNamed));
+			excel.SetRowHeight(currentRow, 16);
+		}
+	}
+
+	excel.SetColumnWidth(1, ExcelColumnWidth::cnSchemaName);
+	excel.SetColumnWidth(2, ExcelColumnWidth::cnObjectName);
+	excel.SetColumnWidth(3, ExcelColumnWidth::cnConstraintName);
+	excel.SetColumnWidth(4, ExcelColumnWidth::cnConstraintValue);
+	excel.SetColumnWidth(5, ExcelColumnWidth::cnSystemNamed);
+}
+
+//***************************************************************************
+//
+void CDBSynchronizer::AddExcelMSSQLTableIndexOptionInfo(Xlnt::CXlntUtil& excel)
+{
+	int32 currentRow = 1;
+
+	excel.AddSheet("TABLE_INDEX_OPTION");
+	ToHeaderStyle(excel, "A1", "W1");
+
+	excel.WriteCell(currentRow, 1, "SCHEMA_NAME");
+	excel.WriteCell(currentRow, 2, "TABLE_NAME");
+	excel.WriteCell(currentRow, 3, "INDEX_NAME");
+	excel.WriteCell(currentRow, 4, "IS_PRIMARYKEY");
+	excel.WriteCell(currentRow, 5, "IS_UNIQUE");
+	excel.WriteCell(currentRow, 6, "IS_DISABLED");
+	excel.WriteCell(currentRow, 7, "IS_PADDED");
+	excel.WriteCell(currentRow, 8, "FILLFACTOR");
+	excel.WriteCell(currentRow, 9, "IS_IGNORE_DUP_KEY");
+	excel.WriteCell(currentRow, 10, "IS_ALLOW_ROW_LOCKS");
+	excel.WriteCell(currentRow, 11, "IS_ALLOW_PAGE_LOCKS");
+	excel.WriteCell(currentRow, 12, "IS_HASFILTER");
+	excel.WriteCell(currentRow, 13, "FILTER_DEFINITION");
+	excel.WriteCell(currentRow, 14, "COMPRESSION_DELAY");
+	excel.WriteCell(currentRow, 15, "OPTIMIZE_FOR_SEQUENTIAL_KEY");
+	excel.WriteCell(currentRow, 16, "IS_STATISTICS_NORECOMPUTE");
+	excel.WriteCell(currentRow, 17, "IS_STATISTICS_INCREMENTAL");
+	excel.WriteCell(currentRow, 18, "DATA_COMPRESSION");
+	excel.WriteCell(currentRow, 19, "DATA_COMPRESSION_DESC");
+	excel.WriteCell(currentRow, 20, "XML_COMPRESSION");
+	excel.WriteCell(currentRow, 21, "XML_COMPRESSION_DESC");
+	excel.WriteCell(currentRow, 22, "DATA_SPACENAME");
+	excel.WriteCell(currentRow, 23, "DATA_SPACENAME_DESC");
+
+	for( DBModel::TableRef& dbTable : _dbTables )
+	{
+		for( DBModel::IndexOptionRef& dbIndexOption : dbTable->_indexOptions )
+		{
+			currentRow++;
+			excel.WriteCell(currentRow, 1, dbIndexOption->_schemaName);
+			excel.WriteCell(currentRow, 2, dbIndexOption->_tableName);
+			excel.WriteCell(currentRow, 3, dbIndexOption->_indexName);
+			excel.WriteCell(currentRow, 4, std::to_string(dbIndexOption->_primaryKey));
+			excel.WriteCell(currentRow, 5, std::to_string(dbIndexOption->_uniqueKey));
+			excel.WriteCell(currentRow, 6, std::to_string(dbIndexOption->_isDisabled));
+			excel.WriteCell(currentRow, 7, std::to_string(dbIndexOption->_isPadded));
+			excel.WriteCell(currentRow, 8, std::to_string(dbIndexOption->_fillFactor));
+			excel.WriteCell(currentRow, 9, std::to_string(dbIndexOption->_ignoreDupKey));
+			excel.WriteCell(currentRow, 10, std::to_string(dbIndexOption->_allowRowLocks));
+			excel.WriteCell(currentRow, 11, std::to_string(dbIndexOption->_allowPageLocks));
+			excel.WriteCell(currentRow, 12, std::to_string(dbIndexOption->_hasFilter));
+			excel.WriteCell(currentRow, 13, dbIndexOption->_filterDefinition);
+			excel.WriteCell(currentRow, 14, std::to_string(dbIndexOption->_compressionDelay));
+			excel.WriteCell(currentRow, 15, dbIndexOption->_optimizeForSequentialKey);
+			excel.WriteCell(currentRow, 16, std::to_string(dbIndexOption->_statisticsNoRecompute));
+			excel.WriteCell(currentRow, 17, std::to_string(dbIndexOption->_statisticsIncremental));
+			excel.WriteCell(currentRow, 18, std::to_string(dbIndexOption->_dataCompression));
+			excel.WriteCell(currentRow, 19, dbIndexOption->_dataCompressionDesc);
+			excel.WriteCell(currentRow, 20, std::to_string(dbIndexOption->_xmlCompression));
+			excel.WriteCell(currentRow, 21, dbIndexOption->_xmlCompressionDesc);
+			excel.WriteCell(currentRow, 22, dbIndexOption->_fileGroupOrPartitionScheme);
+			excel.WriteCell(currentRow, 23, dbIndexOption->_fileGroupOrPartitionSchemeName);
+
+			excel.SetRowHeight(currentRow, 16);
+		}
+	}
+
+	excel.SetColumnWidth(1, ExcelColumnWidth::cnSchemaName);
+	excel.SetColumnWidth(2, ExcelColumnWidth::cnObjectName);
+	excel.SetColumnWidth(3, ExcelColumnWidth::cnConstraintName);
+	excel.SetColumnWidth(4, ExcelColumnWidth::cnDefaultWidth + 1);
+	excel.SetColumnWidth(5, ExcelColumnWidth::cnDefaultWidth + 1);
+	excel.SetColumnWidth(6, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(7, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(8, ExcelColumnWidth::cnDefaultWidth + 1);
+	excel.SetColumnWidth(9, ExcelColumnWidth::cnDefaultWidth + 7);
+	excel.SetColumnWidth(10, ExcelColumnWidth::cnDefaultWidth + 9);
+	excel.SetColumnWidth(11, ExcelColumnWidth::cnDefaultWidth + 9);
+	excel.SetColumnWidth(12, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(13, ExcelColumnWidth::cnDefaultWidth + 4);
+	excel.SetColumnWidth(14, ExcelColumnWidth::cnDefaultWidth + 4);
+	excel.SetColumnWidth(15, ExcelColumnWidth::cnDefaultWidth + 19);
+	excel.SetColumnWidth(16, ExcelColumnWidth::cnDefaultWidth + 17);
+	excel.SetColumnWidth(17, ExcelColumnWidth::cnDefaultWidth + 17);
+	excel.SetColumnWidth(18, ExcelColumnWidth::cnDefaultWidth + 7);
+	excel.SetColumnWidth(19, ExcelColumnWidth::cnDefaultWidth + 13);
+	excel.SetColumnWidth(20, ExcelColumnWidth::cnDefaultWidth + 7);
+	excel.SetColumnWidth(21, ExcelColumnWidth::cnDefaultWidth + 13);
+	excel.SetColumnWidth(22, ExcelColumnWidth::cnDefaultWidth + 7);
+	excel.SetColumnWidth(23, ExcelColumnWidth::cnDefaultWidth + 11);
+}
+
+//***************************************************************************
+//
+void CDBSynchronizer::AddExcelORACLEIdentityColumnInfo(Xlnt::CXlntUtil& excel)
+{
+	int32 currentRow = 1;
+
+	excel.AddSheet("TABLE_IDENTITY_COLUMN");
+	ToHeaderStyle(excel, "A1", "S1");
+
+	excel.WriteCell(currentRow, 1, "SCHEMA_NAME");
+	excel.WriteCell(currentRow, 2, "TABLE_NAME");
+	excel.WriteCell(currentRow, 3, "COLUMN_NAME");
+	excel.WriteCell(currentRow, 4, "IDENTITY_COLUMN");
+	excel.WriteCell(currentRow, 5, "DEFAULT_ON_NULL");
+	excel.WriteCell(currentRow, 6, "GENERATION_TYPE");
+	excel.WriteCell(currentRow, 7, "SEQUENCE_NAME");
+	excel.WriteCell(currentRow, 8, "MIN_VALUE");
+	excel.WriteCell(currentRow, 9, "MAX_VALUE");
+	excel.WriteCell(currentRow, 10, "INCREMENT_BY");
+	excel.WriteCell(currentRow, 11, "CYCLE_FLAG");
+	excel.WriteCell(currentRow, 12, "ORDER_FLAG");
+	excel.WriteCell(currentRow, 13, "CACHE_SIZE");
+	excel.WriteCell(currentRow, 14, "LAST_NUMBER");
+	excel.WriteCell(currentRow, 15, "SCALE_FLAG");
+	excel.WriteCell(currentRow, 16, "EXTEND_FLAG");
+	excel.WriteCell(currentRow, 17, "SHARDED_FLAG");
+	excel.WriteCell(currentRow, 18, "SESSION_FLAG");
+	excel.WriteCell(currentRow, 19, "KEEP_VALUE");
+
+	for( DBModel::TableRef& dbTable : _dbTables )
+	{
+		for( DBModel::IdentityColumnRef& dbIdentityColumn : dbTable->_identityColumns )
+		{
+			currentRow++;
+			excel.WriteCell(currentRow, 1, dbIdentityColumn->_schemaName);
+			excel.WriteCell(currentRow, 2, dbIdentityColumn->_tableName);
+			excel.WriteCell(currentRow, 3, dbIdentityColumn->_columnName);
+			excel.WriteCell(currentRow, 4, dbIdentityColumn->_identityColumn);
+			excel.WriteCell(currentRow, 5, dbIdentityColumn->_defaultOnNull);
+			excel.WriteCell(currentRow, 6, dbIdentityColumn->_generationType);
+			excel.WriteCell(currentRow, 7, dbIdentityColumn->_sequenceName);
+			excel.WriteCell(currentRow, 8, std::to_string(dbIdentityColumn->_minValue));
+			excel.WriteCell(currentRow, 9, std::to_string(dbIdentityColumn->_maxValue));
+			excel.WriteCell(currentRow, 10, std::to_string(dbIdentityColumn->_incrementBy));
+			excel.WriteCell(currentRow, 11, dbIdentityColumn->_cycleFlag);
+			excel.WriteCell(currentRow, 12, dbIdentityColumn->_orderFlag);
+			excel.WriteCell(currentRow, 13, std::to_string(dbIdentityColumn->_cacheSize));
+			excel.WriteCell(currentRow, 14, std::to_string(dbIdentityColumn->_lastNumber));
+			excel.WriteCell(currentRow, 15, dbIdentityColumn->_scaleFlag);
+			excel.WriteCell(currentRow, 16, dbIdentityColumn->_extendFlag);
+			excel.WriteCell(currentRow, 17, dbIdentityColumn->_shardedFlag);
+			excel.WriteCell(currentRow, 18, dbIdentityColumn->_sessionFlag);
+			excel.WriteCell(currentRow, 19, dbIdentityColumn->_keepValue);
+
+			excel.SetRowHeight(currentRow, 16);
+		}
+	}
+
+	excel.SetAllCellTextFormat(9);
+	excel.SetAllCellTextFormat(14);
+
+	excel.SetColumnWidth(1, ExcelColumnWidth::cnSchemaName);
+	excel.SetColumnWidth(2, ExcelColumnWidth::cnObjectName);
+	excel.SetColumnWidth(3, ExcelColumnWidth::cnColumnName);
+	excel.SetColumnWidth(4, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(5, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(6, ExcelColumnWidth::cnDefaultWidth + 4);
+	excel.SetColumnWidth(7, ExcelColumnWidth::cnDefaultWidth + 4);
+	excel.SetColumnWidth(8, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(9, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(10, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(11, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(12, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(13, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(14, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(15, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(16, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(17, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(18, ExcelColumnWidth::cnDefaultWidth);
+	excel.SetColumnWidth(19, ExcelColumnWidth::cnDefaultWidth);
+}
+
+//***************************************************************************
+//
+void CDBSynchronizer::AddExcelMSSQLDefaultConstraintsInfo(Xlnt::CXlntUtil& excel)
+{
+	int32 currentRow = 1;
+
+	excel.AddSheet("TABLE_DEFAULT_CONSTRAINT");
+	ToHeaderStyle(excel, "A1", "F1");
+
+	excel.WriteCell(currentRow, 1, "SCHEMA_NAME");
+	excel.WriteCell(currentRow, 2, "TABLE_NAME");
+	excel.WriteCell(currentRow, 3, "CONST_NAME");
+	excel.WriteCell(currentRow, 4, "COLUMN_NAME");
+	excel.WriteCell(currentRow, 5, "DEFAULT_VALUE");
+	excel.WriteCell(currentRow, 6, "IS_SYSTEM_NAMED");
+
+	for( DBModel::TableRef& dbTable : _dbTables )
+	{
+		for( DBModel::DefaultConstraintRef& dbDefaultConstraint : dbTable->_defaultConstraints )
+		{
+			currentRow++;
+			excel.WriteCell(currentRow, 1, dbDefaultConstraint->_schemaName);
+			excel.WriteCell(currentRow, 2, dbDefaultConstraint->_tableName);
+			excel.WriteCell(currentRow, 3, dbDefaultConstraint->_defaultConstName);
+			excel.WriteCell(currentRow, 4, dbDefaultConstraint->_columnName);
+			excel.WriteCell(currentRow, 5, dbDefaultConstraint->_defaultValue);
+			excel.WriteCell(currentRow, 6, std::to_string(dbDefaultConstraint->_systemNamed));
+			excel.SetRowHeight(currentRow, 16);
+		}
+	}
+
+	excel.SetColumnWidth(1, ExcelColumnWidth::cnSchemaName);
+	excel.SetColumnWidth(2, ExcelColumnWidth::cnObjectName);
+	excel.SetColumnWidth(3, ExcelColumnWidth::cnConstraintName);
+	excel.SetColumnWidth(4, ExcelColumnWidth::cnColumnName);
+	excel.SetColumnWidth(5, ExcelColumnWidth::cnDefaultConstraintValue);
+	excel.SetColumnWidth(6, ExcelColumnWidth::cnSystemNamed);
 }
 
 //***************************************************************************
@@ -1513,8 +1764,8 @@ bool CDBSynchronizer::GatherDBTrigger(const TCHAR* ptszTableName)
 		DBModel::TriggerRef iterTriggerRef = *iter;
 		if( _dbClass == EDBClass::MSSQL )
 		{
-			_tstring triggerName = iterTriggerRef->_schemaName + _T(".") + iterTriggerRef->_triggerName;
-			iterTriggerRef->_fullBody = dbQuery.MSSQLHelpText(EDBObjectType::TRIGGERS, triggerName.c_str());
+			_tstring objectName = iterTriggerRef->_schemaName + _T(".") + iterTriggerRef->_triggerName;
+			iterTriggerRef->_fullBody = dbQuery.MSSQLHelpText(EDBObjectType::TRIGGERS, objectName.c_str());
 		}
 		else if( _dbClass == EDBClass::MYSQL )
 			iterTriggerRef->_fullBody = dbQuery.MYSQLShowObject(EDBObjectType::TRIGGERS, iterTriggerRef->_triggerName.c_str());
@@ -1574,8 +1825,8 @@ bool CDBSynchronizer::GatherDBStoredProcedures(const TCHAR* ptszProcName)
 		for( auto iter = _dbProcedures.begin(); iter != _dbProcedures.end(); iter++ )
 		{
 			DBModel::ProcedureRef iterProcRef = *iter;
-			_tstring procName = iterProcRef->_schemaName + _T(".") + iterProcRef->_procName;
-			iterProcRef->_fullBody = dbQuery.MSSQLHelpText(EDBObjectType::PROCEDURE, procName.c_str());
+			_tstring objectName = iterProcRef->_schemaName + _T(".") + iterProcRef->_procName;
+			iterProcRef->_fullBody = dbQuery.MSSQLHelpText(EDBObjectType::PROCEDURE, objectName.c_str());
 		}
 	}
 	else if( _dbClass == EDBClass::MYSQL )
@@ -1610,7 +1861,7 @@ bool CDBSynchronizer::GatherDBStoredProcedureParams(const TCHAR* ptszProcName)
 	int8	paramMode;
 	TCHAR	tszParamName[DATABASE_OBJECT_NAME_STRLEN] = { 0, };
 	TCHAR	tszDataType[DATABASE_DATATYPEDESC_STRLEN] = { 0, };
-	uint64	maxLength;
+	int64	maxLength;
 	uint8	precision;
 	uint8	scale;
 	TCHAR	tszDataTypeDesc[DATABASE_DATATYPEDESC_STRLEN] = { 0, };
@@ -1723,8 +1974,8 @@ bool CDBSynchronizer::GatherDBFunctions(const TCHAR* ptszFuncName)
 		for( auto iter = _dbFunctions.begin(); iter != _dbFunctions.end(); iter++ )
 		{
 			DBModel::FunctionRef iterFuncRef = *iter;
-			_tstring funcName = iterFuncRef->_schemaName + _T(".") + iterFuncRef->_funcName;
-			iterFuncRef->_fullBody = dbQuery.MSSQLHelpText(EDBObjectType::FUNCTION, funcName.c_str());
+			_tstring objectName = iterFuncRef->_schemaName + _T(".") + iterFuncRef->_funcName;
+			iterFuncRef->_fullBody = dbQuery.MSSQLHelpText(EDBObjectType::FUNCTION, objectName.c_str());
 		}
 	}
 	else if( _dbClass == EDBClass::MYSQL )
@@ -1760,7 +2011,7 @@ bool CDBSynchronizer::GatherDBFunctionParams(const TCHAR* ptszFuncName)
 	TCHAR	tszParamName[DATABASE_OBJECT_NAME_STRLEN] = { 0, };
 	TCHAR	tszDataType[DATABASE_DATATYPEDESC_STRLEN] = { 0, };
 	TCHAR	tszDataTypeDesc[DATABASE_DATATYPEDESC_STRLEN] = { 0, };
-	uint64	maxLength;
+	int64	maxLength;
 	uint8	precision;
 	uint8	scale;
 	TCHAR	tszParamComment[DATABASE_WVARCHAR_MAX] = { 0, };

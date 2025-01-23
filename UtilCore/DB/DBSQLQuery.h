@@ -30,7 +30,21 @@ public:
 };
 
 //***************************************************************************
-//
+// 데이터베이스 오브젝트
+class DB_OBJECT
+{
+	/// <summary>데이터베이스 명</summary>
+	TCHAR tszDBName[DATABASE_NAME_STRLEN] = { 0, };
+
+	/// <summary>오브젝트 타입</summary>
+	EDBObjectType ObjectType;
+
+	/// <summary>오브젝트 명</summary>
+	TCHAR tszObjectName[DATABASE_OBJECT_NAME_STRLEN] = { 0, };
+};
+
+//***************************************************************************
+// DB 시스템 정보
 class DB_SYSTEM_INFO
 {
 public:
@@ -48,7 +62,7 @@ public:
 };
 
 //***************************************************************************
-//
+// DB 데이터 타입(MSSQL만 sys.types 테이블 존재)
 class DB_SYSTEM_DATATYPE
 {
 public:
@@ -62,7 +76,7 @@ public:
 };
 
 //***************************************************************************
-//
+// 테이블 정보
 class TABLE_INFO
 {
 public:
@@ -79,7 +93,7 @@ public:
 };
 
 //***************************************************************************
-//
+// 테이블 컬럼 정보
 class COLUMN_INFO
 {
 public:
@@ -105,7 +119,7 @@ public:
 };
 
 //***************************************************************************
-//
+// 제약조건 정보
 class CONSTRAINT_INFO
 {
 public:
@@ -122,7 +136,7 @@ public:
 };
 
 //***************************************************************************
-//
+// 인덱스 정보
 class INDEX_INFO
 {
 public:
@@ -141,7 +155,7 @@ public:
 };
 
 //***************************************************************************
-//
+// 외래키 정보
 class FOREIGNKEYS_INFO
 {
 public:
@@ -162,7 +176,7 @@ public:
 };
 
 //***************************************************************************
-//
+// 체크 제약조건 정보
 class CHECK_CONSTRAINT_INFO
 {
 public:
@@ -175,7 +189,21 @@ public:
 };
 
 //***************************************************************************
-//
+// 기본값 제약조건 정보
+class DEFAULT_CONSTRAINT_INFO
+{
+public:
+	int32	ObjectId;												// MSSQL 테이블 고유번호
+	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];				// MSSQL 스키마 명
+	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN];				// 테이블 명
+	TCHAR   tszDefaultConstName[DATABASE_OBJECT_NAME_STRLEN];		// 기본값 제약조건 명
+	TCHAR   tszColumnName[DATABASE_COLUMN_NAME_STRLEN];				// 컬럼 명
+	TCHAR   tszDefaultValue[DATABASE_WVARCHAR_MAX];					// 컬럼 제약조건 정의값
+	bool	IsSystemNamed;											// 시스템이 인덱스명을 할당했는지 여부(true/false : 유/무)
+};
+
+//***************************************************************************
+// 트리거 정보
 class TRIGGER_INFO
 {
 public:
@@ -186,7 +214,7 @@ public:
 };
 
 //***************************************************************************
-//
+// 저장프로시저 정보
 class PROCEDURE_INFO
 {
 public:
@@ -200,7 +228,7 @@ public:
 };
 
 //***************************************************************************
-//
+// 저장프로시저 파라미터 정보
 class PROCEDURE_PARAM_INFO
 {
 public:
@@ -219,7 +247,7 @@ public:
 };
 
 //***************************************************************************
-//
+// 함수 정보
 class FUNCTION_INFO
 {
 public:
@@ -233,7 +261,7 @@ public:
 };
 
 //***************************************************************************
-//
+// 함수 파라미터 정보
 class FUNCTION_PARAM_INFO
 {
 public:

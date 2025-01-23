@@ -154,6 +154,12 @@ private:
 	void		AddExcelConstraintsInfo(Xlnt::CXlntUtil& excel);
 	void		AddExcelIndexInfo(Xlnt::CXlntUtil& excel);
 	void		AddExcelForeignKeyInfo(Xlnt::CXlntUtil& excel);
+	void		AddExcelCheckConstraintsInfo(Xlnt::CXlntUtil& excel);
+
+	void		AddExcelMSSQLTableIndexOptionInfo(Xlnt::CXlntUtil& excel);
+	void		AddExcelMSSQLDefaultConstraintsInfo(Xlnt::CXlntUtil& excel);
+
+	void		AddExcelORACLEIdentityColumnInfo(Xlnt::CXlntUtil& excel);
 
 private:
 	EDBClass	_dbClass;
