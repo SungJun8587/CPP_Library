@@ -48,6 +48,7 @@
     <ClInclude Include="EXCEL\XlntUtil.h" />
     <ClInclude Include="JSON\JSONBase.h" />
     <ClInclude Include="JSON\JSONParser.h" />
+    <ClInclude Include="JSON\RapidJSONUtil.h" />
     <ClInclude Include="Memory\ClusteredMap.h" />
     <ClInclude Include="Memory\Containers.h" />
     <ClInclude Include="Memory\CustomAllocator.h" />
@@ -104,6 +105,7 @@
     <ClCompile Include="EXCEL\XlntUtil.cpp" />
     <ClCompile Include="JSON\JSONBase.cpp" />
     <ClCompile Include="JSON\JSONParser.cpp" />
+    <ClCompile Include="JSON\RapidJSONUtil.cpp" />
     <ClCompile Include="Memory\ClusteredMap.cpp" />
     <ClCompile Include="Memory\CustomAllocator.cpp" />
     <ClCompile Include="Memory\MemBuffer.cpp" />
@@ -143,7 +145,9 @@
     <None Include="DB\DB_Error.inl" />
     <None Include="DB\DB_ParamAttr.inl" />
     <None Include="DB\MySQL\MySQL_ParamAttr.inl" />
+    <None Include="Excel\XlntUtil.inl" />
     <None Include="JSON\JSONParser.inl" />
+    <None Include="JSON\RapidJSONUtil.inl" />
     <None Include="Memory\OrderedMap.inl" />
     <None Include="Memory\Singleton.inl" />
     <None Include="Memory\UnOrderedMap.inl" />

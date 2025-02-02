@@ -208,6 +208,9 @@
     <ClInclude Include="Crypto\CryptoUtil.h">
       <Filter>Crypto</Filter>
     </ClInclude>
+    <ClInclude Include="JSON\RapidJSONUtil.h">
+      <Filter>JSON</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\CustomAllocator.cpp">
@@ -332,6 +335,9 @@
     <ClCompile Include="Crypto\CryptoUtil.cpp">
       <Filter>Crypto</Filter>
     </ClCompile>
+    <ClCompile Include="JSON\RapidJSONUtil.cpp">
+      <Filter>JSON</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="DB\BaseODBC.inl">
@@ -360,6 +366,12 @@
     </None>
     <None Include="Memory\UnOrderedMap.inl">
       <Filter>Memory</Filter>
+    </None>
+    <None Include="JSON\RapidJSONUtil.inl">
+      <Filter>JSON</Filter>
+    </None>
+    <None Include="Excel\XlntUtil.inl">
+      <Filter>Excel</Filter>
     </None>
   </ItemGroup>
 </Project>

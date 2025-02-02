@@ -89,8 +89,6 @@ using namespace std;
 
 #include <XML/XMLParser.h>
 
-#include <Excel/XlntUtil.h>
-
 #include <Util/CalculatedElapsedTime.h>
 #include <Util/IconvUtil.h>
 #include <Util/ConvertCharset.h>
@@ -102,6 +100,8 @@ using namespace std;
 #include <Util/ShellUtil.h>
 #include <Util/WebUtil.h>
 #include <Util/Endian.h>
+
+#include <Excel/XlntUtil.h>
 
 #include <ServerConnectInfo.h>
 #include <ServerConfig.h>

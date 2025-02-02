@@ -47,6 +47,38 @@ namespace Xlnt
 	}
 
 	//***************************************************************************
+	// 시트명 변경
+	void CXlntUtil::RenameSheet(const std::string& newSheetName)
+	{
+		if( _workbook.contains(newSheetName) )
+		{
+			throw std::runtime_error("시트 이름이 이미 존재합니다: " + newSheetName);
+		}
+
+		_worksheet = _workbook.active_sheet();
+		_worksheet.title(newSheetName);			// 시트명 변경
+	}
+
+	//***************************************************************************
+	// 해당하는 시트 활성화
+	void CXlntUtil::ActiveSheet(const std::string& sheetName)
+	{
+		if( !_workbook.contains(sheetName) )
+		{
+			throw std::runtime_error("시트가 존재하지 않습니다: " + sheetName);
+		}
+		_worksheet = _workbook.sheet_by_title(sheetName);
+	}
+
+	//***************************************************************************
+	//
+	void CXlntUtil::ActiveSheet(const uint32 sheetIndex)
+	{
+		_workbook.active_sheet(sheetIndex);
+		_worksheet = _workbook.active_sheet();
+	}
+
+	//***************************************************************************
 	// 시트 제거
 	void CXlntUtil::RemoveSheet(const std::string& sheetName)
 	{
@@ -61,27 +93,46 @@ namespace Xlnt
 	}
 
 	//***************************************************************************
-	// 인덱스에 해당하는 시트 활성화
-	void CXlntUtil::ActiveSheet(const uint32 sheetIndex)
-	{
-		_workbook.active_sheet(sheetIndex);
-	}
-
-	//***************************************************************************
-	// 시트명 변경
-	void CXlntUtil::RenameSheet(const std::string& sheetName)
-	{
-		_worksheet = _workbook.active_sheet();
-		_worksheet.title(sheetName);			// 시트명 변경
-	}
-	
-	//***************************************************************************
-	// 셀 데이터 쓰기
-	void CXlntUtil::WriteCell(const std::string& cell_ref, const std::string& value)
+	//
+	void CXlntUtil::RemoveSheet(const uint32 sheetIndex)
 	{
 		try
 		{
-			_worksheet.cell(cell_ref).value(value);
+			_workbook.active_sheet(sheetIndex);
+			_workbook.remove_sheet(_workbook.active_sheet());
+		}
+		catch( const std::exception& e )
+		{
+			throw std::runtime_error("시트를 삭제할 수 없습니다: " + std::string(e.what()));
+		}
+	}
+
+	//***************************************************************************
+	// 모든 시트 이름 가져오기
+	std::vector<std::string> CXlntUtil::GetSheetNames() const
+	{
+		std::vector<std::string> sheetNames;
+		for( const auto& sheet : _workbook.sheet_titles() )
+		{
+			sheetNames.push_back(sheet);
+		}
+		return sheetNames;
+	}
+
+	//***************************************************************************
+	// 셀 데이터 쓰기
+	void CXlntUtil::WriteCell(const std::string& cell_ref, const std::string& value, const bool isCastUtf8)
+	{
+		try
+		{
+			if( isCastUtf8 )
+			{
+				_worksheet.cell(cell_ref).value(Iconv::CIconvUtil::ConvertEncoding(value, "CP949", "UTF-8"));
+			}
+			else
+			{
+				_worksheet.cell(cell_ref).value(value);
+			}
 		}
 		catch( const std::exception& e )
 		{
@@ -91,26 +142,18 @@ namespace Xlnt
 
 	//***************************************************************************
 	//
-	void CXlntUtil::WriteCell(const uint32 row, const uint32 col, const std::string& value)
+	void CXlntUtil::WriteCell(const uint32 row, const uint32 col, const std::string& value, const bool isCastUtf8)
 	{
 		try
 		{
-			_worksheet.cell(col, row).value(value);
-		}
-		catch( const std::exception& e )
-		{
-			throw std::runtime_error("셀에 값을 쓸 수 없습니다: " + std::string(e.what()));
-		}
-	}
-
-	//***************************************************************************
-	// 셀 데이터 쓰기
-	void CXlntUtil::WriteCell(const std::string& cell_ref, const std::wstring& value)
-	{
-		try
-		{
-			Iconv::CIconvUtil iconvUtil("WCHAR_T", "UTF-8");
-			_worksheet.cell(cell_ref).value(iconvUtil.WCharToUtf8(value));
+			if( isCastUtf8 )
+			{
+				_worksheet.cell(col, row).value(Iconv::CIconvUtil::ConvertEncoding(value, "CP949", "UTF-8"));
+			}
+			else
+			{
+				_worksheet.cell(col, row).value(value);
+			}
 		}
 		catch( const std::exception& e )
 		{
@@ -120,12 +163,39 @@ namespace Xlnt
 
 	//***************************************************************************
 	//
-	void CXlntUtil::WriteCell(const uint32 row, const uint32 col, const std::wstring& value)
+	void CXlntUtil::WriteCell(const std::string& cell_ref, const std::wstring& value, const bool isCastUtf8)
 	{
 		try
 		{
-			Iconv::CIconvUtil iconvUtil("WCHAR_T", "UTF-8");
-			_worksheet.cell(col, row).value(iconvUtil.WCharToUtf8(value));
+			if( isCastUtf8 )
+			{
+				_worksheet.cell(cell_ref).value(Iconv::CIconvUtil::ConvertEncoding(value, "WCHAR_T", "UTF-8"));
+			}
+			else
+			{
+				_worksheet.cell(cell_ref).value(Iconv::CIconvUtil::ConvertEncoding(value, "WCHAR_T", "CP949"));
+			}
+		}
+		catch( const std::exception& e )
+		{
+			throw std::runtime_error("셀에 값을 쓸 수 없습니다: " + std::string(e.what()));
+		}
+	}
+
+	//***************************************************************************
+	//
+	void CXlntUtil::WriteCell(const uint32 row, const uint32 col, const std::wstring& value, const bool isCastUtf8)
+	{
+		try
+		{
+			if( isCastUtf8 )
+			{
+				_worksheet.cell(col, row).value(Iconv::CIconvUtil::ConvertEncoding(value, "WCHAR_T", "UTF-8"));
+			}
+			else
+			{
+				_worksheet.cell(col, row).value(Iconv::CIconvUtil::ConvertEncoding(value, "WCHAR_T", "CP949"));
+			}
 		}
 		catch( const std::exception& e )
 		{
@@ -153,7 +223,7 @@ namespace Xlnt
 	{
 		try
 		{
-			return _worksheet.cell(row, col).to_string();
+			return _worksheet.cell(col, row).to_string();
 		}
 		catch( const std::exception& e )
 		{
@@ -279,6 +349,14 @@ namespace Xlnt
 				cell.value(value); // 범위 내 모든 셀에 값 설정
 			}
 		}
+	}
+
+	//***************************************************************************
+	// 데이터의 행 수와 열 수 얻기
+	void CXlntUtil::GetRowColumnCount(uint32& rowCount, uint32& columnCount)
+	{
+		rowCount = _worksheet.highest_row();				// 마지막 행 번호
+		columnCount = _worksheet.highest_column().index;	// 마지막 열 번호
 	}
 
 	//***************************************************************************

@@ -6,6 +6,7 @@
 
 #include "pch.h"
 #include "DBSynchronizer.h"
+#include <XML/RapidXMLUtil.h>
 
 //***************************************************************************
 // Construction/Destruction
@@ -20,6 +21,8 @@ bool CDBSynchronizer::Synchronize(const TCHAR* path)
 	//ParseXmlToDB(path);
 
 	GatherDBTables();
+
+	/*
 	GatherDBTableColumns();
 	GatherDBTableConstraints();
 	if( _dbClass == EDBClass::ORACLE ) GatherDBIdentityColumns();
@@ -33,6 +36,7 @@ bool CDBSynchronizer::Synchronize(const TCHAR* path)
 	GatherDBStoredProcedureParams();
 	GatherDBFunctions();
 	GatherDBFunctionParams();
+	*/
 
 	//CompareDBModel();
 	/*
@@ -717,12 +721,12 @@ void CDBSynchronizer::AddExcelMSSQLDefaultConstraintsInfo(Xlnt::CXlntUtil& excel
 //
 void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 {
-	CXMLNode root;
-	CXMLParser parser;
+	CXMLNode		root;
+	CRapidXMLUtil	parser;
 
 	ASSERT_CRASH(parser.ParseFromFile(path, OUT root));
 
-	CVector<CXMLNode> tables = root.FindChildren(_T("Table"));
+	std::vector<CXMLNode> tables = root.FindChildren(_T("Table"));
 	for( CXMLNode& table : tables )
 	{
 		DBModel::TableRef t = MakeShared<DBModel::Table>(_dbClass);
@@ -731,7 +735,7 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 		t->_tableComment = table.GetStringAttr(_T("desc"));
 		t->_auto_increment_value = table.GetStringAttr(_T("auto_increment_value"));
 
-		CVector<CXMLNode> columns = table.FindChildren(_T("Column"));
+		std::vector<CXMLNode> columns = table.FindChildren(_T("Column"));
 		for( CXMLNode& column : columns )
 		{
 			DBModel::ColumnRef c = MakeShared<DBModel::Column>(_dbClass);
@@ -762,7 +766,7 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 			t->_columns.push_back(c);
 		}
 
-		CVector<CXMLNode> indexes = table.FindChildren(_T("Index"));
+		std::vector<CXMLNode> indexes = table.FindChildren(_T("Index"));
 		for( CXMLNode& index : indexes )
 		{
 			DBModel::IndexRef i = MakeShared<DBModel::Index>(_dbClass);
@@ -779,7 +783,7 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 			i->_uniqueKey = index.FindChild(_T("UniqueKey")).IsValid();
 			i->_systemNamed = index.FindChild(_T("SystemNamed")).IsValid();
 
-			CVector<CXMLNode> columns = index.FindChildren(_T("Column"));
+			std::vector<CXMLNode> columns = index.FindChildren(_T("Column"));
 			for( CXMLNode& column : columns )
 			{
 				DBModel::IndexColumnRef c = MakeShared<DBModel::IndexColumn>();
@@ -795,7 +799,7 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 			t->_indexes.push_back(i);
 		}
 
-		CVector<CXMLNode> foreignKeys = table.FindChildren(_T("ForeignKey"));
+		std::vector<CXMLNode> foreignKeys = table.FindChildren(_T("ForeignKey"));
 		for( CXMLNode& foreignKey : foreignKeys )
 		{
 			DBModel::ForeignKeyRef fk = MakeShared<DBModel::ForeignKey>(_dbClass);
@@ -806,7 +810,7 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 
 			CXMLNode foreignKeyTable = foreignKey.FindChild(_T("ForeignKeyTable"));
 			fk->_foreignKeyTableName = foreignKeyTable.GetStringAttr(_T("name"));
-			CVector<CXMLNode> foreignKeyColumns = foreignKeyTable.FindChildren(_T("Column"));
+			std::vector<CXMLNode> foreignKeyColumns = foreignKeyTable.FindChildren(_T("Column"));
 			for( CXMLNode& foreignKeyColumn : foreignKeyColumns )
 			{
 				DBModel::IndexColumnRef c = MakeShared<DBModel::IndexColumn>();
@@ -816,7 +820,7 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 
 			CXMLNode referenceKeyTable = foreignKey.FindChild(_T("ReferenceKeyTable"));
 			fk->_referenceKeyTableName = referenceKeyTable.GetStringAttr(_T("name"));
-			CVector<CXMLNode> referenceKeyColumns = referenceKeyTable.FindChildren(_T("Column"));
+			std::vector<CXMLNode> referenceKeyColumns = referenceKeyTable.FindChildren(_T("Column"));
 			for( CXMLNode& referenceKeyColumn : referenceKeyColumns )
 			{
 				DBModel::IndexColumnRef c = MakeShared<DBModel::IndexColumn>();
@@ -829,7 +833,7 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 		_xmlTables.push_back(t);
 	}
 
-	CVector<CXMLNode> procedures = root.FindChildren(_T("Procedure"));
+	std::vector<CXMLNode> procedures = root.FindChildren(_T("Procedure"));
 	for( CXMLNode& procedure : procedures )
 	{
 		DBModel::ProcedureRef p = MakeShared<DBModel::Procedure>();
@@ -838,7 +842,7 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 		p->_procComment = procedure.GetStringAttr(_T("desc"));
 		p->_body = procedure.FindChild(_T("body")).GetStringValue();
 
-		CVector<CXMLNode> params = procedure.FindChildren(_T("Param"));
+		std::vector<CXMLNode> params = procedure.FindChildren(_T("Param"));
 		for( CXMLNode& param : params )
 		{
 			DBModel::ProcParamRef procParam = MakeShared<DBModel::ProcParam>();
@@ -852,7 +856,7 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 		_xmlProcedures.push_back(p);
 	}
 
-	CVector<CXMLNode> functions = root.FindChildren(_T("Function"));
+	std::vector<CXMLNode> functions = root.FindChildren(_T("Function"));
 	for( CXMLNode& function : functions )
 	{
 		DBModel::FunctionRef f = MakeShared<DBModel::Function>();
@@ -861,7 +865,7 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 		f->_funcComment = function.GetStringAttr(_T("desc"));
 		f->_body = function.FindChild(_T("body")).GetStringValue();
 
-		CVector<CXMLNode> params = function.FindChildren(_T("Param"));
+		std::vector<CXMLNode> params = function.FindChildren(_T("Param"));
 		for( CXMLNode& param : params )
 		{
 			DBModel::FuncParamRef funcParam = MakeShared<DBModel::FuncParam>();
@@ -875,7 +879,7 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 		_xmlFunctions.push_back(f);
 	}
 
-	CVector<CXMLNode> removedTables = root.FindChildren(_T("RemovedTable"));
+	std::vector<CXMLNode> removedTables = root.FindChildren(_T("RemovedTable"));
 	for( CXMLNode& removedTable : removedTables )
 	{
 		_xmlRemovedTables.insert(removedTable.GetStringAttr(_T("name")));
@@ -886,6 +890,8 @@ void CDBSynchronizer::ParseXmlToDB(const TCHAR* path)
 //
 bool CDBSynchronizer::DBToCreateXml(const TCHAR* path)
 {
+	CRapidXMLUtil	xmlUtil;
+
 	_tXmlDocumentType doc;
 
 	// append xml declaration
@@ -1025,7 +1031,7 @@ bool CDBSynchronizer::DBToCreateXml(const TCHAR* path)
 	_tstring xmlString;
 	rapidxml::print(std::back_inserter(xmlString), doc);
 
-	SaveUTF8NOBOMFile(path, xmlString.c_str(), xmlString.size());
+	xmlUtil.SaveToFile(path, xmlString);
 
 	return true;
 }

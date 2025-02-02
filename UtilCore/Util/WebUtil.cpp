@@ -45,6 +45,7 @@ static int g_pnDecodeMimeBase64[256] = {
 	-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
 };
 
+#ifdef	__MEMBUFFER_H__
 //***************************************************************************
 //
 bool Base64Enc(CMemBuffer<BYTE>& ByteDestination, const BYTE* pbSource, const int iLength)
@@ -1232,4 +1233,127 @@ bool DecodeURIComponent(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource
 
 	return bResult;
 }
+//#else
+//***************************************************************************
+//
+_tstring Base64Enc(const _tstring& source)
+{
+	size_t	length = 0;
+	size_t	size = 0;
+	int		c1, c2, c3;
+	int		e1, e2, e3, e4;
+	char*	pszSourceData = nullptr;
+	char*	pszSourceDoc = nullptr;
+	TCHAR*	ptszDestDoc = nullptr;
 
+	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
+
+#ifdef _UNICODE
+	string sourceData = WStringToString(source);
+	pszSourceData = const_cast<char*>(sourceData.c_str());
+	length = sourceData.size();
+#else
+	pszSourceData = const_cast<char*>(source.c_str());
+	length = source.size();
+#endif
+
+	c1 = c2 = c3 = 0;
+	e1 = e2 = e3 = e4 = 0;
+	size = (4 * (length / 3)) + (length % 3 ? 4 : 0);
+
+	_tstring dest(size, _T('\0'));
+
+	pszSourceDoc = pszSourceData;
+	ptszDestDoc = const_cast<TCHAR*>(dest.c_str());
+	for( int i = 0; i < length; i = i + 3 )
+	{
+		c1 = pszSourceDoc[i];
+		c2 = pszSourceDoc[i + 1];
+		c3 = pszSourceDoc[i + 2];
+
+		e1 = (c1 & 0xFC) >> 2;
+		e2 = ((c1 & 0x03) << 4) | ((c2 & 0xF0) >> 4);
+		e3 = ((c2 & 0x0F) << 2) | ((c3 & 0xC0) >> 6);
+		e4 = c3 & 0x3F;
+
+		*ptszDestDoc = g_pcMimeBase64[e1];
+		*(ptszDestDoc + 1) = g_pcMimeBase64[e2];
+		*(ptszDestDoc + 2) = g_pcMimeBase64[e3];
+		*(ptszDestDoc + 3) = g_pcMimeBase64[e4];
+
+		if( (i + 2) > length ) *(ptszDestDoc + 2) = '=';
+		if( (i + 3) > length ) *(ptszDestDoc + 3) = '=';
+
+		ptszDestDoc = ptszDestDoc + 4;
+	}
+	*ptszDestDoc = '\0';
+
+	return dest;
+}
+
+//***************************************************************************
+//
+_tstring Base64Dec(const _tstring& source)
+{
+	size_t	length = 0;
+	size_t	size = 0;
+	int		c1, c2, c3, c4;
+	int		e1, e2, e3, e4;
+	TCHAR*	ptszSourceDoc = nullptr;
+	char*	pszDestination = nullptr;
+	char*	pszDestDoc = nullptr;
+
+	_tstring dest;
+
+	if( source.c_str() == nullptr || source.size() == 0 ) return dest;
+
+	length = source.size();
+	c1 = c2 = c3 = 0;
+	e1 = e2 = e3 = e4 = 0;
+	size = (length / 4) * 3 + 1;
+
+	pszDestination = new char[size];
+
+	ptszSourceDoc = const_cast<TCHAR*>(source.c_str());
+	pszDestDoc = pszDestination;
+	for( int i = 0; i < length; i = i + 4 )
+	{
+		c1 = ptszSourceDoc[i];
+		c2 = ptszSourceDoc[i + 1];
+		c3 = ptszSourceDoc[i + 2];
+		c4 = ptszSourceDoc[i + 3];
+
+		e1 = g_pnDecodeMimeBase64[c1];
+		e2 = g_pnDecodeMimeBase64[c2];
+
+		if( c3 == '=' )
+			e3 = 0;
+		else e3 = g_pnDecodeMimeBase64[c3];
+
+		if( c4 == '=' )
+			e4 = 0;
+		else e4 = g_pnDecodeMimeBase64[c4];
+
+		*pszDestDoc = (e1 << 2) | ((e2 & 0x30) >> 4);
+		*(pszDestDoc + 1) = ((e2 & 0xf) << 4) | ((e3 & 0x3c) >> 2);
+		*(pszDestDoc + 2) = ((e3 & 0x3) << 6) | e4;
+
+		pszDestDoc = pszDestDoc + 3;
+	}
+	*pszDestDoc = '\0';
+
+#ifdef _UNICODE
+	dest = StringToWString(pszDestination);
+#else
+	dest.assign(pszDestination);
+#endif
+
+	if( pszDestination )
+	{
+		delete[] pszDestination;
+		pszDestination = nullptr;
+	}
+
+	return dest;
+}
+#endif

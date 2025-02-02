@@ -7,14 +7,11 @@
 #ifndef	__WEBUTIL_H__
 #define	__WEBUTIL_H__
 
-#ifndef	__STRINGUTIL_H__
-#include <StringUtil.h> 
+#ifndef	__CONVERTCHARSET_H__
+#include <Util/ConvertCharset.h> 
 #endif
 
-#ifndef	__MEMBUFFER_H__
-#include <MemBuffer.h> 
-#endif
-
+#ifdef	__MEMBUFFER_H__
 bool Base64Enc(CMemBuffer<BYTE>& ByteDestination, const BYTE* pbSource, const int iLength);
 bool Base64Dec(CMemBuffer<BYTE>& ByteDestination, const BYTE* pbSource, const int iLength);
 bool Base64Enc(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource);
@@ -36,5 +33,10 @@ bool DecodeURI(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource);
 
 bool EncodeURIComponent(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource);
 bool DecodeURIComponent(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource);
+//#else
+_tstring Base64Enc(const _tstring& source);
+_tstring Base64Dec(const _tstring& source);
+#endif
+
 
 #endif // ndef __WEBUTIL_H__

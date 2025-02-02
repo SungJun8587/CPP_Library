@@ -37,6 +37,8 @@ typedef unsigned __int64	uint64, time64;
 
 #ifdef _IOSTREAM_
 	#ifdef UNICODE
+		#define _tcout						std::wcout
+		#define _tcerr						std::wcerr
 		typedef std::wstring				_tstring;
 		typedef std::wstringstream			_tstringstream;
 		typedef std::wifstream				_tifstream;
@@ -45,6 +47,8 @@ typedef unsigned __int64	uint64, time64;
 		typedef std::wcmatch				_tcmatch;
 		typedef std::wsregex_token_iterator _tsregex_token_iterator;
 	#else
+		#define _tcout						std::cout
+		#define _tcerr						std::cerr
 		typedef std::string					_tstring;
 		typedef std::ostringstream			_tstringstream;
 		typedef std::ifstream				_tifstream;
