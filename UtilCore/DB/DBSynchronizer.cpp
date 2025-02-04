@@ -22,13 +22,16 @@ bool CDBSynchronizer::Synchronize(const TCHAR* path)
 
 	GatherDBTables();
 
-	/*
 	GatherDBTableColumns();
+
 	GatherDBTableConstraints();
 	if( _dbClass == EDBClass::ORACLE ) GatherDBIdentityColumns();
 	GatherDBIndexes();
+
 	if( _dbClass == EDBClass::MSSQL ) GatherDBIndexOptions();
 	GatherDBForeignKeys();
+
+	/*
 	if( _dbClass == EDBClass::MSSQL ) GatherDBDefaultConstraints();
 	GatherDBCheckConstraints();
 	GatherDBTrigger();
@@ -892,94 +895,87 @@ bool CDBSynchronizer::DBToCreateXml(const TCHAR* path)
 {
 	CRapidXMLUtil	xmlUtil;
 
-	_tXmlDocumentType doc;
-
 	// append xml declaration
-	_tXmlNodeType* header = doc.allocate_node(rapidxml::node_type::node_declaration);
-	header->append_attribute(doc.allocate_attribute(_T("version"), _T("1.0")));
-	header->append_attribute(doc.allocate_attribute(_T("encoding"), _T("utf-8")));
-	doc.append_node(header);
+	xmlUtil.AppendXMLDec();
 
 	// append root node
-	_tXmlNodeType* root = doc.allocate_node(rapidxml::node_type::node_element, _T("GameDB"));
-	doc.append_node(root);
+	rapidxml::xml_node<>* root = xmlUtil.AddNode(_T("GameDB"));
+	xmlUtil.AppendNode(&xmlUtil.GetDocument(), root);
 
 	for( DBModel::TableRef& dbTable : _dbTables )
 	{
-		_tXmlNodeType* table = doc.allocate_node(rapidxml::node_type::node_element, _T("Table"));
-		table->append_attribute(doc.allocate_attribute(_T("schemaname"), dbTable->_schemaName.c_str()));
-		table->append_attribute(doc.allocate_attribute(_T("name"), dbTable->_tableName.c_str()));
-		table->append_attribute(doc.allocate_attribute(_T("desc"), dbTable->_tableComment.c_str()));
-		table->append_attribute(doc.allocate_attribute(_T("auto_increment_value"), dbTable->_auto_increment_value.c_str()));
-		root->append_node(table);
+		rapidxml::xml_node<>* table = xmlUtil.AddNode(_T("Table"));
+		xmlUtil.AddAttribute(table, _T("schemaname"), dbTable->_schemaName);
+		xmlUtil.AddAttribute(table, _T("name"), dbTable->_tableName);
+		xmlUtil.AddAttribute(table, _T("desc"), dbTable->_tableComment);
+		xmlUtil.AddAttribute(table, _T("auto_increment_value"), dbTable->_auto_increment_value);
+		xmlUtil.AppendNode(root, table);
 
 		for( DBModel::ColumnRef& dbColumn : dbTable->_columns )
 		{
-			_tXmlNodeType* column = doc.allocate_node(rapidxml::node_type::node_element, _T("Column"));
-			column->append_attribute(doc.allocate_attribute(_T("seq"), dbColumn->_seq.c_str()));
-			column->append_attribute(doc.allocate_attribute(_T("name"), dbColumn->_tableName.c_str()));
-			column->append_attribute(doc.allocate_attribute(_T("type"), dbColumn->_datatypedesc.c_str()));
-			column->append_attribute(doc.allocate_attribute(_T("notnull"), !dbColumn->_nullable ? _T("true") : _T("false")));
-			if( dbColumn->_defaultDefinition.size() > 0 ) column->append_attribute(doc.allocate_attribute(_T("default"), dbColumn->_defaultDefinition.c_str()));
-			if( dbColumn->_identity ) column->append_attribute(doc.allocate_attribute(_T("identity"), dbColumn->_identitydesc.c_str()));
-			column->append_attribute(doc.allocate_attribute(_T("desc"), dbColumn->_columnComment.c_str()));
-			table->append_node(column);
+			rapidxml::xml_node<>* column = xmlUtil.AddNode(_T("Column"));
+			xmlUtil.AddAttribute(column, _T("seq"), dbColumn->_seq);
+			xmlUtil.AddAttribute(column, _T("name"), dbColumn->_tableName);
+			xmlUtil.AddAttribute(column, _T("type"), dbColumn->_datatypedesc);
+			xmlUtil.AddAttribute(column, _T("notnull"), !dbColumn->_nullable ? _T("true") : _T("false"));
+			if( dbColumn->_defaultDefinition.size() > 0 ) xmlUtil.AddAttribute(column, _T("default"), dbColumn->_defaultDefinition);
+			if( dbColumn->_identity ) xmlUtil.AddAttribute(column, _T("identity"), dbColumn->_identitydesc);
+			xmlUtil.AddAttribute(column, _T("desc"), dbColumn->_columnComment);
+			xmlUtil.AppendNode(table, column);
 		}
-
+		
 		for( DBModel::IndexRef& dbIndex : dbTable->_indexes )
 		{
-			_tXmlNodeType* index = doc.allocate_node(rapidxml::node_type::node_element, _T("Index"));
-			index->append_attribute(doc.allocate_attribute(_T("name"), dbIndex->_tableName.c_str()));
+			rapidxml::xml_node<>* index = xmlUtil.AddNode(_T("Index"));
+			xmlUtil.AddAttribute(index, _T("name"), dbIndex->_tableName);
+			xmlUtil.AddAttribute(index, _T("type"), dbIndex->_type);
 
-			index->append_attribute(doc.allocate_attribute(_T("type"), doc.allocate_string(dbIndex->_type.c_str())));
-
-			if( dbIndex->_primaryKey ) index->append_node(doc.allocate_node(rapidxml::node_type::node_element, _T("PrimaryKey")));
-			if( dbIndex->_uniqueKey ) index->append_node(doc.allocate_node(rapidxml::node_type::node_element, _T("UniqueKey")));
-			if( dbIndex->_systemNamed ) index->append_node(doc.allocate_node(rapidxml::node_type::node_element, _T("SystemNamed")));
+			if( dbIndex->_primaryKey ) xmlUtil.AppendNode(index, xmlUtil.AddNode(_T("PrimaryKey")));
+			if( dbIndex->_uniqueKey ) xmlUtil.AppendNode(index, xmlUtil.AddNode(_T("UniqueKey")));  
+			if( dbIndex->_systemNamed ) xmlUtil.AppendNode(index, xmlUtil.AddNode(_T("SystemNamed")));  
 
 			for( DBModel::IndexColumnRef& dbIndexColumn : dbIndex->_columns )
 			{
-				_tXmlNodeType* column = doc.allocate_node(rapidxml::node_type::node_element, _T("Column"));
-
-				column->append_attribute(doc.allocate_attribute(_T("seq"), dbIndexColumn->_seq.c_str()));
-				column->append_attribute(doc.allocate_attribute(_T("name"), dbIndexColumn->_columnName.c_str()));
-				column->append_attribute(doc.allocate_attribute(_T("order"), dbIndexColumn->GetSortText().c_str()));
-				index->append_node(column);
+				rapidxml::xml_node<>* column = xmlUtil.AddNode(_T("Column"));
+				xmlUtil.AddAttribute(column, _T("seq"), dbIndexColumn->_seq);
+				xmlUtil.AddAttribute(column, _T("name"), dbIndexColumn->_columnName);
+				xmlUtil.AddAttribute(column, _T("order"), dbIndexColumn->GetSortText());
+				xmlUtil.AppendNode(index, column);
 			}
-			table->append_node(index);
+			xmlUtil.AppendNode(table, index);
 		}
 
 		for( DBModel::ForeignKeyRef& dbForeignKey : dbTable->_foreignKeys )
 		{
-			_tXmlNodeType* referenceKey = doc.allocate_node(rapidxml::node_type::node_element, _T("ForeignKey"));
-			referenceKey->append_attribute(doc.allocate_attribute(_T("name"), dbForeignKey->_foreignKeyName.c_str()));
-			referenceKey->append_attribute(doc.allocate_attribute(_T("update_rule"), dbForeignKey->_updateRule.c_str()));
-			referenceKey->append_attribute(doc.allocate_attribute(_T("delete_rule"), dbForeignKey->_deleteRule.c_str()));
+			rapidxml::xml_node<>* referenceKey = xmlUtil.AddNode(_T("ForeignKey"));
+			xmlUtil.AddAttribute(referenceKey, _T("name"), dbForeignKey->_foreignKeyName);
+			xmlUtil.AddAttribute(referenceKey, _T("update_rule"), dbForeignKey->_updateRule);
+			xmlUtil.AddAttribute(referenceKey, _T("delete_rule"), dbForeignKey->_deleteRule);
 
-			_tXmlNodeType* foreignKeyTable = doc.allocate_node(rapidxml::node_type::node_element, _T("ForeignKeyTable"));
-			foreignKeyTable->append_attribute(doc.allocate_attribute(_T("name"), dbForeignKey->_foreignKeyTableName.c_str()));
+			rapidxml::xml_node<>* foreignKeyTable = xmlUtil.AddNode(_T("ForeignKeyTable"));
+			xmlUtil.AddAttribute(foreignKeyTable, _T("name"), dbForeignKey->_foreignKeyTableName);
 			for( DBModel::IndexColumnRef& dbForeignKeyColumn : dbForeignKey->_foreignKeyColumns )
 			{
-				_tXmlNodeType* column = doc.allocate_node(rapidxml::node_type::node_element, _T("Column"));
-				column->append_attribute(doc.allocate_attribute(_T("name"), dbForeignKeyColumn->_columnName.c_str()));
-				foreignKeyTable->append_node(column);
+				rapidxml::xml_node<>* column = xmlUtil.AddNode(_T("Column"));
+				xmlUtil.AddAttribute(column, _T("name"), dbForeignKeyColumn->_columnName);
+				xmlUtil.AppendNode(foreignKeyTable, column);
 			}
-			referenceKey->append_node(foreignKeyTable);
+			xmlUtil.AppendNode(referenceKey, foreignKeyTable);
 
-			_tXmlNodeType* referenceKeyTable = doc.allocate_node(rapidxml::node_type::node_element, _T("ReferenceKeyTable"));
-			referenceKeyTable->append_attribute(doc.allocate_attribute(_T("name"), dbForeignKey->_referenceKeyTableName.c_str()));
+			rapidxml::xml_node<>* referenceKeyTable = xmlUtil.AddNode(_T("ReferenceKeyTable"));
+			xmlUtil.AddAttribute(referenceKeyTable, _T("name"), dbForeignKey->_referenceKeyTableName);
 			for( DBModel::IndexColumnRef& dbReferenceKeyColumn : dbForeignKey->_referenceKeyColumns )
 			{
-				_tXmlNodeType* column = doc.allocate_node(rapidxml::node_type::node_element, _T("Column"));
-				column->append_attribute(doc.allocate_attribute(_T("name"), dbReferenceKeyColumn->_columnName.c_str()));
-				referenceKeyTable->append_node(column);
+				rapidxml::xml_node<>* column = xmlUtil.AddNode(_T("Column"));
+				xmlUtil.AddAttribute(column, _T("name"), dbReferenceKeyColumn->_columnName);
+				xmlUtil.AppendNode(referenceKeyTable, column);
 			}
-			referenceKey->append_node(referenceKeyTable);
-
-			table->append_node(referenceKey);
+			xmlUtil.AppendNode(referenceKey, referenceKeyTable);
+			xmlUtil.AppendNode(table, referenceKey);
 		}
 	}
 
+	/*
 	for( DBModel::ProcedureRef& dbProcedure : _dbProcedures )
 	{
 		_tXmlNodeType* procedure = doc.allocate_node(rapidxml::node_type::node_element, _T("Procedure"));
@@ -1027,11 +1023,9 @@ bool CDBSynchronizer::DBToCreateXml(const TCHAR* path)
 
 		root->append_node(function);
 	}
+	*/
 
-	_tstring xmlString;
-	rapidxml::print(std::back_inserter(xmlString), doc);
-
-	xmlUtil.SaveToFile(path, xmlString);
+	xmlUtil.SaveFile(path);
 
 	return true;
 }

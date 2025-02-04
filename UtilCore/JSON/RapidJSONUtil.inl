@@ -42,6 +42,10 @@ inline _tstring CRapidJSONUtil::Serialize(const _tstring& key, const T& obj, con
 	{
 		AddValue(key, obj);
 	}
+	else if constexpr( std::is_same_v<typename std::decay<T>::type, TCHAR*> || std::is_same_v<typename std::decay<T>::type, const TCHAR*> )
+	{
+		AddValue(key, obj);
+	}
 	else if constexpr( std::is_same_v<T, _tstring> )
 	{
 		AddValue(key, obj);
@@ -91,12 +95,18 @@ inline T CRapidJSONUtil::Deserialize(const _tstring& key)
 	}
 	else if constexpr( std::is_arithmetic<T>::value )
 	{
-		return GetValue<T>(key);
+		return GetValue<T>(key, 0);
+	}
+	else if constexpr( std::is_same_v<typename std::decay<T>::type, TCHAR*> || std::is_same_v<typename std::decay<T>::type, const TCHAR*> )
+	{
+		return GetValue<T>(key, _T(""));
 	}
 	else if constexpr( std::is_same_v<T, _tstring> )
 	{
-		return GetValue<T>(key);
+		return GetValue<T>(key, _T(""));
 	}
+
+	return T();
 }
 
 //***************************************************************************
@@ -355,7 +365,15 @@ inline std::map<Key, T> CRapidJSONUtil::GetObjectMap(const _tstring& key) const
 template <typename T>
 inline _tValue CRapidJSONUtil::ConvertToJSONValue(const T& value) const
 {
-	if constexpr( std::is_same<T, int32_t>::value )
+	if constexpr( std::is_same<T, int16_t>::value )
+	{
+		return _tValue(value);
+	}
+	else if constexpr( std::is_same<T, uint16_t>::value )
+	{
+		return _tValue(value);
+	}
+	else if constexpr( std::is_same<T, int32_t>::value )
 	{
 		return _tValue(value);
 	}
@@ -387,11 +405,7 @@ inline _tValue CRapidJSONUtil::ConvertToJSONValue(const T& value) const
 	{
 		return _tValue(value, _allocator);
 	}
-	else if constexpr( std::is_same_v<T, std::string> )
-	{
-		return _tValue(value.c_str(), _allocator);
-	}
-	else if constexpr( std::is_same_v<T, std::wstring> )
+	else if constexpr( std::is_same_v<T, _tstring> )
 	{
 		return _tValue(value.c_str(), _allocator);
 	}
@@ -425,7 +439,15 @@ inline _tValue CRapidJSONUtil::ConvertToJSONValue(const T& value) const
 template <typename T>
 inline T CRapidJSONUtil::ConvertFromJSONValue(const _tValue& value) const
 {
-	if constexpr( std::is_same<T, int32_t>::value )
+	if constexpr( std::is_same<T, int16_t>::value )
+	{
+		return value.GetInt();
+	}
+	else if constexpr( std::is_same<T, uint16_t>::value )
+	{
+		return value.GetUint();
+	}
+	else if constexpr( std::is_same<T, int32_t>::value )
 	{
 		return value.GetInt();
 	}
@@ -453,11 +475,11 @@ inline T CRapidJSONUtil::ConvertFromJSONValue(const _tValue& value) const
 	{
 		return value.GetBool();
 	}
-	else if constexpr( std::is_same_v<T, std::string> )
+	else if constexpr( std::is_same_v<typename std::decay<T>::type, TCHAR*> || std::is_same_v<typename std::decay<T>::type, const TCHAR*> )
 	{
 		return value.GetString();
 	}
-	else if constexpr( std::is_same_v<T, std::wstring> )
+	else if constexpr( std::is_same_v<T, _tstring> )
 	{
 		return value.GetString();
 	}

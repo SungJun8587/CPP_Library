@@ -65,7 +65,7 @@ public:
 	int64				GetInt64Attr(const TCHAR* ptszKey, int64 defaultValue = 0);
 	float				GetFloatAttr(const TCHAR* ptszKey, float defaultValue = 0.0f);
 	double				GetDoubleAttr(const TCHAR* ptszKey, double defaultValue = 0.0);
-	_tstring			GetStringAttr(const TCHAR* ptszKey, const TCHAR* defaultValue = _T(""));
+	const TCHAR*		GetStringAttr(const TCHAR* ptszKey, const TCHAR* defaultValue = _T(""));
 
 	bool				GetBoolValue(bool defaultValue = false);
 	int8				GetInt8Value(int8 defaultValue = 0);
@@ -74,7 +74,7 @@ public:
 	int64				GetInt64Value(int64 defaultValue = 0);
 	float				GetFloatValue(float defaultValue = 0.0f);
 	double				GetDoubleValue(double defaultValue = 0.0);
-	_tstring			GetStringValue(const TCHAR* defaultValue = _T(""));
+	const TCHAR*		GetStringValue(const TCHAR* defaultValue = _T(""));
 
 	CXMLNode				FindChild(const TCHAR* ptszKey);
 	std::vector<CXMLNode>	FindChildren(const TCHAR* ptszKey);
@@ -117,6 +117,10 @@ public:
 	CRapidXMLUtil(const CRapidXMLUtil& other);
 	~CRapidXMLUtil();
 
+	rapidxml::xml_document<>& GetDocument() { 
+		return _doc;  
+	}
+
 	xml_node<char>* GetRootNode() {
 		// 첫 번째 노드를 가져와서 root 노드를 반환
 		return _doc.first_node();
@@ -126,9 +130,18 @@ public:
 		_doc.clear();
 	}
 
+	void AppendXMLDec();
+
+	xml_node<>* AddNode(const _tstring& nodeName);
+	void AppendNode(xml_node<>* parentNode, xml_node<>* node);
 	void RemoveNode(const _tstring& nodeName);
 
+	void AddAttribute(xml_node<>* node, const _tstring& attName, const _tstring& attValue);
+	void SetAttribute(xml_node<>* node, const _tstring& attName, const _tstring& attValue);
+	void RemoveAttribute(xml_node<>* node, const _tstring& attName);
+
 	bool ParseFromFile(const _tstring& filename, OUT CXMLNode& root);
+	bool SaveFile(const _tstring& filename);
 	bool SaveFileToXML(const _tstring& filename, const _tstring& xmlData);
 
 	void PrintXML() const;

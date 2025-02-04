@@ -40,20 +40,20 @@ typedef rapidjson::GenericStringBuffer<rapidjson::UTF16<>> WStringBuffer;
 typedef rapidjson::GenericPointer<WValue> WPointer;
 
 #ifdef _UNICODE
-typedef WDocument		_tDocument;
-typedef WValue			_tValue;
+typedef WDocument       _tDocument;
+typedef WValue          _tValue;
 typedef WStringStream   _tStringStream;
 typedef WStringBuffer   _tStringBuffer;
-typedef WPointer		_tPointer;
+typedef WPointer        _tPointer;
 typedef Writer<WStringBuffer, UTF16<>, UTF16<>> _tWriter;
 typedef PrettyWriter<WStringBuffer, UTF16<>, UTF16<>> _tPrettyWriter;
 typedef GenericArray<true, WValue> _tArray;
 #else
-typedef Document		_tDocument;
-typedef Value			_tValue;
-typedef StringBuffer	_tStringBuffer;
-typedef StringStream	_tStringStream;
-typedef Pointer			_tPointer;
+typedef Document        _tDocument;
+typedef Value           _tValue;
+typedef StringBuffer    _tStringBuffer;
+typedef StringStream    _tStringStream;
+typedef Pointer         _tPointer;
 typedef Writer<StringBuffer, UTF8<>, UTF8<>> _tWriter;
 typedef PrettyWriter<StringBuffer, UTF8<>, UTF8<>> _tPrettyWriter;
 typedef GenericArray<true, Value> _tArray;
@@ -90,14 +90,16 @@ public:
     CRapidJSONUtil& operator=(double dValue);
     CRapidJSONUtil& operator=(bool bValue);
 
+    CRapidJSONUtil& operator+(const std::pair<const TCHAR*, CRapidJSONUtil>& keyValue);
     CRapidJSONUtil& operator+(const std::pair<_tstring, CRapidJSONUtil>& keyValue);
     CRapidJSONUtil& operator+(const CRapidJSONUtil& other);
 
+    CRapidJSONUtil& operator-(const TCHAR* ptszKey);
     CRapidJSONUtil& operator-(const _tstring& key);
     CRapidJSONUtil& operator-(const uint32 index);
 
     bool IsExists(const TCHAR* ptszKey) const;
-    bool IsExists(const _tstring& strKey) const;
+    bool IsExists(const _tstring& key) const;
     bool IsObject() const;
     bool IsArray() const;
     bool IsString() const;
@@ -246,8 +248,8 @@ private:
     struct dependent_false : std::false_type {};
 
 private:
-    _tDocument _document;                       // JSON Document
-    _tDocument::AllocatorType& _allocator;      // Allocator
+    _tDocument                  _document;      // JSON Document
+    _tDocument::AllocatorType&  _allocator;     // Allocator
     
     bool _bIsDebugPrint;
 };

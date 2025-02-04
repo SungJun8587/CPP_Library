@@ -117,6 +117,25 @@ CRapidJSONUtil& CRapidJSONUtil::operator=(bool bValue)
 
 //***************************************************************************
 // + 연산자 오버로딩(객체 확장)
+CRapidJSONUtil& CRapidJSONUtil::operator+(const std::pair<const TCHAR*, CRapidJSONUtil>& keyValue)
+{
+	if( !_document.IsObject() )
+	{
+		_document.SetObject();
+	}
+
+	_tValue key(keyValue.first, _allocator);	// Key를 rapidjson::Value로 변환
+	_tValue value;
+
+	// Value도 복사하여 추가해야 함
+	value.CopyFrom(keyValue.second._document, _allocator);
+
+	_document.AddMember(key, value, _allocator);
+	return *this;
+}
+
+//***************************************************************************
+// + 연산자 오버로딩(객체 확장)
 CRapidJSONUtil& CRapidJSONUtil::operator+(const std::pair<_tstring, CRapidJSONUtil>& keyValue)
 {
 	if( !_document.IsObject() )
@@ -150,14 +169,21 @@ CRapidJSONUtil& CRapidJSONUtil::operator+(const CRapidJSONUtil& other)
 
 //***************************************************************************
 // - 연산자 오버로딩(객체 속성 삭제)
-CRapidJSONUtil& CRapidJSONUtil::operator-(const _tstring& key)
+CRapidJSONUtil& CRapidJSONUtil::operator-(const TCHAR* ptszKey)
 {
-	if( _document.IsObject() && _document.HasMember(key.c_str()) )
+	if( _document.IsObject() && _document.HasMember(ptszKey) )
 	{
-		RecursiveRemove(_document[key.c_str()]);
-		_document.RemoveMember(key.c_str());
+		RecursiveRemove(_document[ptszKey]);
+		_document.RemoveMember(ptszKey);
 	}
 	return *this;
+}
+
+//***************************************************************************
+// - 연산자 오버로딩(객체 속성 삭제)
+CRapidJSONUtil& CRapidJSONUtil::operator-(const _tstring& key)
+{
+	return operator-(key.c_str());
 }
 
 //***************************************************************************
@@ -172,35 +198,6 @@ CRapidJSONUtil& CRapidJSONUtil::operator-(const uint32 index)
 	return *this;
 }
 
-/*
-//***************************************************************************
-// [] 연산자 오버로딩(Setter)
-_tValue& CRapidJSONUtil::operator[](const _tstring& key)
-{
-	if( !_document.HasMember(key.c_str()) ) 
-	{
-		_tValue newKey(key.c_str(), _allocator);
-		_document.AddMember(newKey, _tValue(), _allocator);
-	}
-	return _document[key.c_str()];
-}
-
-//***************************************************************************
-// [] 연산자 오버로딩(Getter)
-const _tValue& CRapidJSONUtil::operator[](const _tstring& key) const
-{
-	if( !_document.HasMember(key.c_str()) ) 
-	{
-#ifdef _UNICODE
-		std::wcerr << L"Key not found : " << key << std::endl;
-#else
-		std::cerr << "Key not found : " << key << std::endl;
-#endif
-	}
-	return _document[key.c_str()];
-}
-*/
-
 //***************************************************************************
 //
 bool CRapidJSONUtil::IsExists(const TCHAR* ptszKey) const
@@ -210,9 +207,9 @@ bool CRapidJSONUtil::IsExists(const TCHAR* ptszKey) const
 
 //***************************************************************************
 //
-bool CRapidJSONUtil::IsExists(const _tstring& strKey) const
+bool CRapidJSONUtil::IsExists(const _tstring& key) const
 {
-	return IsExists(strKey.c_str());
+	return IsExists(key.c_str());
 }
 
 //***************************************************************************
