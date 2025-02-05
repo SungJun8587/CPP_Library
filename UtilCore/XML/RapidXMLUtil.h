@@ -31,12 +31,12 @@
 
 using namespace rapidxml;
 
-#define RootName		"Root"
-#define VectorName		"Vector"
-#define MapName			"Map"
-#define MapKey			"Key"
-#define MapValue		"Value"
-#define ItemName		"Item"
+#define RootName		_T("Root")
+#define VectorName		_T("Vector")
+#define MapName			_T("Map")
+#define MapKey			_T("Key")
+#define MapValue		_T("Value")
+#define ItemName		_T("Item")
 
 class CXMLNode
 {
@@ -130,21 +130,24 @@ public:
 		_doc.clear();
 	}
 
-	void AppendXMLDec();
+	bool ParseFromFile(const _tstring& filename, OUT CXMLNode& root);
+	bool SaveFile(const _tstring& filename);
+	bool SaveFileToXML(const _tstring& filename, const _tstring& xmlData);
+	void PrintXML() const;
 
-	xml_node<>* AddNode(const _tstring& nodeName);
-	void AppendNode(xml_node<>* parentNode, xml_node<>* node);
+	void XMLDeclaration();
+
+	xml_node<>* AddNode(xml_node<>* parentNode, const _tstring& nodeName);
 	void RemoveNode(const _tstring& nodeName);
 
 	void AddAttribute(xml_node<>* node, const _tstring& attName, const _tstring& attValue);
 	void SetAttribute(xml_node<>* node, const _tstring& attName, const _tstring& attValue);
 	void RemoveAttribute(xml_node<>* node, const _tstring& attName);
 
-	bool ParseFromFile(const _tstring& filename, OUT CXMLNode& root);
-	bool SaveFile(const _tstring& filename);
-	bool SaveFileToXML(const _tstring& filename, const _tstring& xmlData);
+	void AddValue(const _tstring& str, xml_node<>* parent, const TCHAR* ptszTagName = ItemName);
+	void AddCDataValue(const _tstring& str, xml_node<>* parent, const TCHAR* ptszTagName);
+	void GetValue(_tstring& str, xml_node<>* node);
 
-	void PrintXML() const;
 	void RemoveNodeRecursive(xml_node<char>* node);
 
 	//***************************************************************************
@@ -203,40 +206,37 @@ public:
 	inline T Deserialize(const std::string& xml);
 
 	template <typename T>
-	inline void AddObject(const T& obj, xml_node<>* parent, const char* tagName = ItemName);
+	inline void AddObject(const T& obj, xml_node<>* parent, const TCHAR* ptszTagName = ItemName);
 
 	template <typename T>
 	inline void GetObject(T& obj, xml_node<>* node);
 
 	template <typename T>
-	inline void AddVector(const std::vector<T>& container, xml_node<>* parent, const char* tagName = VectorName);
+	inline void AddVector(const std::vector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName = VectorName);
 
 	template <typename T>
-	inline void GetVector(std::vector<T>& container, xml_node<>* parent, const char* tagName = VectorName);
+	inline void GetVector(std::vector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName = VectorName);
 
 	template <typename T>
-	inline void AddObjectVector(const std::vector<T>& container, xml_node<>* parent, const char* tagName = VectorName);
+	inline void AddObjectVector(const std::vector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName = VectorName);
 
 	template <typename T>
-	inline void GetObjectVector(std::vector<T>& container, xml_node<>* parent, const char* tagName = VectorName);
+	inline void GetObjectVector(std::vector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName = VectorName);
 
 	template <typename K, typename V>
-	inline void AddMap(const std::map<K, V>& container, xml_node<>* parent, const char* tagName = MapName);
+	inline void AddMap(const std::map<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName = MapName);
 
 	template <typename K, typename V>
-	inline void GetMap(std::map<K, V>& container, xml_node<>* parent, const char* tagName = MapName);
+	inline void GetMap(std::map<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName = MapName);
 
 	template <typename K, typename V>
-	inline void AddObjectMap(const std::map<K, V>& container, xml_node<>* parent, const char* tagName = MapName);
+	inline void AddObjectMap(const std::map<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName = MapName);
 
 	template <typename K, typename V>
-	inline void GetObjectMap(std::map<K, V>& container, xml_node<>* parent, const char* tagName = MapName);
-
-	inline void AddValue(const _tstring& str, xml_node<>* parent, const char* tagName = ItemName);
-	inline void GetValue(_tstring& str, xml_node<>* node);
+	inline void GetObjectMap(std::map<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName = MapName);
 
 	template <typename T, typename std::enable_if<std::is_arithmetic<T>::value>::type* = nullptr>
-	inline void AddValue(const T& value, xml_node<>* parent, const char* tagName = ItemName);
+	inline void AddValue(const T& value, xml_node<>* parent, const TCHAR* ptszTagName = ItemName);
 
 	template <typename T, typename std::enable_if<std::is_arithmetic<T>::value>::type* = nullptr>
 	inline void GetValue(T& value, xml_node<>* node);
@@ -252,24 +252,35 @@ public:
 	//***************************************************************************
 	// 숫자 타입 직렬화 함수
 	template <typename T>
-	static void Serialize(const T& value, xml_node<>* parent, xml_document<>& doc, const char* tagName = ItemName)
+	static void Serialize(const T& value, xml_node<>* parent, xml_document<>& doc, const TCHAR* ptszTagName = ItemName)
 	{
-		xml_node<>* node = doc.allocate_node(node_type::node_element, tagName, doc.allocate_string(std::to_string(value).c_str()));
+		string nodeName;
+
+#ifdef UNICODE
+		nodeName = Iconv::CIconvUtil::ConvertEncoding(ptszTagName, "WCHAR_T", "UTF-8");
+#else
+		nodeName = ptszTagName;
+#endif
+
+		xml_node<>* node = doc.allocate_node(node_type::node_element, doc.allocate_string(nodeName.c_str()), doc.allocate_string(std::to_string(value).c_str()));
 		parent->append_node(node);
 	}
 
 	//***************************************************************************
 	// 문자열 타입 직렬화 함수
-	static void Serialize(const _tstring& value, xml_node<>* parent, xml_document<>& doc, const char* tagName = ItemName)
+	static void Serialize(const _tstring& value, xml_node<>* parent, xml_document<>& doc, const TCHAR* ptszTagName = ItemName)
 	{
+		string nodeName;
 		string nodeValue;
 
 #ifdef UNICODE
+		nodeName = Iconv::CIconvUtil::ConvertEncoding(ptszTagName, "WCHAR_T", "UTF-8");
 		nodeValue = Iconv::CIconvUtil::ConvertEncoding(value, "WCHAR_T", "UTF-8");
 #else
+		nodeName = ptszTagName;
 		nodeValue = value;
 #endif
-		xml_node<>* node = doc.allocate_node(node_type::node_element, tagName, doc.allocate_string(nodeValue.c_str()));
+		xml_node<>* node = doc.allocate_node(node_type::node_element, doc.allocate_string(nodeName.c_str()), doc.allocate_string(nodeValue.c_str()));
 		parent->append_node(node);
 	}
 

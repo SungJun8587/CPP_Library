@@ -277,7 +277,7 @@ bool Base64Dec(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 // php : 빈칸은 +로 변환하고, 영문자, 숫자, '-', '.', '_' 제외한 문자를 16진수로 변환.
 // 아스키 코드를 16진수로 교환
 // EUC-KR, UTF-7, UTF-8, UTF-16에서 다르게 작동
-bool UrlEncode(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, int iCodePage)
+bool UrlEncode(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const int iCodePage)
 {
 	unsigned char cChar = '\0';
 
@@ -375,7 +375,7 @@ bool UrlEncode(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, int iCo
 
 //***************************************************************************
 //
-bool UrlDecode(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, int iCodePage)
+bool UrlDecode(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const int iCodePage)
 {
 	BOOL	bResult = false;
 	int		nCount = 0;
@@ -1249,7 +1249,7 @@ _tstring Base64Enc(const _tstring& source)
 	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
 
 #ifdef _UNICODE
-	string sourceData = WStringToString(source);
+	string sourceData = Iconv::CIconvUtil::ConvertEncoding(source, "WCHAR_T", "CP949");
 	pszSourceData = const_cast<char*>(sourceData.c_str());
 	length = sourceData.size();
 #else
@@ -1343,7 +1343,7 @@ _tstring Base64Dec(const _tstring& source)
 	*pszDestDoc = '\0';
 
 #ifdef _UNICODE
-	dest = StringToWString(pszDestination);
+	dest = Iconv::CIconvUtil::ConvertEncodingW(pszDestination, "CP949", "WCHAR_T");
 #else
 	dest.assign(pszDestination);
 #endif
@@ -1351,6 +1351,194 @@ _tstring Base64Dec(const _tstring& source)
 	if( pszDestination )
 	{
 		delete[] pszDestination;
+		pszDestination = nullptr;
+	}
+
+	return dest;
+}
+
+//***************************************************************************
+// asp, c#, php 처리방법 차이남
+// asp : 영문자, 숫자를 제외한 문자를 16진수로 변환
+// c# : 영문자, 숫자, '!', '\'', '(', ')', '*', '-', '.', '_' 제외한 문자를 16진수로 변환
+// php : 빈칸은 +로 변환하고, 영문자, 숫자, '-', '.', '_' 제외한 문자를 16진수로 변환.
+// 아스키 코드를 16진수로 교환
+// EUC-KR, UTF-7, UTF-8, UTF-16에서 다르게 작동
+_tstring UrlEncode(const _tstring& source, const int iCodePage)
+{
+	unsigned char cChar = '\0';
+
+	size_t	size = 0;
+	char*	pszSourceData = nullptr;
+	char*	pszSourceDoc = nullptr;
+	char*	pszDestDoc = nullptr;
+	char	szExcept[] = "";
+	//char	szExcept[] = "!'()*-._";	
+
+	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
+
+	std::string	sourceData;
+
+#ifdef _UNICODE
+	if( iCodePage == CP_ACP )
+	{
+		sourceData = Iconv::CIconvUtil::ConvertEncoding(source, "WCHAR_T", "CP949");
+		pszSourceData = const_cast<char*>(sourceData.c_str());
+	}
+	else if( iCodePage == CP_UTF8 )
+	{
+		sourceData = Iconv::CIconvUtil::ConvertEncoding(source, "WCHAR_T", "UTF-8");
+		pszSourceData = const_cast<char*>(sourceData.c_str());
+	}
+#else
+	if( iCodePage == CP_ACP )
+	{
+		pszSourceData = const_cast<char*>(source.c_str());
+	}
+	else if( iCodePage == CP_UTF8 )
+	{
+		sourceData = Iconv::CIconvUtil::ConvertEncoding(source, "CP949", "UTF-8");
+		pszSourceData = const_cast<char*>(sourceData.c_str());
+	}
+#endif
+
+	pszSourceDoc = pszSourceData;
+	if( nullptr != pszSourceDoc )
+	{
+		while( *pszSourceDoc )
+		{
+			cChar = (unsigned char)*pszSourceDoc;
+			if( !((cChar > 47 && cChar < 57) || (cChar > 64 && cChar < 91) || (cChar > 96 && cChar < 123) || strchr(szExcept, cChar)) )
+				size += 2;
+
+			pszSourceDoc++;
+			size++;
+		}
+	}
+
+	_tstring dest(size, '\0');
+
+#ifdef _UNICODE
+	string destData(size, '\0');
+
+	pszSourceDoc = pszSourceData;
+	pszDestDoc = const_cast<char*>(destData.c_str());
+#else
+	pszSourceDoc = pszSourceData;
+	pszDestDoc = const_cast<char*>(dest.c_str());
+#endif
+
+	if( nullptr != pszSourceDoc )
+	{
+		while( *pszSourceDoc )
+		{
+			cChar = (unsigned char)*pszSourceDoc;
+			if( (cChar > 47 && cChar < 57) || (cChar > 64 && cChar < 91) || (cChar > 96 && cChar < 123) || strchr(szExcept, cChar) )
+				*pszDestDoc++ = cChar;
+			else if( cChar == ' ' )
+				*pszDestDoc++ = '+';
+			else
+			{
+				*pszDestDoc++ = '%';
+				*pszDestDoc++ = g_pcDigits[(cChar >> 4) & 0x0F];
+				*pszDestDoc++ = g_pcDigits[cChar & 0x0F];
+			}
+			pszSourceDoc++;
+		}
+		*pszDestDoc = '\0';
+	}
+#ifdef _UNICODE
+	dest = Iconv::CIconvUtil::ConvertEncodingW(destData, "CP949", "WCHAR_T");
+#endif
+
+	return dest;
+}
+
+//***************************************************************************
+//
+_tstring UrlDecode(const _tstring& source, const int iCodePage)
+{
+	size_t	size = 0;
+	int		nNum = 0;
+	int		nRetval = 0;
+	TCHAR*	ptszSourceDoc = nullptr;
+	char*	pszDestination = nullptr;
+	char*	pszDestDoc = nullptr;
+
+	_tstring dest;
+
+	if( source.c_str() == nullptr || source.size() == 0 ) return dest;
+
+	ptszSourceDoc = const_cast<TCHAR*>(source.c_str());
+	while( *ptszSourceDoc )
+	{
+		if( *ptszSourceDoc == '%' )
+			ptszSourceDoc = ptszSourceDoc + 2;
+
+		ptszSourceDoc++;
+		size++;
+	}
+
+	pszDestination = new char[size + 1];
+
+	ptszSourceDoc = const_cast<TCHAR*>(source.c_str());
+	pszDestDoc = pszDestination;
+	while( *ptszSourceDoc )
+	{
+		if( *ptszSourceDoc == '%' )
+		{
+			nNum = 0;
+			nRetval = 0;
+			for( int i = 0; i < 2; i++ )
+			{
+				ptszSourceDoc++;
+				if( *ptszSourceDoc < ':' )
+					nNum = *ptszSourceDoc - 48;
+				else if( *ptszSourceDoc > '@' && *ptszSourceDoc < '[' )
+					nNum = (*ptszSourceDoc - 'A') + 10;
+				else
+					nNum = (*ptszSourceDoc - 'a') + 10;
+
+				if( i == 0 )
+					nNum = nNum * 16;
+
+				nRetval += nNum;
+			}
+
+			*pszDestDoc++ = nRetval;
+		}
+		else if( *ptszSourceDoc == '+' )
+			*pszDestDoc++ = ' ';
+		else
+			*pszDestDoc++ = (char)*ptszSourceDoc;
+
+		ptszSourceDoc++;
+	}
+	*pszDestDoc = '\0';
+
+#ifdef _UNICODE
+	if( iCodePage == CP_ACP )
+	{
+		dest = Iconv::CIconvUtil::ConvertEncodingW(pszDestination, "CP949", "WCHAR_T");
+	}
+	else if( iCodePage == CP_UTF8 )
+	{
+		dest = Iconv::CIconvUtil::ConvertEncodingW(pszDestination, "UTF-8", "WCHAR_T");
+	}
+#else
+	if( iCodePage == CP_ACP )
+	{
+		dest.assign(pszDestination);
+	}
+	else if( iCodePage == CP_UTF8 )
+	{
+		dest = Iconv::CIconvUtil::ConvertEncoding(pszDestination, "UTF-8", "CP949");
+	}
+#endif
+
+	if( pszDestination )
+	{
+		delete[]pszDestination;
 		pszDestination = nullptr;
 	}
 

@@ -88,6 +88,11 @@ public:
 	bool		BindCol(int32 iColIndex, SQLSMALLINT targetType, int64& tValue, SQLLEN& lRetSize);
 	bool		BindCol(int32 iColIndex, SQLSMALLINT targetType, uint64& tValue, SQLLEN& lRetSize);
 
+	// Fetch 후에 값을 읽어온다.
+	template< typename _TMain >
+	bool		GetData(int32 iColNum, _TMain& tValue);
+	bool		GetData(int32 iColNum, TCHAR* ptszData, int32& iBuffSize);
+
 	bool		PrepareQuery(const TCHAR* ptszQueryInfo);
 	bool		Execute();									// 준비된 SQL 구문의 실행
 	bool		ExecDirect(const TCHAR* ptszQueryInfo);		// SQL 구문을 바로 실행
@@ -111,11 +116,6 @@ public:
 	int64		RowCount();			// insert, update, delete, select(모든 레코드 Fetch 후에 RowCount 적용됨)에 영향 받은 행 수
 	long		RowNumber();		// 현재 커서의 행번호
 	bool		DescribeCol(int32 iColNum, COL_DESCRIPTION& ColDescription); // 열 정보
-
-	// Fetch 후에 값을 읽어온다.
-	template< typename _TMain >
-	bool		GetData(int32 iColNum, _TMain& tValue);
-	bool		GetData(int32 iColNum, TCHAR* ptszData, int32& iBuffSize);
 
 private:
 	SQLHENV		m_hEnv;

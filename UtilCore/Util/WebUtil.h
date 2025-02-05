@@ -17,8 +17,8 @@ bool Base64Dec(CMemBuffer<BYTE>& ByteDestination, const BYTE* pbSource, const in
 bool Base64Enc(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource);
 bool Base64Dec(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource);
 
-bool UrlEncode(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, int iCodePage);
-bool UrlDecode(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, int iCodePage);
+bool UrlEncode(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const int iCodePage);
+bool UrlDecode(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const int iCodePage);
 
 bool UrlPathEncode(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource);
 
@@ -36,6 +36,9 @@ bool DecodeURIComponent(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource
 //#else
 _tstring Base64Enc(const _tstring& source);
 _tstring Base64Dec(const _tstring& source);
+
+_tstring UrlEncode(const _tstring& source, const int iCodePage);
+_tstring UrlDecode(const _tstring& source, const int iCodePage);
 #endif
 
 

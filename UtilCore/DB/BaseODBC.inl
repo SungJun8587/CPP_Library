@@ -116,12 +116,12 @@ bool CBaseODBC::BindCol(int32 iColIndex, _TMain& tValue, SQLLEN& lRetSize)
 template< typename _TMain >
 bool CBaseODBC::GetData(int32 iColNum, _TMain& tValue)
 {
-	long		lRetSize = 0;
+	SQLLEN		lRetSize;
 	SQLRETURN	nRet;
 
 	CDBColAttr& dbCol = m_DBColAttrMgr(tValue);
 
-	nRet = SQLGetData(m_hStmt, iColNum, dbCol.m_nTargetType, &dbCol.m_ptrBuff, dbCol.m_nBuffSize, (SQLLEN*)&lRetSize);
+	nRet = SQLGetData(m_hStmt, iColNum, dbCol.m_nTargetType, &dbCol.m_ptrBuff, dbCol.m_nBuffSize, &lRetSize);
 	if( lRetSize == SQL_NO_TOTAL || lRetSize == SQL_NULL_DATA )
 		return false;
 	return nRet == SQL_SUCCESS || nRet == SQL_SUCCESS_WITH_INFO;

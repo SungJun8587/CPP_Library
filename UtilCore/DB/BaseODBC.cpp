@@ -771,6 +771,24 @@ bool CBaseODBC::BindCol(int32 iColIndex, SQLSMALLINT targetType, uint64& value, 
 
 //***************************************************************************
 //	
+bool CBaseODBC::GetData(int32 iColNum, TCHAR* ptszData, int32& iBufSize)
+{
+	SQLLEN		lRetSize;
+	SQLRETURN	nRet;
+
+#ifdef _UNICODE	
+	nRet = SQLGetData(m_hStmt, iColNum, SQL_C_WCHAR, (SQLWCHAR*)ptszData, iBufSize, &lRetSize);
+#else
+	nRet = SQLGetData(m_hStmt, iColNum, SQL_C_CHAR, (SQLCHAR*)ptszData, iBufSize, &lRetSize);
+#endif
+
+	if( lRetSize == SQL_NO_TOTAL || lRetSize == SQL_NULL_DATA )
+		return false;
+	return nRet == SQL_SUCCESS || nRet == SQL_SUCCESS_WITH_INFO;
+}
+
+//***************************************************************************
+//	
 short CBaseODBC::GetNumCols()
 {
 	short		temp;
@@ -822,23 +840,5 @@ bool CBaseODBC::DescribeCol(int32 iColNum, COL_DESCRIPTION& ColDescription)
 
 	nRet = SQLColAttribute(m_hStmt, iColNum, SQL_DESC_DISPLAY_SIZE, NULL, 0, NULL, (SQLLEN*)&ColDescription.DispLength);
 
-	return nRet == SQL_SUCCESS || nRet == SQL_SUCCESS_WITH_INFO;
-}
-
-//***************************************************************************
-//	
-bool CBaseODBC::GetData(int32 iColNum, TCHAR* ptszData, int32& iBufSize)
-{
-	long		lRetSize = 0;
-	SQLRETURN	nRet;
-
-#ifdef _UNICODE	
-	nRet = SQLGetData(m_hStmt, iColNum, SQL_C_CHAR, (SQLWCHAR*)ptszData, iBufSize, (SQLLEN*)&lRetSize);
-#else
-	nRet = SQLGetData(m_hStmt, iColNum, SQL_C_CHAR, (SQLCHAR*)ptszData, iBufSize, (SQLLEN*)&lRetSize);
-#endif
-
-	if( lRetSize == SQL_NO_TOTAL || lRetSize == SQL_NULL_DATA )
-		return false;
 	return nRet == SQL_SUCCESS || nRet == SQL_SUCCESS_WITH_INFO;
 }

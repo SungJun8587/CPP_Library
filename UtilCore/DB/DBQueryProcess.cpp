@@ -1031,10 +1031,10 @@ _tstring CDBQueryProcess::MYSQLShowObject(const EDBObjectType dbObject, const TC
 
 	int32	iNameSize = DATABASE_OBJECT_NAME_STRLEN;
 	int32	iBaseSize = DATABASE_BASE_STRLEN;
-	int32   iBodySize = DATABASE_WVARCHAR_MAX;
+	int32   iBodySize = DATABASE_TEXT_MAX;
 	TCHAR	tszName[DATABASE_OBJECT_NAME_STRLEN] = { 0, };
 	TCHAR	tszSqlmode[DATABASE_BASE_STRLEN] = { 0, };
-	TCHAR	tszBody[DATABASE_WVARCHAR_MAX] = { 0, };
+	TCHAR	tszBody[DATABASE_TEXT_MAX] = { 0, };
 	TCHAR	tszCharacterSetClient[DATABASE_BASE_STRLEN] = { 0, };
 	TCHAR	tszCollationConnection[DATABASE_BASE_STRLEN] = { 0, };
 	TCHAR	tszDatabaseCollation[DATABASE_BASE_STRLEN] = { 0, };

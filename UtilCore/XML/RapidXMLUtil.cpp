@@ -249,7 +249,7 @@ CRapidXMLUtil::~CRapidXMLUtil()
 }
 
 //***************************************************************************
-//
+// XML 파일 파싱하여 파싱 클래스인 CXMLNode 클래스에 할당
 bool CRapidXMLUtil::ParseFromFile(const _tstring& filename, OUT CXMLNode& root)
 {
 	_xmlString = LoadFromFile<std::string>(filename);
@@ -261,7 +261,7 @@ bool CRapidXMLUtil::ParseFromFile(const _tstring& filename, OUT CXMLNode& root)
 }
 
 //***************************************************************************
-//
+// 현재 XML 다큐먼트 상태 파일에 저장
 bool CRapidXMLUtil::SaveFile(const _tstring& filename)
 {
 	rapidxml::print(std::back_inserter(_xmlString), _doc);
@@ -280,7 +280,7 @@ bool CRapidXMLUtil::SaveFile(const _tstring& filename)
 }
 
 //***************************************************************************
-//
+// XML에 문자열에 파일에 저장
 bool CRapidXMLUtil::SaveFileToXML(const _tstring& filename, const _tstring& xmlData)
 {
 	_xmlString = TcharToUtf8(xmlData);
@@ -299,7 +299,7 @@ bool CRapidXMLUtil::SaveFileToXML(const _tstring& filename, const _tstring& xmlD
 }
 
 //***************************************************************************
-// XML 출력 (디버깅용)
+// XML 출력(디버깅용)
 void CRapidXMLUtil::PrintXML() const
 {
 	string xmlString;
@@ -309,25 +309,8 @@ void CRapidXMLUtil::PrintXML() const
 }
 
 //***************************************************************************
-// 재귀적으로 하위 노드 삭제
-void CRapidXMLUtil::RemoveNodeRecursive(xml_node<char>* node)
-{
-	if( !node ) return;
-
-	while( node->first_node() )
-	{
-		RemoveNodeRecursive(node->first_node());
-	}
-
-	if( node->parent() )
-	{
-		node->parent()->remove_node(node);
-	}
-}
-
-//***************************************************************************
 // XML 헤더 설정
-void CRapidXMLUtil::AppendXMLDec()
+void CRapidXMLUtil::XMLDeclaration()
 {
 	rapidxml::xml_node<>* header = _doc.allocate_node(rapidxml::node_type::node_declaration);
 	header->append_attribute(_doc.allocate_attribute("version", "1.0"));
@@ -336,25 +319,20 @@ void CRapidXMLUtil::AppendXMLDec()
 }
 
 //***************************************************************************
-//
-xml_node<>* CRapidXMLUtil::AddNode(const _tstring& nodeName)
+// 부모 노드(parentNode)에 노드 추가
+xml_node<>* CRapidXMLUtil::AddNode(xml_node<>* parentNode, const _tstring& nodeName)
 {
 	xml_node<>* node  = _doc.allocate_node(rapidxml::node_type::node_element, _doc.allocate_string(TcharToUtf8(nodeName).c_str()));
-	return node;
-}
-
-//***************************************************************************
-//
-void CRapidXMLUtil::AppendNode(xml_node<>* parentNode, xml_node<>* node)
-{
 	parentNode->append_node(node);
+
+	return node;
 }
 
 //***************************************************************************
 // 노드 및 모든 하위 노드 삭제
 void CRapidXMLUtil::RemoveNode(const _tstring& nodeName)
 {
-	xml_node<char>* root = _doc.first_node(RootName);
+	xml_node<char>* root = _doc.first_node(TcharToUtf8(RootName).c_str());
 	if( !root )
 	{
 		_tcout << _T("Root node not found") << endl;
@@ -422,5 +400,45 @@ void CRapidXMLUtil::RemoveAttribute(xml_node<>* node, const _tstring& attName)
 	for( xml_node<>* child = node->first_node(); child; child = child->next_sibling() )
 	{
 		RemoveAttribute(child, attName);
+	}
+}
+
+//***************************************************************************
+// 노드 문자열 값 추가
+void CRapidXMLUtil::AddValue(const _tstring& str, xml_node<>* parent, const TCHAR* ptszTagName)
+{
+	xml_node<>* node = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(ptszTagName).c_str()), _doc.allocate_string(TcharToUtf8(str).c_str()));
+	parent->append_node(node);
+}
+
+//***************************************************************************
+// 노드 CData 문자열 추가(<![CDATA[ 내용 ]]>)
+void CRapidXMLUtil::AddCDataValue(const _tstring& str, xml_node<>* parent, const TCHAR* ptszTagName)
+{
+	xml_node<>* node = _doc.allocate_node(node_type::node_cdata, _doc.allocate_string(TcharToUtf8(ptszTagName).c_str()), _doc.allocate_string(TcharToUtf8(str).c_str()));
+	parent->append_node(node);
+}
+
+//***************************************************************************
+// 노드 문자열 값 얻기
+void CRapidXMLUtil::GetValue(_tstring& str, xml_node<>* node)
+{
+	if( node ) str = Utf8ToTchar(node->value());
+}
+
+//***************************************************************************
+// 재귀적으로 하위 노드 삭제
+void CRapidXMLUtil::RemoveNodeRecursive(xml_node<char>* node)
+{
+	if( !node ) return;
+
+	while( node->first_node() )
+	{
+		RemoveNodeRecursive(node->first_node());
+	}
+
+	if( node->parent() )
+	{
+		node->parent()->remove_node(node);
 	}
 }

@@ -80,7 +80,7 @@ template <typename T>
 inline std::string CRapidXMLUtil::SerializeWithIndent(const T& obj)
 {
     _doc.clear();
-    xml_node<>* root = _doc.allocate_node(node_type::node_element, RootName);
+    xml_node<>* root = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(RootName).c_str()));
     _doc.append_node(root);
 
     SerializeObject(obj, root);
@@ -96,10 +96,10 @@ template <typename T>
 inline std::string CRapidXMLUtil::Serialize(const T& obj)
 {
     _doc.clear();
-    xml_node<>* root = _doc.allocate_node(node_type::node_element, RootName);
+    xml_node<>* root = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(RootName).c_str()));
     _doc.append_node(root);
 
-    return UnicodeToUtf8(ConvertToXML(_T(""), obj));
+    return TcharToUtf8(ConvertToXML(_T(""), obj));
 }
 
 //***************************************************************************
@@ -122,7 +122,7 @@ inline T CRapidXMLUtil::Deserialize(const std::string& xml)
         _tcerr << _T("Location of error : ") << e.where<TCHAR>() << std::endl;
     }
 
-    xml_node<>* root = _doc.first_node(RootName);
+    xml_node<>* root = _doc.first_node(_doc.allocate_string(TcharToUtf8(RootName).c_str()));
     if( !root ) 
     {
         _tcerr << _T("Root node not found in XML") << std::endl;
@@ -134,9 +134,9 @@ inline T CRapidXMLUtil::Deserialize(const std::string& xml)
 //***************************************************************************
 // 사용자 정의 객체 추가(직렬화)
 template <typename T>
-inline void CRapidXMLUtil::AddObject(const T& obj, xml_node<>* parent, const char* tagName)
+inline void CRapidXMLUtil::AddObject(const T& obj, xml_node<>* parent, const TCHAR* ptszTagName)
 {
-    xml_node<>* classNode = _doc.allocate_node(node_type::node_element, tagName);
+    xml_node<>* classNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(ptszTagName).c_str()));
     parent->append_node(classNode);
     obj.ToXML(classNode, _doc);
 }
@@ -155,9 +155,9 @@ inline void CRapidXMLUtil::GetObject(T& obj, xml_node<>* node)
 //***************************************************************************
 // 기본 데이터 벡터 추가(직렬화)
 template <typename T>
-inline void CRapidXMLUtil::AddVector(const std::vector<T>& container, xml_node<>* parent, const char* tagName)
+inline void CRapidXMLUtil::AddVector(const std::vector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName)
 {
-    xml_node<>* containerNode = _doc.allocate_node(node_type::node_element, tagName);
+    xml_node<>* containerNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(ptszTagName).c_str()));
     parent->append_node(containerNode);
 
     for( const auto& item : container )
@@ -176,12 +176,12 @@ inline void CRapidXMLUtil::AddVector(const std::vector<T>& container, xml_node<>
 //***************************************************************************
 // 기본 데이터 벡터 가져오기(역직렬화)
 template <typename T>
-inline void CRapidXMLUtil::GetVector(std::vector<T>& container, xml_node<>* parent, const char* tagName)
+inline void CRapidXMLUtil::GetVector(std::vector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName)
 {
-    xml_node<>* containerNode = parent->first_node(tagName);
+    xml_node<>* containerNode = parent->first_node(TcharToUtf8(ptszTagName).c_str());
     if( containerNode )
     {
-        for( xml_node<>* node = containerNode->first_node(ItemName); node; node = node->next_sibling(ItemName) )
+        for( xml_node<>* node = containerNode->first_node(TcharToUtf8(ItemName).c_str()); node; node = node->next_sibling(TcharToUtf8(ItemName).c_str()) )
         {
             T item;
 
@@ -202,14 +202,14 @@ inline void CRapidXMLUtil::GetVector(std::vector<T>& container, xml_node<>* pare
 //***************************************************************************
 // 사용자 정의 객체 벡터 추가(직렬화)
 template <typename T>
-inline void CRapidXMLUtil::AddObjectVector(const std::vector<T>& container, xml_node<>* parent, const char* tagName)
+inline void CRapidXMLUtil::AddObjectVector(const std::vector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName)
 {
-    xml_node<>* containerNode = _doc.allocate_node(node_type::node_element, tagName);
+    xml_node<>* containerNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(ptszTagName).c_str()));
     parent->append_node(containerNode);
 
     for( const auto& item : container )
     {
-        xml_node<>* classNode = _doc.allocate_node(node_type::node_element, ItemName);
+        xml_node<>* classNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(ItemName).c_str()));
         containerNode->append_node(classNode);
         item.ToXML(classNode, _doc);
     }
@@ -218,12 +218,12 @@ inline void CRapidXMLUtil::AddObjectVector(const std::vector<T>& container, xml_
 //***************************************************************************
 // 사용자 정의 객체 벡터 가져오기(역직렬화)
 template <typename T>
-inline void CRapidXMLUtil::GetObjectVector(std::vector<T>& container, xml_node<>* parent, const char* tagName)
+inline void CRapidXMLUtil::GetObjectVector(std::vector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName)
 {
-    xml_node<>* containerNode = parent->first_node(tagName);
+    xml_node<>* containerNode = parent->first_node(TcharToUtf8(ptszTagName).c_str());
     if( containerNode )
     {
-        for( xml_node<>* node = containerNode->first_node(ItemName); node; node = node->next_sibling(ItemName) )
+        for( xml_node<>* node = containerNode->first_node(TcharToUtf8(ItemName).c_str()); node; node = node->next_sibling(TcharToUtf8(ItemName).c_str()) )
         {
             T item;
             item.FromXML(node);
@@ -235,14 +235,14 @@ inline void CRapidXMLUtil::GetObjectVector(std::vector<T>& container, xml_node<>
 //***************************************************************************
 // 기본 데이터 맵 추가(직렬화)
 template <typename K, typename V>
-inline void CRapidXMLUtil::AddMap(const std::map<K, V>& container, xml_node<>* parent, const char* tagName)
+inline void CRapidXMLUtil::AddMap(const std::map<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName)
 {
-    xml_node<>* containerNode = _doc.allocate_node(node_type::node_element, tagName);
+    xml_node<>* containerNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(ptszTagName).c_str()));
     parent->append_node(containerNode);
 
     for( const auto& item : container )
     {
-        xml_node<>* itemNode = _doc.allocate_node(node_type::node_element, ItemName);
+        xml_node<>* itemNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(ItemName).c_str()));
         containerNode->append_node(itemNode);
 
         if constexpr( std::is_arithmetic<K>::value )
@@ -268,17 +268,17 @@ inline void CRapidXMLUtil::AddMap(const std::map<K, V>& container, xml_node<>* p
 //***************************************************************************
 // 기본 데이터 맵 가져오기(역직렬화)
 template <typename K, typename V>
-inline void CRapidXMLUtil::GetMap(std::map<K, V>& container, xml_node<>* parent, const char* tagName)
+inline void CRapidXMLUtil::GetMap(std::map<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName)
 {
-    xml_node<>* containerNode = parent->first_node(tagName);
+    xml_node<>* containerNode = parent->first_node(TcharToUtf8(ptszTagName).c_str());
     if( containerNode ) 
     {
-        for( xml_node<>* node = containerNode->first_node(ItemName); node; node = node->next_sibling(ItemName) )
+        for( xml_node<>* node = containerNode->first_node(TcharToUtf8(ItemName).c_str()); node; node = node->next_sibling(TcharToUtf8(ItemName).c_str()) )
         {
             K key;
             V value;
 
-            xml_node<>* keyNode = node->first_node(MapKey);
+            xml_node<>* keyNode = node->first_node(TcharToUtf8(MapKey).c_str());
             if( keyNode )
             {
                 if constexpr( std::is_arithmetic<K>::value )
@@ -291,7 +291,7 @@ inline void CRapidXMLUtil::GetMap(std::map<K, V>& container, xml_node<>* parent,
                 }
             }
 
-            xml_node<>* valueNode = node->first_node(MapValue);
+            xml_node<>* valueNode = node->first_node(TcharToUtf8(MapValue).c_str());
             if( valueNode )
             {
                 if constexpr( std::is_arithmetic<V>::value )
@@ -312,20 +312,20 @@ inline void CRapidXMLUtil::GetMap(std::map<K, V>& container, xml_node<>* parent,
 //***************************************************************************
 // 사용자 정의 객체 맵 추가(직렬화)
 template <typename K, typename V>
-inline void CRapidXMLUtil::AddObjectMap(const std::map<K, V>& container, xml_node<>* parent, const char* tagName)
+inline void CRapidXMLUtil::AddObjectMap(const std::map<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName)
 {
-    xml_node<>* containerNode = _doc.allocate_node(node_type::node_element, tagName);
+    xml_node<>* containerNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(ptszTagName).c_str()));
     parent->append_node(containerNode);
 
     for( const auto& item : container ) 
     {
-        xml_node<>* itemNode = _doc.allocate_node(node_type::node_element, ItemName);
+        xml_node<>* itemNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(ItemName).c_str()));
         containerNode->append_node(itemNode);
 
-        xml_node<>* node = _doc.allocate_node(node_type::node_element, MapKey, _doc.allocate_string(TcharToUtf8(item.first).c_str()));
+        xml_node<>* node = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(MapKey).c_str()), _doc.allocate_string(TcharToUtf8(item.first).c_str()));
         itemNode->append_node(node);
 
-        xml_node<>* classNode = _doc.allocate_node(node_type::node_element, MapValue);
+        xml_node<>* classNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(MapValue).c_str()));
         itemNode->append_node(classNode);
         item.second.ToXML(classNode, _doc);
     }
@@ -334,23 +334,23 @@ inline void CRapidXMLUtil::AddObjectMap(const std::map<K, V>& container, xml_nod
 //***************************************************************************
 // 사용자 정의 객체 맵 가져오기(역직렬화)
 template <typename K, typename V>
-inline void CRapidXMLUtil::GetObjectMap(std::map<K, V>& container, xml_node<>* parent, const char* tagName)
+inline void CRapidXMLUtil::GetObjectMap(std::map<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName)
 {
-    xml_node<>* containerNode = parent->first_node(tagName);
+    xml_node<>* containerNode = parent->first_node(TcharToUtf8(ptszTagName).c_str());
     if( containerNode ) 
     {
-        for( xml_node<>* node = containerNode->first_node(ItemName); node; node = node->next_sibling(ItemName) )
+        for( xml_node<>* node = containerNode->first_node(TcharToUtf8(ItemName).c_str()); node; node = node->next_sibling(TcharToUtf8(ItemName).c_str()) )
         {
             K key;
             V value;
 
-            xml_node<>* keyNode = node->first_node(MapKey);
+            xml_node<>* keyNode = node->first_node(TcharToUtf8(MapKey).c_str());
             if( keyNode ) 
             {
                 key = Utf8ToTchar(keyNode->value());
             }
 
-            xml_node<>* valueNode = node->first_node(MapValue);
+            xml_node<>* valueNode = node->first_node(TcharToUtf8(MapValue).c_str());
             if( valueNode ) 
             {
                 value.FromXML(valueNode);
@@ -362,26 +362,11 @@ inline void CRapidXMLUtil::GetObjectMap(std::map<K, V>& container, xml_node<>* p
 }
 
 //***************************************************************************
-// 문자열 처리
-inline void CRapidXMLUtil::AddValue(const _tstring& str, xml_node<>* parent, const char* tagName)
-{
-    xml_node<>* node = _doc.allocate_node(node_type::node_element, tagName, _doc.allocate_string(TcharToUtf8(str).c_str()));
-    parent->append_node(node);
-}
-
-//***************************************************************************
-//
-inline void CRapidXMLUtil::GetValue(_tstring& str, xml_node<>* node)
-{
-    if( node ) str = Utf8ToTchar(node->value());
-}
-
-//***************************************************************************
 // 숫자 타입 처리
 template <typename T, typename std::enable_if<std::is_arithmetic<T>::value>::type*>
-inline void CRapidXMLUtil::AddValue(const T& value, xml_node<>* parent, const char* tagName)
+inline void CRapidXMLUtil::AddValue(const T& value, xml_node<>* parent, const TCHAR* ptszTagName)
 {
-    xml_node<>* node = _doc.allocate_node(node_type::node_element, tagName, _doc.allocate_string(std::to_string(value).c_str()));
+    xml_node<>* node = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(ptszTagName).c_str()), _doc.allocate_string(std::to_string(value).c_str()));
     parent->append_node(node);
 }
 
@@ -401,25 +386,20 @@ inline _tstring CRapidXMLUtil::ConvertToXML(const _tstring& nodeName, const T& o
     xml_node<char>* root = _doc.first_node();
     if( !root )
     {
-        root = _doc.allocate_node(node_type::node_element, RootName);
+        root = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(RootName).c_str()));
         _doc.append_node(root);
     }
-
-    char* tagName = nullptr;
-
-    if( nodeName.size() > 0 )
-        tagName = _doc.allocate_string(TcharToUtf8(nodeName).c_str());
 
     if constexpr( is_vector<T>::value )
     {
         using ValueType = typename T::value_type;
         if constexpr( std::is_arithmetic_v<ValueType> || std::is_same_v<ValueType, _tstring> )
         {
-            AddVector(obj, root, tagName != nullptr ? tagName : VectorName);        // 기본 자료형 벡터
+            AddVector(obj, root, nodeName.size() > 0 ? nodeName.c_str() : VectorName);        // 기본 자료형 벡터
         }
         else
         {
-            AddObjectVector(obj, root, tagName != nullptr ? tagName : VectorName);  // 사용자 정의 클래스 벡터
+            AddObjectVector(obj, root, nodeName.size() > 0 ? nodeName.c_str() : VectorName);  // 사용자 정의 클래스 벡터
         }
     }
     else if constexpr( is_map<T>::value )
@@ -432,34 +412,34 @@ inline _tstring CRapidXMLUtil::ConvertToXML(const _tstring& nodeName, const T& o
             // 키가 _tstring인 경우만 처리
             if constexpr( std::is_arithmetic_v<ValueType> || std::is_same_v<ValueType, _tstring> )
             {
-                AddMap(obj, root, tagName != nullptr ? tagName : MapName);           // 기본 자료형 맵
+                AddMap(obj, root, nodeName.size() > 0 ? nodeName.c_str() : MapName);           // 기본 자료형 맵
             }
             else
             {
-                AddObjectMap(obj, root, tagName != nullptr ? tagName : MapName);     // 사용자 정의 클래스 맵
+                AddObjectMap(obj, root, nodeName.size() > 0 ? nodeName.c_str() : MapName);     // 사용자 정의 클래스 맵
             }
         }
     }
     else if constexpr( has_toxml_method<T>::value )
     {
-        AddObject(obj, root, tagName != nullptr ? tagName : ItemName);
+        AddObject(obj, root, nodeName.size() > 0 ? nodeName.c_str() : ItemName);
     }
     else if constexpr( std::is_arithmetic<T>::value )
     {
-        AddValue(obj, root, tagName != nullptr ? tagName : ItemName);
+        AddValue(obj, root, nodeName.size() > 0 ? nodeName.c_str() : ItemName);
     }
     else if constexpr( std::is_same_v<T, _tstring> )
     {
-        AddValue(obj, root, tagName != nullptr ? tagName : ItemName);
+        AddValue(obj, root, nodeName.size() > 0 ? nodeName.c_str() : ItemName);
     }
     else if constexpr( std::is_same_v<typename std::decay<T>::type, TCHAR*> || std::is_same_v<typename std::decay<T>::type, const TCHAR*> )
     {
-        AddValue(obj, root, tagName != nullptr ? tagName : ItemName);
+        AddValue(obj, root, nodeName.size() > 0 ? nodeName.c_str() : ItemName);
     }
 
     std::ostringstream oss;
     oss << _doc;
-    return Utf8ToUnicode(oss.str());
+    return Utf8ToTchar(oss.str());
 }
 
 //***************************************************************************
@@ -469,11 +449,6 @@ inline std::optional<T> CRapidXMLUtil::ConvertFromXML(const _tstring& nodeName)
 {
     T value;
 
-    char* tagName = nullptr;
-
-    if( nodeName.size() > 0 )
-        tagName = _doc.allocate_string(TcharToUtf8(nodeName).c_str());
-
     xml_node<char>* root = _doc.first_node();
     if( !root ) return std::nullopt;        // 노드가 없거나 값이 없으면 std::nullopt 반환
 
@@ -482,11 +457,11 @@ inline std::optional<T> CRapidXMLUtil::ConvertFromXML(const _tstring& nodeName)
         using ValueType = typename T::value_type;
         if constexpr( std::is_arithmetic_v<ValueType> || std::is_same_v<ValueType, _tstring> )
         {
-            GetVector<ValueType>(value, root, tagName != nullptr ? tagName : VectorName);        // 기본 자료형 벡터
+            GetVector<ValueType>(value, root, nodeName.size() > 0 ? nodeName.c_str() : VectorName);        // 기본 자료형 벡터
         }
         else
         {
-            GetObjectVector<ValueType>(value, root, tagName != nullptr ? tagName : VectorName);  // 사용자 정의 클래스 벡터
+            GetObjectVector<ValueType>(value, root, nodeName.size() > 0 ? nodeName.c_str() : VectorName);  // 사용자 정의 클래스 벡터
         }
     }
     else if constexpr( is_map<T>::value )
@@ -499,25 +474,25 @@ inline std::optional<T> CRapidXMLUtil::ConvertFromXML(const _tstring& nodeName)
             // 키가 _tstring인 경우만 처리
             if constexpr( std::is_arithmetic_v<ValueType> || std::is_same_v<ValueType, _tstring> )
             {
-                GetMap<KeyType, ValueType>(value, root, tagName != nullptr ? tagName : MapName);           // 기본 자료형 맵
+                GetMap<KeyType, ValueType>(value, root, nodeName.size() > 0 ? nodeName.c_str() : MapName);           // 기본 자료형 맵
             }
             else
             {
-                GetObjectMap<KeyType, ValueType>(value, root, tagName != nullptr ? tagName : MapName);     // 사용자 정의 클래스 맵
+                GetObjectMap<KeyType, ValueType>(value, root, nodeName.size() > 0 ? nodeName.c_str() : MapName);     // 사용자 정의 클래스 맵
             }
         }
     }
     else if constexpr( has_toxml_method<T>::value )
     {
-        GetObject<T>(value, root->first_node(tagName));
+        GetObject<T>(value, root->first_node(nodeName.size() > 0 ? TcharToUtf8(nodeName).c_str() : nullptr));
     }
     else if constexpr( std::is_same_v<T, _tstring> )
     {
-        GetValue(value, root->first_node(tagName));
+        GetValue(value, root->first_node(nodeName.size() > 0 ? TcharToUtf8(nodeName).c_str() : nullptr));
     }
     else if constexpr( std::is_arithmetic<T>::value )
     {
-        GetValue(value, root->first_node(tagName));
+        GetValue(value, root->first_node(nodeName.size() > 0 ? TcharToUtf8(nodeName).c_str() : nullptr));
     }
 
     return optional<T>(value);
