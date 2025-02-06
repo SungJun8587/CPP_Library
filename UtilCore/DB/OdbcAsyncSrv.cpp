@@ -58,14 +58,14 @@ shared_ptr<CDBAsyncSrvHandler> COdbcAsyncSrv::Regist(const BYTE command, shared_
 
 //***************************************************************************
 //
-bool COdbcAsyncSrv::StartService(CVector<CDBNode> DBNodeVec, INT32 nMaxThreadCnt)
+bool COdbcAsyncSrv::StartService(std::vector<CDBNode> DBNodeVec, INT32 nMaxThreadCnt)
 {
 	return InitOdbc(DBNodeVec, nMaxThreadCnt);
 }
 
 //***************************************************************************
 //
-bool COdbcAsyncSrv::InitOdbc(CVector<CDBNode> DBNodeVec, INT32 nMaxThreadCnt)
+bool COdbcAsyncSrv::InitOdbc(std::vector<CDBNode> DBNodeVec, INT32 nMaxThreadCnt)
 {
 	if( 0 == nMaxThreadCnt )
 		_nMaxThreadCnt = static_cast<int32>(SYSTEM::CoreCount());	// Thread Count는 Core 갯수만큼만 생성
@@ -90,7 +90,7 @@ bool COdbcAsyncSrv::InitOdbc(CVector<CDBNode> DBNodeVec, INT32 nMaxThreadCnt)
 			return false;
 		}
 
-		if( false == _pOdbcConnPools[nIdx]->Init(iter.m_dbClass, iter.m_tszDSN) )
+		if( false == _pOdbcConnPools[nIdx]->Init(iter._dbClass, iter._tszDSN) )
 		{
 			LOG_ERROR(_T("Failed to Initialize COdbcConnPool"));
 

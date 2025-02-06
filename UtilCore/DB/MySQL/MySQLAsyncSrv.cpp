@@ -58,14 +58,14 @@ shared_ptr<CDBAsyncSrvHandler> CMySQLAsyncSrv::Regist(const BYTE command, shared
 
 //***************************************************************************
 //
-bool CMySQLAsyncSrv::StartService(CVector<CDBNode> DBNodeVec, INT32 nMaxThreadCnt)
+bool CMySQLAsyncSrv::StartService(std::vector<CDBNode> DBNodeVec, INT32 nMaxThreadCnt)
 {
 	return InitMySQL(DBNodeVec, nMaxThreadCnt);
 }
 
 //***************************************************************************
 //
-bool CMySQLAsyncSrv::InitMySQL(CVector<CDBNode> DBNodeVec, INT32 nMaxThreadCnt)
+bool CMySQLAsyncSrv::InitMySQL(std::vector<CDBNode> DBNodeVec, INT32 nMaxThreadCnt)
 {
 	if( 0 == nMaxThreadCnt )
 		_nMaxThreadCnt = static_cast<int32>(SYSTEM::CoreCount());	// Thread Count는 Core 갯수만큼만 생성
@@ -90,9 +90,9 @@ bool CMySQLAsyncSrv::InitMySQL(CVector<CDBNode> DBNodeVec, INT32 nMaxThreadCnt)
 			return false;
 		}
 
-		if( false == _pMySQLConnPools[nIdx]->Init(iter.m_tszDBHost, iter.m_tszDBUserId, iter.m_tszDBPasswd, iter.m_tszDBName, iter.m_nPort) )
+		if( false == _pMySQLConnPools[nIdx]->Init(iter._tszDBHost, iter._tszDBUserId, iter._tszDBPasswd, iter._tszDBName, iter._nPort) )
 		{
-			LOG_ERROR(_T("Failed to Initialize CMySQLConnPool[%s, %u]"), iter.m_tszDBHost, iter.m_nPort);
+			LOG_ERROR(_T("Failed to Initialize CMySQLConnPool[%s, %u]"), iter._tszDBHost, iter._nPort);
 			return false;
 		}
 		++nIdx;

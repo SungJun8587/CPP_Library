@@ -84,10 +84,9 @@ using namespace std;
 
 #include <BaseGlobal.h>
 
-#include <JSON/JSONBase.h>
-#include <JSON/JSONParser.h>
-
-#include <XML/XMLParser.h>
+#include <JSON/RapidJSONUtil.h>
+#include <XML/RapidXMLUtil.h>
+#include <Crypto/CryptoUtil.h>
 
 #include <Util/CalculatedElapsedTime.h>
 #include <Util/IconvUtil.h>
@@ -113,7 +112,7 @@ using namespace std;
 #include <DB/DBModel.h>
 #include <DB/DBSyncBind.h>
 #include <DB/DBQueryProcess.h>
-#include <DB/DBSynchronizer.h>
+#include <DB/DBSchema.h>
 #include <DB/DBAsyncSrv.h>
 #include <DB/OdbcConnPool.h>
 #include <DB/OdbcAsyncSrv.h>

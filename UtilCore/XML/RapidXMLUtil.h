@@ -1,6 +1,6 @@
 
 //***************************************************************************
-// XMLParser.h : interface for the CXMLParser class.
+// RapidXMLUtil.h : interface for the CRapidXMLUtil class.
 //
 //***************************************************************************
 

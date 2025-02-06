@@ -33,8 +33,8 @@ public:
 	int Push(st_DBAsyncRq* pAsyncRq);
 	st_DBAsyncRq* Pop();
 
-	bool StartService(CVector<CDBNode> DBNodeVec, INT32 nMaxThreadCnt = 0);
-	bool InitOdbc(CVector<CDBNode> DBNodeVec, INT32 nMaxThreadCnt);
+	bool StartService(std::vector<CDBNode> DBNodeVec, INT32 nMaxThreadCnt = 0);
+	bool InitOdbc(std::vector<CDBNode> DBNodeVec, INT32 nMaxThreadCnt);
 
 	void StartIoThreads(INT32 nMaxThreadCnt);
 	bool Action();

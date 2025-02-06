@@ -1,6 +1,6 @@
 
 //***************************************************************************
-// RapidXMLUtil.cpp: implementation of the CXMLParser class.
+// RapidXMLUtil.cpp: implementation of the CRapidXMLUtil class.
 //
 //***************************************************************************
 

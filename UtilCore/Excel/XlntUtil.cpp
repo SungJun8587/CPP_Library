@@ -123,6 +123,8 @@ namespace Xlnt
 	// 셀 데이터 쓰기
 	void CXlntUtil::WriteCell(const std::string& cell_ref, const std::string& value, const bool isCastUtf8)
 	{
+		if( value.size() < 1 ) return;
+
 		try
 		{
 			if( isCastUtf8 )
@@ -144,6 +146,8 @@ namespace Xlnt
 	//
 	void CXlntUtil::WriteCell(const uint32 row, const uint32 col, const std::string& value, const bool isCastUtf8)
 	{
+		if( value.size() < 1 ) return;
+
 		try
 		{
 			if( isCastUtf8 )
@@ -165,6 +169,8 @@ namespace Xlnt
 	//
 	void CXlntUtil::WriteCell(const std::string& cell_ref, const std::wstring& value, const bool isCastUtf8)
 	{
+		if( value.size() < 1 ) return;
+
 		try
 		{
 			if( isCastUtf8 )
@@ -186,6 +192,8 @@ namespace Xlnt
 	//
 	void CXlntUtil::WriteCell(const uint32 row, const uint32 col, const std::wstring& value, const bool isCastUtf8)
 	{
+		if( value.size() < 1 ) return;
+
 		try
 		{
 			if( isCastUtf8 )

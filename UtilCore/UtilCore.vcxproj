@@ -36,9 +36,9 @@
     <ClInclude Include="DB\DBMYSQLQuery.h" />
     <ClInclude Include="DB\DBORACLEQuery.h" />
     <ClInclude Include="DB\DBQueryProcess.h" />
+    <ClInclude Include="DB\DBSchema.h" />
     <ClInclude Include="DB\DBSQLQuery.h" />
     <ClInclude Include="DB\DBSyncBind.h" />
-    <ClInclude Include="DB\DBSynchronizer.h" />
     <ClInclude Include="DB\MySQL\BaseMySQL.h" />
     <ClInclude Include="DB\MySQL\MySQLAsyncSrv.h" />
     <ClInclude Include="DB\MySQL\MySQLConnPool.h" />
@@ -46,8 +46,6 @@
     <ClInclude Include="DB\OdbcConnPool.h" />
     <ClInclude Include="DB\RedisConn.h" />
     <ClInclude Include="EXCEL\XlntUtil.h" />
-    <ClInclude Include="JSON\JSONBase.h" />
-    <ClInclude Include="JSON\JSONParser.h" />
     <ClInclude Include="JSON\RapidJSONUtil.h" />
     <ClInclude Include="Memory\ClusteredMap.h" />
     <ClInclude Include="Memory\Containers.h" />
@@ -85,7 +83,7 @@
     <ClInclude Include="Util\ShellUtil.h" />
     <ClInclude Include="Util\StringUtil.h" />
     <ClInclude Include="Util\WebUtil.h" />
-    <ClInclude Include="XML\XMLParser.h" />
+    <ClInclude Include="XML\RapidXMLUtil.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BaseGlobal.cpp" />
@@ -96,15 +94,13 @@
     <ClCompile Include="DB\DBBind.cpp" />
     <ClCompile Include="DB\DBModel.cpp" />
     <ClCompile Include="DB\DBQueryProcess.cpp" />
-    <ClCompile Include="DB\DBSynchronizer.cpp" />
+    <ClCompile Include="DB\DBSchema.cpp" />
     <ClCompile Include="DB\MySQL\BaseMySQL.cpp" />
     <ClCompile Include="DB\MySQL\MySQLAsyncSrv.cpp" />
     <ClCompile Include="DB\MySQL\MySQLConnPool.cpp" />
     <ClCompile Include="DB\OdbcAsyncSrv.cpp" />
     <ClCompile Include="DB\OdbcConnPool.cpp" />
     <ClCompile Include="EXCEL\XlntUtil.cpp" />
-    <ClCompile Include="JSON\JSONBase.cpp" />
-    <ClCompile Include="JSON\JSONParser.cpp" />
     <ClCompile Include="JSON\RapidJSONUtil.cpp" />
     <ClCompile Include="Memory\ClusteredMap.cpp" />
     <ClCompile Include="Memory\CustomAllocator.cpp" />
@@ -137,7 +133,7 @@
     <ClCompile Include="Util\ShellUtil.cpp" />
     <ClCompile Include="Util\StringUtil.cpp" />
     <ClCompile Include="Util\WebUtil.cpp" />
-    <ClCompile Include="XML\XMLParser.cpp" />
+    <ClCompile Include="XML\RapidXMLUtil.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="DB\BaseODBC.inl" />
@@ -146,11 +142,11 @@
     <None Include="DB\DB_ParamAttr.inl" />
     <None Include="DB\MySQL\MySQL_ParamAttr.inl" />
     <None Include="Excel\XlntUtil.inl" />
-    <None Include="JSON\JSONParser.inl" />
     <None Include="JSON\RapidJSONUtil.inl" />
     <None Include="Memory\OrderedMap.inl" />
     <None Include="Memory\Singleton.inl" />
     <None Include="Memory\UnOrderedMap.inl" />
+    <None Include="XML\RapidXMLUtil.inl" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -218,7 +214,7 @@
     <OutDir>Bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>Bin\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)64D</TargetName>
-    <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\JSON-Utilities-master\source;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.40-winx64\include;E:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;E:\GitHub\CPP\Library\ExternalLib\libiconv-1.18\build\include;E:\GitHub\CPP\Library\ExternalLib\OpenSSL-Win64\include;$(ProjectDir);$(IncludePath)</IncludePath>
+    <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.40-winx64\include;E:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;E:\GitHub\CPP\Library\ExternalLib\libiconv-1.18\build\include;E:\GitHub\CPP\Library\ExternalLib\OpenSSL-Win64\include;$(ProjectDir);$(IncludePath)</IncludePath>
     <LibraryPath>EE:\GitHub\CPP\Library\ExternalLib\Bin\$(Platform)\$(Configuration);E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.33-winx64\lib;$(LibraryPath)</LibraryPath>
     <SourcePath>$(SourcePath)</SourcePath>
   </PropertyGroup>
@@ -236,7 +232,7 @@
     <OutDir>Bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>Bin\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)64</TargetName>
-    <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\JSON-Utilities-master\source;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.40-winx64\include;E:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;E:\GitHub\CPP\Library\ExternalLib\libiconv-1.18\build\include;E:\GitHub\CPP\Library\ExternalLib\OpenSSL-Win64\include;$(ProjectDir);$(IncludePath)</IncludePath>
+    <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.40-winx64\include;E:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;E:\GitHub\CPP\Library\ExternalLib\libiconv-1.18\build\include;E:\GitHub\CPP\Library\ExternalLib\OpenSSL-Win64\include;$(ProjectDir);$(IncludePath)</IncludePath>
     <LibraryPath>EE:\GitHub\CPP\Library\ExternalLib\Bin\$(Platform)\$(Configuration);E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.33-winx64\lib;$(LibraryPath)</LibraryPath>
     <SourcePath>$(SourcePath)</SourcePath>
   </PropertyGroup>

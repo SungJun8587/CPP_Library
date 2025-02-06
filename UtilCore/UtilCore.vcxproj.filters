@@ -60,9 +60,6 @@
     <ClInclude Include="DB\DBModel.h">
       <Filter>DB</Filter>
     </ClInclude>
-    <ClInclude Include="DB\DBSynchronizer.h">
-      <Filter>DB</Filter>
-    </ClInclude>
     <ClInclude Include="DB\OdbcAsyncSrv.h">
       <Filter>DB</Filter>
     </ClInclude>
@@ -98,17 +95,8 @@
     <ClInclude Include="BaseRedefineDataType.h" />
     <ClInclude Include="ServerConfig.h" />
     <ClInclude Include="ServiceSvr.h" />
-    <ClInclude Include="JSON\JSONBase.h">
-      <Filter>JSON</Filter>
-    </ClInclude>
-    <ClInclude Include="JSON\JSONParser.h">
-      <Filter>JSON</Filter>
-    </ClInclude>
     <ClInclude Include="Memory\Singleton.h">
       <Filter>Memory</Filter>
-    </ClInclude>
-    <ClInclude Include="XML\XMLParser.h">
-      <Filter>XML</Filter>
     </ClInclude>
     <ClInclude Include="DB\AdoDB.h">
       <Filter>DB</Filter>
@@ -211,6 +199,12 @@
     <ClInclude Include="JSON\RapidJSONUtil.h">
       <Filter>JSON</Filter>
     </ClInclude>
+    <ClInclude Include="DB\DBSchema.h">
+      <Filter>DB</Filter>
+    </ClInclude>
+    <ClInclude Include="XML\RapidXMLUtil.h">
+      <Filter>XML</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\CustomAllocator.cpp">
@@ -232,9 +226,6 @@
       <Filter>DB</Filter>
     </ClCompile>
     <ClCompile Include="DB\DBModel.cpp">
-      <Filter>DB</Filter>
-    </ClCompile>
-    <ClCompile Include="DB\DBSynchronizer.cpp">
       <Filter>DB</Filter>
     </ClCompile>
     <ClCompile Include="DB\OdbcAsyncSrv.cpp">
@@ -259,15 +250,6 @@
     <ClCompile Include="BaseGlobal.cpp" />
     <ClCompile Include="ServerConfig.cpp" />
     <ClCompile Include="ServiceSvr.cpp" />
-    <ClCompile Include="JSON\JSONBase.cpp">
-      <Filter>JSON</Filter>
-    </ClCompile>
-    <ClCompile Include="JSON\JSONParser.cpp">
-      <Filter>JSON</Filter>
-    </ClCompile>
-    <ClCompile Include="XML\XMLParser.cpp">
-      <Filter>XML</Filter>
-    </ClCompile>
     <ClCompile Include="DB\AdoDB.cpp">
       <Filter>DB</Filter>
     </ClCompile>
@@ -338,6 +320,12 @@
     <ClCompile Include="JSON\RapidJSONUtil.cpp">
       <Filter>JSON</Filter>
     </ClCompile>
+    <ClCompile Include="DB\DBSchema.cpp">
+      <Filter>DB</Filter>
+    </ClCompile>
+    <ClCompile Include="XML\RapidXMLUtil.cpp">
+      <Filter>XML</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="DB\BaseODBC.inl">
@@ -355,9 +343,6 @@
     <None Include="DB\MySQL\MySQL_ParamAttr.inl">
       <Filter>DB\MySQL</Filter>
     </None>
-    <None Include="JSON\JSONParser.inl">
-      <Filter>JSON</Filter>
-    </None>
     <None Include="Memory\Singleton.inl">
       <Filter>Memory</Filter>
     </None>
@@ -372,6 +357,9 @@
     </None>
     <None Include="Excel\XlntUtil.inl">
       <Filter>Excel</Filter>
+    </None>
+    <None Include="XML\RapidXMLUtil.inl">
+      <Filter>XML</Filter>
     </None>
   </ItemGroup>
 </Project>
