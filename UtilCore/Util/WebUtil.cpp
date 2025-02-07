@@ -1367,12 +1367,12 @@ _tstring UrlEncode(const _tstring& source, const int iCodePage)
 	}
 
 #ifdef _UNICODE
-	string destData(size, '\0');
+	string destData(size + 1, _T('\0'));
 
 	pszSourceDoc = pszSourceData;
 	pszDestDoc = const_cast<char*>(destData.c_str());
 #else
-	_tstring dest(size, '\0');
+	_tstring dest(size + 1, _T('\0'));
 
 	pszSourceDoc = pszSourceData;
 	pszDestDoc = const_cast<char*>(dest.c_str());
@@ -1593,7 +1593,7 @@ _tstring HtmlEncode(const _tstring& source)
 		size++;
 	}
 
-	_tstring dest(size, _T('\0'));
+	_tstring dest(size + 1, _T('\0'));
 
 	ptszSourceDoc = const_cast<TCHAR*>(source.c_str());
 	ptszDestDoc = const_cast<TCHAR*>(dest.c_str());
@@ -1665,7 +1665,7 @@ _tstring HtmlDecode(const _tstring& source)
 		size++;
 	}
 
-	_tstring dest(size, _T('\0'));
+	_tstring dest(size + 1, _T('\0'));
 
 	ptszSourceDoc = const_cast<TCHAR*>(source.c_str());
 	ptszDestDoc = const_cast<TCHAR*>(dest.c_str());
@@ -1743,7 +1743,7 @@ _tstring Escape(const _tstring& source)
 		pwszSourceDoc++;
 	}
 
-	_tstring dest(size, '\0');
+	_tstring dest(size + 1, _T('\0'));
 
 	pwszSourceDoc = pwszSource;
 	ptszDestDoc = const_cast<TCHAR*>(dest.c_str());
@@ -1806,11 +1806,11 @@ _tstring UnEscape(const _tstring& source)
 	ptszSourceDoc = const_cast<TCHAR*>(source.c_str());
 
 #ifdef _UNICODE
-	_tstring dest(size, '\0');
+	_tstring dest(size + 1, _T('\0'));
 
 	pwszDestDoc = const_cast<wchar_t*>(dest.c_str());
 #else
-	std::wstring destData(size, '\0');
+	std::wstring destData(size + 1, _T('\0'));
 
 	pwszDestDoc = const_cast<wchar_t*>(destData.c_str());
 #endif
@@ -1922,12 +1922,12 @@ _tstring EncodeURI(const _tstring& source)
 	}
 
 #ifdef _UNICODE
-	string destData(size, '\0');
+	string destData(size + 1, _T('\0'));
 
 	pszSourceDoc = pszSourceData;
 	pszDestDoc = const_cast<char*>(destData.c_str());
 #else
-	_tstring dest(size, '\0');
+	_tstring dest(size + 1, _T('\0'));
 
 	pszSourceDoc = pszSourceData;
 	pszDestDoc = const_cast<char*>(dest.c_str());
@@ -2071,12 +2071,12 @@ _tstring EncodeURIComponent(const _tstring& source)
 	}
 
 #ifdef _UNICODE
-	string destData(size, '\0');
+	string destData(size + 1, _T('\0'));
 
 	pszSourceDoc = pszSourceData;
 	pszDestDoc = const_cast<char*>(destData.c_str());
 #else
-	_tstring dest(size, '\0');
+	_tstring dest(size + 1, _T('\0'));
 
 	pszSourceDoc = pszSourceData;
 	pszDestDoc = const_cast<char*>(dest.c_str());
