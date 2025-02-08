@@ -12,31 +12,31 @@
 //Function to passing FolderPath to FullFilePath 
 bool FolderPathPassing(CMemBuffer<TCHAR>& TFolderPath, const TCHAR* ptszFullFilePath)
 {
-	size_t	nLen = 0;
-	size_t	nCount = 0;
-	size_t	nIndex = 0;
+	size_t	length = 0;
+	size_t	size = 0;
+	size_t	index = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
 	TCHAR* ptszDestLoc = nullptr;
 
 	if( ptszFullFilePath == nullptr ) return false;
-	if( (nLen = _tcslen(ptszFullFilePath)) < 1 ) return false;
+	if( (length = _tcslen(ptszFullFilePath)) < 1 ) return false;
 
-	for( ptszSourceLoc = ptszFullFilePath + nLen - 1; nCount < nLen; ptszSourceLoc-- )
+	for( ptszSourceLoc = ptszFullFilePath + length - 1; size < length; ptszSourceLoc-- )
 	{
 		if( *ptszSourceLoc == _T('/') || *ptszSourceLoc == _T('\\') ) break;
 
-		nCount++;
+		size++;
 	}
 
-	TFolderPath.Init(nLen - nCount + 1);
+	TFolderPath.Init(length - size + 1);
 
 	for( ptszSourceLoc = ptszFullFilePath, ptszDestLoc = TFolderPath.GetBuffer(); *ptszSourceLoc; ptszSourceLoc++, ptszDestLoc++ )
 	{
-		if( nIndex == nLen - nCount ) break;
+		if( index == length - size ) break;
 
 		*ptszDestLoc = *ptszSourceLoc;
-		nIndex++;
+		index++;
 	}
 	*ptszDestLoc = _T('\0');
 
@@ -47,25 +47,25 @@ bool FolderPathPassing(CMemBuffer<TCHAR>& TFolderPath, const TCHAR* ptszFullFile
 //Function to passing FileNameExt to FullFilePath 
 bool FileNameExtPathPassing(CMemBuffer<TCHAR>& TFileNameExt, const TCHAR* ptszFullFilePath)
 {
-	size_t	nLen = 0;
-	size_t	nCount = 0;
+	size_t	length = 0;
+	size_t	size = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
 	TCHAR* ptszDestLoc = nullptr;
 
 	if( ptszFullFilePath == nullptr ) return false;
-	if( (nLen = _tcslen(ptszFullFilePath)) < 1 ) return false;
+	if( (length = _tcslen(ptszFullFilePath)) < 1 ) return false;
 
-	for( ptszSourceLoc = ptszFullFilePath + nLen - 1; nCount < nLen; ptszSourceLoc-- )
+	for( ptszSourceLoc = ptszFullFilePath + length - 1; size < length; ptszSourceLoc-- )
 	{
 		if( *ptszSourceLoc == _T('/') || *ptszSourceLoc == _T('\\') ) break;
 
-		nCount++;
+		size++;
 	}
 
-	TFileNameExt.Init(nCount + 1);
+	TFileNameExt.Init(size + 1);
 
-	ptszSourceLoc = ptszFullFilePath + nLen - nCount;
+	ptszSourceLoc = ptszFullFilePath + length - size;
 	ptszDestLoc = TFileNameExt.GetBuffer();
 
 	while( *ptszDestLoc++ = *ptszSourceLoc++ );
@@ -77,41 +77,41 @@ bool FileNameExtPathPassing(CMemBuffer<TCHAR>& TFileNameExt, const TCHAR* ptszFu
 //Function to passing FileName and FileExt to FileNameExt 
 bool FileNameExtPassing(CMemBuffer<TCHAR>& TFileName, CMemBuffer<TCHAR>& TFileExt, const TCHAR* ptszFileNameExt)
 {
-	size_t	nLen = 0;
-	size_t	nCount = 0;
-	size_t	nIndex = 0;
+	size_t	length = 0;
+	size_t	size = 0;
+	size_t	index = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
 	TCHAR* ptszDestLoc = nullptr;
 
 	if( ptszFileNameExt == nullptr ) return false;
-	if( (nLen = _tcslen(ptszFileNameExt)) < 1 ) return false;
+	if( (length = _tcslen(ptszFileNameExt)) < 1 ) return false;
 
-	for( ptszSourceLoc = ptszFileNameExt + nLen - 1; nCount < nLen; ptszSourceLoc-- )
+	for( ptszSourceLoc = ptszFileNameExt + length - 1; size < length; ptszSourceLoc-- )
 	{
 		if( *ptszSourceLoc == _T('.') )
 		{
-			nCount++;
+			size++;
 			break;
 		}
 
-		nCount++;
+		size++;
 	}
 
-	TFileName.Init(nLen - nCount + 1);
+	TFileName.Init(length - size + 1);
 
 	for( ptszSourceLoc = ptszFileNameExt, ptszDestLoc = TFileName.GetBuffer(); *ptszSourceLoc; ptszSourceLoc++, ptszDestLoc++ )
 	{
-		if( nIndex == nLen - nCount ) break;
+		if( index == length - size ) break;
 
 		*ptszDestLoc = *ptszSourceLoc;
-		nIndex++;
+		index++;
 	}
 	*ptszDestLoc = _T('\0');
 
-	TFileExt.Init(nCount);
+	TFileExt.Init(size);
 
-	ptszSourceLoc = ptszFileNameExt + nLen - nCount + 1;
+	ptszSourceLoc = ptszFileNameExt + length - size + 1;
 	ptszDestLoc = TFileExt.GetBuffer();
 
 	while( *ptszDestLoc++ = *ptszSourceLoc++ );
@@ -123,35 +123,35 @@ bool FileNameExtPassing(CMemBuffer<TCHAR>& TFileName, CMemBuffer<TCHAR>& TFileEx
 // 
 bool HostNamePassing(CMemBuffer<TCHAR>& THostName, const TCHAR* ptszFullUrl)
 {
-	size_t	nLen = 0;
-	size_t	nCount = 0;
-	size_t	nIndex = 0;
+	size_t	length = 0;
+	size_t	size = 0;
+	size_t	index = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
 	TCHAR* ptszDestLoc = nullptr;
 
 	if( ptszFullUrl == nullptr ) return false;
-	if( (nLen = _tcslen(ptszFullUrl)) < 1 ) return false;
+	if( (length = _tcslen(ptszFullUrl)) < 1 ) return false;
 
 	if( (ptszSourceLoc = _tcsstr(ptszFullUrl, _T("://"))) != NULL )
-		nCount = nLen - _tcslen(ptszSourceLoc) + 3;
+		size = length - _tcslen(ptszSourceLoc) + 3;
 
-	for( ptszSourceLoc = ptszFullUrl + nCount; *ptszSourceLoc; ptszSourceLoc++ )
+	for( ptszSourceLoc = ptszFullUrl + size; *ptszSourceLoc; ptszSourceLoc++ )
 	{
 		if( !isalpha(*ptszSourceLoc) && !isdigit(*ptszSourceLoc) && *ptszSourceLoc != _T('-') && *ptszSourceLoc != _T('.') && *ptszSourceLoc != _T(':') )
 			break;
 
-		nCount++;
+		size++;
 	}
 
-	THostName.Init(nCount + 1);
+	THostName.Init(size + 1);
 
 	for( ptszSourceLoc = ptszFullUrl, ptszDestLoc = THostName.GetBuffer(); *ptszSourceLoc; ptszSourceLoc++, ptszDestLoc++ )
 	{
-		if( nIndex == nCount ) break;
+		if( index == size ) break;
 
 		*ptszDestLoc = *ptszSourceLoc;
-		nIndex++;
+		index++;
 	}
 	*ptszDestLoc = _T('\0');
 
@@ -162,42 +162,42 @@ bool HostNamePassing(CMemBuffer<TCHAR>& THostName, const TCHAR* ptszFullUrl)
 //
 bool UrlFullPathPassing(CMemBuffer<TCHAR>& TUrlFullPath, const TCHAR* ptszFullUrl)
 {
-	size_t	nLen = 0;
-	size_t	nFirst = 0;
-	size_t	nCount = 0;
-	size_t	nIndex = 0;
+	size_t	length = 0;
+	size_t	first = 0;
+	size_t	size = 0;
+	size_t	index = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
 	TCHAR* ptszDestLoc = nullptr;
 
 	if( ptszFullUrl == nullptr ) return false;
-	if( (nLen = _tcslen(ptszFullUrl)) < 1 ) return false;
+	if( (length = _tcslen(ptszFullUrl)) < 1 ) return false;
 
 	if( (ptszSourceLoc = _tcsstr(ptszFullUrl, _T("://"))) != NULL )
-		nFirst = nLen - _tcslen(ptszSourceLoc) + 3;
+		first = length - _tcslen(ptszSourceLoc) + 3;
 
-	for( ptszSourceLoc = ptszFullUrl + nFirst; *ptszSourceLoc; ptszSourceLoc++ )
+	for( ptszSourceLoc = ptszFullUrl + first; *ptszSourceLoc; ptszSourceLoc++ )
 	{
 		if( !isalpha(*ptszSourceLoc) && !isdigit(*ptszSourceLoc) && *ptszSourceLoc != _T('-') && *ptszSourceLoc != _T('.') && *ptszSourceLoc != _T(':') )
 			break;
 
-		nFirst++;
+		first++;
 	}
 
-	for( ptszSourceLoc = ptszFullUrl + nLen; nCount < nLen; ptszSourceLoc-- )
+	for( ptszSourceLoc = ptszFullUrl + length; size < length; ptszSourceLoc-- )
 	{
 		if( *ptszSourceLoc == URL_QUERYSTRING_CHAR_TOKEN ) break;
-		nCount++;
+		size++;
 	}
 
-	TUrlFullPath.Init(nLen - nFirst - nCount + 1);
+	TUrlFullPath.Init(length - first - size + 1);
 
-	for( ptszSourceLoc = ptszFullUrl + nFirst, ptszDestLoc = TUrlFullPath.GetBuffer(); *ptszSourceLoc; ptszSourceLoc++, ptszDestLoc++ )
+	for( ptszSourceLoc = ptszFullUrl + first, ptszDestLoc = TUrlFullPath.GetBuffer(); *ptszSourceLoc; ptszSourceLoc++, ptszDestLoc++ )
 	{
-		if( nIndex == nLen - nFirst - nCount ) break;
+		if( index == length - first - size ) break;
 
 		*ptszDestLoc = *ptszSourceLoc;
-		nIndex++;
+		index++;
 	}
 	*ptszDestLoc = _T('\0');
 
@@ -208,24 +208,24 @@ bool UrlFullPathPassing(CMemBuffer<TCHAR>& TUrlFullPath, const TCHAR* ptszFullUr
 // 
 bool QueryStringPassing(CMemBuffer<TCHAR>& TQueryString, const TCHAR* ptszFullUrl)
 {
-	size_t	nLen = 0;
-	size_t	nCount = 0;
+	size_t	length = 0;
+	size_t	size = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
 	TCHAR* ptszDestLoc = nullptr;
 
 	if( ptszFullUrl == nullptr ) return false;
-	if( (nLen = _tcslen(ptszFullUrl)) < 1 ) return false;
+	if( (length = _tcslen(ptszFullUrl)) < 1 ) return false;
 
-	for( ptszSourceLoc = ptszFullUrl + nLen - 1; nCount < nLen; ptszSourceLoc-- )
+	for( ptszSourceLoc = ptszFullUrl + length - 1; size < length; ptszSourceLoc-- )
 	{
 		if( *ptszSourceLoc == URL_QUERYSTRING_CHAR_TOKEN ) break;
-		nCount++;
+		size++;
 	}
 
-	TQueryString.Init(nCount + 1);
+	TQueryString.Init(size + 1);
 
-	ptszSourceLoc = ptszFullUrl + nLen - nCount;
+	ptszSourceLoc = ptszFullUrl + length - size;
 	ptszDestLoc = TQueryString.GetBuffer();
 
 	while( *ptszDestLoc++ = *ptszSourceLoc++ );
@@ -237,29 +237,29 @@ bool QueryStringPassing(CMemBuffer<TCHAR>& TQueryString, const TCHAR* ptszFullUr
 //
 bool Tokenize(CMemBuffer<TCHAR>*& ppTDestination, const TCHAR* ptszSource, const TCHAR* ptszToken)
 {
-	size_t	nLen = 0;
-	size_t	nIndex = 0;
+	size_t	length = 0;
+	size_t	index = 0;
 	TCHAR* ptszTokenize = nullptr;
 	TCHAR* ptszSourceLoc = nullptr;
 	TCHAR* ptszNextToken = nullptr;
 
 	if( ptszSource == nullptr || ptszToken == nullptr ) return false;
-	if( (nLen = _tcslen(ptszSource)) < 1 ) return false;
+	if( (length = _tcslen(ptszSource)) < 1 ) return false;
 	if( !_tcsstr(ptszSource, ptszToken) ) return false;
 
-	ptszSourceLoc = new TCHAR[nLen + 1];
-	_tcsncpy_s(ptszSourceLoc, nLen + 1, ptszSource, _TRUNCATE);
+	ptszSourceLoc = new TCHAR[length + 1];
+	_tcsncpy_s(ptszSourceLoc, length + 1, ptszSource, _TRUNCATE);
 
 	ptszTokenize = _tcstok_s(ptszSourceLoc, ptszToken, &ptszNextToken);
 	while( ptszTokenize )
 	{
-		ppTDestination[nIndex].Init(_tcslen(ptszTokenize) + 1);
+		ppTDestination[index].Init(_tcslen(ptszTokenize) + 1);
 
-		_tcsncpy_s(ppTDestination[nIndex].GetBuffer(), _tcslen(ptszTokenize) + 1, ptszTokenize, _TRUNCATE);
+		_tcsncpy_s(ppTDestination[index].GetBuffer(), _tcslen(ptszTokenize) + 1, ptszTokenize, _TRUNCATE);
 
 		ptszTokenize = _tcstok_s(nullptr, ptszToken, &ptszNextToken);
 
-		nIndex++;
+		index++;
 	}
 
 	if( ptszSourceLoc )
@@ -275,15 +275,15 @@ bool Tokenize(CMemBuffer<TCHAR>*& ppTDestination, const TCHAR* ptszSource, const
 //
 bool StrUpper(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 {
-	size_t	nLen = 0;
+	size_t	length = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
 	TCHAR* ptszDestLoc = nullptr;
 
 	if( ptszSource == nullptr ) return false;
-	if( (nLen = _tcslen(ptszSource)) < 1 ) return false;
+	if( (length = _tcslen(ptszSource)) < 1 ) return false;
 
-	TDestination.Init(nLen + 1);
+	TDestination.Init(length + 1);
 
 	for( ptszSourceLoc = ptszSource, ptszDestLoc = TDestination.GetBuffer(); *ptszSourceLoc; ptszSourceLoc++, ptszDestLoc++ )
 	{
@@ -300,15 +300,15 @@ bool StrUpper(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 //
 bool StrLower(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 {
-	size_t	nLen = 0;
+	size_t	length = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
 	TCHAR* ptszDestLoc = nullptr;
 
 	if( ptszSource == nullptr ) return false;
-	if( (nLen = _tcslen(ptszSource)) < 1 ) return false;
+	if( (length = _tcslen(ptszSource)) < 1 ) return false;
 
-	TDestination.Init(nLen + 1);
+	TDestination.Init(length + 1);
 
 	for( ptszSourceLoc = ptszSource, ptszDestLoc = TDestination.GetBuffer(); *ptszSourceLoc; ptszSourceLoc++, ptszDestLoc++ )
 	{
@@ -325,21 +325,21 @@ bool StrLower(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 //
 bool StrReverse(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 {
-	size_t	nLen = 0;
-	size_t	nIndex = 0;
+	size_t	length = 0;
+	size_t	index = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
 	TCHAR* ptszDestLoc = nullptr;
 
 	if( ptszSource == nullptr ) return false;
-	if( (nLen = _tcslen(ptszSource)) < 1 ) return false;
+	if( (length = _tcslen(ptszSource)) < 1 ) return false;
 
-	TDestination.Init(nLen + 1);
+	TDestination.Init(length + 1);
 
-	for( ptszSourceLoc = ptszSource + nLen - 1, ptszDestLoc = TDestination.GetBuffer(); nIndex < nLen; ptszSourceLoc--, ptszDestLoc++ )
+	for( ptszSourceLoc = ptszSource + length - 1, ptszDestLoc = TDestination.GetBuffer(); index < length; ptszSourceLoc--, ptszDestLoc++ )
 	{
 		*ptszDestLoc = *ptszSourceLoc;
-		nIndex++;
+		index++;
 	}
 	*ptszDestLoc = _T('\0');
 
@@ -350,15 +350,15 @@ bool StrReverse(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 //
 bool StrAppend(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const TCHAR* ptszAppend)
 {
-	size_t	nLen = 0;
+	size_t	length = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
 	TCHAR* ptszDestLoc = nullptr;
 
 	if( ptszSource == nullptr || ptszAppend == nullptr ) return false;
-	if( (nLen = _tcslen(ptszSource)) < 0 ) return false;
+	if( (length = _tcslen(ptszSource)) < 0 ) return false;
 
-	TDestination.Init(nLen + _tcslen(ptszAppend) + 1);
+	TDestination.Init(length + _tcslen(ptszAppend) + 1);
 
 	for( ptszSourceLoc = ptszSource, ptszDestLoc = TDestination.GetBuffer(); *ptszSourceLoc; ptszSourceLoc++, ptszDestLoc++ )
 		*ptszDestLoc = *ptszSourceLoc;
@@ -373,23 +373,23 @@ bool StrAppend(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const T
 
 //***************************************************************************
 //
-bool StrMid(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const size_t nStart)
+bool StrMid(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const size_t start)
 {
-	size_t	nLen = 0;
-	size_t	nFirst = 0;
+	size_t	length = 0;
+	size_t	first = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
 	TCHAR* ptszDestLoc = nullptr;
 
 	if( ptszSource == nullptr ) return false;
-	if( (nLen = _tcslen(ptszSource)) < 1 ) return false;
-	if( nStart < 0 || nStart > nLen - 1 ) return false;
+	if( (length = _tcslen(ptszSource)) < 1 ) return false;
+	if( start < 0 || start > length - 1 ) return false;
 
-	nFirst = nStart;
+	first = start;
 
-	TDestination.Init(nLen - nFirst + 1);
+	TDestination.Init(length - first + 1);
 
-	ptszSourceLoc = ptszSource + nStart;
+	ptszSourceLoc = ptszSource + start;
 	ptszDestLoc = TDestination.GetBuffer();
 
 	while( *ptszDestLoc++ = *ptszSourceLoc++ );
@@ -399,33 +399,33 @@ bool StrMid(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const size
 
 //***************************************************************************
 //
-bool StrMid(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const size_t nStart, const size_t nCount)
+bool StrMid(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const size_t start, const size_t count)
 {
-	size_t	nLen = 0;
-	size_t	nFirst = 0;
-	size_t	nIndex = 0;
+	size_t	length = 0;
+	size_t	first = 0;
+	size_t	index = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
 	TCHAR* ptszDestLoc = nullptr;
 
 	if( ptszSource == nullptr ) return false;
-	if( (nLen = _tcslen(ptszSource)) < 1 ) return false;
-	if( nStart < 0 || nStart > nLen - 1 ) return false;
-	if( nCount < 0 || nStart + nCount > nLen - 1 ) return false;
+	if( (length = _tcslen(ptszSource)) < 1 ) return false;
+	if( start < 0 || start > length - 1 ) return false;
+	if( count < 0 || start + count > length - 1 ) return false;
 
-	nFirst = nStart;
+	first = start;
 
-	TDestination.Init(nCount + 1);
+	TDestination.Init(count + 1);
 
-	ptszSourceLoc = ptszSource + nFirst;
+	ptszSourceLoc = ptszSource + first;
 	ptszDestLoc = TDestination.GetBuffer();
 
 	while( *ptszSourceLoc )
 	{
-		if( nIndex == nCount ) break;
+		if( index == count ) break;
 
 		*ptszDestLoc++ = *ptszSourceLoc++;
-		nIndex++;
+		index++;
 	}
 	*ptszDestLoc = _T('\0');
 
@@ -434,25 +434,25 @@ bool StrMid(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const size
 
 //***************************************************************************
 //Function to cut string until special character 
-bool StrMidToken(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const size_t nStart, const TCHAR tcToken)
+bool StrMidToken(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const size_t start, const TCHAR tcToken)
 {
-	size_t	nLen = 0;
-	size_t	nFirst = 0;
-	size_t	nIndex = 0;
+	size_t	length = 0;
+	size_t	first = 0;
+	size_t	index = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
 	TCHAR* ptszDestLoc = nullptr;
 
 	if( ptszSource == nullptr ) return false;
-	if( (nLen = _tcslen(ptszSource)) < 1 ) return false;
-	if( nStart < 0 || nStart > nLen - 1 ) return false;
+	if( (length = _tcslen(ptszSource)) < 1 ) return false;
+	if( start < 0 || start > length - 1 ) return false;
 	if( !_tcschr(ptszSource, tcToken) ) return false;
 
-	nFirst = nStart;
+	first = start;
 
-	TDestination.Init(nLen - nFirst + 1);
+	TDestination.Init(length - first + 1);
 
-	ptszSourceLoc = ptszSource + nFirst;
+	ptszSourceLoc = ptszSource + first;
 	ptszDestLoc = TDestination.GetBuffer();
 
 	while( *ptszSourceLoc )
@@ -460,7 +460,7 @@ bool StrMidToken(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const
 		if( *ptszSourceLoc == tcToken ) break;
 
 		*ptszDestLoc++ = *ptszSourceLoc++;
-		nIndex++;
+		index++;
 	}
 	*ptszDestLoc = _T('\0');
 
@@ -469,29 +469,29 @@ bool StrMidToken(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const
 
 //***************************************************************************
 //
-bool StrLeft(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const size_t nCount)
+bool StrLeft(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const size_t count)
 {
-	size_t	nLen = 0;
-	size_t	nIndex = 0;
+	size_t	length = 0;
+	size_t	index = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
 	TCHAR* ptszDestLoc = nullptr;
 
 	if( ptszSource == nullptr ) return false;
-	if( (nLen = _tcslen(ptszSource)) < 1 ) return false;
-	if( nCount < 0 || nCount > nLen ) return false;
+	if( (length = _tcslen(ptszSource)) < 1 ) return false;
+	if( count < 0 || count > length ) return false;
 
-	TDestination.Init(nCount + 1);
+	TDestination.Init(count + 1);
 
 	ptszSourceLoc = ptszSource;
 	ptszDestLoc = TDestination.GetBuffer();
 
 	while( *ptszSourceLoc )
 	{
-		if( nIndex == nCount ) break;
+		if( index == count ) break;
 
 		*ptszDestLoc++ = *ptszSourceLoc++;
-		nIndex++;
+		index++;
 	}
 	*ptszDestLoc = _T('\0');
 
@@ -500,20 +500,20 @@ bool StrLeft(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const siz
 
 //***************************************************************************
 //
-bool StrRight(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const size_t nCount)
+bool StrRight(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const size_t count)
 {
-	size_t	nLen = 0;
+	size_t	length = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
 	TCHAR* ptszDestLoc = nullptr;
 
 	if( ptszSource == nullptr ) return false;
-	if( (nLen = _tcslen(ptszSource)) < 1 ) return false;
-	if( nCount < 0 || nCount > nLen ) return false;
+	if( (length = _tcslen(ptszSource)) < 1 ) return false;
+	if( count < 0 || count > length ) return false;
 
-	TDestination.Init(nCount + 1);
+	TDestination.Init(count + 1);
 
-	ptszSourceLoc = ptszSource + nLen - nCount;
+	ptszSourceLoc = ptszSource + length - count;
 	ptszDestLoc = TDestination.GetBuffer();
 
 	while( *ptszDestLoc++ = *ptszSourceLoc++ );
@@ -525,15 +525,15 @@ bool StrRight(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const si
 //
 bool StrReplace(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const TCHAR tcSrcToken, const TCHAR tcDestToken)
 {
-	size_t	nLen = 0;
+	size_t	length = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
 	TCHAR* ptszDestLoc = nullptr;
 
 	if( ptszSource == nullptr ) return false;
-	if( (nLen = _tcslen(ptszSource)) < 1 ) return false;
+	if( (length = _tcslen(ptszSource)) < 1 ) return false;
 
-	TDestination.Init(nLen + 1);
+	TDestination.Init(length + 1);
 
 	for( ptszSourceLoc = ptszSource, ptszDestLoc = TDestination.GetBuffer(); *ptszSourceLoc; ptszSourceLoc++, ptszDestLoc++ )
 	{
@@ -552,9 +552,9 @@ bool StrReplace(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const 
 bool StrReplace(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const TCHAR* ptszSrcToken, const TCHAR* ptszDestToken)
 {
 	bool	bResult = false;
-	size_t	nLen = 0;
-	size_t	nTokenCount = 0;
-	size_t	nIndex = 0;
+	size_t	length = 0;
+	size_t	nTokecount = 0;
+	size_t	index = 0;
 	size_t	nSubLen = 0;
 	size_t	nEndIndex = 0;
 
@@ -565,16 +565,16 @@ bool StrReplace(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const 
 	TCHAR* ptszDestLoc = nullptr;
 
 	if( ptszSource == nullptr || ptszSrcToken == nullptr || ptszDestToken == nullptr ) return false;
-	if( (nLen = _tcslen(ptszSource)) < 1 ) return false;
+	if( (length = _tcslen(ptszSource)) < 1 ) return false;
 
 	for( ptszSourceLoc = ptszSource; *ptszSourceLoc; ptszSourceLoc++ )
 	{
 		if( *ptszSourceLoc == *ptszSrcToken )
 		{
 			bResult = true;
-			for( nIndex = 0, ptszSrcTemp = ptszSrcToken; *ptszSrcTemp; ptszSrcTemp++, nIndex++ )
+			for( index = 0, ptszSrcTemp = ptszSrcToken; *ptszSrcTemp; ptszSrcTemp++, index++ )
 			{
-				if( *(ptszSourceLoc + nIndex) != *ptszSrcTemp )
+				if( *(ptszSourceLoc + index) != *ptszSrcTemp )
 				{
 					bResult = false;
 					break;
@@ -583,13 +583,13 @@ bool StrReplace(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const 
 
 			if( bResult )
 			{
-				nTokenCount++;
+				nTokecount++;
 				ptszSourceLoc = ptszSourceLoc + _tcslen(ptszSrcToken) - 1;
 			}
 		}
 	}
 
-	if( nTokenCount < 0 )
+	if( nTokecount < 0 )
 	{
 		nEndIndex = _tcslen(ptszSource);
 
@@ -601,7 +601,7 @@ bool StrReplace(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const 
 	}
 
 	nSubLen = _tcslen(ptszDestToken) - _tcslen(ptszSrcToken);
-	nEndIndex = nLen + (nSubLen * nTokenCount);
+	nEndIndex = length + (nSubLen * nTokecount);
 
 	TDestination.Init(nEndIndex + 1);
 
@@ -610,9 +610,9 @@ bool StrReplace(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const 
 		if( *ptszSourceLoc == *ptszSrcToken )
 		{
 			bResult = true;
-			for( nIndex = 0, ptszSrcTemp = ptszSrcToken; *ptszSrcTemp; ptszSrcTemp++, nIndex++ )
+			for( index = 0, ptszSrcTemp = ptszSrcToken; *ptszSrcTemp; ptszSrcTemp++, index++ )
 			{
-				if( *(ptszSourceLoc + nIndex) != *ptszSrcTemp )
+				if( *(ptszSourceLoc + index) != *ptszSrcTemp )
 				{
 					bResult = false;
 					break;
@@ -640,14 +640,14 @@ bool StrReplace(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const 
 //
 bool TrimLeft(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 {
-	size_t	nLen = 0;
-	size_t	nCount = 0;
+	size_t	length = 0;
+	size_t	count = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
 	TCHAR* ptszDestLoc = nullptr;
 
 	if( ptszSource == nullptr ) return false;
-	if( (nLen = _tcslen(ptszSource)) < 1 ) return false;
+	if( (length = _tcslen(ptszSource)) < 1 ) return false;
 
 	ptszSourceLoc = ptszSource;
 	while( _istspace(*ptszSourceLoc) )
@@ -666,13 +666,13 @@ bool TrimLeft(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 //
 bool TrimLeft(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const TCHAR ctToken)
 {
-	size_t	nLen = 0;
+	size_t	length = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
 	TCHAR* ptszDestLoc = nullptr;
 
 	if( ptszSource == nullptr ) return false;
-	if( (nLen = _tcslen(ptszSource)) < 1 ) return false;
+	if( (length = _tcslen(ptszSource)) < 1 ) return false;
 
 	ptszSourceLoc = ptszSource;
 	while( *ptszSourceLoc == ctToken )
@@ -691,13 +691,13 @@ bool TrimLeft(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const TC
 //
 bool TrimLeft(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const TCHAR* ptszToken)
 {
-	size_t	nLen = 0;
+	size_t	length = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
 	TCHAR* ptszDestLoc = nullptr;
 
 	if( ptszSource == nullptr ) return false;
-	if( (nLen = _tcslen(ptszSource)) < 1 ) return false;
+	if( (length = _tcslen(ptszSource)) < 1 ) return false;
 
 	ptszSourceLoc = ptszSource;
 	while( *ptszSourceLoc )
@@ -720,30 +720,30 @@ bool TrimLeft(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const TC
 //
 bool TrimRight(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 {
-	size_t	nLen = 0;
-	size_t	nCount = 0;
-	size_t	nIndex = 0;
+	size_t	length = 0;
+	size_t	count = 0;
+	size_t	index = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
 	TCHAR* ptszDestLoc = nullptr;
 
 	if( ptszSource == nullptr ) return false;
-	if( (nLen = _tcslen(ptszSource)) < 1 ) return false;
+	if( (length = _tcslen(ptszSource)) < 1 ) return false;
 
-	for( ptszSourceLoc = ptszSource + nLen - 1; nCount < nLen; ptszSourceLoc-- )
+	for( ptszSourceLoc = ptszSource + length - 1; count < length; ptszSourceLoc-- )
 	{
-		if( _istspace(*ptszSourceLoc) ) nCount++;
+		if( _istspace(*ptszSourceLoc) ) count++;
 		else break;
 	}
 
-	TDestination.Init(nLen - nCount + 1);
+	TDestination.Init(length - count + 1);
 
 	for( ptszSourceLoc = ptszSource, ptszDestLoc = TDestination.GetBuffer(); *ptszSourceLoc; ptszSourceLoc++, ptszDestLoc++ )
 	{
-		if( nIndex == nLen - nCount ) break;
+		if( index == length - count ) break;
 
 		*ptszDestLoc = *ptszSourceLoc;
-		nIndex++;
+		index++;
 	}
 	*ptszDestLoc = _T('\0');
 
@@ -754,30 +754,30 @@ bool TrimRight(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 //
 bool TrimRight(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const TCHAR ctToken)
 {
-	size_t	nLen = 0;
-	size_t	nCount = 0;
-	size_t	nIndex = 0;
+	size_t	length = 0;
+	size_t	count = 0;
+	size_t	index = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
 	TCHAR* ptszDestLoc = nullptr;
 
 	if( ptszSource == nullptr ) return false;
-	if( (nLen = _tcslen(ptszSource)) < 1 ) return false;
+	if( (length = _tcslen(ptszSource)) < 1 ) return false;
 
-	for( ptszSourceLoc = ptszSource + nLen - 1; nCount < nLen; ptszSourceLoc-- )
+	for( ptszSourceLoc = ptszSource + length - 1; count < length; ptszSourceLoc-- )
 	{
-		if( *ptszSourceLoc == ctToken ) nCount++;
+		if( *ptszSourceLoc == ctToken ) count++;
 		else break;
 	}
 
-	TDestination.Init(nLen - nCount + 1);
+	TDestination.Init(length - count + 1);
 
 	for( ptszSourceLoc = ptszSource, ptszDestLoc = TDestination.GetBuffer(); *ptszSourceLoc; ptszSourceLoc++, ptszDestLoc++ )
 	{
-		if( nIndex == nLen - nCount ) break;
+		if( index == length - count ) break;
 
 		*ptszDestLoc = *ptszSourceLoc;
-		nIndex++;
+		index++;
 	}
 	*ptszDestLoc = _T('\0');
 
@@ -788,31 +788,31 @@ bool TrimRight(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const T
 //
 bool TrimRight(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const TCHAR* ptszToken)
 {
-	size_t	nLen = 0;
-	size_t	nCount = 0;
-	size_t	nIndex = 0;
+	size_t	length = 0;
+	size_t	count = 0;
+	size_t	index = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
 	TCHAR* ptszDestLoc = nullptr;
 
 	if( ptszSource == nullptr ) return false;
-	if( (nLen = _tcslen(ptszSource)) < 1 ) return false;
+	if( (length = _tcslen(ptszSource)) < 1 ) return false;
 
-	for( ptszSourceLoc = ptszSource + nLen - 1; nCount < nLen; ptszSourceLoc-- )
+	for( ptszSourceLoc = ptszSource + length - 1; count < length; ptszSourceLoc-- )
 	{
 		if( _tcschr(ptszToken, *ptszSourceLoc) == nullptr )
 			break;
-		nCount++;
+		count++;
 	}
 
-	TDestination.Init(nLen - nCount + 1);
+	TDestination.Init(length - count + 1);
 
 	for( ptszSourceLoc = ptszSource, ptszDestLoc = TDestination.GetBuffer(); *ptszSourceLoc; ptszSourceLoc++, ptszDestLoc++ )
 	{
-		if( nIndex == nLen - nCount ) break;
+		if( index == length - count ) break;
 
 		*ptszDestLoc = *ptszSourceLoc;
-		nIndex++;
+		index++;
 	}
 	*ptszDestLoc = _T('\0');
 
@@ -823,27 +823,27 @@ bool TrimRight(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const T
 //
 bool StrCutUnicodeAscii(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const size_t nSize)
 {
-	size_t	nLen = 0;
-	size_t	nCount = 0;
-	size_t	nIndex = 0;
+	size_t	length = 0;
+	size_t	count = 0;
+	size_t	index = 0;
 	size_t	nEndIndex = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
 	TCHAR* ptszDestLoc = nullptr;
 
 	if( ptszSource == nullptr ) return false;
-	if( (nLen = _tcslen(ptszSource)) < 1 ) return false;
-	if( nSize < 0 || nSize > nLen ) return false;
+	if( (length = _tcslen(ptszSource)) < 1 ) return false;
+	if( nSize < 0 || nSize > length ) return false;
 
 #ifndef _UNICODE
-	for( nCount = 0, ptszSourceLoc = ptszSource; *ptszSourceLoc; ptszSourceLoc++ )
+	for( count = 0, ptszSourceLoc = ptszSource; *ptszSourceLoc; ptszSourceLoc++ )
 	{
-		if( !((unsigned)(*ptszSourceLoc) < 0x80) ) nCount++;
+		if( !((unsigned)(*ptszSourceLoc) < 0x80) ) count++;
 	}
 
-	if( nCount % 2 == 1 )
-		nEndIndex = nSize + (nCount / 2) + 1;
-	else nEndIndex = nSize + (nCount / 2);
+	if( count % 2 == 1 )
+		nEndIndex = nSize + (count / 2) + 1;
+	else nEndIndex = nSize + (count / 2);
 #else
 	nEndIndex = nSize;
 #endif
@@ -852,10 +852,10 @@ bool StrCutUnicodeAscii(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource
 
 	for( ptszSourceLoc = ptszSource, ptszDestLoc = TDestination.GetBuffer(); *ptszSourceLoc; ptszSourceLoc++, ptszDestLoc++ )
 	{
-		if( nIndex == nEndIndex ) break;
+		if( index == nEndIndex ) break;
 
 		*ptszDestLoc = *ptszSourceLoc;
-		nIndex++;
+		index++;
 	}
 	*ptszDestLoc = _T('\0');
 
@@ -866,35 +866,35 @@ bool StrCutUnicodeAscii(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource
 //
 bool StrCatLocationToken(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const size_t nLocation, const TCHAR tcToken)
 {
-	size_t	nLen = 0;
-	size_t	nCount = 0;
-	size_t	nIndex = 0;
+	size_t	length = 0;
+	size_t	count = 0;
+	size_t	index = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
 	TCHAR* ptszDestLoc = nullptr;
 
 	if( ptszSource == nullptr ) return false;
-	if( (nLen = _tcslen(ptszSource)) < 1 ) return false;
+	if( (length = _tcslen(ptszSource)) < 1 ) return false;
 	if( nLocation == 0 ) return false;
 
-	if( (nLen % nLocation) == 0 )
-		nCount = nLen / nLocation - 1;
+	if( (length % nLocation) == 0 )
+		count = length / nLocation - 1;
 	else
-		nCount = nLen / nLocation;	// ((int)nValue / (int)nDiv) 은 항상 소숫점 버림
+		count = length / nLocation;	// ((int)nValue / (int)nDiv) 은 항상 소숫점 버림
 
-	TDestination.Init(nLen + nCount + 1);
+	TDestination.Init(length + count + 1);
 
 	for( ptszSourceLoc = ptszSource, ptszDestLoc = TDestination.GetBuffer(); *ptszSourceLoc; ptszSourceLoc++, ptszDestLoc++ )
 	{
-		if( nIndex == nLocation )
+		if( index == nLocation )
 		{
 			*ptszDestLoc = tcToken;
 			ptszDestLoc++;
-			nIndex = 0;
+			index = 0;
 		}
 
 		*ptszDestLoc = *ptszSourceLoc;
-		nIndex++;
+		index++;
 	}
 	*ptszDestLoc = _T('\0');
 
@@ -905,26 +905,26 @@ bool StrCatLocationToken(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSourc
 //
 bool StrCatLocationToken(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const size_t nLocation, const TCHAR* ptszToken)
 {
-	size_t	nLen = 0;
-	size_t	nCount = 0;
-	size_t	nIndex = 0;
+	size_t	length = 0;
+	size_t	count = 0;
+	size_t	index = 0;
 	const TCHAR* ptszSourceLoc = nullptr;
 	TCHAR* ptszDestLoc = nullptr;
 
 	if( ptszSource == nullptr ) return false;
-	if( (nLen = _tcslen(ptszSource)) < 1 ) return false;
+	if( (length = _tcslen(ptszSource)) < 1 ) return false;
 	if( nLocation == 0 ) return false;
 
-	if( (nLen % nLocation) == 0 )
-		nCount = nLen / nLocation - 1;
+	if( (length % nLocation) == 0 )
+		count = length / nLocation - 1;
 	else
-		nCount = nLen / nLocation;	// ((int)nValue / (int)nDiv) 은 항상 소숫점 버림
+		count = length / nLocation;	// ((int)nValue / (int)nDiv) 은 항상 소숫점 버림
 
-	TDestination.Init(nLen + (nCount * _tcslen(ptszToken)) + 1);
+	TDestination.Init(length + (count * _tcslen(ptszToken)) + 1);
 
 	for( ptszSourceLoc = ptszSource, ptszDestLoc = TDestination.GetBuffer(); *ptszSourceLoc; ptszSourceLoc++, ptszDestLoc++ )
 	{
-		if( nIndex == nLocation )
+		if( index == nLocation )
 		{
 			while( ptszToken )
 			{
@@ -933,11 +933,11 @@ bool StrCatLocationToken(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSourc
 				ptszToken++;
 			}
 
-			nIndex = 0;
+			index = 0;
 		}
 
 		*ptszDestLoc = *ptszSourceLoc;
-		nIndex++;
+		index++;
 	}
 	*ptszDestLoc = _T('\0');
 
@@ -951,34 +951,32 @@ bool StrCatLocationToken(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSourc
 //Function to passing FolderPath to FullFilePath 
 _tstring FolderPathPassing(const _tstring& fullFilePath)
 {
-	size_t	nLen = 0;
-	size_t	nCount = 0;
-	size_t	nIndex = 0;
+	size_t	length = 0;
+	size_t	size = 0;
+	size_t	index = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
-	TCHAR* ptszDestLoc = nullptr;
 
 	if( fullFilePath.c_str() == nullptr || fullFilePath.size() == 0 ) return _T("");
 
-	nLen = fullFilePath.size();
-	for( ptszSourceLoc = fullFilePath.c_str() + nLen - 1; nCount < nLen; ptszSourceLoc-- )
+	length = fullFilePath.size();
+	for( ptszSourceLoc = fullFilePath.c_str() + length - 1; size < length; ptszSourceLoc-- )
 	{
 		if( *ptszSourceLoc == _T('/') || *ptszSourceLoc == _T('\\') ) break;
-		nCount++;
+		size++;
 	}
 
-	if( nLen - nCount > DIRECTORY_STRLEN ) return _T("");
+	if( length - size > DIRECTORY_STRLEN ) return _T("");
 
-	_tstring dest(nLen - nCount + 1, _T('\0'));
+	_tstring dest(length - size + 1, _T('\0'));
 
-	for( ptszSourceLoc = fullFilePath.c_str(), ptszDestLoc = const_cast<TCHAR*>(dest.c_str()); *ptszSourceLoc; ptszSourceLoc++, ptszDestLoc++ )
+	for( ptszSourceLoc = fullFilePath.c_str(); *ptszSourceLoc; ptszSourceLoc++ )
 	{
-		if( nIndex == nLen - nCount ) break;
+		if( index == length - size ) break;
 
-		*ptszDestLoc = *ptszSourceLoc;
-		nIndex++;
+		dest[index++] = *ptszSourceLoc;
 	}
-	*ptszDestLoc = _T('\0');
+	dest[index] = _T('\0');
 
 	return dest;
 }
@@ -987,30 +985,29 @@ _tstring FolderPathPassing(const _tstring& fullFilePath)
 //Function to passing FileNameExt to FullFilePath 
 _tstring FileNameExtPathPassing(const _tstring& fullFilePath)
 {
-	size_t	nLen = 0;
-	size_t	nCount = 0;
+	size_t	length = 0;
+	size_t	size = 0;
+	size_t	index = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
-	TCHAR* ptszDestLoc = nullptr;
 
 	if( fullFilePath.c_str() == nullptr || fullFilePath.size() == 0 ) return _T("");
 
-	nLen = fullFilePath.size();
-	for( ptszSourceLoc = fullFilePath.c_str() + nLen - 1; nCount < nLen; ptszSourceLoc-- )
+	length = fullFilePath.size();
+	for( ptszSourceLoc = fullFilePath.c_str() + length - 1; size < length; ptszSourceLoc-- )
 	{
 		if( *ptszSourceLoc == _T('/') || *ptszSourceLoc == _T('\\') ) break;
 
-		nCount++;
+		size++;
 	}
 
-	if( nCount > FILENAMEEXT_STRLEN ) return _T("");
+	if( size > FILENAMEEXT_STRLEN ) return _T("");
 
-	_tstring dest(nCount + 1, _T('\0'));
+	_tstring dest(size + 1, _T('\0'));
 
-	ptszSourceLoc = fullFilePath.c_str() + nLen - nCount;
-	ptszDestLoc = const_cast<TCHAR*>(dest.c_str());
+	ptszSourceLoc = fullFilePath.c_str() + length - size;
 
-	while( *ptszDestLoc++ = *ptszSourceLoc++ );
+	while( dest[index++] = *ptszSourceLoc++ );
 
 	return dest;
 }
@@ -1019,46 +1016,43 @@ _tstring FileNameExtPathPassing(const _tstring& fullFilePath)
 //Function to passing FileName and FileExt to FileNameExt 
 bool FileNameExtPassing(const _tstring& fileNameExt, _tstring& fileName, _tstring& fileExt)
 {
-	size_t	nLen = 0;
-	size_t	nCount = 0;
-	size_t	nIndex = 0;
+	size_t	length = 0;
+	size_t	size = 0;
+	size_t	index = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
-	TCHAR* ptszDestLoc = nullptr;
 	
 	if( fileNameExt.c_str() == nullptr || fileNameExt.size() == 0 ) return false;
 
-	nLen = fileNameExt.size();
-	for( ptszSourceLoc = fileNameExt.c_str() + nLen - 1; nCount < nLen; ptszSourceLoc-- )
+	length = fileNameExt.size();
+	for( ptszSourceLoc = fileNameExt.c_str() + length - 1; size < length; ptszSourceLoc-- )
 	{
 		if( *ptszSourceLoc == _T('.') )
 		{
-			nCount++;
+			size++;
 			break;
 		}
-
-		nCount++;
+		size++;
 	}
 
-	if( nLen - nCount > FILENAME_STRLEN ) return false;
+	if( length - size > FILENAME_STRLEN ) return false;
 
-	fileName.resize(nLen - nCount + 1);
-	for( ptszSourceLoc = fileNameExt.c_str(), ptszDestLoc = const_cast<TCHAR*>(fileName.c_str()); *ptszSourceLoc; ptszSourceLoc++, ptszDestLoc++ )
+	fileName.resize(length - size + 1);
+	for( ptszSourceLoc = fileNameExt.c_str(); *ptszSourceLoc; ptszSourceLoc++ )
 	{
-		if( nIndex == nLen - nCount ) break;
+		if( index == length - size ) break;
 
-		*ptszDestLoc = *ptszSourceLoc;
-		nIndex++;
+		fileName[index++] = *ptszSourceLoc;
 	}
-	*ptszDestLoc = _T('\0');
+	fileName[index] = _T('\0');
 
-	if( nCount > FILEEXT_STRLEN ) return false;
+	if( size > FILEEXT_STRLEN ) return false;
 
-	fileExt.resize(nCount + 1);
-	ptszSourceLoc = fileNameExt.c_str() + nLen - nCount + 1;
-	ptszDestLoc = const_cast<TCHAR*>(fileExt.c_str());
+	fileExt.resize(size + 1);
+	ptszSourceLoc = fileNameExt.c_str() + length - size + 1;
 
-	while( *ptszDestLoc++ = *ptszSourceLoc++ );
+	index = 0;
+	while( fileExt[index++] = *ptszSourceLoc++ );
 
 	return true;
 }
@@ -1131,39 +1125,37 @@ bool ParseURL(const _tstring& fullUrl, _tstring& protocol, _tstring& hostName, _
 //
 _tstring HostNamePassing(const _tstring& fullUrl)
 {
-	size_t	nLen = 0;
-	size_t	nCount = 0;
-	size_t	nIndex = 0;
+	size_t	length = 0;
+	size_t	size = 0;
+	size_t	index = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
-	TCHAR* ptszDestLoc = nullptr;
 
 	if( fullUrl.c_str() == nullptr || fullUrl.size() == 0 ) return _T("");
-	nLen = fullUrl.size();
+	length = fullUrl.size();
 
 	if( (ptszSourceLoc = _tcsstr(fullUrl.c_str(), _T("://"))) != NULL )
-		nCount = nLen - _tcslen(ptszSourceLoc) + 3;
+		size = length - _tcslen(ptszSourceLoc) + 3;
 
-	for( ptszSourceLoc = fullUrl.c_str() + nCount; *ptszSourceLoc; ptszSourceLoc++ )
+	for( ptszSourceLoc = fullUrl.c_str() + size; *ptszSourceLoc; ptszSourceLoc++ )
 	{
 		if( !isalpha(*ptszSourceLoc) && !isdigit(*ptszSourceLoc) && *ptszSourceLoc != _T('-') && *ptszSourceLoc != _T('.') && *ptszSourceLoc != _T(':') )
 			break;
 
-		nCount++;
+		size++;
 	}
 
-	if( nCount > HTTP_PROTOCOL_STRLEN + HTTP_HOSTNAME_STRLEN ) return _T("");
+	if( size > HTTP_PROTOCOL_STRLEN + HTTP_HOSTNAME_STRLEN ) return _T("");
 
-	_tstring dest(nCount + 1, _T('\0'));
+	_tstring dest(size + 1, _T('\0'));
 
-	for( ptszSourceLoc = fullUrl.c_str(), ptszDestLoc = const_cast<TCHAR*>(dest.c_str()); *ptszSourceLoc; ptszSourceLoc++, ptszDestLoc++ )
+	for( ptszSourceLoc = fullUrl.c_str(); *ptszSourceLoc; ptszSourceLoc++ )
 	{
-		if( nIndex == nCount ) break;
+		if( index == size ) break;
 
-		*ptszDestLoc = *ptszSourceLoc;
-		nIndex++;
+		dest[index++] = *ptszSourceLoc;
 	}
-	*ptszDestLoc = _T('\0');
+	dest[index] = _T('\0');
 
 	return dest;
 }
@@ -1172,46 +1164,44 @@ _tstring HostNamePassing(const _tstring& fullUrl)
 // 
 _tstring UrlFullPathPassing(const _tstring& fullUrl)
 {
-	size_t	nLen = 0;
-	size_t	nFirst = 0;
-	size_t	nCount = 0;
-	size_t	nIndex = 0;
+	size_t	length = 0;
+	size_t	first = 0;
+	size_t	size = 0;
+	size_t	index = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
-	TCHAR* ptszDestLoc = nullptr;
 
 	if( fullUrl.c_str() == nullptr || fullUrl.size() == 0 ) return _T("");
-	nLen = fullUrl.size();
+	length = fullUrl.size();
 
 	if( (ptszSourceLoc = _tcsstr(fullUrl.c_str(), _T("://"))) != NULL )
-		nFirst = nLen - _tcslen(ptszSourceLoc) + 3;
+		first = length - _tcslen(ptszSourceLoc) + 3;
 
-	for( ptszSourceLoc = fullUrl.c_str() + nFirst; *ptszSourceLoc; ptszSourceLoc++ )
+	for( ptszSourceLoc = fullUrl.c_str() + first; *ptszSourceLoc; ptszSourceLoc++ )
 	{
 		if( !isalpha(*ptszSourceLoc) && !isdigit(*ptszSourceLoc) && *ptszSourceLoc != _T('-') && *ptszSourceLoc != _T('.') && *ptszSourceLoc != _T(':') )
 			break;
 
-		nFirst++;
+		first++;
 	}
 
-	for( ptszSourceLoc = fullUrl.c_str() + nLen; nCount < nLen; ptszSourceLoc-- )
+	for( ptszSourceLoc = fullUrl.c_str() + length; size < length; ptszSourceLoc-- )
 	{
 		if( *ptszSourceLoc == URL_QUERYSTRING_CHAR_TOKEN ) break;
-		nCount++;
+		size++;
 	}
 
-	if( nLen - nFirst - nCount > HTTP_URLPATH_STRLEN ) return _T("");
+	if( length - first - size > HTTP_URLPATH_STRLEN ) return _T("");
 
-	_tstring dest(nLen - nFirst - nCount + 1, _T('\0'));
+	_tstring dest(length - first - size + 1, _T('\0'));
 
-	for( ptszSourceLoc = fullUrl.c_str() + nFirst, ptszDestLoc = const_cast<TCHAR*>(dest.c_str()); *ptszSourceLoc; ptszSourceLoc++, ptszDestLoc++ )
+	for( ptszSourceLoc = fullUrl.c_str() + first; *ptszSourceLoc; ptszSourceLoc++ )
 	{
-		if( nIndex == nLen - nFirst - nCount ) break;
+		if( index == length - first - size ) break;
 
-		*ptszDestLoc = *ptszSourceLoc;
-		nIndex++;
+		dest[index++] = *ptszSourceLoc;
 	}
-	*ptszDestLoc = _T('\0');
+	dest[index] = _T('\0');
 
 	return dest;
 }
@@ -1220,29 +1210,27 @@ _tstring UrlFullPathPassing(const _tstring& fullUrl)
 //
 _tstring QueryStringPassing(const _tstring& fullUrl)
 {
-	size_t	nLen = 0;
-	size_t	nCount = 0;
+	size_t	length = 0;
+	size_t	size = 0;
+	size_t	index = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
-	TCHAR* ptszDestLoc = nullptr;
 
 	if( fullUrl.c_str() == nullptr || fullUrl.size() == 0 ) return _T("");
-	nLen = fullUrl.size();
+	length = fullUrl.size();
 
-	for( ptszSourceLoc = fullUrl.c_str() + nLen - 1; nCount < nLen; ptszSourceLoc-- )
+	for( ptszSourceLoc = fullUrl.c_str() + length - 1; size < length; ptszSourceLoc-- )
 	{
 		if( *ptszSourceLoc == URL_QUERYSTRING_CHAR_TOKEN ) break;
-		nCount++;
+		size++;
 	}
 
-	if( nCount > HTTP_QUERYSTRING_STRLEN ) return _T("");
+	if( size > HTTP_QUERYSTRING_STRLEN ) return _T("");
 
-	_tstring dest(nCount + 1, _T('\0'));
+	_tstring dest(size + 1, _T('\0'));
 
-	ptszSourceLoc = fullUrl.c_str() + nLen - nCount;
-	ptszDestLoc = const_cast<TCHAR*>(dest.c_str());
-
-	while( *ptszDestLoc++ = *ptszSourceLoc++ );
+	ptszSourceLoc = fullUrl.c_str() + length - size;
+	while( dest[index++] = *ptszSourceLoc++ );
 
 	return dest;
 }
@@ -1251,8 +1239,8 @@ _tstring QueryStringPassing(const _tstring& fullUrl)
 //
 size_t TokenCount(const _tstring& source, const _tstring& token)
 {
-	size_t	nLen = 0;
-	size_t	nCount = 0;
+	size_t	length = 0;
+	size_t	count = 0;
 	TCHAR*	ptszTokenize = nullptr;
 	TCHAR*	ptszSourceLoc = nullptr;
 	TCHAR*	ptszToken = nullptr;
@@ -1263,17 +1251,17 @@ size_t TokenCount(const _tstring& source, const _tstring& token)
 
 	if( !_tcsstr(const_cast<TCHAR*>(source.c_str()), const_cast<TCHAR*>(token.c_str())) ) return -1;
 
-	nLen = source.size();
-	ptszSourceLoc = new TCHAR[nLen + 1];
+	length = source.size();
+	ptszSourceLoc = new TCHAR[length + 1];
 
-	_tcsncpy_s(ptszSourceLoc, nLen + 1, const_cast<TCHAR*>(source.c_str()), _TRUNCATE);
+	_tcsncpy_s(ptszSourceLoc, length + 1, const_cast<TCHAR*>(source.c_str()), _TRUNCATE);
 	ptszToken = const_cast<TCHAR*>(token.c_str());
 
 	ptszTokenize = _tcstok_s(ptszSourceLoc, ptszToken, &ptszNextToken);
 	while( ptszTokenize )
 	{
 		ptszTokenize = _tcstok_s(nullptr, ptszToken, &ptszNextToken);
-		nCount++;
+		count++;
 	}
 
 	if( ptszSourceLoc )
@@ -1282,14 +1270,14 @@ size_t TokenCount(const _tstring& source, const _tstring& token)
 		ptszSourceLoc = nullptr;
 	}
 
-	return nCount;
+	return count;
 }
 
 //***************************************************************************
 //
 bool Tokenize(std::vector<_tstring>& dests, const _tstring& source, const _tstring& token)
 {
-	size_t	nLen = 0;
+	size_t	length = 0;
 	TCHAR*	ptszTokenize = nullptr;
 	TCHAR*	ptszSourceLoc = nullptr;
 	TCHAR*	ptszToken = nullptr;
@@ -1299,10 +1287,10 @@ bool Tokenize(std::vector<_tstring>& dests, const _tstring& source, const _tstri
 	if( token.c_str() == nullptr || token.size() == 0 ) return false;
 	if( !_tcsstr(const_cast<TCHAR*>(source.c_str()), const_cast<TCHAR*>(token.c_str())) ) return false;
 
-	nLen = source.size();
-	ptszSourceLoc = new TCHAR[nLen + 1];
+	length = source.size();
+	ptszSourceLoc = new TCHAR[length + 1];
 
-	_tcsncpy_s(ptszSourceLoc, nLen + 1, const_cast<TCHAR*>(source.c_str()), _TRUNCATE);
+	_tcsncpy_s(ptszSourceLoc, length + 1, const_cast<TCHAR*>(source.c_str()), _TRUNCATE);
 	ptszToken = const_cast<TCHAR*>(token.c_str());
 
 	ptszTokenize = _tcstok_s(ptszSourceLoc, ptszToken, &ptszNextToken);

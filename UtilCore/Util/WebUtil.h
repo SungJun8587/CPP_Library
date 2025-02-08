@@ -8,8 +8,8 @@
 #define	__WEBUTIL_H__
 
 #ifdef	__MEMBUFFER_H__
-bool Base64Enc(CMemBuffer<BYTE>& ByteDestination, const BYTE* pbSource, const int iLength);
-bool Base64Dec(CMemBuffer<BYTE>& ByteDestination, const BYTE* pbSource, const int iLength);
+bool Base64Enc(CMemBuffer<BYTE>& ByteDestination, const BYTE* pbSource, const size_t length);
+bool Base64Dec(CMemBuffer<BYTE>& ByteDestination, const BYTE* pbSource, const size_t length);
 bool Base64Enc(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource);
 bool Base64Dec(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource);
 

@@ -413,7 +413,10 @@ DWORD UnicodeToAnsi(CMemBuffer<char>& ansi, const wchar_t* unicode, const size_t
 }
 
 //***************************************************************************
-//
+// 와이드바이트 문자열을 UTF-8 문자열로 변환
+//	[out] CMemBuffer<char>& utf8 : UTF-8 문자열 버퍼
+//	[in] const wchar_t* unicode : 와이드바이트 문자열
+//	[in] const size_t unicode_size : 와이드바이트 문자열 문자수 : 문자 개수 + 1('\0')
 DWORD UnicodeToUtf8(CMemBuffer<char>& utf8, const wchar_t* unicode, const size_t unicode_size)
 {
 	DWORD error = 0;
@@ -461,7 +464,10 @@ DWORD UnicodeToUtf8(CMemBuffer<char>& utf8, const wchar_t* unicode, const size_t
 }
 
 //***************************************************************************
-//
+// UTF-8 문자열을 와이드바이트 문자열로 변환
+//	[out] CMemBuffer<wchar_t>& unicode : 와이드바이트 문자열 버퍼
+//	[in] const char* utf8 : UTF-8 문자열
+//	[in] const size_t utf8_size : UTF-8 바이트수
 DWORD Utf8ToUnicode(CMemBuffer<wchar_t>& unicode, const char* utf8, const size_t utf8_size)
 {
 	DWORD error = 0;
@@ -507,7 +513,10 @@ DWORD Utf8ToUnicode(CMemBuffer<wchar_t>& unicode, const char* utf8, const size_t
 }
 
 //***************************************************************************
-//
+// 멀티바이트 문자열을 UTF-8 문자열로 변환
+//	[out] CMemBuffer<char>& utf8 : UTF-8 문자열 버퍼
+//	[in] const char* ansi : 멀티바이트 문자열
+//	[in] const size_t ansi_size : 멀티바이트 문자열 바이트 수 : 바이트 수 + 1('\0') 
 DWORD AnsiToUtf8(CMemBuffer<char>& utf8, const char* ansi, const size_t ansi_size)
 {
 	DWORD error = 0;
@@ -600,7 +609,10 @@ bool TCharToByte(CMemBuffer<BYTE>& Destination, const TCHAR* ptszBuffer)
 
 #ifdef _STRING_
 //***************************************************************************
-//
+// 멀티바이트 문자열을 와이드바이트 문자열로 변환
+//	[out] std::wstring& unicode : 와이드바이트 문자열
+//	[in] const char* ansi : 멀티바이트 문자열
+//	[in] size_t ansi_size : 멀티바이트 문자열 바이트 수 : 바이트 수 + 1('\0') 
 DWORD AnsiToUnicode_String(std::wstring& unicode, const char* ansi, const size_t ansi_size)
 {
 	DWORD error = 0;
@@ -648,7 +660,10 @@ DWORD AnsiToUnicode_String(std::wstring& unicode, const char* ansi, const size_t
 }
 
 //***************************************************************************
-//
+// 와이드바이트 문자열을 멀티바이트 문자열로 변환
+//	[out] std::string& ansi : 멀티바이트 문자열
+//	[in] const wchar_t* unicode : 와이드바이트 문자열
+//	[in] const size_t unicode_size : 와이드바이트 문자열 문자수 : 문자 개수 + 1('\0')
 DWORD UnicodeToAnsi_String(std::string& ansi, const wchar_t* unicode, const size_t unicode_size)
 {
 	DWORD error = 0;
@@ -698,7 +713,10 @@ DWORD UnicodeToAnsi_String(std::string& ansi, const wchar_t* unicode, const size
 }
 
 //***************************************************************************
-//
+// 와이드바이트 문자열을 UTF8 문자열로 변환
+//	[out] std::string& utf8 : UTF8 문자열
+//	[in] const wchar_t* unicode : 와이드바이트 문자열
+//	[in] const size_t unicode_size : 와이드바이트 문자열 문자수 : 문자 개수 + 1('\0')
 DWORD UnicodeToUtf8_String(std::string& utf8, const wchar_t* unicode, const size_t unicode_size)
 {
 	DWORD error = 0;
@@ -748,7 +766,10 @@ DWORD UnicodeToUtf8_String(std::string& utf8, const wchar_t* unicode, const size
 }
 
 //***************************************************************************
-//
+// UTF8 문자열을 와이드바이트 문자열로 변환
+//	[out] std::wstring& unicode : 와이드바이트 문자열
+//	[in] const char* utf8 : UTF8 문자열
+//	[in] const size_t utf8_size : UTF8 문자열 바이트 수 : 바이트 수 + 1('\0') 
 DWORD Utf8ToUnicode_String(std::wstring& unicode, const char* utf8, const size_t utf8_size)
 {
 	DWORD error = 0;

@@ -21,22 +21,22 @@ using namespace std;
 //
 typedef struct _WINSOCK_ERRORCODE_INFO
 {
-	int nErrorCode;
-	TCHAR* ptszErrMsg;
+	int				nErrorCode;
+	const TCHAR*	ptszErrMsg;
 } WINSOCK_ERRORCODE_INFO, *PWINSOCK_ERRORCODE_INFO;
 
 BOOL	OpenSocketLib();
 BOOL	CloseSocketLib();
 
-BOOL	IPToAddr(const int nAf, LPCTSTR lpszHostAddress, void* Dest);
-BOOL	AddrToIP(const int nAf, const void* Src, LPTSTR lptszHostAddress, socklen_t nSize);
+BOOL	IPToAddr(const int nAf, const TCHAR* ptszHostAddress, void* Dest);
+BOOL	AddrToIP(const int nAf, const void* Src, TCHAR* ptszHostAddress, socklen_t nSize);
 
 void	IPv4ToIPv6(const struct in_addr IPv4, struct in_addr6& IPv6);
 
-BOOL	GetSockAddrIn(LPCTSTR lptszHostName, const int nPort, std::list<addrinfo> &SockAddrList);
+BOOL	GetSockAddrIn(const TCHAR* ptszHostName, const int nPort, std::list<addrinfo> &SockAddrList);
 
-TCHAR*	GetErrMsgToWinsockErrCodeEn(const int nErrorCode);
-TCHAR*	GetErrMsgToWinsockErrCodeKr(const int nErrorCode);
-void	ReportError(LPCTSTR lptszInOperationDesc, const int nErrorCode);
+const TCHAR*	GetErrMsgToWinsockErrCodeEn(const int nErrorCode);
+const TCHAR*	GetErrMsgToWinsockErrCodeKr(const int nErrorCode);
+void	ReportError(const TCHAR* ptszInOperationDesc, const int nErrorCode);
 
 #endif // ndef __SOCKETUTIL_H__

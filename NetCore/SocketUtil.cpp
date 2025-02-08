@@ -4,7 +4,7 @@
 //
 //***************************************************************************
 
-#include "stdafx.h"
+#include "pch.h"
 #include "SocketUtil.h"
 
 WINSOCK_ERRORCODE_INFO g_ErrTableEn[] =
@@ -170,7 +170,7 @@ BOOL CloseSocketLib()
 // Reference : 
 //
 // ******************************************************************************************
-BOOL IPToAddr(const int nAf, LPCTSTR lptszHostAddress, void* Dest)
+BOOL IPToAddr(const int nAf, const TCHAR* ptszHostAddress, void* Dest)
 {
 	int		nRet = -1;
 	int		nLen = 0;
@@ -182,7 +182,7 @@ BOOL IPToAddr(const int nAf, LPCTSTR lptszHostAddress, void* Dest)
 
 	ZeroMemory(&ss, sizeof(ss));
 
-	_tcscpy_s(tszHostAddress, _countof(tszHostAddress), lptszHostAddress);
+	_tcsncpy_s(tszHostAddress, _countof(tszHostAddress), ptszHostAddress, _TRUNCATE);
 
 	if( nRet = WSAStringToAddress(tszHostAddress, nAf, NULL, (struct sockaddr *)&ss, &nLen) == 0 )
 	{
@@ -220,7 +220,7 @@ BOOL IPToAddr(const int nAf, LPCTSTR lptszHostAddress, void* Dest)
 // Reference : 
 //
 // ******************************************************************************************
-BOOL AddrToIP(const int nAf, const void* Src, LPTSTR lptszHostAddress, socklen_t nSize)
+BOOL AddrToIP(const int nAf, const void* Src, TCHAR* ptszHostAddress, socklen_t nSize)
 {
 	int		nRet = -1;
 	struct sockaddr_storage ss;
@@ -242,7 +242,7 @@ BOOL AddrToIP(const int nAf, const void* Src, LPTSTR lptszHostAddress, socklen_t
 			return FALSE;
 	}
 
-	if( (nRet = WSAAddressToString((struct sockaddr *)&ss, sizeof(ss), NULL, lptszHostAddress, &ulSize)) != 0 )
+	if( (nRet = WSAAddressToString((struct sockaddr *)&ss, sizeof(ss), NULL, ptszHostAddress, &ulSize)) != 0 )
 		return FALSE;
 
 	return TRUE;
@@ -279,7 +279,7 @@ void IPv4ToIPv6(const struct in_addr IPv4, struct in_addr6& IPv6)
 // Reference : 
 //
 // ******************************************************************************************
-BOOL GetSockAddrIn(LPCTSTR lptszHostName, const int nPort, std::list<addrinfo>& SockAddrList)
+BOOL GetSockAddrIn(const TCHAR* ptszHostName, const int nPort, std::list<addrinfo>& SockAddrList)
 {
 	int		nError = -1;
 	int		nAddrLen = -1;
@@ -296,13 +296,13 @@ BOOL GetSockAddrIn(LPCTSTR lptszHostName, const int nPort, std::list<addrinfo>& 
 	Hints.ai_family = AF_UNSPEC;
 	Hints.ai_socktype = SOCK_STREAM;
 
-	if( lptszHostName )
+	if( ptszHostName )
 	{
 #ifdef _UNICODE
-		WideCharToMultiByte(CP_ACP, 0, lptszHostName, -1, szHostName, _countof(szHostName), NULL, NULL);
+		WideCharToMultiByte(CP_ACP, 0, ptszHostName, -1, szHostName, _countof(szHostName), NULL, NULL);
 		pszHostName = szHostName;
 #else
-		pszHostName = lptszHostName;
+		pszHostName = ptszHostName;
 #endif
 	}
 
@@ -337,7 +337,7 @@ BOOL GetSockAddrIn(LPCTSTR lptszHostName, const int nPort, std::list<addrinfo>& 
 // Reference : 
 //
 // ******************************************************************************************
-TCHAR* GetErrMsgToWinsockErrCodeEn(const int nErrorCode)
+const TCHAR* GetErrMsgToWinsockErrCodeEn(const int nErrorCode)
 {
 	for( int i = 0; i < 50; i++ )
 	{
@@ -357,7 +357,7 @@ TCHAR* GetErrMsgToWinsockErrCodeEn(const int nErrorCode)
 // Reference : 
 //
 // ******************************************************************************************
-TCHAR* GetErrMsgToWinsockErrCodeKr(const int nErrorCode)
+const TCHAR* GetErrMsgToWinsockErrCodeKr(const int nErrorCode)
 {
 	for( int i = 0; i < 50; i++ )
 	{
@@ -378,10 +378,10 @@ TCHAR* GetErrMsgToWinsockErrCodeKr(const int nErrorCode)
 // Reference : 
 //
 // ******************************************************************************************
-void ReportError(LPCTSTR lptszInOperationDesc, const int nErrorCode)
+void ReportError(const TCHAR* ptszInOperationDesc, const int nErrorCode)
 {
 	TCHAR  tszBuffer[MAX_BUFFER_SIZE];
-	TCHAR* ptszMsgBuffer = NULL;
+	const TCHAR* ptszMsgBuffer = NULL;
 
 #ifdef _DEBUG_KR
 	ptszMsgBuffer = GetErrMsgToWinsockErrCodeEn(nErrorCode);
@@ -399,7 +399,7 @@ void ReportError(LPCTSTR lptszInOperationDesc, const int nErrorCode)
 		0, NULL);
 #endif
 
-	_stprintf_s(tszBuffer, _countof(tszBuffer), _T("Error %s: %d- %s"), lptszInOperationDesc, nErrorCode, ptszMsgBuffer);
+	_stprintf_s(tszBuffer, _countof(tszBuffer), _T("Error %s: %d- %s"), ptszInOperationDesc, nErrorCode, ptszMsgBuffer);
 
 #ifdef _DEBUGLOG
 	g_SysLog.EventLog(tszBuffer);

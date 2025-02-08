@@ -48,25 +48,25 @@ static int g_pnDecodeMimeBase64[256] = {
 #ifdef	__MEMBUFFER_H__
 //***************************************************************************
 //
-bool Base64Enc(CMemBuffer<BYTE>& ByteDestination, const BYTE* pbSource, const int iLength)
+bool Base64Enc(CMemBuffer<BYTE>& ByteDestination, const BYTE* pbSource, const size_t length)
 {
 	int		c1, c2, c3;
 	int		e1, e2, e3, e4;
-	int		nSize = 0;
-	BYTE* pbSourceDoc = nullptr;
-	BYTE* pbDestDoc = nullptr;
+	size_t	size = 0;
+	BYTE*	pbSourceDoc = nullptr;
+	BYTE*	pbDestDoc = nullptr;
 
-	if( pbSource == nullptr || iLength == 0 ) return false;
+	if( pbSource == nullptr || length == 0 ) return false;
 
 	c1 = c2 = c3 = 0;
 	e1 = e2 = e3 = e4 = 0;
-	nSize = (4 * (iLength / 3)) + (iLength % 3 ? 4 : 0) + 1;
+	size = (4 * (length / 3)) + (length % 3 ? 4 : 0) + 1;
 
-	ByteDestination.Init(nSize);
+	ByteDestination.Init(size);
 
 	pbSourceDoc = (BYTE*)pbSource;
 	pbDestDoc = ByteDestination.GetBuffer();
-	for( int i = 0; i < iLength; i = i + 3 )
+	for( size_t i = 0; i < length; i = i + 3 )
 	{
 		c1 = pbSourceDoc[i];
 		c2 = pbSourceDoc[i + 1];
@@ -82,8 +82,8 @@ bool Base64Enc(CMemBuffer<BYTE>& ByteDestination, const BYTE* pbSource, const in
 		*(pbDestDoc + 2) = g_pcMimeBase64[e3];
 		*(pbDestDoc + 3) = g_pcMimeBase64[e4];
 
-		if( (i + 2) > iLength ) *(pbDestDoc + 2) = '=';
-		if( (i + 3) > iLength ) *(pbDestDoc + 3) = '=';
+		if( (i + 2) > length ) *(pbDestDoc + 2) = '=';
+		if( (i + 3) > length ) *(pbDestDoc + 3) = '=';
 
 		pbDestDoc = pbDestDoc + 4;
 	}
@@ -94,26 +94,26 @@ bool Base64Enc(CMemBuffer<BYTE>& ByteDestination, const BYTE* pbSource, const in
 
 //***************************************************************************
 //
-bool Base64Dec(CMemBuffer<BYTE>& ByteDestination, const BYTE* pbSource, const int iLength)
+bool Base64Dec(CMemBuffer<BYTE>& ByteDestination, const BYTE* pbSource, const size_t length)
 {
 	int		c1, c2, c3, c4;
 	int		e1, e2, e3, e4;
-	int		nSize = 0;
-	BYTE* pbSourceDoc = nullptr;
-	BYTE* pbDestDoc = nullptr;
+	size_t	size = 0;
+	BYTE*	pbSourceDoc = nullptr;
+	BYTE*	pbDestDoc = nullptr;
 
-	if( pbSource == nullptr || iLength == 0 ) return false;
+	if( pbSource == nullptr || length == 0 ) return false;
 
 	c1 = c2 = c3 = 0;
 	e1 = e2 = e3 = e4 = 0;
 
-	nSize = (iLength / 4) * 3 + (iLength % 4 ? 3 : 0) + 1;
+	size = (length / 4) * 3 + (length % 4 ? 3 : 0) + 1;
 
-	ByteDestination.Init(nSize);
+	ByteDestination.Init(size);
 
 	pbSourceDoc = (BYTE*)pbSource;
 	pbDestDoc = ByteDestination.GetBuffer();
-	for( int i = 0; i < iLength; i = i + 4 )
+	for( size_t i = 0; i < length; i = i + 4 )
 	{
 		c1 = pbSourceDoc[i];
 		c2 = pbSourceDoc[i + 1];
@@ -146,38 +146,36 @@ bool Base64Dec(CMemBuffer<BYTE>& ByteDestination, const BYTE* pbSource, const in
 //
 bool Base64Enc(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 {
-	int		nLength = 0;
-	int		nSize = 0;
+	size_t	length = 0;
+	size_t	size = 0;
 	int		c1, c2, c3;
 	int		e1, e2, e3, e4;
-	char* pszSourceData = nullptr;
-	char* pszSourceDoc = nullptr;
+	const char*	pszSourceDoc = nullptr;
 	TCHAR* ptszDestDoc = nullptr;
 
-	CMemBuffer<char>	SrcBuffer;
-
-	int iLength = static_cast<int>(_tcslen(ptszSource));
-	if( ptszSource == nullptr || iLength == 0 ) return false;
+	length = _tcslen(ptszSource);
+	if( ptszSource == nullptr || length == 0 ) return false;
 
 #ifdef _UNICODE
-	if( UnicodeToAnsi(SrcBuffer, ptszSource, wcslen(ptszSource) + 1) != 0 ) return false;
+	CMemBuffer<char>	SrcBuffer;
 
-	pszSourceData = SrcBuffer.GetBuffer();
-	nLength = (int)SrcBuffer.GetBufSize();
+	if( UnicodeToAnsi(SrcBuffer, ptszSource, length + 1) != 0 ) return false;
+
+	pszSourceDoc = SrcBuffer.GetBuffer();
+	length = SrcBuffer.GetBufLength();
 #else
-	pszSourceData = (char*)ptszSource;
-	nLength = (int)strlen(ptszSource);
+	pszSourceDoc = ptszSource;
+	length = length + 1;
 #endif
 
 	c1 = c2 = c3 = 0;
 	e1 = e2 = e3 = e4 = 0;
-	nSize = (4 * (nLength / 3)) + (nLength % 3 ? 4 : 0) + 1;
+	size = (4 * (length / 3)) + (length % 3 ? 4 : 0) + 1;
 
-	TDestination.Init(nSize);
+	TDestination.Init(size);
 
-	pszSourceDoc = pszSourceData;
 	ptszDestDoc = TDestination.GetBuffer();
-	for( int i = 0; i < nLength; i = i + 3 )
+	for( size_t i = 0; i < length; i = i + 3 )
 	{
 		c1 = pszSourceDoc[i];
 		c2 = pszSourceDoc[i + 1];
@@ -193,8 +191,8 @@ bool Base64Enc(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 		*(ptszDestDoc + 2) = g_pcMimeBase64[e3];
 		*(ptszDestDoc + 3) = g_pcMimeBase64[e4];
 
-		if( (i + 2) > nLength ) *(ptszDestDoc + 2) = '=';
-		if( (i + 3) > nLength ) *(ptszDestDoc + 3) = '=';
+		if( (i + 2) > length ) *(ptszDestDoc + 2) = '=';
+		if( (i + 3) > length ) *(ptszDestDoc + 3) = '=';
 
 		ptszDestDoc = ptszDestDoc + 4;
 	}
@@ -208,25 +206,26 @@ bool Base64Enc(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 bool Base64Dec(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 {
 	BOOL	bResult = false;
-	int		nSize = 0;
+	size_t	length = 0;
+	size_t	size = 0;
 	int		c1, c2, c3, c4;
 	int		e1, e2, e3, e4;
-	TCHAR* ptszSourceDoc = nullptr;
-	char* pszDestination = nullptr;
-	char* pszDestDoc = nullptr;
+	const TCHAR* ptszSourceDoc = nullptr;
+	char*	pszDestination = nullptr;
+	char*	pszDestDoc = nullptr;
 
-	int iLength = static_cast<int>(_tcslen(ptszSource));
-	if( ptszSource == nullptr || iLength == 0 ) return false;
+	length = _tcslen(ptszSource);
+	if( ptszSource == nullptr || length == 0 ) return false;
 
 	c1 = c2 = c3 = 0;
 	e1 = e2 = e3 = e4 = 0;
-	nSize = (iLength / 4) * 3 + 1;
+	size = (length / 4) * 3 + 1;
 
-	pszDestination = new char[nSize];
+	pszDestination = new char[size];
 
-	ptszSourceDoc = (TCHAR*)ptszSource;
+	ptszSourceDoc = ptszSource;
 	pszDestDoc = pszDestination;
-	for( int i = 0; i < iLength; i = i + 4 )
+	for( size_t i = 0; i < length; i = i + 4 )
 	{
 		c1 = ptszSourceDoc[i];
 		c2 = ptszSourceDoc[i + 1];
@@ -281,41 +280,40 @@ bool UrlEncode(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const i
 {
 	unsigned char cChar = '\0';
 
-	int		nCount = 0;
-	char* pszSourceData = nullptr;
-	char* pszSourceDoc = nullptr;
-	char* pszDestDoc = nullptr;
+	size_t	length = 0;
+	size_t	size = 0;
+	const char* pszSourceData = nullptr;
+	const char* pszSourceDoc = nullptr;
+	char*	pszDestDoc = nullptr;
 	char	szExcept[] = "";
 	//char	szExcept[] = "!'()*-._";	
 
+	length = _tcslen(ptszSource);
+	if( ptszSource == nullptr || length == 0 ) return false;
+
 	CMemBuffer<char>	SrcBuffer;
 
-	int iLength = static_cast<int>(_tcslen(ptszSource));
-	if( ptszSource == nullptr || iLength == 0 ) return false;
-
 #ifdef _UNICODE
-	CMemBuffer<char>	DestBuffer;
-
 	if( iCodePage == CP_ACP )
 	{
-		if( UnicodeToAnsi(SrcBuffer, ptszSource, iLength + 1) != 0 ) return false;
+		if( UnicodeToAnsi(SrcBuffer, ptszSource, length + 1) != 0 ) return false;
 
 		pszSourceData = SrcBuffer.GetBuffer();
 	}
 	else if( iCodePage == CP_UTF8 )
 	{
-		if( UnicodeToUtf8(SrcBuffer, ptszSource, iLength + 1) != 0 ) return false;
+		if( UnicodeToUtf8(SrcBuffer, ptszSource, length + 1) != 0 ) return false;
 
 		pszSourceData = SrcBuffer.GetBuffer();
 	}
 #else
 	if( iCodePage == CP_ACP )
 	{
-		pszSourceData = (char*)ptszSource;
+		pszSourceData = ptszSource;
 	}
 	else if( iCodePage == CP_UTF8 )
 	{
-		if( AnsiToUtf8(SrcBuffer, ptszSource, iLength + 1) != 0 ) return false;
+		if( AnsiToUtf8(SrcBuffer, ptszSource, length + 1) != 0 ) return false;
 
 		pszSourceData = SrcBuffer.GetBuffer();
 	}
@@ -328,25 +326,23 @@ bool UrlEncode(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const i
 		{
 			cChar = (unsigned char)*pszSourceDoc;
 			if( !((cChar > 47 && cChar < 57) || (cChar > 64 && cChar < 91) || (cChar > 96 && cChar < 123) || strchr(szExcept, cChar)) )
-				nCount += 2;
+				size += 2;
 
 			pszSourceDoc++;
-			nCount++;
+			size++;
 		}
 	}
 
 #ifdef _UNICODE
-	DestBuffer.Init(nCount + 1);
-
-	pszSourceDoc = pszSourceData;
+	CMemBuffer<char>	DestBuffer;
+	DestBuffer.Init(size + 1);
 	pszDestDoc = DestBuffer.GetBuffer();
 #else
-	TDestination.Init(nCount + 1);
-
-	pszSourceDoc = pszSourceData;
+	TDestination.Init(size + 1);
 	pszDestDoc = TDestination.GetBuffer();
 #endif
 
+	pszSourceDoc = pszSourceData;
 	if( nullptr != pszSourceDoc )
 	{
 		while( *pszSourceDoc )
@@ -366,6 +362,7 @@ bool UrlEncode(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const i
 		}
 		*pszDestDoc = '\0';
 	}
+
 #ifdef _UNICODE
 	if( AnsiToUnicode(TDestination, DestBuffer.GetBuffer(), DestBuffer.GetBufLength()) != 0 ) return false;
 #endif
@@ -378,31 +375,28 @@ bool UrlEncode(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const i
 bool UrlDecode(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource, const int iCodePage)
 {
 	BOOL	bResult = false;
-	int		nCount = 0;
+	size_t	size = 0;
 	int		nNum = 0;
 	int		nRetval = 0;
-	TCHAR* ptszSourceDoc = nullptr;
-	char* pszDestination = nullptr;
-	char* pszDestDoc = nullptr;
+	const TCHAR* ptszSourceDoc = nullptr;
+	char*	pszDestination = nullptr;
+	char*	pszDestDoc = nullptr;
 
-	CMemBuffer<char>	DestBuffer;
+	if( ptszSource == nullptr || _tcslen(ptszSource) == 0 ) return false;
 
-	int iLength = static_cast<int>(_tcslen(ptszSource));
-	if( ptszSource == nullptr || iLength == 0 ) return false;
-
-	ptszSourceDoc = (TCHAR*)ptszSource;
+	ptszSourceDoc = ptszSource;
 	while( *ptszSourceDoc )
 	{
 		if( *ptszSourceDoc == '%' )
 			ptszSourceDoc = ptszSourceDoc + 2;
 
 		ptszSourceDoc++;
-		nCount++;
+		size++;
 	}
 
-	pszDestination = new char[nCount + 1];
+	pszDestination = new char[size + 1];
 
-	ptszSourceDoc = (TCHAR*)ptszSource;
+	ptszSourceDoc = ptszSource;
 	pszDestDoc = pszDestination;
 	while( *ptszSourceDoc )
 	{
@@ -478,39 +472,38 @@ bool UrlPathEncode(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 {
 	BOOL	bResult = false;
 	unsigned char cChar = '\0';
-	int		nCount = 0;
-	char* pszSourceData = nullptr;
-	char* pszSourceDoc = nullptr;
-	char* pszDestination = nullptr;
-	char* pszDestDoc = nullptr;
+	size_t	length = 0;
+	size_t	size = 0;
+	const char*	pszSourceDoc = nullptr;
+	char*	pszDestination = nullptr;
+	char*	pszDestDoc = nullptr;
+
+	length = _tcslen(ptszSource);
+	if( ptszSource == nullptr || length == 0 ) return false;
 
 	CMemBuffer<char>	SrcBuffer;
 
-	int iLength = static_cast<int>(_tcslen(ptszSource));
-	if( ptszSource == nullptr || iLength == 0 ) return false;
-
 #ifdef _UNICODE
-	if( UnicodeToUtf8(SrcBuffer, ptszSource, wcslen(ptszSource) + 1) != 0 ) return false;
-	pszSourceData = SrcBuffer.GetBuffer();
+	if( UnicodeToUtf8(SrcBuffer, ptszSource, length + 1) != 0 ) return false;
+	pszSourceDoc = SrcBuffer.GetBuffer();
 #else
-	if( AnsiToUtf8(SrcBuffer, ptszSource, strlen(ptszSource) + 1) != 0 ) return false;
-	pszSourceData = SrcBuffer.GetBuffer();
+	if( AnsiToUtf8(SrcBuffer, ptszSource, length + 1) != 0 ) return false;
+	pszSourceDoc = SrcBuffer.GetBuffer();
 #endif
 
-	pszSourceDoc = pszSourceData;
 	while( *pszSourceDoc )
 	{
 		cChar = (unsigned char)*pszSourceDoc;
 		if( !((cChar > -1 && cChar < 32) || (cChar > 32 && cChar < 128)) )
-			nCount += 2;
+			size += 2;
 
 		pszSourceDoc++;
-		nCount++;
+		size++;
 	}
 
-	pszDestination = new char[nCount + 1];
+	pszDestination = new char[size + 1];
 
-	pszSourceDoc = pszSourceData;
+	pszSourceDoc = SrcBuffer.GetBuffer();
 	pszDestDoc = pszDestination;
 	while( *pszSourceDoc )
 	{
@@ -533,7 +526,6 @@ bool UrlPathEncode(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 	if( AnsiToUnicode(TDestination, pszDestination, strlen(pszDestination) + 1) != 0 ) bResult = false;
 #else
 	TDestination.Init(_tcslen(pszDestination) + 1);
-
 	strncpy_s(TDestination.GetBuffer(), TDestination.GetBufSize(), pszDestination, _TRUNCATE);
 #endif
 
@@ -551,30 +543,29 @@ bool UrlPathEncode(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 // EUC-KR, UTF-7, UTF-8, UTF-16에서 동일하게 작동
 bool HtmlEncode(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 {
-	int		nCount = 0;
-	TCHAR* ptszSourceDoc = nullptr;
-	TCHAR* ptszDestDoc = nullptr;
+	size_t	size = 0;
+	const TCHAR*	ptszSourceDoc = nullptr;
+	TCHAR*	ptszDestDoc = nullptr;
 
-	int iLength = static_cast<int>(_tcslen(ptszSource));
-	if( ptszSource == nullptr || iLength == 0 ) return false;
+	if( ptszSource == nullptr || _tcslen(ptszSource) == 0 ) return false;
 
-	ptszSourceDoc = (TCHAR*)ptszSource;
+	ptszSourceDoc = ptszSource;
 	while( *ptszSourceDoc )
 	{
 		if( *ptszSourceDoc == '<' || *ptszSourceDoc == '>' )
-			nCount = nCount + 3;
+			size = size + 3;
 		else if( *ptszSourceDoc == '&' )
-			nCount = nCount + 4;
+			size = size + 4;
 		else if( *ptszSourceDoc == '"' )
-			nCount = nCount + 5;
+			size = size + 5;
 
 		ptszSourceDoc++;
-		nCount++;
+		size++;
 	}
 
-	TDestination.Init(nCount + 1);
+	TDestination.Init(size + 1);
 
-	ptszSourceDoc = (TCHAR*)ptszSource;
+	ptszSourceDoc = ptszSource;
 	ptszDestDoc = TDestination.GetBuffer();
 	while( *ptszSourceDoc )
 	{
@@ -622,14 +613,13 @@ bool HtmlEncode(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 //
 bool HtmlDecode(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 {
-	int		nCount = 0;
-	TCHAR* ptszSourceDoc = nullptr;
-	TCHAR* ptszDestDoc = nullptr;
+	size_t	size = 0;
+	const TCHAR* ptszSourceDoc = nullptr;
+	TCHAR*	ptszDestDoc = nullptr;
 
-	int iLength = static_cast<int>(_tcslen(ptszSource));
-	if( ptszSource == nullptr || iLength == 0 ) return false;
+	if( ptszSource == nullptr || _tcslen(ptszSource) == 0 ) return false;
 
-	ptszSourceDoc = (TCHAR*)ptszSource;
+	ptszSourceDoc = ptszSource;
 	while( *ptszSourceDoc )
 	{
 		if( *ptszSourceDoc == '&' && *(ptszSourceDoc + 1) == 'l' && *(ptszSourceDoc + 2) == 't' && *(ptszSourceDoc + 3) == ';' )
@@ -642,12 +632,12 @@ bool HtmlDecode(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 			ptszSourceDoc = ptszSourceDoc + 5;
 
 		ptszSourceDoc++;
-		nCount++;
+		size++;
 	}
 
-	TDestination.Init(nCount + 1);
+	TDestination.Init(size + 1);
 
-	ptszSourceDoc = (TCHAR*)ptszSource;
+	ptszSourceDoc = ptszSource;
 	ptszDestDoc = TDestination.GetBuffer();
 	while( *ptszSourceDoc )
 	{
@@ -686,48 +676,49 @@ bool HtmlDecode(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 // EUC-KR, UTF-7, UTF-8, UTF-16에서 동일하게 작동
 bool Escape(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 {
-	int			nCount = 0;
+	size_t	length = 0;
+	size_t	size = 0;
 	wchar_t		wcChar = '\0';
-	wchar_t* pwszSource = nullptr;
-	wchar_t* pwszSourceDoc = nullptr;
-	TCHAR* ptszDestDoc = nullptr;
+	const wchar_t*	pwszSourceData = nullptr;
+	const wchar_t*	pwszSourceDoc = nullptr;
+	TCHAR*		ptszDestDoc = nullptr;
 	wchar_t		wszExcept[] = L"*@-_+./";
 
-	int iLength = static_cast<int>(_tcslen(ptszSource));
-	if( ptszSource == nullptr || iLength == 0 ) return false;
+	length = _tcslen(ptszSource);
+	if( ptszSource == nullptr || length == 0 ) return false;
 
 #ifdef _UNICODE
-	pwszSource = (TCHAR*)ptszSource;
+	pwszSourceData = ptszSource;
 #else
 	CMemBuffer<wchar_t>	WSrcBuffer;
 
-	if( AnsiToUnicode(WSrcBuffer, ptszSource, strlen(ptszSource) + 1) != 0 ) return false;
+	if( AnsiToUnicode(WSrcBuffer, ptszSource, length + 1) != 0 ) return false;
 
-	pwszSource = WSrcBuffer.GetBuffer();
+	pwszSourceData = WSrcBuffer.GetBuffer();
 #endif
 
-	pwszSourceDoc = pwszSource;
+	pwszSourceDoc = pwszSourceData;
 	while( *pwszSourceDoc )
 	{
 		wcChar = *pwszSourceDoc;
 		if( wcChar > 0x7f )
-			nCount = nCount + 6;
+			size = size + 6;
 		else if( !((wcChar > 47 && wcChar < 57) || (wcChar > 64 && wcChar < 91) || (wcChar > 96 && wcChar < 123) || wcschr(wszExcept, wcChar)) )
 		{
 			if( wcChar <= 0xf )
-				nCount++;
+				size++;
 
-			nCount = nCount + 3;
+			size = size + 3;
 		}
 		else
-			nCount++;
+			size++;
 
 		pwszSourceDoc++;
 	}
 
-	TDestination.Init(nCount + 1);
+	TDestination.Init(size + 1);
 
-	pwszSourceDoc = pwszSource;
+	pwszSourceDoc = pwszSourceData;
 	ptszDestDoc = TDestination.GetBuffer();
 	while( *pwszSourceDoc )
 	{
@@ -763,16 +754,15 @@ bool Escape(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 //
 bool UnEscape(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 {
-	int			nCount = 0;
-	int			nNum = 0;
-	int			nRetval = 0;
-	TCHAR* ptszSourceDoc = nullptr;
+	size_t	size = 0;
+	int		nNum = 0;
+	int		nRetval = 0;
+	const TCHAR*	ptszSourceDoc = nullptr;
 	wchar_t* pwszDestDoc = nullptr;
 
-	int iLength = static_cast<int>(_tcslen(ptszSource));
-	if( ptszSource == nullptr || iLength == 0 ) return false;
+	if( ptszSource == nullptr || _tcslen(ptszSource) == 0 ) return false;
 
-	ptszSourceDoc = (TCHAR*)ptszSource;
+	ptszSourceDoc = ptszSource;
 	while( *ptszSourceDoc )
 	{
 		if( *ptszSourceDoc == '%' )
@@ -783,23 +773,19 @@ bool UnEscape(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 		}
 
 		ptszSourceDoc++;
-		nCount++;
+		size++;
 	}
 
-	ptszSourceDoc = (TCHAR*)ptszSource;
-
 #ifdef _UNICODE
-	TDestination.Init(nCount + 1);
-
+	TDestination.Init(size + 1);
 	pwszDestDoc = TDestination.GetBuffer();
 #else
 	CMemBuffer<wchar_t>	WDestBuffer;
-
-	WDestBuffer.Init(nCount + 1);
-
+	WDestBuffer.Init(size + 1);
 	pwszDestDoc = WDestBuffer.GetBuffer();
 #endif
 
+	ptszSourceDoc = ptszSource;
 	while( *ptszSourceDoc )
 	{
 		if( *ptszSourceDoc == '%' )
@@ -876,53 +862,44 @@ bool UnEscape(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 bool EncodeURI(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 {
 	unsigned char cChar = '\0';
-
-	int		nCount = 0;
-	char* pszSourceData = nullptr;
-	char* pszSourceDoc = nullptr;
-	char* pszDestDoc = nullptr;
+	size_t	length = 0;
+	size_t	size = 0;
+	const char* pszSourceDoc = nullptr;
+	char*	pszDestDoc = nullptr;
 	char	szExcept[] = ",/?:@&=+$#";
+
+	length = _tcslen(ptszSource);
+	if( ptszSource == nullptr || length == 0 ) return false;
 
 	CMemBuffer<char>	SrcBuffer;
 
-	int iLength = static_cast<int>(_tcslen(ptszSource));
-	if( ptszSource == nullptr || iLength == 0 ) return false;
-
 #ifdef _UNICODE
-	if( UnicodeToUtf8(SrcBuffer, ptszSource, iLength + 1) != 0 ) return false;
-
-	pszSourceData = SrcBuffer.GetBuffer();
+	if( UnicodeToUtf8(SrcBuffer, ptszSource, length + 1) != 0 ) return false;
 #else
-	if( AnsiToUtf8(SrcBuffer, ptszSource, iLength + 1) != 0 ) return false;
-
-	pszSourceData = SrcBuffer.GetBuffer();
+	if( AnsiToUtf8(SrcBuffer, ptszSource, length + 1) != 0 ) return false;
 #endif
 
-	pszSourceDoc = pszSourceData;
+	pszSourceDoc = SrcBuffer.GetBuffer();
 	while( *pszSourceDoc )
 	{
 		cChar = (unsigned char)*pszSourceDoc;
 		if( !((cChar > 47 && cChar < 57) || (cChar > 64 && cChar < 91) || (cChar > 96 && cChar < 123) || strchr(szExcept, cChar)) )
-			nCount += 2;
+			size += 2;
 
 		pszSourceDoc++;
-		nCount++;
+		size++;
 	}
 
 #ifdef _UNICODE
 	CMemBuffer<char>	DestBuffer;
-
-	DestBuffer.Init(nCount + 1);
-
-	pszSourceDoc = pszSourceData;
+	DestBuffer.Init(size + 1);
 	pszDestDoc = DestBuffer.GetBuffer();
 #else
-	TDestination.Init(nCount + 1);
-
-	pszSourceDoc = pszSourceData;
+	TDestination.Init(size + 1);
 	pszDestDoc = TDestination.GetBuffer();
 #endif
 
+	pszSourceDoc = SrcBuffer.GetBuffer();
 	while( *pszSourceDoc )
 	{
 		cChar = (unsigned char)*pszSourceDoc;
@@ -952,29 +929,28 @@ bool EncodeURI(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 bool DecodeURI(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 {
 	BOOL	bResult = false;
-	int		nCount = 0;
+	size_t	size = 0;
 	int		nNum = 0;
 	int		nRetval = 0;
-	TCHAR* ptszSourceDoc = nullptr;
-	char* pszDestination = nullptr;
-	char* pszDestDoc = nullptr;
+	const TCHAR* ptszSourceDoc = nullptr;
+	char*	pszDestination = nullptr;
+	char*	pszDestDoc = nullptr;
 
-	int iLength = static_cast<int>(_tcslen(ptszSource));
-	if( ptszSource == nullptr || iLength == 0 ) return false;
+	if( ptszSource == nullptr || _tcslen(ptszSource) == 0 ) return false;
 
-	ptszSourceDoc = (TCHAR*)ptszSource;
+	ptszSourceDoc = ptszSource;
 	while( *ptszSourceDoc )
 	{
 		if( *ptszSourceDoc == '%' )
 			ptszSourceDoc = ptszSourceDoc + 2;
 
 		ptszSourceDoc++;
-		nCount++;
+		size++;
 	}
 
-	pszDestination = new char[nCount + 1];
+	pszDestination = new char[size + 1];
 
-	ptszSourceDoc = (TCHAR*)ptszSource;
+	ptszSourceDoc = ptszSource;
 	pszDestDoc = pszDestination;
 	while( *ptszSourceDoc )
 	{
@@ -1034,51 +1010,43 @@ bool EncodeURIComponent(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource
 {
 	unsigned char cChar = '\0';
 
-	int		nCount = 0;
-	char* pszSourceData = nullptr;
-	char* pszSourceDoc = nullptr;
-	char* pszDestDoc = nullptr;
+	size_t	length = 0;
+	size_t	size = 0;
+	const char*	pszSourceDoc = nullptr;
+	char*	pszDestDoc = nullptr;
+
+	length = _tcslen(ptszSource);
+	if( ptszSource == nullptr || length == 0 ) return false;
 
 	CMemBuffer<char>	SrcBuffer;
 
-	int iLength = static_cast<int>(_tcslen(ptszSource));
-	if( ptszSource == nullptr || iLength == 0 ) return false;
-
 #ifdef _UNICODE
-	if( UnicodeToUtf8(SrcBuffer, ptszSource, iLength + 1) != 0 ) return false;
-
-	pszSourceData = SrcBuffer.GetBuffer();
+	if( UnicodeToUtf8(SrcBuffer, ptszSource, length + 1) != 0 ) return false;
 #else
-	if( AnsiToUtf8(SrcBuffer, ptszSource, iLength + 1) != 0 ) return false;
-
-	pszSourceData = SrcBuffer.GetBuffer();
+	if( AnsiToUtf8(SrcBuffer, ptszSource, length + 1) != 0 ) return false;
 #endif
 
-	pszSourceDoc = pszSourceData;
+	pszSourceDoc = SrcBuffer.GetBuffer();
 	while( *pszSourceDoc )
 	{
 		cChar = (unsigned char)*pszSourceDoc;
 		if( !((cChar > 47 && cChar < 57) || (cChar > 64 && cChar < 91) || (cChar > 96 && cChar < 123)) )
-			nCount += 2;
+			size += 2;
 
 		pszSourceDoc++;
-		nCount++;
+		size++;
 	}
 
 #ifdef _UNICODE
 	CMemBuffer<char>	DestBuffer;
-
-	DestBuffer.Init(nCount + 1);
-
-	pszSourceDoc = pszSourceData;
+	DestBuffer.Init(size + 1);
 	pszDestDoc = DestBuffer.GetBuffer();
 #else
-	TDestination.Init(nCount + 1);
-
-	pszSourceDoc = pszSourceData;
+	TDestination.Init(size + 1);
 	pszDestDoc = TDestination.GetBuffer();
 #endif
 
+	pszSourceDoc = SrcBuffer.GetBuffer();
 	while( *pszSourceDoc )
 	{
 		cChar = (unsigned char)*pszSourceDoc;
@@ -1108,29 +1076,28 @@ bool EncodeURIComponent(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource
 bool DecodeURIComponent(CMemBuffer<TCHAR>& TDestination, const TCHAR* ptszSource)
 {
 	BOOL	bResult = false;
-	int		nCount = 0;
+	size_t	size = 0;
 	int		nNum = 0;
 	int		nRetval = 0;
-	TCHAR* ptszSourceDoc = nullptr;
+	const TCHAR* ptszSourceDoc = nullptr;
 	char* pszDestination = nullptr;
 	char* pszDestDoc = nullptr;
 
-	int iLength = static_cast<int>(_tcslen(ptszSource));
-	if( ptszSource == nullptr || iLength == 0 ) return false;
+	if( ptszSource == nullptr || _tcslen(ptszSource) == 0 ) return false;
 
-	ptszSourceDoc = (TCHAR*)ptszSource;
+	ptszSourceDoc = ptszSource;
 	while( *ptszSourceDoc )
 	{
 		if( *ptszSourceDoc == '%' )
 			ptszSourceDoc = ptszSourceDoc + 2;
 
 		ptszSourceDoc++;
-		nCount++;
+		size++;
 	}
 
-	pszDestination = new char[nCount + 1];
+	pszDestination = new char[size + 1];
 
-	ptszSourceDoc = (TCHAR*)ptszSource;
+	ptszSourceDoc = ptszSource;
 	pszDestDoc = pszDestination;
 	while( *ptszSourceDoc )
 	{
@@ -1192,30 +1159,27 @@ _tstring Base64Enc(const _tstring& source)
 	size_t	size = 0;
 	int		c1, c2, c3;
 	int		e1, e2, e3, e4;
-	char* pszSourceData = nullptr;
-	char* pszSourceDoc = nullptr;
-	TCHAR* ptszDestDoc = nullptr;
+	const char*	pszSourceDoc = nullptr;
 
 	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
 
 #ifdef _UNICODE
-	string sourceData = Iconv::CIconvUtil::ConvertEncoding(source, "WCHAR_T", "CP949");
-	pszSourceData = const_cast<char*>(sourceData.c_str());
-	length = sourceData.size();
+	std::string sourceData = Iconv::CIconvUtil::ConvertEncoding(source, "WCHAR_T", "CP949");
+	pszSourceDoc = sourceData.c_str();
+	length = sourceData.size() + 1;
 #else
-	pszSourceData = const_cast<char*>(source.c_str());
-	length = source.size();
+	pszSourceDoc = source.c_str();
+	length = source.size() + 1;
 #endif
 
 	c1 = c2 = c3 = 0;
 	e1 = e2 = e3 = e4 = 0;
 	size = (4 * (length / 3)) + (length % 3 ? 4 : 0);
 
-	_tstring dest(size, _T('\0'));
+	int destIndex = 0;
+	_tstring dest(size, '\0');
 
-	pszSourceDoc = pszSourceData;
-	ptszDestDoc = const_cast<TCHAR*>(dest.c_str());
-	for( int i = 0; i < length; i = i + 3 )
+	for( size_t i = 0; i < length; i = i + 3 )
 	{
 		c1 = pszSourceDoc[i];
 		c2 = pszSourceDoc[i + 1];
@@ -1226,17 +1190,17 @@ _tstring Base64Enc(const _tstring& source)
 		e3 = ((c2 & 0x0F) << 2) | ((c3 & 0xC0) >> 6);
 		e4 = c3 & 0x3F;
 
-		*ptszDestDoc = g_pcMimeBase64[e1];
-		*(ptszDestDoc + 1) = g_pcMimeBase64[e2];
-		*(ptszDestDoc + 2) = g_pcMimeBase64[e3];
-		*(ptszDestDoc + 3) = g_pcMimeBase64[e4];
+		dest[destIndex] = g_pcMimeBase64[e1];
+		dest[destIndex + 1] = g_pcMimeBase64[e2];
+		dest[destIndex + 2] = g_pcMimeBase64[e3];
+		dest[destIndex + 3] = g_pcMimeBase64[e4];
 
-		if( (i + 2) > length ) *(ptszDestDoc + 2) = '=';
-		if( (i + 3) > length ) *(ptszDestDoc + 3) = '=';
-
-		ptszDestDoc = ptszDestDoc + 4;
+		if( (i + 2) > length ) dest[destIndex + 2] = '=';
+		if( (i + 3) > length ) dest[destIndex + 3] = '=';
+		
+		destIndex = destIndex + 4;
 	}
-	*ptszDestDoc = '\0';
+	dest[destIndex] = '\0';
 
 	return dest;
 }
@@ -1249,13 +1213,11 @@ _tstring Base64Dec(const _tstring& source)
 	size_t	size = 0;
 	int		c1, c2, c3, c4;
 	int		e1, e2, e3, e4;
-	TCHAR* ptszSourceDoc = nullptr;
-	char* pszDestination = nullptr;
-	char* pszDestDoc = nullptr;
+	const TCHAR*	ptszSourceDoc = nullptr;
+	char*	pszDestination = nullptr;
+	char*	pszDestDoc = nullptr;
 
-	_tstring dest;
-
-	if( source.c_str() == nullptr || source.size() == 0 ) return dest;
+	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
 
 	length = source.size();
 	c1 = c2 = c3 = 0;
@@ -1264,9 +1226,9 @@ _tstring Base64Dec(const _tstring& source)
 
 	pszDestination = new char[size];
 
-	ptszSourceDoc = const_cast<TCHAR*>(source.c_str());
+	ptszSourceDoc = source.c_str();
 	pszDestDoc = pszDestination;
-	for( int i = 0; i < length; i = i + 4 )
+	for( size_t i = 0; i < length; i = i + 4 )
 	{
 		c1 = ptszSourceDoc[i];
 		c2 = ptszSourceDoc[i + 1];
@@ -1291,6 +1253,8 @@ _tstring Base64Dec(const _tstring& source)
 		pszDestDoc = pszDestDoc + 3;
 	}
 	*pszDestDoc = '\0';
+
+	_tstring dest;
 
 #ifdef _UNICODE
 	dest = Iconv::CIconvUtil::ConvertEncodingW(pszDestination, "CP949", "WCHAR_T");
@@ -1319,11 +1283,10 @@ _tstring UrlEncode(const _tstring& source, const int iCodePage)
 	unsigned char cChar = '\0';
 
 	size_t	size = 0;
-	char* pszSourceData = nullptr;
-	char* pszSourceDoc = nullptr;
-	char* pszDestDoc = nullptr;
-	char	szExcept[] = "";
-	//char	szExcept[] = "!'()*-._";	
+	const char* pszSourceData = nullptr;
+	const char* pszSourceDoc = nullptr;
+	char		szExcept[] = "";
+	//char		szExcept[] = "!'()*-._";	
 
 	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
 
@@ -1333,22 +1296,22 @@ _tstring UrlEncode(const _tstring& source, const int iCodePage)
 	if( iCodePage == CP_ACP )
 	{
 		sourceData = Iconv::CIconvUtil::ConvertEncoding(source, "WCHAR_T", "CP949");
-		pszSourceData = const_cast<char*>(sourceData.c_str());
+		pszSourceData = sourceData.c_str();
 	}
 	else if( iCodePage == CP_UTF8 )
 	{
 		sourceData = Iconv::CIconvUtil::ConvertEncoding(source, "WCHAR_T", "UTF-8");
-		pszSourceData = const_cast<char*>(sourceData.c_str());
+		pszSourceData = sourceData.c_str();
 	}
 #else
 	if( iCodePage == CP_ACP )
 	{
-		pszSourceData = const_cast<char*>(source.c_str());
+		pszSourceData = source.c_str();
 	}
 	else if( iCodePage == CP_UTF8 )
 	{
 		sourceData = Iconv::CIconvUtil::ConvertEncoding(source, "CP949", "UTF-8");
-		pszSourceData = const_cast<char*>(sourceData.c_str());
+		pszSourceData = sourceData.c_str();
 	}
 #endif
 
@@ -1366,39 +1329,34 @@ _tstring UrlEncode(const _tstring& source, const int iCodePage)
 		}
 	}
 
-#ifdef _UNICODE
-	string destData(size + 1, _T('\0'));
+	int destIndex = 0;
+	std::string destData(size + 1, '\0');
 
 	pszSourceDoc = pszSourceData;
-	pszDestDoc = const_cast<char*>(destData.c_str());
-#else
-	_tstring dest(size + 1, _T('\0'));
-
-	pszSourceDoc = pszSourceData;
-	pszDestDoc = const_cast<char*>(dest.c_str());
-#endif
-
 	if( nullptr != pszSourceDoc )
 	{
 		while( *pszSourceDoc )
 		{
 			cChar = (unsigned char)*pszSourceDoc;
 			if( (cChar > 47 && cChar < 57) || (cChar > 64 && cChar < 91) || (cChar > 96 && cChar < 123) || strchr(szExcept, cChar) )
-				*pszDestDoc++ = cChar;
+				destData[destIndex++] = cChar;
 			else if( cChar == ' ' )
-				*pszDestDoc++ = '+';
+				destData[destIndex++] = '+';
 			else
 			{
-				*pszDestDoc++ = '%';
-				*pszDestDoc++ = g_pcDigits[(cChar >> 4) & 0x0F];
-				*pszDestDoc++ = g_pcDigits[cChar & 0x0F];
+				destData[destIndex++] = '%';
+				destData[destIndex++] = g_pcDigits[(cChar >> 4) & 0x0F];
+				destData[destIndex++] = g_pcDigits[cChar & 0x0F];
 			}
 			pszSourceDoc++;
 		}
-		*pszDestDoc = '\0';
+		destData[destIndex] = '\0';
 	}
+
 #ifdef _UNICODE
 	_tstring dest = Iconv::CIconvUtil::ConvertEncodingW(destData, "CP949", "WCHAR_T");
+#else
+	_tstring dest = destData;
 #endif
 
 	return dest;
@@ -1411,15 +1369,13 @@ _tstring UrlDecode(const _tstring& source, const int iCodePage)
 	size_t	size = 0;
 	int		nNum = 0;
 	int		nRetval = 0;
-	TCHAR* ptszSourceDoc = nullptr;
-	char* pszDestination = nullptr;
-	char* pszDestDoc = nullptr;
+	const TCHAR* ptszSourceDoc = nullptr;
+	char*	pszDestination = nullptr;
+	char*	pszDestDoc = nullptr;
 
-	_tstring dest;
+	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
 
-	if( source.c_str() == nullptr || source.size() == 0 ) return dest;
-
-	ptszSourceDoc = const_cast<TCHAR*>(source.c_str());
+	ptszSourceDoc = source.c_str();
 	while( *ptszSourceDoc )
 	{
 		if( *ptszSourceDoc == '%' )
@@ -1431,7 +1387,7 @@ _tstring UrlDecode(const _tstring& source, const int iCodePage)
 
 	pszDestination = new char[size + 1];
 
-	ptszSourceDoc = const_cast<TCHAR*>(source.c_str());
+	ptszSourceDoc = source.c_str();
 	pszDestDoc = pszDestination;
 	while( *ptszSourceDoc )
 	{
@@ -1465,6 +1421,8 @@ _tstring UrlDecode(const _tstring& source, const int iCodePage)
 		ptszSourceDoc++;
 	}
 	*pszDestDoc = '\0';
+
+	_tstring dest;
 
 #ifdef _UNICODE
 	if( iCodePage == CP_ACP )
@@ -1504,26 +1462,21 @@ _tstring UrlPathEncode(const _tstring& source)
 {
 	unsigned char cChar = '\0';
 	size_t	size = 0;
-	char* pszSourceData = nullptr;
-	char* pszSourceDoc = nullptr;
-	char* pszDestination = nullptr;
-	char* pszDestDoc = nullptr;
+	const char* pszSourceDoc = nullptr;
+	char*	pszDestination = nullptr;
+	char*	pszDestDoc = nullptr;
 
-	_tstring dest;
-
-	if( source.c_str() == nullptr || source.size() == 0 ) return dest;
+	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
 
 	std::string	sourceData;
 
 #ifdef _UNICODE
 	sourceData = Iconv::CIconvUtil::ConvertEncoding(source, "WCHAR_T", "UTF-8");
-	pszSourceData = const_cast<char*>(sourceData.c_str());
 #else
 	sourceData = Iconv::CIconvUtil::ConvertEncoding(source, "CP949", "UTF-8");
-	pszSourceData = const_cast<char*>(sourceData.c_str());
 #endif
 
-	pszSourceDoc = pszSourceData;
+	pszSourceDoc = sourceData.c_str();
 	while( *pszSourceDoc )
 	{
 		cChar = (unsigned char)*pszSourceDoc;
@@ -1536,7 +1489,7 @@ _tstring UrlPathEncode(const _tstring& source)
 
 	pszDestination = new char[size + 1];
 
-	pszSourceDoc = pszSourceData;
+	pszSourceDoc = sourceData.c_str();
 	pszDestDoc = pszDestination;
 	while( *pszSourceDoc )
 	{
@@ -1552,6 +1505,8 @@ _tstring UrlPathEncode(const _tstring& source)
 		pszSourceDoc++;
 	}
 	*pszDestDoc = '\0';
+
+	_tstring dest;
 
 #ifdef _UNICODE
 	dest = Iconv::CIconvUtil::ConvertEncodingW(pszDestination, "CP949", "WCHAR_T");
@@ -1574,12 +1529,11 @@ _tstring UrlPathEncode(const _tstring& source)
 _tstring HtmlEncode(const _tstring& source)
 {
 	size_t	size = 0;
-	TCHAR* ptszSourceDoc = nullptr;
-	TCHAR* ptszDestDoc = nullptr;
+	const TCHAR* ptszSourceDoc = nullptr;
 
 	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
 
-	ptszSourceDoc = const_cast<TCHAR*>(source.c_str());
+	ptszSourceDoc = source.c_str();
 	while( *ptszSourceDoc )
 	{
 		if( *ptszSourceDoc == '<' || *ptszSourceDoc == '>' )
@@ -1593,48 +1547,48 @@ _tstring HtmlEncode(const _tstring& source)
 		size++;
 	}
 
-	_tstring dest(size + 1, _T('\0'));
+	int destIndex = 0;
+	_tstring dest(size + 1, '\0');
 
-	ptszSourceDoc = const_cast<TCHAR*>(source.c_str());
-	ptszDestDoc = const_cast<TCHAR*>(dest.c_str());
+	ptszSourceDoc = source.c_str();
 	while( *ptszSourceDoc )
 	{
 		if( *ptszSourceDoc == '<' )
 		{
-			*ptszDestDoc++ = '&';
-			*ptszDestDoc++ = 'l';
-			*ptszDestDoc++ = 't';
-			*ptszDestDoc++ = ';';
+			dest[destIndex++] = '&';
+			dest[destIndex++] = 'l';
+			dest[destIndex++] = 't';
+			dest[destIndex++] = ';';
 		}
 		else if( *ptszSourceDoc == '>' )
 		{
-			*ptszDestDoc++ = '&';
-			*ptszDestDoc++ = 'g';
-			*ptszDestDoc++ = 't';
-			*ptszDestDoc++ = ';';
+			dest[destIndex++] = '&';
+			dest[destIndex++] = 'g';
+			dest[destIndex++] = 't';
+			dest[destIndex++] = ';';
 		}
 		else if( *ptszSourceDoc == '&' )
 		{
-			*ptszDestDoc++ = '&';
-			*ptszDestDoc++ = 'a';
-			*ptszDestDoc++ = 'm';
-			*ptszDestDoc++ = 'p';
-			*ptszDestDoc++ = ';';
+			dest[destIndex++] = '&';
+			dest[destIndex++] = 'a';
+			dest[destIndex++] = 'm';
+			dest[destIndex++] = 'p';
+			dest[destIndex++] = ';';
 		}
 		else if( *ptszSourceDoc == '"' )
 		{
-			*ptszDestDoc++ = '&';
-			*ptszDestDoc++ = 'q';
-			*ptszDestDoc++ = 'u';
-			*ptszDestDoc++ = 'o';
-			*ptszDestDoc++ = 't';
-			*ptszDestDoc++ = ';';
+			dest[destIndex++] = '&';
+			dest[destIndex++] = 'q';
+			dest[destIndex++] = 'u';
+			dest[destIndex++] = 'o';
+			dest[destIndex++] = 't';
+			dest[destIndex++] = ';';
 		}
-		else *ptszDestDoc++ = *ptszSourceDoc;
+		else dest[destIndex++] = *ptszSourceDoc;
 
 		ptszSourceDoc++;
 	}
-	*ptszDestDoc = '\0';
+	dest[destIndex] = '\0';
 
 	return dest;
 }
@@ -1644,12 +1598,11 @@ _tstring HtmlEncode(const _tstring& source)
 _tstring HtmlDecode(const _tstring& source)
 {
 	size_t	size = 0;
-	TCHAR* ptszSourceDoc = nullptr;
-	TCHAR* ptszDestDoc = nullptr;
+	const TCHAR* ptszSourceDoc = nullptr;
 
 	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
 
-	ptszSourceDoc = const_cast<TCHAR*>(source.c_str());
+	ptszSourceDoc = source.c_str();
 	while( *ptszSourceDoc )
 	{
 		if( *ptszSourceDoc == '&' && *(ptszSourceDoc + 1) == 'l' && *(ptszSourceDoc + 2) == 't' && *(ptszSourceDoc + 3) == ';' )
@@ -1665,37 +1618,37 @@ _tstring HtmlDecode(const _tstring& source)
 		size++;
 	}
 
-	_tstring dest(size + 1, _T('\0'));
+	int destIndex = 0;
+	_tstring dest(size + 1, '\0');
 
-	ptszSourceDoc = const_cast<TCHAR*>(source.c_str());
-	ptszDestDoc = const_cast<TCHAR*>(dest.c_str());
+	ptszSourceDoc = source.c_str();
 	while( *ptszSourceDoc )
 	{
 		if( *ptszSourceDoc == '&' && *(ptszSourceDoc + 1) == 'l' && *(ptszSourceDoc + 2) == 't' && *(ptszSourceDoc + 3) == ';' )
 		{
-			*ptszDestDoc++ = '<';
+			dest[destIndex++] = '<';
 			ptszSourceDoc = ptszSourceDoc + 3;
 		}
 		else if( *ptszSourceDoc == '&' && *(ptszSourceDoc + 1) == 'g' && *(ptszSourceDoc + 2) == 't' && *(ptszSourceDoc + 3) == ';' )
 		{
-			*ptszDestDoc++ = '>';
+			dest[destIndex++] = '>';
 			ptszSourceDoc = ptszSourceDoc + 3;
 		}
 		else if( *ptszSourceDoc == '&' && *(ptszSourceDoc + 1) == 'a' && *(ptszSourceDoc + 2) == 'm' && *(ptszSourceDoc + 3) == 'p' && *(ptszSourceDoc + 4) == ';' )
 		{
-			*ptszDestDoc++ = '&';
+			dest[destIndex++] = '&';
 			ptszSourceDoc = ptszSourceDoc + 4;
 		}
 		else if( *ptszSourceDoc == '&' && *(ptszSourceDoc + 1) == 'q' && *(ptszSourceDoc + 2) == 'u' && *(ptszSourceDoc + 3) == 'o' && *(ptszSourceDoc + 4) == 't' && *(ptszSourceDoc + 5) == ';' )
 		{
-			*ptszDestDoc++ = '"';
+			dest[destIndex++] = '"';
 			ptszSourceDoc = ptszSourceDoc + 5;
 		}
-		else *ptszDestDoc++ = *ptszSourceDoc;
+		else dest[destIndex++] = *ptszSourceDoc;
 
 		ptszSourceDoc++;
 	}
-	*ptszDestDoc = '\0';
+	dest[destIndex] = '\0';
 
 	return dest;
 }
@@ -1708,23 +1661,22 @@ _tstring Escape(const _tstring& source)
 {
 	size_t		size = 0;
 	wchar_t		wcChar = '\0';
-	wchar_t* pwszSource = nullptr;
-	wchar_t* pwszSourceDoc = nullptr;
-	TCHAR* ptszDestDoc = nullptr;
+	const wchar_t*	pwszSourceData = nullptr;
+	const wchar_t*	pwszSourceDoc = nullptr;
 	wchar_t		wszExcept[] = L"*@-_+./";
 
 	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
 
 #ifdef _UNICODE
-	pwszSource = const_cast<wchar_t*>(source.c_str());;
+	pwszSourceData = source.c_str();
 #else
 	std::wstring sourceData;
 	sourceData = Iconv::CIconvUtil::ConvertEncodingW(source, "CP949", "WCHAR_T");
 
-	pwszSource = const_cast<wchar_t*>(sourceData.c_str());;
+	pwszSourceData = sourceData.c_str();
 #endif
 
-	pwszSourceDoc = pwszSource;
+	pwszSourceDoc = pwszSourceData;
 	while( *pwszSourceDoc )
 	{
 		wcChar = *pwszSourceDoc;
@@ -1743,36 +1695,36 @@ _tstring Escape(const _tstring& source)
 		pwszSourceDoc++;
 	}
 
-	_tstring dest(size + 1, _T('\0'));
+	int destIndex = 0;
+	_tstring dest(size + 1, '\0');
 
-	pwszSourceDoc = pwszSource;
-	ptszDestDoc = const_cast<TCHAR*>(dest.c_str());
+	pwszSourceDoc = pwszSourceData;
 	while( *pwszSourceDoc )
 	{
 		wcChar = *pwszSourceDoc;
 		if( wcChar > 0x7f )
 		{
-			*ptszDestDoc++ = '%';
-			*ptszDestDoc++ = 'u';
+			dest[destIndex++] = '%';
+			dest[destIndex++] = 'u';
 
-			*ptszDestDoc++ = g_pcDigits[(wcChar >> 12) & 0x0F];
-			*ptszDestDoc++ = g_pcDigits[(wcChar >> 8) & 0x0F];
-			*ptszDestDoc++ = g_pcDigits[(wcChar >> 4) & 0x0F];
-			*ptszDestDoc++ = g_pcDigits[wcChar & 0x0F];
+			dest[destIndex++] = g_pcDigits[(wcChar >> 12) & 0x0F];
+			dest[destIndex++] = g_pcDigits[(wcChar >> 8) & 0x0F];
+			dest[destIndex++] = g_pcDigits[(wcChar >> 4) & 0x0F];
+			dest[destIndex++] = g_pcDigits[wcChar & 0x0F];
 		}
 		else if( !((wcChar > 47 && wcChar < 57) || (wcChar > 64 && wcChar < 91) || (wcChar > 96 && wcChar < 123) || wcschr(wszExcept, wcChar)) )
 		{
-			*ptszDestDoc++ = '%';
+			dest[destIndex++] = '%';
 
-			*ptszDestDoc++ = g_pcDigits[(wcChar >> 4) & 0x0F];
-			*ptszDestDoc++ = g_pcDigits[wcChar & 0x0F];
+			dest[destIndex++] = g_pcDigits[(wcChar >> 4) & 0x0F];
+			dest[destIndex++] = g_pcDigits[wcChar & 0x0F];
 		}
 		else
-			*ptszDestDoc++ = (TCHAR)wcChar;
+			dest[destIndex++] = (TCHAR)wcChar;
 
 		pwszSourceDoc++;
 	}
-	*ptszDestDoc = '\0';
+	dest[destIndex] = '\0';
 
 	return dest;
 }
@@ -1784,12 +1736,11 @@ _tstring UnEscape(const _tstring& source)
 	size_t		size = 0;
 	int			nNum = 0;
 	int			nRetval = 0;
-	TCHAR* ptszSourceDoc = nullptr;
-	wchar_t* pwszDestDoc = nullptr;
+	const TCHAR* ptszSourceDoc = nullptr;
 
 	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
 
-	ptszSourceDoc = const_cast<TCHAR*>(source.c_str());
+	ptszSourceDoc = source.c_str();
 	while( *ptszSourceDoc )
 	{
 		if( *ptszSourceDoc == '%' )
@@ -1803,18 +1754,10 @@ _tstring UnEscape(const _tstring& source)
 		size++;
 	}
 
-	ptszSourceDoc = const_cast<TCHAR*>(source.c_str());
+	int destIndex = 0;
+	std::wstring destData(size + 1, '\0');
 
-#ifdef _UNICODE
-	_tstring dest(size + 1, _T('\0'));
-
-	pwszDestDoc = const_cast<wchar_t*>(dest.c_str());
-#else
-	std::wstring destData(size + 1, _T('\0'));
-
-	pwszDestDoc = const_cast<wchar_t*>(destData.c_str());
-#endif
-
+	ptszSourceDoc = source.c_str();
 	while( *ptszSourceDoc )
 	{
 		if( *ptszSourceDoc == '%' )
@@ -1845,7 +1788,7 @@ _tstring UnEscape(const _tstring& source)
 					nRetval += nNum;
 				}
 
-				*pwszDestDoc++ = nRetval;
+				destData[destIndex++] = nRetval;
 			}
 			else
 			{
@@ -1867,18 +1810,20 @@ _tstring UnEscape(const _tstring& source)
 					nRetval += nNum;
 				}
 
-				*pwszDestDoc++ = nRetval;
+				destData[destIndex++] = nRetval;
 			}
 		}
 		else
-			*pwszDestDoc++ = *ptszSourceDoc;
+			destData[destIndex++] = *ptszSourceDoc;
 
 		ptszSourceDoc++;
 	}
-	*pwszDestDoc = '\0';
+	destData[destIndex] = '\0';
 
 #ifndef _UNICODE
 	_tstring dest = Iconv::CIconvUtil::ConvertEncoding(destData, "WCHAR_T", "CP949");
+#else 
+	_tstring dest = destData;
 #endif
 
 	return dest;
@@ -1893,9 +1838,7 @@ _tstring EncodeURI(const _tstring& source)
 	unsigned char cChar = '\0';
 
 	size_t	size = 0;
-	char* pszSourceData = nullptr;
-	char* pszSourceDoc = nullptr;
-	char* pszDestDoc = nullptr;
+	const char* pszSourceDoc = nullptr;
 	char	szExcept[] = ",/?:@&=+$#";
 
 	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
@@ -1904,13 +1847,11 @@ _tstring EncodeURI(const _tstring& source)
 
 #ifdef _UNICODE
 	sourceData = Iconv::CIconvUtil::ConvertEncoding(source, "WCHAR_T", "UTF-8");
-	pszSourceData = const_cast<char*>(sourceData.c_str());
 #else
 	sourceData = Iconv::CIconvUtil::ConvertEncoding(source, "CP949", "UTF-8");
-	pszSourceData = const_cast<char*>(sourceData.c_str());
 #endif
 
-	pszSourceDoc = pszSourceData;
+	pszSourceDoc = sourceData.c_str();
 	while( *pszSourceDoc )
 	{
 		cChar = (unsigned char)*pszSourceDoc;
@@ -1921,37 +1862,31 @@ _tstring EncodeURI(const _tstring& source)
 		size++;
 	}
 
-#ifdef _UNICODE
-	string destData(size + 1, _T('\0'));
+	int destIndex = 0;
+	string destData(size + 1, '\0');
 
-	pszSourceDoc = pszSourceData;
-	pszDestDoc = const_cast<char*>(destData.c_str());
-#else
-	_tstring dest(size + 1, _T('\0'));
-
-	pszSourceDoc = pszSourceData;
-	pszDestDoc = const_cast<char*>(dest.c_str());
-#endif
-
+	pszSourceDoc = sourceData.c_str();
 	while( *pszSourceDoc )
 	{
 		cChar = (unsigned char)*pszSourceDoc;
 		if( (cChar > 47 && cChar < 57) || (cChar > 64 && cChar < 91) || (cChar > 96 && cChar < 123) || strchr(szExcept, cChar) )
-			*pszDestDoc++ = cChar;
+			destData[destIndex++] = cChar;
 		else if( cChar == ' ' )
-			*pszDestDoc++ = '+';
+			destData[destIndex++] = '+';
 		else
 		{
-			*pszDestDoc++ = '%';
-			*pszDestDoc++ = g_pcDigits[(cChar >> 4) & 0x0F];
-			*pszDestDoc++ = g_pcDigits[cChar & 0x0F];
+			destData[destIndex++] = '%';
+			destData[destIndex++] = g_pcDigits[(cChar >> 4) & 0x0F];
+			destData[destIndex++] = g_pcDigits[cChar & 0x0F];
 		}
 		pszSourceDoc++;
 	}
-	*pszDestDoc = '\0';
+	destData[destIndex] = '\0';
 
 #ifdef _UNICODE
 	_tstring dest = Iconv::CIconvUtil::ConvertEncodingW(destData, "CP949", "WCHAR_T");
+#else
+	_tstring dest = destData;
 #endif
 
 	return dest;
@@ -1964,15 +1899,13 @@ _tstring DecodeURI(const _tstring& source)
 	size_t	size = 0;
 	int		nNum = 0;
 	int		nRetval = 0;
-	TCHAR* ptszSourceDoc = nullptr;
-	char* pszDestination = nullptr;
-	char* pszDestDoc = nullptr;
+	const TCHAR* ptszSourceDoc = nullptr;
+	char*	pszDestination = nullptr;
+	char*	pszDestDoc = nullptr;
 
-	_tstring dest;
+	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
 
-	if( source.c_str() == nullptr || source.size() == 0 ) return dest;
-
-	ptszSourceDoc = const_cast<TCHAR*>(source.c_str());
+	ptszSourceDoc = source.c_str();
 	while( *ptszSourceDoc )
 	{
 		if( *ptszSourceDoc == '%' )
@@ -1984,7 +1917,7 @@ _tstring DecodeURI(const _tstring& source)
 
 	pszDestination = new char[size + 1];
 
-	ptszSourceDoc = const_cast<TCHAR*>(source.c_str());
+	ptszSourceDoc = source.c_str();
 	pszDestDoc = pszDestination;
 	while( *ptszSourceDoc )
 	{
@@ -2020,9 +1953,9 @@ _tstring DecodeURI(const _tstring& source)
 	*pszDestDoc = '\0';
 
 #ifdef _UNICODE
-	dest = Iconv::CIconvUtil::ConvertEncodingW(pszDestination, "UTF-8", "WCHAR_T");
+	_tstring dest = Iconv::CIconvUtil::ConvertEncodingW(pszDestination, "UTF-8", "WCHAR_T");
 #else
-	dest = Iconv::CIconvUtil::ConvertEncoding(pszDestination, "UTF-8", "CP949");
+	_tstring dest = Iconv::CIconvUtil::ConvertEncoding(pszDestination, "UTF-8", "CP949");
 #endif
 
 	if( pszDestination )
@@ -2043,9 +1976,7 @@ _tstring EncodeURIComponent(const _tstring& source)
 	unsigned char cChar = '\0';
 
 	size_t	size = 0;
-	char* pszSourceData = nullptr;
-	char* pszSourceDoc = nullptr;
-	char* pszDestDoc = nullptr;
+	const char* pszSourceDoc = nullptr;
 
 	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
 
@@ -2053,13 +1984,11 @@ _tstring EncodeURIComponent(const _tstring& source)
 
 #ifdef _UNICODE
 	sourceData = Iconv::CIconvUtil::ConvertEncoding(source, "WCHAR_T", "UTF-8");
-	pszSourceData = const_cast<char*>(sourceData.c_str());
 #else
 	sourceData = Iconv::CIconvUtil::ConvertEncoding(source, "CP949", "UTF-8");
-	pszSourceData = const_cast<char*>(sourceData.c_str());
 #endif
 
-	pszSourceDoc = pszSourceData;
+	pszSourceDoc = sourceData.c_str();
 	while( *pszSourceDoc )
 	{
 		cChar = (unsigned char)*pszSourceDoc;
@@ -2070,37 +1999,31 @@ _tstring EncodeURIComponent(const _tstring& source)
 		size++;
 	}
 
-#ifdef _UNICODE
-	string destData(size + 1, _T('\0'));
+	int destIndex = 0;
+	string destData(size + 1, '\0');
 
-	pszSourceDoc = pszSourceData;
-	pszDestDoc = const_cast<char*>(destData.c_str());
-#else
-	_tstring dest(size + 1, _T('\0'));
-
-	pszSourceDoc = pszSourceData;
-	pszDestDoc = const_cast<char*>(dest.c_str());
-#endif
-
+	pszSourceDoc = sourceData.c_str();
 	while( *pszSourceDoc )
 	{
 		cChar = (unsigned char)*pszSourceDoc;
 		if( (cChar > 47 && cChar < 57) || (cChar > 64 && cChar < 91) || (cChar > 96 && cChar < 123) )
-			*pszDestDoc++ = cChar;
+			destData[destIndex++] = cChar;
 		else if( cChar == ' ' )
-			*pszDestDoc++ = '+';
+			destData[destIndex++] = '+';
 		else
 		{
-			*pszDestDoc++ = '%';
-			*pszDestDoc++ = g_pcDigits[(cChar >> 4) & 0x0F];
-			*pszDestDoc++ = g_pcDigits[cChar & 0x0F];
+			destData[destIndex++] = '%';
+			destData[destIndex++] = g_pcDigits[(cChar >> 4) & 0x0F];
+			destData[destIndex++] = g_pcDigits[cChar & 0x0F];
 		}
 		pszSourceDoc++;
 	}
-	*pszDestDoc = '\0';
+	destData[destIndex] = '\0';
 
 #ifdef _UNICODE
 	_tstring dest = Iconv::CIconvUtil::ConvertEncodingW(destData, "CP949", "WCHAR_T");
+#else
+	_tstring dest = destData;
 #endif
 
 	return dest;
@@ -2113,15 +2036,13 @@ _tstring DecodeURIComponent(const _tstring& source)
 	size_t	size = 0;
 	int		nNum = 0;
 	int		nRetval = 0;
-	TCHAR* ptszSourceDoc = nullptr;
-	char* pszDestination = nullptr;
-	char* pszDestDoc = nullptr;
+	const TCHAR* ptszSourceDoc = nullptr;
+	char*	pszDestination = nullptr;
+	char*	pszDestDoc = nullptr;
 
-	_tstring dest;
+	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
 
-	if( source.c_str() == nullptr || source.size() == 0 ) return dest;
-
-	ptszSourceDoc = const_cast<TCHAR*>(source.c_str());
+	ptszSourceDoc = source.c_str();
 	while( *ptszSourceDoc )
 	{
 		if( *ptszSourceDoc == '%' )
@@ -2133,7 +2054,7 @@ _tstring DecodeURIComponent(const _tstring& source)
 
 	pszDestination = new char[size + 1];
 
-	ptszSourceDoc = const_cast<TCHAR*>(source.c_str());
+	ptszSourceDoc = source.c_str();
 	pszDestDoc = pszDestination;
 	while( *ptszSourceDoc )
 	{
@@ -2169,9 +2090,9 @@ _tstring DecodeURIComponent(const _tstring& source)
 	*pszDestDoc = '\0';
 
 #ifdef _UNICODE
-	dest = Iconv::CIconvUtil::ConvertEncodingW(pszDestination, "UTF-8", "WCHAR_T");
+	_tstring dest = Iconv::CIconvUtil::ConvertEncodingW(pszDestination, "UTF-8", "WCHAR_T");
 #else
-	dest = Iconv::CIconvUtil::ConvertEncoding(pszDestination, "UTF-8", "CP949");
+	_tstring dest = Iconv::CIconvUtil::ConvertEncoding(pszDestination, "UTF-8", "CP949");
 #endif
 
 	if( pszDestination )

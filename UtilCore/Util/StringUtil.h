@@ -31,10 +31,10 @@ bool	StrReverse(CMemBuffer<TCHAR>& tDestination, const TCHAR* ptszSource);
 bool	StrAppend(CMemBuffer<TCHAR>& tDestination, const TCHAR* ptszSource, const TCHAR* ptszAppend);
 
 bool	StrMid(CMemBuffer<TCHAR>& tDestination, const TCHAR* ptszSource, const size_t nStart);
-bool	StrMid(CMemBuffer<TCHAR>& tDestination, const TCHAR* ptszSource, const size_t nStart, const size_t nCount);
+bool	StrMid(CMemBuffer<TCHAR>& tDestination, const TCHAR* ptszSource, const size_t nStart, const size_t count);
 bool	StrMidToken(CMemBuffer<TCHAR>& tDestination, const TCHAR* ptszSource, const size_t nStart, const TCHAR tcToken);
-bool	StrLeft(CMemBuffer<TCHAR>& tDestination, const TCHAR* ptszSource, const size_t nCount);
-bool	StrRight(CMemBuffer<TCHAR>& tDestination, const TCHAR* ptszSource, const size_t nCount);
+bool	StrLeft(CMemBuffer<TCHAR>& tDestination, const TCHAR* ptszSource, const size_t count);
+bool	StrRight(CMemBuffer<TCHAR>& tDestination, const TCHAR* ptszSource, const size_t count);
 bool	StrReplace(CMemBuffer<TCHAR>& tDestination, const TCHAR* ptszSource, const TCHAR tcSrcToken, const TCHAR tcDestToken);
 bool	StrReplace(CMemBuffer<TCHAR>& tDestination, const TCHAR* ptszSource, const TCHAR* ptszSrcToken, const TCHAR* ptszDestToken);
 
