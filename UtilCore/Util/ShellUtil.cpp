@@ -13,9 +13,6 @@ bool IsAbleFile(const TCHAR* ptszSourceFullPath, const SH_APPLY_FILEINFO ShApply
 {
 	size_t		nTokenCount = 0;
 	size_t		nIndex = 0;
-	TCHAR		tszFileNameExt[FILENAMEEXT_STRLEN];
-	TCHAR		tszFileName[FILENAME_STRLEN];
-	TCHAR		tszFileExt[FILEEXT_STRLEN];
 	TCHAR		tszTime[FILEATT_DATETIME_STRLEN];
 	TCHAR*		ptszApplyExt = nullptr;
 
@@ -37,8 +34,12 @@ bool IsAbleFile(const TCHAR* ptszSourceFullPath, const SH_APPLY_FILEINFO ShApply
 
 	if( ShApplyFileInfo.m_tszApplyExt && _tcslen(ShApplyFileInfo.m_tszApplyExt) > 0 && _tcscmp(ShApplyFileInfo.m_tszApplyExt, _T("*.*")) != 0 )
 	{
-		if( !FileNameExtPathPassing(tszFileNameExt, ptszSourceFullPath) ) return false;
-		if( !FileNameExtPassing(tszFileName, tszFileExt, tszFileNameExt) ) return false;
+		_tstring fileNameExt, fileName, fileExt;
+
+		fileNameExt = FileNameExtPathPassing(ptszSourceFullPath);
+		if( fileNameExt.size() < 1 ) return false;
+		if( !FileNameExtPassing(fileNameExt, fileName, fileExt) ) return false;
+		if( fileExt.size() < 1 ) return false;
 
 		std::vector<_tstring> destination;
 		Tokenize(destination, ShApplyFileInfo.m_tszApplyExt, _T(";"));
@@ -47,7 +48,7 @@ bool IsAbleFile(const TCHAR* ptszSourceFullPath, const SH_APPLY_FILEINFO ShApply
 		for( nIndex = 0; nIndex < nTokenCount; nIndex++ )
 		{
 			ptszApplyExt = const_cast<TCHAR*>(destination[nIndex].c_str());
-			if( _tcscmp(ptszApplyExt, tszFileExt) == 0 ) break;
+			if( _tcscmp(ptszApplyExt, const_cast<TCHAR*>(fileExt.c_str())) == 0 ) break;
 		}
 
 		if( ShApplyFileInfo.m_bIsApply )
@@ -618,22 +619,22 @@ HANDLE GetFileHandleDuplicate(TCHAR* ptszDestFullPath, TCHAR* ptszDestFileNameEx
 {
 	int		i = 0;
 	TCHAR	tszFolderPath[FULLPATH_STRLEN];
-	TCHAR	tszFileNameExt[FILENAMEEXT_STRLEN];
-	TCHAR	tszFileName[FILENAME_STRLEN];
-	TCHAR	tszFileExt[FILEEXT_STRLEN];
 	TCHAR	tszTempFullPath[DIRECTORY_STRLEN + FILENAME_STRLEN];
 	TCHAR   tszTempFileNameExt[FILENAMEEXT_STRLEN];
 
 	HANDLE	hFile;
 
-	if( !FolderPathPassing(tszFolderPath, ptszFullPath) ) return NULL;
-	if( !FileNameExtPathPassing(tszFileNameExt, ptszFullPath) ) return NULL;
-	if( !FileNameExtPassing(tszFileName, tszFileExt, tszFileNameExt) ) return NULL;
+	_tstring folderPath, fileNameExt;
+	_tstring fileName, fileExt;
+
+	folderPath = FolderPathPassing(ptszFullPath);
+	fileNameExt = FileNameExtPathPassing(ptszFullPath);
+	FileNameExtPassing(fileNameExt, fileName, fileExt);
 
 	CreateDirectoryRecursive(tszFolderPath);
 
-	_sntprintf_s(tszTempFullPath, _countof(tszTempFullPath), _TRUNCATE, _T("%s%s"), tszFolderPath, tszFileNameExt);
-	_sntprintf_s(tszTempFileNameExt, _countof(tszTempFileNameExt), _TRUNCATE, _T("%s.%s"), tszFileName, tszFileExt);
+	_sntprintf_s(tszTempFullPath, _countof(tszTempFullPath), _TRUNCATE, _T("%s%s"), tszFolderPath, fileNameExt.c_str());
+	_sntprintf_s(tszTempFileNameExt, _countof(tszTempFileNameExt), _TRUNCATE, _T("%s.%s"), fileName.c_str(), fileExt.c_str());
 
 	hFile = CreateFile(tszTempFullPath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_NEW, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile == INVALID_HANDLE_VALUE )
@@ -644,7 +645,7 @@ HANDLE GetFileHandleDuplicate(TCHAR* ptszDestFullPath, TCHAR* ptszDestFileNameEx
 		tszTempFileNameExt[0] = '\0';
 		for( i = 1; i < MAX_FILENAME_CONVERT_INDEX_NUM; i++ )
 		{
-			_sntprintf_s(tszTempFileNameExt, _countof(tszTempFileNameExt), _TRUNCATE, _T("%s(%d).%s"), tszFileName, i, tszFileExt);
+			_sntprintf_s(tszTempFileNameExt, _countof(tszTempFileNameExt), _TRUNCATE, _T("%s(%d).%s"), fileName.c_str(), i, fileExt.c_str());
 			_sntprintf_s(tszTempFullPath, _countof(tszTempFullPath), _TRUNCATE, _T("%s%s"), tszFolderPath, tszTempFileNameExt);
 			hFile = CreateFile(tszTempFullPath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_NEW, FILE_ATTRIBUTE_ARCHIVE, NULL);
 

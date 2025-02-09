@@ -1,4 +1,4 @@
-namespace Xlnt
+ï»¿namespace Xlnt
 {
 	//***************************************************************************
 	//
@@ -10,15 +10,15 @@ namespace Xlnt
 			throw std::runtime_error("Active sheet is not set.");
 		}
 
-		// Çì´õ Ãß°¡
+		// í—¤ë” ì¶”ê°€
 		const auto headers = T::get_field_names();
 		for( uint32 col = 0; col < headers.size(); ++col )
 		{
 			_worksheet.cell(col + 1, 1).value(headers[col]);
 		}
 
-		// µ¥ÀÌÅÍ Ãß°¡
-		if( isCastUtf8 )	// ÇÑ±Û ±úÁü ¹æÁö : ANSI(¿¹: CP949, Windows-1252) -> UTF-8 º¯°æÇÏ¿© ¾×¼¿ ÀúÀå 
+		// ë°ì´í„° ì¶”ê°€
+		if( isCastUtf8 )	// í•œê¸€ ê¹¨ì§ ë°©ì§€ : ANSI(ì˜ˆ: CP949, Windows-1252) -> UTF-8 ë³€ê²½í•˜ì—¬ ì•¡ì…€ ì €ì¥ 
 		{
 			Iconv::CIconvUtil iconvUtil("CP949", "UTF-8");
 

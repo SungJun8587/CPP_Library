@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // XlntUtil.h : interface for the CXlntUtil class.
 //
@@ -19,7 +19,7 @@
 
 namespace Xlnt
 {
-	// Helper: std::tupleÀÇ °¢ ¿ä¼Ò¸¦ ¹İº¹ÀûÀ¸·Î Ã³¸®
+	// Helper: std::tupleì˜ ê° ìš”ì†Œë¥¼ ë°˜ë³µì ìœ¼ë¡œ ì²˜ë¦¬
 	template <typename Tuple, typename Func, std::size_t... Is>
 	void for_each_impl(Tuple&& tuple, Func&& func, std::index_sequence<Is...>)
 	{
@@ -33,7 +33,7 @@ namespace Xlnt
 		for_each_impl(std::forward<Tuple>(tuple), std::forward<Func>(func), std::make_index_sequence<size>{});
 	}
 
-	// ExcelSerializable ÅÛÇÃ¸´ Å¬·¡½º
+	// ExcelSerializable í…œí”Œë¦¿ í´ë˜ìŠ¤
 	template <typename... Fields>
 	struct ExcelSerializable {
 		using FieldTuple = std::tuple<Fields...>;
@@ -41,7 +41,7 @@ namespace Xlnt
 
 		ExcelSerializable(Fields... args) : fields(std::make_tuple(args...)) {}
 
-		// Á÷·ÄÈ­: µ¥ÀÌÅÍ¸¦ Excel ÇàÀ¸·Î º¯È¯
+		// ì§ë ¬í™”: ë°ì´í„°ë¥¼ Excel í–‰ìœ¼ë¡œ ë³€í™˜
 		std::vector<std::string> serialize() const
 		{
 			std::vector<std::string> row;
@@ -52,7 +52,7 @@ namespace Xlnt
 			return row;
 		}
 
-		// ¿ªÁ÷·ÄÈ­: Excel Çà µ¥ÀÌÅÍ¸¦ °´Ã¼¿¡ Àû¿ë
+		// ì—­ì§ë ¬í™”: Excel í–‰ ë°ì´í„°ë¥¼ ê°ì²´ì— ì ìš©
 		void deserialize(const std::vector<std::string>& row)
 		{
 			for_each_in_tuple(fields, [&row](auto& field, std::size_t index)
@@ -64,7 +64,7 @@ namespace Xlnt
 			});
 		}
 
-		// ÇÊµå ÀÌ¸§ °¡Á®¿À±â (µ¥ÀÌÅÍ Å¬·¡½º¿¡¼­ ±¸Çö ÇÊ¿ä)
+		// í•„ë“œ ì´ë¦„ ê°€ì ¸ì˜¤ê¸° (ë°ì´í„° í´ë˜ìŠ¤ì—ì„œ êµ¬í˜„ í•„ìš”)
 		static std::vector<std::string> get_field_names()
 		{
 			return {};

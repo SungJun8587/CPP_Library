@@ -9,9 +9,6 @@
 
 #pragma once
 
-#include <stdio.h>
-#include <stdint.h>
-#include <iostream>
 #include <string>
 #include <list>
 #include <map>
@@ -20,11 +17,7 @@
 #ifdef _MSC_VER
 #pragma comment(lib, "ws2_32.lib")
 
-#ifdef _DEBUG
-#pragma comment(lib, "hiredis64D.lib")
-#else
-#pragma comment(lib, "hiredis64.lib")
-#endif
+#pragma comment(lib, LIB_NAME("hiredis"))
 
 #include <winsock.h>
 #endif
