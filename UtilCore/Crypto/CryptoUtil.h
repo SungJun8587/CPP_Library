@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // CryptoUtil.h : interface for the CCryptoUtil class.
 //
@@ -42,7 +42,7 @@ namespace Crypto
 
 		public:
 			//***************************************************************************
-			// ÇØ½Ã ¾Ë°í¸®Áò Áö¿ø ¿©ºÎ È®ÀÎ(MD5, SHA256, SHA512, SHA1, RIPEMD160
+			// í•´ì‹œ ì•Œê³ ë¦¬ì¦˜ ì§€ì› ì—¬ë¶€ í™•ì¸(MD5, SHA256, SHA512, SHA1, RIPEMD160
 			static bool IsHashAlgorithmSupported(const std::string& algorithm)
 			{
 				const EVP_MD* md = EVP_get_digestbyname(algorithm.c_str());
@@ -50,7 +50,7 @@ namespace Crypto
 			}
 
 			//***************************************************************************
-			// ¾ÏÈ£È­ ¾Ë°í¸®Áò Áö¿ø ¿©ºÎ È®ÀÎ(AES-128-CBC, AES-192-CBC, AES-256-CBC, SEED-CBC, AES-128-GCM, AES-256-GCM)
+			// ì•”í˜¸í™” ì•Œê³ ë¦¬ì¦˜ ì§€ì› ì—¬ë¶€ í™•ì¸(AES-128-CBC, AES-192-CBC, AES-256-CBC, SEED-CBC, AES-128-GCM, AES-256-GCM)
 			static bool IsCipherAlgorithmSupported(const std::string& algorithm)
 			{
 				const EVP_CIPHER* cipher = EVP_get_cipherbyname(algorithm.c_str());
@@ -59,7 +59,7 @@ namespace Crypto
 
 		private:
 			//***************************************************************************
-			// EVP ±â¹İ ¾ÏÈ£È­ ÇÔ¼ö
+			// EVP ê¸°ë°˜ ì•”í˜¸í™” í•¨ìˆ˜
 			static std::string encryptEVP(const std::string& plaintext, const std::string& key, const std::string& iv, const EVP_CIPHER* cipher)
 			{
 				std::vector<unsigned char> ciphertext(plaintext.size() + EVP_MAX_BLOCK_LENGTH);
@@ -97,7 +97,7 @@ namespace Crypto
 			}
 
 			//***************************************************************************
-			// EVP ±â¹İ º¹È£È­ ÇÔ¼ö
+			// EVP ê¸°ë°˜ ë³µí˜¸í™” í•¨ìˆ˜
 			static std::string decryptEVP(const std::string& ciphertext, const std::string& key, const std::string& iv, const EVP_CIPHER* cipher)
 			{
 				std::vector<unsigned char> plaintext(ciphertext.size());
@@ -135,7 +135,7 @@ namespace Crypto
 			}
 
 			//***************************************************************************
-			// AES-GCM ¾ÏÈ£È­/º¹È£È­ ÇÔ¼ö
+			// AES-GCM ì•”í˜¸í™”/ë³µí˜¸í™” í•¨ìˆ˜
 			static std::string encryptEVP_AESGCM(const std::string& input, const std::string& key, const std::string& iv, std::string& tag, bool encrypt)
 			{
 				std::vector<unsigned char> output(input.size() + EVP_MAX_BLOCK_LENGTH);
@@ -218,7 +218,7 @@ namespace Crypto
 			}
 
 			//***************************************************************************
-			// ¹ÙÀÌ³Ê¸® µ¥ÀÌÅÍ¸¦ 16Áø¼ö ¹®ÀÚ¿­·Î º¯È¯
+			// ë°”ì´ë„ˆë¦¬ ë°ì´í„°ë¥¼ 16ì§„ìˆ˜ ë¬¸ìì—´ë¡œ ë³€í™˜
 			static std::string toHex(const unsigned char* data, size_t length)
 			{
 				std::string result;
@@ -232,7 +232,7 @@ namespace Crypto
 			}
 
 		private:
-			std::string _key;  // AES, SEED, AES-GCM Å°
+			std::string _key;  // AES, SEED, AES-GCM í‚¤
 			std::string _iv;   // AES, SEED, AES-GCM IV
 	};
 }
