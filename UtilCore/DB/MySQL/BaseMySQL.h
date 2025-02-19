@@ -10,9 +10,13 @@
 #include <mysql.h>
 #include <mysqld_error.h>
 
-#pragma comment(lib, "libmySQL")
+#pragma comment(lib, LIB_NAME("libmysql"))
 
 #include "MySQL_ParamAttr.inl"
+
+//***************************************************************************
+// - mysql_library_init(0, NULL, NULL);		// MySQL 라이브러리 초기화(프로그램에서 단 한 번만 호출)
+// - mysql_library_end();					// MySQL 라이브러리 메모리 정리(프로그램 종료 시 한 번만 호출)
 
 //***************************************************************************
 //
@@ -27,6 +31,7 @@ public:
 	bool		Connect(const uint32 uiConnectTimeOut = MYSQL_DEFAULT_CONNECTION_TIMEOUT, const uint32 uiReadTimeOut = MYSQL_DEFAULT_QUERY_READ_TIMEOUT, const uint32 uiWriteTimeOut = MYSQL_DEFAULT_QUERY_WRITE_TIMEOUT, const char* pszPluginDir = nullptr);
 	bool		Disconnect();
 	void		StmtClose();
+	void		FreeResult(MYSQL_RES* res);
 
 	MYSQL*		GetConnPtr();
 	bool		IsConnected();
@@ -107,11 +112,8 @@ public:
 		memset(&bind, 0, sizeof(bind));
 
 		// std::wstring을 UTF-8로 변환
-		std::string utf8;
-
-		int required_cch = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, pwszValue, static_cast<int>(ulBufSize), nullptr, 0, nullptr, nullptr);
-		utf8.resize(required_cch);
-		WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, pwszValue, -1, const_cast<char*>(utf8.c_str()), static_cast<int>(utf8.size()), NULL, NULL);
+		Iconv::CIconvUtil unicodeToUtf8("WCHAR_T", "UTF-8");		// WCHAR_T -> UTF-8 변환
+		std::string utf8 = unicodeToUtf8.WCharToUtf8(pwszValue);
 
 		unsigned long size = static_cast<unsigned long>(utf8.size());
 

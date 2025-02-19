@@ -58,28 +58,28 @@ shared_ptr<CDBAsyncSrvHandler> COdbcAsyncSrv::Regist(const BYTE command, shared_
 
 //***************************************************************************
 //
-bool COdbcAsyncSrv::StartService(std::vector<CDBNode> DBNodeVec, INT32 nMaxThreadCnt)
+bool COdbcAsyncSrv::StartService(std::vector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt)
 {
-	return InitOdbc(DBNodeVec, nMaxThreadCnt);
+	return InitOdbc(dbNodeVec, nMaxThreadCnt);
 }
 
 //***************************************************************************
 //
-bool COdbcAsyncSrv::InitOdbc(std::vector<CDBNode> DBNodeVec, INT32 nMaxThreadCnt)
+bool COdbcAsyncSrv::InitOdbc(std::vector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt)
 {
 	if( 0 == nMaxThreadCnt )
 		_nMaxThreadCnt = static_cast<int32>(SYSTEM::CoreCount());	// Thread Count는 Core 갯수만큼만 생성
 	else
 		_nMaxThreadCnt = nMaxThreadCnt;
 
-	_nDBCount = static_cast<int32>(DBNodeVec.size());
+	_nDBCount = static_cast<int32>(dbNodeVec.size());
 	if( _nDBCount <= 0 )
 		return true;
 
 	_pOdbcConnPools = new COdbcConnPool * [_nDBCount];
 	int32 nIdx = 0;
 
-	for( auto& iter : DBNodeVec )
+	for( auto& iter : dbNodeVec )
 	{
 		if( nIdx >= _nDBCount ) break;
 
@@ -101,16 +101,16 @@ bool COdbcAsyncSrv::InitOdbc(std::vector<CDBNode> DBNodeVec, INT32 nMaxThreadCnt
 	}
 
 	_bOpen = true;
-	StartIoThreads(_nMaxThreadCnt);
+	StartIoThreads();
 
 	return true;
 }
 
 //***************************************************************************
 //
-void COdbcAsyncSrv::StartIoThreads(INT32 nMaxThreadCnt)
+void COdbcAsyncSrv::StartIoThreads()
 {
-	for( int32 i = 0; i < nMaxThreadCnt; i++ )
+	for( int32 i = 0; i < _nMaxThreadCnt; i++ )
 	{
 		gpThreadManager->CreateThread([=]() {
 			RunningThread();

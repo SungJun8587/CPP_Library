@@ -9,7 +9,7 @@
 
 class COdbcAsyncSrv
 {
-	typedef std::map<UINT16, shared_ptr<CDBAsyncSrvHandler>>	COMMAND_MAP;
+	typedef std::map<uint16, shared_ptr<CDBAsyncSrvHandler>>	COMMAND_MAP;
 
 	enum
 	{
@@ -33,10 +33,10 @@ public:
 	int Push(st_DBAsyncRq* pAsyncRq);
 	st_DBAsyncRq* Pop();
 
-	bool StartService(std::vector<CDBNode> DBNodeVec, INT32 nMaxThreadCnt = 0);
-	bool InitOdbc(std::vector<CDBNode> DBNodeVec, INT32 nMaxThreadCnt);
+	bool StartService(std::vector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt = 0);
+	bool InitOdbc(std::vector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt);
 
-	void StartIoThreads(INT32 nMaxThreadCnt);
+	void StartIoThreads();
 	bool Action();
 	void StopThread() {
 		_bStopThread.store(true);	// 플래그를 설정하여 루프 종료 

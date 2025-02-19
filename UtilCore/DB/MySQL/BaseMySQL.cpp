@@ -55,7 +55,8 @@ bool CBaseMySQL::Connect(const uint32 uiConnectTimeOut, const uint32 uiReadTimeO
 
 	if( !m_szDBHost ) return false;
 
-	try {
+	try 
+	{
 		m_pConn = mysql_init(nullptr);
 		if( !m_pConn )
 		{
@@ -143,15 +144,23 @@ bool CBaseMySQL::Disconnect()
 	}
 	m_bConnected = false;
 
+	LOG_DEBUG(_T("%s"), __TFUNCTION__);
+
 	return true;
 }
-
 
 //***************************************************************************
 //
 void CBaseMySQL::StmtClose()
 {
 	if( m_pStmt ) mysql_stmt_close(m_pStmt);
+}
+
+//***************************************************************************
+//
+void CBaseMySQL::FreeResult(MYSQL_RES* res)
+{
+	if( res ) mysql_free_result(res);
 }
 
 //***************************************************************************
@@ -282,7 +291,7 @@ bool CBaseMySQL::AutoCommit(bool bSetvalue)
 {
 	int ac = (bSetvalue) ? 1 : 0;
 
-	if( !mysql_autocommit(m_pConn, ac) )
+	if( mysql_autocommit(m_pConn, ac) != 0 )
 	{
 		return false;
 	}

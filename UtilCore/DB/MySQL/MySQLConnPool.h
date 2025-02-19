@@ -28,7 +28,7 @@ protected:
 	CMySQLConnPool(const CMySQLConnPool& rhs);
 	CMySQLConnPool& operator=(const CMySQLConnPool& rhs);
 
-	CBaseMySQL**	 _pMySQLConns;			// 커넥션 풀 배열
+	CBaseMySQL**	_pMySQLConns;			// 커넥션 풀 배열
 	bool*			_pInUseFlag;			// 사용 상태 플래그 배열
 	int32			_nMaxPoolSize;			// 최대 풀 크기
 

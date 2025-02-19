@@ -58,28 +58,28 @@ shared_ptr<CDBAsyncSrvHandler> CMySQLAsyncSrv::Regist(const BYTE command, shared
 
 //***************************************************************************
 //
-bool CMySQLAsyncSrv::StartService(std::vector<CDBNode> DBNodeVec, INT32 nMaxThreadCnt)
+bool CMySQLAsyncSrv::StartService(std::vector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt)
 {
-	return InitMySQL(DBNodeVec, nMaxThreadCnt);
+	return InitMySQL(dbNodeVec, nMaxThreadCnt);
 }
 
 //***************************************************************************
 //
-bool CMySQLAsyncSrv::InitMySQL(std::vector<CDBNode> DBNodeVec, INT32 nMaxThreadCnt)
+bool CMySQLAsyncSrv::InitMySQL(std::vector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt)
 {
 	if( 0 == nMaxThreadCnt )
 		_nMaxThreadCnt = static_cast<int32>(SYSTEM::CoreCount());	// Thread Count는 Core 갯수만큼만 생성
 	else
 		_nMaxThreadCnt = nMaxThreadCnt;
 
-	_nDBCount = static_cast<int32>(DBNodeVec.size());
+	_nDBCount = static_cast<int32>(dbNodeVec.size());
 	if( _nDBCount <= 0 )
 		return true;
 
 	_pMySQLConnPools = new CMySQLConnPool * [_nDBCount];
 	int32 nIdx = 0;
 
-	for( auto& iter : DBNodeVec )
+	for( auto& iter : dbNodeVec )
 	{
 		if( nIdx >= _nDBCount ) break;
 
@@ -99,16 +99,16 @@ bool CMySQLAsyncSrv::InitMySQL(std::vector<CDBNode> DBNodeVec, INT32 nMaxThreadC
 	}
 
 	_bOpen = true;
-	StartIoThreads(_nMaxThreadCnt);
+	StartIoThreads();
 
 	return true;
 }
 
 //***************************************************************************
 //
-void CMySQLAsyncSrv::StartIoThreads(INT32 nMaxThreadCnt)
+void CMySQLAsyncSrv::StartIoThreads()
 {
-	for( int32 i = 0; i < nMaxThreadCnt; i++ )
+	for( int32 i = 0; i < _nMaxThreadCnt; i++ )
 	{
 		gpThreadManager->CreateThread([=]() {
 			RunningThread();
@@ -154,6 +154,7 @@ bool CMySQLAsyncSrv::Action()
 
 		shared_ptr<CDBAsyncSrvHandler> command = static_cast<shared_ptr<CDBAsyncSrvHandler>>(it->second);
 		EDBReturnType Ret = command->ProcessAsyncCall(pAsyncRq);	// 패킷 처리
+	
 		if( Ret != EDBReturnType::OK )
 		{
 			LOG_ERROR(_T("Failed Async Call... callIdent: [%u]"), pAsyncRq->callIdent);
@@ -177,12 +178,12 @@ bool CMySQLAsyncSrv::Action()
 			}
 		}
 
-		uint64 endTick = _GetTickCount();
-		if( 300 <= endTick - startTick )
-			LOG_WARNING(_T("2. Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"), endTick - startTick, cumulateCallCnt++, static_cast<int>(Ret), pAsyncRq->callIdent);
-
+		//uint64 endTick = _GetTickCount();
+		//if( 300 <= endTick - startTick )
+			//LOG_WARNING(_T("2. Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"), endTick - startTick, cumulateCallCnt++, static_cast<int>(Ret), pAsyncRq->callIdent);
 		SAFE_DELETE(pAsyncRq);
 	}
+
 	return true;
 }
 

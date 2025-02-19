@@ -107,7 +107,10 @@ CBaseMySQL* CMySQLConnPool::GetMySQLConn(int32 nType)
 	if( pMySQLConn == nullptr || !pMySQLConn->IsConnected() )
 	{
 		if( pMySQLConn )
+		{
+			LOG_DEBUG(_T("Disconnect MySQL...."));
 			SAFE_DELETE(pMySQLConn);
+		}
 
 		pMySQLConn = new CBaseMySQL(_szDBHost, _szDBUserId, _szDBPasswd, _szDBName, _uiPort);
 		if( !pMySQLConn->Connect() )
@@ -132,5 +135,7 @@ CBaseMySQL* CMySQLConnPool::GetMySQLConn(int32 nType)
 void CMySQLConnPool::Clear(void)
 {
 	for( int32 i = 0; i < _nMaxPoolSize; ++i )
+	{
 		SAFE_DELETE(_pMySQLConns[i]);
+	}
 }
