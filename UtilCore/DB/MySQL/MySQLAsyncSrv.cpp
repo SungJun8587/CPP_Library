@@ -99,7 +99,6 @@ bool CMySQLAsyncSrv::InitMySQL(std::vector<CDBNode> dbNodeVec, const int32 nMaxT
 	}
 
 	_bOpen = true;
-	StartIoThreads();
 
 	return true;
 }

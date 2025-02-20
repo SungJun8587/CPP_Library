@@ -216,6 +216,8 @@ bool CBaseODBC::Disconnect()
 		m_hEnv = SQL_NULL_HENV;
 	}
 
+	LOG_DEBUG(_T("%s"), __TFUNCTION__);
+
 	return true;
 }
 

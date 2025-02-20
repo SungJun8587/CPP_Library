@@ -101,7 +101,6 @@ bool COdbcAsyncSrv::InitOdbc(std::vector<CDBNode> dbNodeVec, const int32 nMaxThr
 	}
 
 	_bOpen = true;
-	StartIoThreads();
 
 	return true;
 }

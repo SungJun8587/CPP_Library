@@ -51,7 +51,7 @@ DWORD	AnsiToUtf8_String(std::string& utf8, const char* ansi, const size_t ansi_s
 DWORD	Utf8ToAnsi_String(std::string& ansi, const char* utf8, const size_t utf8_size);
 
 wstring StringToWString(const std::string& ansi);
-string WStringToString(const std::wstring& unicode);
+string	WStringToString(const std::wstring& unicode);
 
 string UnicodeToUtf8(const std::wstring unicode);
 wstring Utf8ToUnicode(const std::string utf8);
