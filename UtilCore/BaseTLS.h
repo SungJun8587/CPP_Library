@@ -14,6 +14,9 @@
 #endif
 
 extern thread_local uint32				LThreadId;
+
+#ifdef __DEADLOCKPROFILER_H__
 extern thread_local std::stack<int32>	LLockStack;
+#endif
 
 #endif // ndef __BASETLS_H__

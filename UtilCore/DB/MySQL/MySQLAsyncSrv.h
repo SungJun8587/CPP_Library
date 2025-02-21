@@ -43,9 +43,9 @@ public:
 		_cva.notify_all();			// 모든 대기 스레드를 깨움
 	};
 
-	CMySQLConnPool*	GetAccountOdbcConnPool(void);
+	CMySQLConnPool*	GetAccountConnPool(void);
 	CMySQLConnPool*	GetMySQLConnPool(uint64 m_nID);
-	CMySQLConnPool*	GetLogOdbcConnPool();
+	CMySQLConnPool*	GetLogConnPool();
 
 	std::queue<st_DBAsyncRq*>			_queueDBAsyncRq;		// DB 요청 구조체 큐
 	COMMAND_MAP							_mapCommand;			// 맵 핸들러

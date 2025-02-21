@@ -177,9 +177,10 @@ bool CMySQLAsyncSrv::Action()
 			}
 		}
 
-		//uint64 endTick = _GetTickCount();
-		//if( 300 <= endTick - startTick )
-			//LOG_WARNING(_T("2. Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"), endTick - startTick, cumulateCallCnt++, static_cast<int>(Ret), pAsyncRq->callIdent);
+		uint64 endTick = _GetTickCount();
+		if( 300 <= endTick - startTick )
+			LOG_WARNING(_T("2. Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"), endTick - startTick, cumulateCallCnt++, static_cast<int>(Ret), pAsyncRq->callIdent);
+		
 		SAFE_DELETE(pAsyncRq);
 	}
 
@@ -237,7 +238,7 @@ st_DBAsyncRq* CMySQLAsyncSrv::Pop()
 
 //***************************************************************************
 //
-CMySQLConnPool* CMySQLAsyncSrv::GetAccountOdbcConnPool(void)
+CMySQLConnPool* CMySQLAsyncSrv::GetAccountConnPool(void)
 {
 	if( _pMySQLConnPools == nullptr )
 	{
@@ -276,7 +277,7 @@ CMySQLConnPool* CMySQLAsyncSrv::GetMySQLConnPool(uint64 m_nID)
 
 //***************************************************************************
 //
-CMySQLConnPool* CMySQLAsyncSrv::GetLogOdbcConnPool()
+CMySQLConnPool* CMySQLAsyncSrv::GetLogConnPool()
 {
 	if( _pMySQLConnPools == nullptr )
 	{

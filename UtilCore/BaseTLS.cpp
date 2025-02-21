@@ -8,4 +8,7 @@
 #include "BaseTLS.h"
 
 thread_local uint32				LThreadId = 0;
+
+#ifdef __DEADLOCKPROFILER_H__
 thread_local std::stack<int32>	LLockStack;
+#endif
