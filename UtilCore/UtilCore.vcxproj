@@ -205,8 +205,8 @@
     <OutDir>Bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>Bin\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)32D</TargetName>
-    <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\JSON-Utilities-master\source;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.40-winx64\include;E:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;E:\GitHub\CPP\Library\ExternalLib\cryptopp-CRYPTOPP_8_9_0;$(ProjectDir);$(IncludePath)</IncludePath>
-    <LibraryPath>EE:\GitHub\CPP\Library\ExternalLib\Bin\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
+    <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.4.4-winx64\include;E:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;E:\GitHub\CPP\Library\ExternalLib\libiconv-1.18\build\include;E:\GitHub\CPP\Library\ExternalLib\openssl-master\include;$(ProjectDir);$(IncludePath)</IncludePath>
+    <LibraryPath>E:\GitHub\CPP\Library\ExternalLib\Bin\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
     <SourcePath>$(SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -214,8 +214,8 @@
     <OutDir>Bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>Bin\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)64D</TargetName>
-    <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.40-winx64\include;E:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;E:\GitHub\CPP\Library\ExternalLib\libiconv-1.18\build\include;E:\GitHub\CPP\Library\ExternalLib\OpenSSL-Win64\include;$(ProjectDir);$(IncludePath)</IncludePath>
-    <LibraryPath>EE:\GitHub\CPP\Library\ExternalLib\Bin\$(Platform)\$(Configuration);E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.33-winx64\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.4.4-winx64\include;E:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;E:\GitHub\CPP\Library\ExternalLib\libiconv-1.18\build\include;E:\GitHub\CPP\Library\ExternalLib\openssl-master\include;$(ProjectDir);$(IncludePath)</IncludePath>
+    <LibraryPath>E:\GitHub\CPP\Library\ExternalLib\Bin\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
     <SourcePath>$(SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -223,8 +223,8 @@
     <OutDir>Bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>Bin\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)32</TargetName>
-    <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\JSON-Utilities-master\source;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.40-winx64\include;E:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;E:\GitHub\CPP\Library\ExternalLib\cryptopp-CRYPTOPP_8_9_0;$(ProjectDir);$(IncludePath)</IncludePath>
-    <LibraryPath>EE:\GitHub\CPP\Library\ExternalLib\Bin\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
+    <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.4.4-winx64\include;E:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;E:\GitHub\CPP\Library\ExternalLib\libiconv-1.18\build\include;E:\GitHub\CPP\Library\ExternalLib\openssl-master\include;$(ProjectDir);$(IncludePath)</IncludePath>
+    <LibraryPath>E:\GitHub\CPP\Library\ExternalLib\Bin\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
     <SourcePath>$(SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -232,8 +232,8 @@
     <OutDir>Bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>Bin\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)64</TargetName>
-    <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.40-winx64\include;E:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;E:\GitHub\CPP\Library\ExternalLib\libiconv-1.18\build\include;E:\GitHub\CPP\Library\ExternalLib\OpenSSL-Win64\include;$(ProjectDir);$(IncludePath)</IncludePath>
-    <LibraryPath>EE:\GitHub\CPP\Library\ExternalLib\Bin\$(Platform)\$(Configuration);E:\GitHub\CPP\Library\ExternalLib\mysql-8.0.33-winx64\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.4.4-winx64\include;E:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;E:\GitHub\CPP\Library\ExternalLib\libiconv-1.18\build\include;E:\GitHub\CPP\Library\ExternalLib\openssl-master\include;$(ProjectDir);$(IncludePath)</IncludePath>
+    <LibraryPath>E:\GitHub\CPP\Library\ExternalLib\Bin\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
     <SourcePath>$(SourcePath)</SourcePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">

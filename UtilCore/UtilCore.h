@@ -47,7 +47,6 @@ using namespace std;
 
 #include <BaseDefine.h>
 #include <BaseRedefineDataType.h>
-#include <BaseTLS.h>
 #include <BaseMacro.h>
 
 /***********************************************************************************************/
@@ -82,6 +81,7 @@ using namespace std;
 #include <Memory/MemBuffer.h>
 #include <Memory/Stream.h>
 
+#include <BaseTLS.h>
 #include <BaseGlobal.h>
 
 #include <JSON/RapidJSONUtil.h>
