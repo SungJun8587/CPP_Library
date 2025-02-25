@@ -1,4 +1,4 @@
-
+﻿
 //***************************************************************************
 // BaseMySQL.h : interface for the CBaseMySQL class.
 //
@@ -12,11 +12,9 @@
 
 #pragma comment(lib, LIB_NAME("libmysql"))
 
-#include "MySQL_ParamAttr.inl"
-
 //***************************************************************************
-// - mysql_library_init(0, NULL, NULL);		// MySQL ���̺귯�� �ʱ�ȭ(���α׷����� �� �� ���� ȣ��)
-// - mysql_library_end();					// MySQL ���̺귯�� �޸� ����(���α׷� ���� �� �� ���� ȣ��)
+// - mysql_library_init(0, NULL, NULL);		// MySQL 라이브러리 초기화(프로그램에서 단 한 번만 호출)
+// - mysql_library_end();					// MySQL 라이브러리 메모리 정리(프로그램 종료 시 한 번만 호출)
 
 //***************************************************************************
 //
@@ -38,8 +36,8 @@ public:
 
 	bool		GetServerInfo(TCHAR* ptszServerInfo);
 	bool		GetClientInfo(TCHAR* ptszClientInfo);
-	bool        SetCharacterSetName(const TCHAR* ptszCharacterSetName);
-	bool        GetCharacterSetName(TCHAR* ptszCharacterSetName);
+	bool		SetCharacterSetName(const TCHAR* ptszCharacterSetName);
+	bool		GetCharacterSetName(TCHAR* ptszCharacterSetName);
 	bool		GetCharacterSetInfo(MY_CHARSET_INFO& charset);
 	bool		GetEscapeString(char* pszDest, const char* pszSrc, int32 iLen);
 
@@ -70,9 +68,16 @@ public:
 	bool		Query(const char* pszSQL, void* pclsData, bool (*FetchRow)(void*, MYSQL_ROW& Row));
 	bool		Query(const wchar_t* pwszSQL, void* pclsData, bool (*FetchRow)(void*, MYSQL_ROW& Row));
 
-	uint64		GetRowCount(MYSQL_RES* pRes);
-	uint64		GetFieldCount(MYSQL_RES* pRes);
-	bool		GetFields(MYSQL_RES* pRes, MYSQL_FIELD*& pFields, uint64& ui64FieldCount);
+	uint64		GetAffectedRow();
+	uint32		GetFieldCount();
+
+	uint64		GetStmtNumRows();
+	uint64		GetStmtAffectedRow();
+	uint32		GetStmtFieldCount();
+
+	uint64		GetNumRows(MYSQL_RES* pRes);
+	uint64		GetNumFields(MYSQL_RES* pRes);
+	bool		GetFetchField(MYSQL_RES* pRes, MYSQL_FIELD*& pFields, uint64& ui64FieldCount);
 
 	void		GetData(const MYSQL_ROW Row, const int nColNum, bool& bIsData);
 	void		GetData(const MYSQL_ROW Row, const int nColNum, char* pszValue, int nBufSize);
@@ -82,13 +87,14 @@ public:
 	void		GetData(const MYSQL_ROW Row, const int nColNum, int64& i64Data);
 	void		GetData(const MYSQL_ROW Row, const int nColNum, uint64& ui64Data);
 
-	uint64		GetAffectedRow();
 	uint32		GetErrorNo();
 	bool		GetErrorMessage(TCHAR* ptszMessage);
 	bool		GetStmtErrorMessage(MYSQL_STMT* pStmt, TCHAR* ptszMessage);
 
 	//***************************************************************************
-	//
+	// bind.buffer에 pszValue를 가리키는 포인터(주소)를 저장 
+	//	- 이 함수를 여러번 호출할 경우, 해당 변수는 서로 다른 메모리 공간이어야 함.
+	//  - 예를 들어, 루프로 szValue에 데이터를 넣고 호출할 경우, szValue는 char szValue[batchCount][50]로 선언된 변수여야 함. 
 	static MYSQL_BIND BindParam(const char* pszValue, ulong* ulBufLength)
 	{
 		MYSQL_BIND bind{};
@@ -97,23 +103,28 @@ public:
 		unsigned long size = static_cast<unsigned long>(strlen(pszValue));
 
 		bind.buffer_type = MYSQL_TYPE_STRING;
-		bind.buffer = (void*)pszValue;			// const char*�� ���� ���ڿ�
-		bind.buffer_length = size;				// ���ڿ� ����
+		bind.buffer = (void*)pszValue;			// const char*로 받은 문자열
+		bind.buffer_length = size;				// 문자열 길이
 		bind.length = ulBufLength;
 	
 		return bind;
 	};
 
 	//***************************************************************************
-	//
+	// bind.buffer에 메모리를 생성하고, std::wstring을 UTF-8로 변환한 문자열을 복사 
+	//	- 이 함수를 여러번 호출할 경우, 해당 변수는 서로 같은 메모리 공간이어도 됨.
+	//  - 예를 들어, 루프로 wszValue에 데이터를 넣고 호출할 경우, wszValue는 wchar_t wszValue[50]로 선언된 변수
 	static MYSQL_BIND BindParam(const wchar_t* pwszValue, ulong ulBufSize)
 	{
 		MYSQL_BIND bind{};
 		memset(&bind, 0, sizeof(bind));
 
-		// std::wstring�� UTF-8�� ��ȯ
-		Iconv::CIconvUtil unicodeToUtf8("WCHAR_T", "UTF-8");		// WCHAR_T -> UTF-8 ��ȯ
-		std::string utf8 = unicodeToUtf8.WCharToUtf8(pwszValue);
+		// std::wstring을 UTF-8로 변환
+		std::string utf8;
+
+		int required_cch = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, pwszValue, static_cast<int>(ulBufSize), nullptr, 0, nullptr, nullptr);
+		utf8.resize(required_cch);
+		WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, pwszValue, -1, const_cast<char*>(utf8.c_str()), static_cast<int>(utf8.size()), NULL, NULL);
 
 		unsigned long size = static_cast<unsigned long>(utf8.size());
 
@@ -131,7 +142,9 @@ public:
 	};
 
 	//***************************************************************************
-	//
+	// bind.buffer에 tValue를 가리키는 포인터(주소)를 저장
+	//	- 이 함수를 여러번 호출할 경우, 해당 변수는 서로 다른 메모리 공간이어야 함.
+	//  - 예를 들어, 루프로 tValue에 데이터를 넣고 호출할 경우, tValue는 자료형(int32, bool 등) value[batchCount]로 선언된 변수여야 함. 
 	template<typename T>
 	static MYSQL_BIND BindParam(const T& tValue)
 	{
@@ -233,8 +246,8 @@ public:
 	}
 
 private:
-	void        ErrorQuery(const char* pszFunc, const char* pszSQL, uint32 uiErrno = 0, const char* pszMessage = nullptr);
-	void        StmtErrorQuery(MYSQL_STMT* pStmt, const char* pszFunc, const char* pszSQL, uint32 uiErrno = 0, const char* pszMessage = nullptr);
+	void		ErrorQuery(const char* pszFunc, const char* pszSQL, uint32 uiErrno = 0, const char* pszMessage = nullptr);
+	void		StmtErrorQuery(MYSQL_STMT* pStmt, const char* pszFunc, const char* pszSQL, uint32 uiErrno = 0, const char* pszMessage = nullptr);
 
 private:
 	bool		m_bConnected;
@@ -249,8 +262,8 @@ private:
 
 	uint32		m_uiPort;
 
-	MYSQL*		m_pConn;		// MySQL Connection �ڵ鷯
-	MYSQL_STMT* m_pStmt;		// MySQL ������ ���� ����
+	MYSQL*		m_pConn;		// MySQL Connection 핸들러
+	MYSQL_STMT*	m_pStmt;		// MySQL 쿼리문 실행 관리
 };
 
 #endif // ndef __BASEMYSQL_H__

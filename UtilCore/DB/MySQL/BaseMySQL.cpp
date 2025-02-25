@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // BaseMySQL.cpp: implementation of the CBaseMySQL class.
 //
@@ -337,18 +337,6 @@ bool CBaseMySQL::Rollback()
 
 //***************************************************************************
 //
-uint64 CBaseMySQL::GetAffectedRow()
-{
-	if( !m_bConnected )
-	{
-		return 0;
-	}
-
-	return mysql_affected_rows(m_pConn);
-}
-
-//***************************************************************************
-//
 bool CBaseMySQL::SelectDB(const char* pszSelectDBName)
 {
 	if( !m_bConnected )
@@ -498,10 +486,10 @@ bool CBaseMySQL::PrepareBindParam(const std::vector<MYSQL_BIND>& bindParams)
 }
 
 //***************************************************************************
-// - STMT_ATTR_UPDATE_MAX_LENGTH : Ãâ·Â ¹öÆÛÀÇ ÃÖ´ë ±æÀÌ¸¦ ÀÚµ¿À¸·Î ¾÷µ¥ÀÌÆ®ÇÒÁö ¿©ºÎ¸¦ ¼³Á¤. ±âº»°ª: 0(ºñÈ°¼ºÈ­), 1ÀÌ¸é mysql_stmt_store_result()¸¦ È£ÃâÇÏ¸é ¿­ µ¥ÀÌÅÍÀÇ ÃÖ´ë ±æÀÌ°¡ °è»ê.
-// - STMT_ATTR_CURSOR_TYPE : Ä¿¼­ À¯ÇüÀ» ¼³Á¤. ±âº»°ª: CURSOR_TYPE_NO_CURSOR, CURSOR_TYPE_READ_ONLY¸¦ ¼³Á¤ÇÏ¸é ¼­¹ö¿¡¼­ ÀĞ±â Àü¿ë Ä¿¼­¸¦ È°¼ºÈ­. ´ë·® µ¥ÀÌÅÍ¸¦ Ã³¸®ÇÒ ¶§ ¸Ş¸ğ¸® »ç¿ë·®À» ÁÙÀÌ´Â µ¥ À¯¿ë.
-// - STMT_ATTR_PREFETCH_ROWS : ¼­¹ö·ÎºÎÅÍ ¹Ì¸® °¡Á®¿Ã Çà(row)ÀÇ °³¼ö¸¦ ¼³Á¤. unsigned long. ±âº»°ª: 1, ÀÌ °ªÀ» ´Ã¸®¸é ÇàÀ» ¹Ì¸® °¡Á®¿Í ³×Æ®¿öÅ© ¿Õº¹ È½¼ö¸¦ ÁÙÀÏ ¼ö ÀÖÀ½.
-// - STMT_ATTR_ARRAY_SIZE : ¹è¿­ ¹ÙÀÎµù ½Ã ÇÑ ¹ø¿¡ Ã³¸®ÇÒ Çà(row)ÀÇ °³¼ö¸¦ ¼³Á¤. unsigned long. ±âº»°ª: 1, ´ë·® µ¥ÀÌÅÍ »ğÀÔ¿¡¼­ È°¿ë
+// - STMT_ATTR_UPDATE_MAX_LENGTH : ì¶œë ¥ ë²„í¼ì˜ ìµœëŒ€ ê¸¸ì´ë¥¼ ìë™ìœ¼ë¡œ ì—…ë°ì´íŠ¸í• ì§€ ì—¬ë¶€ë¥¼ ì„¤ì •. ê¸°ë³¸ê°’: 0(ë¹„í™œì„±í™”), 1ì´ë©´ mysql_stmt_store_result()ë¥¼ í˜¸ì¶œí•˜ë©´ ì—´ ë°ì´í„°ì˜ ìµœëŒ€ ê¸¸ì´ê°€ ê³„ì‚°.
+// - STMT_ATTR_CURSOR_TYPE : ì»¤ì„œ ìœ í˜•ì„ ì„¤ì •. ê¸°ë³¸ê°’: CURSOR_TYPE_NO_CURSOR, CURSOR_TYPE_READ_ONLYë¥¼ ì„¤ì •í•˜ë©´ ì„œë²„ì—ì„œ ì½ê¸° ì „ìš© ì»¤ì„œë¥¼ í™œì„±í™”. ëŒ€ëŸ‰ ë°ì´í„°ë¥¼ ì²˜ë¦¬í•  ë•Œ ë©”ëª¨ë¦¬ ì‚¬ìš©ëŸ‰ì„ ì¤„ì´ëŠ” ë° ìœ ìš©.
+// - STMT_ATTR_PREFETCH_ROWS : ì„œë²„ë¡œë¶€í„° ë¯¸ë¦¬ ê°€ì ¸ì˜¬ í–‰(row)ì˜ ê°œìˆ˜ë¥¼ ì„¤ì •. unsigned long. ê¸°ë³¸ê°’: 1, ì´ ê°’ì„ ëŠ˜ë¦¬ë©´ í–‰ì„ ë¯¸ë¦¬ ê°€ì ¸ì™€ ë„¤íŠ¸ì›Œí¬ ì™•ë³µ íšŸìˆ˜ë¥¼ ì¤„ì¼ ìˆ˜ ìˆìŒ.
+// - STMT_ATTR_ARRAY_SIZE : ë°°ì—´ ë°”ì¸ë”© ì‹œ í•œ ë²ˆì— ì²˜ë¦¬í•  í–‰(row)ì˜ ê°œìˆ˜ë¥¼ ì„¤ì •. unsigned long. ê¸°ë³¸ê°’: 1, ëŒ€ëŸ‰ ë°ì´í„° ì‚½ì…ì—ì„œ í™œìš©
 bool CBaseMySQL::PrepareAttSet(enum enum_stmt_attr_type attr_type, const void* attr)
 {
 	if( mysql_stmt_attr_set(m_pStmt, attr_type, attr) )
@@ -513,11 +501,11 @@ bool CBaseMySQL::PrepareAttSet(enum enum_stmt_attr_type attr_type, const void* a
 }
 
 //***************************************************************************
-// 1. Prepare(const char* pszSQL) ÇÔ¼ö È£Ãâ
-// 2. StmtBindParam() ÇÔ¼ö È£Ãâ
-// 3. StmtAttSet() ÇÔ¼ö È£Ãâ
-// 4. StmtExecute() ÇÔ¼ö È£Ãâ
-// 5. StmtClose() ÇÔ¼ö È£Ãâ
+// 1. Prepare(const char* pszSQL) í•¨ìˆ˜ í˜¸ì¶œ
+// 2. StmtBindParam() í•¨ìˆ˜ í˜¸ì¶œ
+// 3. StmtAttSet() í•¨ìˆ˜ í˜¸ì¶œ
+// 4. StmtExecute() í•¨ìˆ˜ í˜¸ì¶œ
+// 5. StmtClose() í•¨ìˆ˜ í˜¸ì¶œ
 bool CBaseMySQL::PrepareExecute(uint64_t* pnIdx)
 {
 	bool bResult = true;
@@ -542,8 +530,6 @@ bool CBaseMySQL::PrepareExecute(uint64_t* pnIdx)
 	{
 		*pnIdx = mysql_stmt_insert_id(m_pStmt);
 	}
-
-	StmtClose();
 
 	return bResult;
 }
@@ -715,8 +701,70 @@ bool CBaseMySQL::Query(const wchar_t* pwszSQL, void* pclsData, bool (*FetchRow)(
 }
 
 //***************************************************************************
-//
-uint64 CBaseMySQL::GetRowCount(MYSQL_RES* pRes)
+// INSERT, UPDATE, DELETE ê°™ì€ DML(Data Manipulation Language) ë¬¸ì´ ì‹¤í–‰ëœ í›„ ì˜í–¥ì„ ë°›ì€(ë³€ê²½ëœ) í–‰(row) ê°œìˆ˜ë¥¼ ë°˜í™˜
+uint64 CBaseMySQL::GetAffectedRow()
+{
+	if( !m_bConnected )
+	{
+		return 0;
+	}
+
+	return mysql_affected_rows(m_pConn);
+}
+
+//***************************************************************************
+// ë§ˆì§€ë§‰ìœ¼ë¡œ ì‹¤í–‰í•œ ì¿¼ë¦¬ê°€ ë°˜í™˜í•˜ëŠ” ì»¬ëŸ¼(í•„ë“œ) ê°œìˆ˜ë¥¼ ë°˜í™˜. 
+// SELECT ë¬¸ì„ ì‹¤í–‰í•œ ê²½ìš° í•´ë‹¹ ê²°ê³¼ì˜ ì»¬ëŸ¼ ê°œìˆ˜ë¥¼ ë°˜í™˜í•˜ê³ ,
+// INSERT, UPDATE, DELETE ê°™ì€ DML ë¬¸ì„ ì‹¤í–‰í•œ ê²½ìš°ì—ëŠ” 0ì„ ë°˜í™˜
+uint32 CBaseMySQL::GetFieldCount()
+{
+	if( !m_bConnected )
+	{
+		return 0;
+	}
+
+	return mysql_field_count(m_pConn);
+}
+
+//***************************************************************************
+// ì¤€ë¹„ëœ ë¬¸(statement, MYSQL_STMT)ì„ ì‹¤í–‰í•œ í›„ ê²°ê³¼ ì§‘í•©ì˜ í–‰ ìˆ˜ë¥¼ ë°˜í™˜
+uint64 CBaseMySQL::GetStmtNumRows()
+{
+	if( !m_pStmt )
+	{
+		return 0;
+	}
+
+	return mysql_stmt_num_rows(m_pStmt);
+}
+
+//***************************************************************************
+// ì¤€ë¹„ëœ ë¬¸(statement, MYSQL_STMT)ìœ¼ë¡œ INSERT, UPDATE, DELETE ë“±ì˜ DML(Data Manipulation Language) ì‹¤í–‰ í›„ ì˜í–¥ì„ ë°›ì€ í–‰(row) ê°œìˆ˜ë¥¼ ë°˜í™˜
+uint64 CBaseMySQL::GetStmtAffectedRow()
+{
+	if( !m_pStmt )
+	{
+		return 0;
+	}
+
+	return mysql_stmt_affected_rows(m_pStmt);
+}
+
+//***************************************************************************
+// ì¤€ë¹„ëœ ë¬¸(MYSQL_STMT)ì´ ë°˜í™˜í•˜ëŠ” ì»¬ëŸ¼ ê°œìˆ˜ë¥¼ ë°˜í™˜
+uint32 CBaseMySQL::GetStmtFieldCount()
+{
+	if( !m_pStmt )
+	{
+		return 0;
+	}
+
+	return mysql_stmt_field_count(m_pStmt);
+}
+
+//***************************************************************************
+// SELECT ì¿¼ë¦¬ë¥¼ ì‹¤í–‰í•œ í›„, mysql_store_result() ë˜ëŠ” mysql_use_result()ë¥¼ í†µí•´ ê°€ì ¸ì˜¨ MYSQL_RES ê²°ê³¼ ì§‘í•©ì˜ ì´ í–‰(row) ìˆ˜ë¥¼ ë°˜í™˜
+uint64 CBaseMySQL::GetNumRows(MYSQL_RES* pRes)
 {
 	if( pRes == NULL ) return 0;
 
@@ -724,8 +772,8 @@ uint64 CBaseMySQL::GetRowCount(MYSQL_RES* pRes)
 }
 
 //***************************************************************************
-//
-uint64 CBaseMySQL::GetFieldCount(MYSQL_RES* pRes)
+// MYSQL_RES ê²°ê³¼ ì§‘í•©ì˜ ì´ ì»¬ëŸ¼(í•„ë“œ) ìˆ˜ë¥¼ ë°˜í™˜
+uint64 CBaseMySQL::GetNumFields(MYSQL_RES* pRes)
 {
 	if( pRes == NULL ) return 0;
 
@@ -733,12 +781,12 @@ uint64 CBaseMySQL::GetFieldCount(MYSQL_RES* pRes)
 }
 
 //***************************************************************************
-//
-bool CBaseMySQL::GetFields(MYSQL_RES* pRes, MYSQL_FIELD*& pFields, uint64& ui64FieldCount)
+// MYSQL_RES ê²°ê³¼ ì§‘í•©ì—ì„œ ì»¬ëŸ¼ ì •ë³´ë¥¼ í¬í•¨í•œ MYSQL_FIELD êµ¬ì¡°ì²´ë¥¼ ë°˜í™˜
+bool CBaseMySQL::GetFetchField(MYSQL_RES* pRes, MYSQL_FIELD*& pFields, uint64& ui64FieldCount)
 {
 	if( pRes == NULL ) return false;
 
-	ui64FieldCount = GetFieldCount(pRes);
+	ui64FieldCount = GetNumFields(pRes);
 	pFields = mysql_fetch_field(pRes);
 
 	return true;
@@ -793,7 +841,7 @@ void CBaseMySQL::GetData(const MYSQL_ROW Row, const int nColNum, uint32& ui32Dat
 {
 	if( Row[nColNum] )
 	{
-		ui32Data = GetUInt32(Row[nColNum]);
+		ui32Data = strtoul(Row[nColNum], NULL, 10);
 	}
 }
 
@@ -813,7 +861,7 @@ void CBaseMySQL::GetData(const MYSQL_ROW Row, const int nColNum, uint64& ui64Dat
 {
 	if( Row[nColNum] )
 	{
-		ui64Data = GetUInt64(Row[nColNum]);
+		ui64Data = strtoull(Row[nColNum], NULL, 10);
 	}
 }
 
