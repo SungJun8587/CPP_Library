@@ -32,7 +32,7 @@ cpu_id PROC
     test eax, eax           ; EAX == 0이면 지원 안 함
     jz exit
 
-	; RCX가 가리키는 메모리 주소의 유효성을 확인
+	; rcx, rdx, r8, r9가 가리키는 메모리 주소의 유효성을 확인
     test rcx, rcx           ; EAX의 메모리 주소 NULL 체크
     jz exit                 ; NULL이면 종료
     test rdx, rdx           ; EBX의 메모리 주소 NULL 체크
@@ -43,23 +43,24 @@ cpu_id PROC
     jz exit                 ; NULL이면 종료
 
     ; RCX가 가리키는 메모리 주소의 유효성을 확인
-    mov r15, rcx           ; 첫 번째 인자 (CPUID 요청 및 결과를 저장할 메모리 주소)
-    test r15, r15          ; NULL 체크
-    jz exit                ; NULL이면 종료
+	mov r15, rcx			; 첫 번째 인자(CPUID 요청 및 결과를 저장할 메모리 주소)
+	mov r14, rdx			; 두 번째 인자(CPUID 요청 및 결과를 저장할 메모리 주소)
+	mov r13, r8             ; 세 번째 인자(CPUID 요청 및 결과를 저장할 메모리 주소)
+	mov r12, r9             ; 네 번째 인자(CPUID 요청 및 결과를 저장할 메모리 주소)
+
+	mov eax, [r15]			; EAX = CPUID 요청값(예 : 0x80000001)
+	mov ebx, [r14]
+	mov ecx, [r13]
+	mov edx, [r12]
 
     ; CPUID 실행
-    mov eax, [r15]         ; EAX = CPUID 요청값 (예: 0x80000001)
-    xor ebx, ebx           ; EBX 초기화
-	xor ecx, ecx           ; ECX 초기화
-	xor edx, edx           ; EDX 초기화
-
     cpuid                  ; CPUID 명령어 실행
 
     ; 결과를 메모리에 저장
-    mov [r15], eax				; EAX 결과 저장 (두 번째 인자)
-    mov [r15 + 4], ebx          ; EBX 결과 저장 (세 번째 인자)
-    mov [r15 + 8], ecx          ; ECX 결과 저장 (네 번째 인자)
-    mov [r15 + 12], edx			; EDX 결과 저장 (네 번째 인자)
+    mov [r15], eax				; EAX 결과 저장(첫 번째 인자)
+    mov [r14], ebx				; EBX 결과 저장(두 번째 인자)
+    mov [r13], ecx				; ECX 결과 저장(세 번째 인자)
+    mov [r12], edx				; EDX 결과 저장(네 번째 인자)
 
 exit:
     ret

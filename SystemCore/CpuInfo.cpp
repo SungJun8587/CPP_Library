@@ -26,8 +26,6 @@ CCpuInfo::CCpuInfo()
 	m_dwFeatureEbx = 0;
 	m_dwFeatureEcx = 0;
 	m_dwFeatures = 0;
-	
-	m_dwExtendedFeatureEax = 0;
 	m_dwExtendedFeatureEdx = 0;
 
 	m_dwEax1 = 0;
@@ -275,7 +273,6 @@ void CCpuInfo::GetExtendedFeature()
 
 	cpu_id(&dwEax, &dwEbx, &dwEcx, &dwEdx);
 
-	m_dwExtendedFeatureEax = dwEax;
 	m_dwExtendedFeatureEdx = dwEdx;
 }
 

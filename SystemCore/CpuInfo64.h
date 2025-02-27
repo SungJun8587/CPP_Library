@@ -7,6 +7,27 @@
 #ifndef __CPUINFO64_H__
 #define __CPUINFO64_H__
 
+//***************************************************************************
+// 리눅스에서는 파라미터를 전달할 때 6개 레지스터를 사용(인자가 7개 이상일 경우부터는 스택을 같이 사용)
+//	- RDI : 첫번째 인자
+//	- RSI : 두번째 인자
+//	- RDX : 세번째 인자
+//	- RCX : 네번째 인자
+//	- R8 : 다섯번째 인자(추가된 범용 레지스터)
+//	- R9 : 여섯번째 인자(추가된 범용 레지스터)
+//  - [rsp + 8] : 일곱번째 인자
+//  - [rsp + 16] : 여덟번째 인자
+// 
+// 윈도우는 리눅스와 달리 레지스터를 4개까지 사용(인자가 5개 이상일 경우부터는 스택을 같이 사용)
+//	- RCX : 첫번째 인자
+//	- RDX : 두번째 인자
+//	- R8 : 세번째 인자(추가된 범용 레지스터)
+//	- R9 : 네번째 인자(추가된 범용 레지스터)
+//  - [rsp + 8] : 다섯번째 인자
+//  - [rsp + 16] : 여섯번째 인자
+//
+//***************************************************************************
+
 extern "C" int cpu_id_supported(); // returns true if CPUID is supported
 extern "C" void cpu_id(unsigned long* eax, unsigned long* ebx, unsigned long* ecx, unsigned long* edx);
 extern "C" int cpu_vendor(unsigned long* highestcpuid, char* vendorname);

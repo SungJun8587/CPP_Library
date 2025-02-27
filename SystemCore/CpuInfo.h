@@ -130,7 +130,7 @@ public:
 
 	void	GetNameString();
 
-public:
+private:
 	void	DetectCpuGenInfo();
 	void	DetectCpuDescInfo();
 	void	DetectCpuSpeed();
@@ -157,8 +157,6 @@ private:
 	DWORD	m_dwFeatureEbx;
 	DWORD	m_dwFeatureEcx;
 	DWORD	m_dwFeatures;
-
-	DWORD	m_dwExtendedFeatureEax;
 	DWORD	m_dwExtendedFeatureEdx;
 
 	DWORD	m_dwEax1;
