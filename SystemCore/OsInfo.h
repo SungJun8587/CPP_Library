@@ -340,10 +340,10 @@ public:
 	COsInfo();
 	virtual ~COsInfo();
 
-	WindowsVersion COsInfo::GetWindowsVersion() const {
+	WindowsVersion GetWindowsVersion() const {
 		return m_nWinVersion;								// returns the windows version
 	}
-	WindowsEdition COsInfo::GetWindowsEdition() const {
+	WindowsEdition GetWindowsEdition() const {
 		return m_nWinEdition;								// returns the windows edition
 	}
 

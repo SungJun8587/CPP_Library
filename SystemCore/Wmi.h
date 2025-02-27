@@ -32,7 +32,7 @@ public:
 #else
 		CMemBuffer<char>	CName;
 
-		if( !WideCharToMultiByteStr(CName, pwszName) ) return false;
+		if( !UnicodeToAnsi(CName, pwszName, wcslen(pwszName)) ) return false;
 
 		StringCbCopy(m_tszName, _countof(m_tszName), CName.GetBuffer());
 #endif
@@ -54,11 +54,11 @@ public:
 	~CWmi();
 
 	BOOL	Connect(TCHAR *ptszHost = NULL, TCHAR *ptszUserName = NULL, TCHAR *ptszUserPass = NULL);
-	int		ExecQuery(TCHAR *ptszQuery);
+	int		ExecQuery(const TCHAR *ptszQuery);
 
-	BOOL	GetProperties(int nIndex, TCHAR *ptszProperty, VARIANT &vtVal);
-	BOOL	GetProperties(int nIndex, TCHAR *ptszProperty, TCHAR *ptszValue, DWORD dwSize);
-	BOOL	GetProperties(int nIndex, TCHAR *ptszProperty, long *plValue);
+	BOOL	GetProperties(int nIndex, const TCHAR *ptszProperty, VARIANT &vtVal);
+	BOOL	GetProperties(int nIndex, const TCHAR *ptszProperty, TCHAR *ptszValue, DWORD dwSize);
+	BOOL	GetProperties(int nIndex, const TCHAR *ptszProperty, long *plValue);
 
 private:
 	IWbemLocator	*m_pIWbemLocator;

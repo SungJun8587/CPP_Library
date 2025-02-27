@@ -71,15 +71,15 @@ BOOL CWmi::Connect(TCHAR *ptszHost, TCHAR *ptszUserName, TCHAR *ptszUserPass)
 		CMemBuffer<wchar_t>	WUserName;
 		CMemBuffer<wchar_t>	WUserPass;
 
-		if( !MultiByteToWideCharStr(WHost, ptszHost) ) return false;
+		if( !AnsiToUnicode(WHost, ptszHost, strlen(ptszHost)) ) return false;
 
 		pwszHost = WHost.GetBuffer();
 
-		if( !MultiByteToWideCharStr(WUserName, ptszUserName) ) return false;
+		if( !AnsiToUnicode(WUserName, ptszUserName, strlen(ptszUserName)) ) return false;
 
 		pwszUserName = WUserName.GetBuffer();
 
-		if( !MultiByteToWideCharStr(WUserPass, ptszUserPass) ) return false;
+		if( !AnsiToUnicode(WUserPass, ptszUserPass, strlen(ptszUserPass)) ) return false;
 
 		pwszUserPass = WUserPass.GetBuffer();
 #endif
@@ -169,7 +169,7 @@ BOOL CWmi::Connect(TCHAR *ptszHost, TCHAR *ptszUserName, TCHAR *ptszUserPass)
 
 //***************************************************************************
 //
-int CWmi::ExecQuery(TCHAR *ptszQuery)
+int CWmi::ExecQuery(const TCHAR *ptszQuery)
 {
 	HRESULT	hr;
 	ULONG	ulCount = 1;
@@ -228,7 +228,7 @@ int CWmi::ExecQuery(TCHAR *ptszQuery)
 
 //***************************************************************************
 //
-BOOL CWmi::GetProperties(int nIndex, TCHAR *ptszProperty, VARIANT &vtVal)
+BOOL CWmi::GetProperties(int nIndex, const TCHAR *ptszProperty, VARIANT &vtVal)
 {
 	USES_CONVERSION;
 
@@ -249,7 +249,7 @@ BOOL CWmi::GetProperties(int nIndex, TCHAR *ptszProperty, VARIANT &vtVal)
 
 //***************************************************************************
 //
-BOOL CWmi::GetProperties(int nIndex, TCHAR *ptszProperty, TCHAR *ptszValue, DWORD dwSize)
+BOOL CWmi::GetProperties(int nIndex, const TCHAR *ptszProperty, TCHAR *ptszValue, DWORD dwSize)
 {
 	USES_CONVERSION;
 
@@ -284,7 +284,7 @@ BOOL CWmi::GetProperties(int nIndex, TCHAR *ptszProperty, TCHAR *ptszValue, DWOR
 
 //***************************************************************************
 //
-BOOL CWmi::GetProperties(int nIndex, TCHAR *ptszProperty, long *plValue)
+BOOL CWmi::GetProperties(int nIndex, const TCHAR *ptszProperty, long *plValue)
 {
 	HRESULT	hr;
 	VARIANT	vtVal;

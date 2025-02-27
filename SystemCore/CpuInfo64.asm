@@ -28,27 +28,41 @@ cpu_id_supported ENDP
 
 
 cpu_id PROC
+    call cpu_id_supported   ; CPUID 지원 여부 확인
+    test eax, eax           ; EAX == 0이면 지원 안 함
+    jz exit
 
-	call cpu_id_supported
-	cmp eax, 0
-	je exit
+	; RCX가 가리키는 메모리 주소의 유효성을 확인
+    test rcx, rcx           ; EAX의 메모리 주소 NULL 체크
+    jz exit                 ; NULL이면 종료
+    test rdx, rdx           ; EBX의 메모리 주소 NULL 체크
+    jz exit                 ; NULL이면 종료
+    test r8, r8             ; ECX의 메모리 주소 NULL 체크
+    jz exit                 ; NULL이면 종료
+    test r9, r9             ; EDX의 메모리 주소 NULL 체크
+    jz exit                 ; NULL이면 종료
 
-	mov r15, rcx
-	mov eax, [r15]
+    ; RCX가 가리키는 메모리 주소의 유효성을 확인
+    mov r15, rcx           ; 첫 번째 인자 (CPUID 요청 및 결과를 저장할 메모리 주소)
+    test r15, r15          ; NULL 체크
+    jz exit                ; NULL이면 종료
 
-	mov ebx, edx
-	mov ecx, r8d
-	mov edx, r9d
+    ; CPUID 실행
+    mov eax, [r15]         ; EAX = CPUID 요청값 (예: 0x80000001)
+    xor ebx, ebx           ; EBX 초기화
+	xor ecx, ecx           ; ECX 초기화
+	xor edx, edx           ; EDX 초기화
 
-	cpuid
+    cpuid                  ; CPUID 명령어 실행
 
-	mov DWORD PTR [r15], eax
-	mov DWORD PTR [r15+32], ebx
-	mov DWORD PTR [r15+64], ecx
-	mov DWORD PTR [r15+96], edx
+    ; 결과를 메모리에 저장
+    mov [r15], eax				; EAX 결과 저장 (두 번째 인자)
+    mov [r15 + 4], ebx          ; EBX 결과 저장 (세 번째 인자)
+    mov [r15 + 8], ecx          ; ECX 결과 저장 (네 번째 인자)
+    mov [r15 + 12], edx			; EDX 결과 저장 (네 번째 인자)
 
 exit:
-	ret
+    ret
 cpu_id ENDP
 
 

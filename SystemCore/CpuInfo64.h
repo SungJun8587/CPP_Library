@@ -8,8 +8,8 @@
 #define __CPUINFO64_H__
 
 extern "C" int cpu_id_supported(); // returns true if CPUID is supported
-extern "C" void cpu_id(DWORD* eax, DWORD* ebx, DWORD* ecx, DWORD* edx);
-extern "C" int cpu_vendor(DWORD* highestcpuid, char* vendorname);
+extern "C" void cpu_id(unsigned long* eax, unsigned long* ebx, unsigned long* ecx, unsigned long* edx);
+extern "C" int cpu_vendor(unsigned long* highestcpuid, char* vendorname);
 extern "C" long long cpu_brand_part0(); // returns 8 byte string if brand is supported, or 0 if not supported
 extern "C" long long cpu_brand_part1(); // returns 8 byte string if brand is supported, or 0 if not supported
 extern "C" long long cpu_brand_part2(); // returns 8 byte string if brand is supported, or 0 if not supported

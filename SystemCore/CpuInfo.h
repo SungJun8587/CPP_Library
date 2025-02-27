@@ -130,7 +130,7 @@ public:
 
 	void	GetNameString();
 
-private:
+public:
 	void	DetectCpuGenInfo();
 	void	DetectCpuDescInfo();
 	void	DetectCpuSpeed();
@@ -145,7 +145,7 @@ private:
 	void	GetAmdL2CacheInfo();
 	void	GetOldIntelName();
 
-	void	GetCeleronAndXeon( DWORD dwRegisterCache, BOOL *pbIsCeleron, BOOL *pbIsXeon, BOOL bIsEax = false );
+	void	GetCeleronAndXeon(DWORD dwRegisterCache, BOOL *pbIsCeleron, BOOL *pbIsXeon, BOOL bIsEax = false);
 
 	__int64	CalculateCpuSpeed() const;
 	__int64	CalculateCpuSpeedMethod2() const;
@@ -157,7 +157,9 @@ private:
 	DWORD	m_dwFeatureEbx;
 	DWORD	m_dwFeatureEcx;
 	DWORD	m_dwFeatures;
-	DWORD   m_dwExtendedFeatures;
+
+	DWORD	m_dwExtendedFeatureEax;
+	DWORD	m_dwExtendedFeatureEdx;
 
 	DWORD	m_dwEax1;
 	DWORD	m_dwEbx1;

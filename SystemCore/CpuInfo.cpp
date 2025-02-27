@@ -26,7 +26,9 @@ CCpuInfo::CCpuInfo()
 	m_dwFeatureEbx = 0;
 	m_dwFeatureEcx = 0;
 	m_dwFeatures = 0;
-	m_dwExtendedFeatures = 0;
+	
+	m_dwExtendedFeatureEax = 0;
+	m_dwExtendedFeatureEdx = 0;
 
 	m_dwEax1 = 0;
 	m_dwEbx1 = 0;
@@ -230,7 +232,7 @@ void CCpuInfo::GetIntelCacheInfo()
 //
 void CCpuInfo::GetAmdL1CacheInfo()
 {
-	DWORD dwEax = 0x80000005, dwEbx = 0, dwEcx = 0, dwEdx = 0;
+	DWORD dwEax = AMD_L1CACHE_FEATURE, dwEbx = 0, dwEcx = 0, dwEdx = 0;
 
 	cpu_id(&dwEax, &dwEbx, &dwEcx, &dwEdx);
 
@@ -244,7 +246,7 @@ void CCpuInfo::GetAmdL1CacheInfo()
 //
 void CCpuInfo::GetAmdL2CacheInfo()
 {
-	DWORD dwEax = 0x80000006, dwEbx = 0, dwEcx = 0, dwEdx = 0;
+	DWORD dwEax = AMD_L2CACHE_FEATURE, dwEbx = 0, dwEcx = 0, dwEdx = 0;
 
 	cpu_id(&dwEax, &dwEbx, &dwEcx, &dwEdx);
 
@@ -269,11 +271,12 @@ DWORD CCpuInfo::GetLargestExtendedFeature()
 //
 void CCpuInfo::GetExtendedFeature()
 {
-	DWORD dwEax = 0x80000001, dwEbx = 0, dwEcx = 0, dwEdx = 0;
+	unsigned long dwEax = AMD_EXTENDED_FEATURE, dwEbx = 0, dwEcx = 0, dwEdx = 0;
 
 	cpu_id(&dwEax, &dwEbx, &dwEcx, &dwEdx);
 
-	m_dwExtendedFeatures = dwEdx;
+	m_dwExtendedFeatureEax = dwEax;
+	m_dwExtendedFeatureEdx = dwEdx;
 }
 
 //***************************************************************************
@@ -320,7 +323,7 @@ void CCpuInfo::GetOldIntelName()
 	struct brand_entry
 	{
 		long	lBrandValue;
-		TCHAR	*pszBrand;
+		const TCHAR	*pszBrand;
 	};
 
 	struct brand_entry brand_table[BRANDTABLESIZE] =

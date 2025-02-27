@@ -487,7 +487,7 @@ public:
 	const TCHAR* GetProductName() const {
 		return m_SoundCard.m_tszProductName;
 	}
-	const TCHAR* CSoundCardInfo::GetCompanyName() const {
+	const TCHAR* GetCompanyName() const {
 		return m_SoundCard.m_tszCompanyName;
 	}
 

@@ -42,8 +42,8 @@ public:
 
 	void		InitForLogFile(const TCHAR* ptszDirecoryName, const TCHAR* ptszFileNamePrefix, const int nConfig, const TCHAR* ptszTerminator = NULL);
 
-	bool		EventLog(TCHAR* ptszLog, bool bFlag = true);
-	bool		EventLog(bool bFlag, TCHAR* ptszFormat, ...);
+	bool		EventLog(const TCHAR* ptszLog, bool bFlag = true);
+	bool		EventLog(bool bFlag, const TCHAR* ptszFormat, ...);
 
 	bool		LogString(void);
 	void		ResetString(void);

@@ -40,7 +40,7 @@ void CEventLog::InitForLogFile(const TCHAR* ptszDirecoryName, const TCHAR* ptszF
 //***************************************************************************
 // bFlag = true -> Write Line Header
 // bFlag = false -> Don't Write Line Header
-bool CEventLog::EventLog(TCHAR* ptszLog, bool bFlag)
+bool CEventLog::EventLog(const TCHAR* ptszLog, bool bFlag)
 {
 	bool	bResult = true;
 	DWORD	dwHighCount, dwWritten;
@@ -86,7 +86,7 @@ bool CEventLog::EventLog(TCHAR* ptszLog, bool bFlag)
 //***************************************************************************
 // bFlag = true -> Write Line Header
 // bFlag = false -> Don't Write Line Header
-bool CEventLog::EventLog(bool bFlag, TCHAR* ptszFormat, ...)
+bool CEventLog::EventLog(bool bFlag, const TCHAR* ptszFormat, ...)
 {
 	bool	bResult = true;
 	DWORD	dwHighCount, dwWritten;
