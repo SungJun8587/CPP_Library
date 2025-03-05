@@ -344,42 +344,42 @@ void CCpuInfo::GetOldIntelName()
 				{
 					case 0:
 					case 1:
-						StringCchCopy(tszCpuName, _countof(tszCpuName), _T("Intel486(TM) DX processor"));
+						_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel486(TM) DX processor"));
 						break;
 					case 2:
-						StringCchCopy(tszCpuName, _countof(tszCpuName), _T("Intel486(TM) SX processor"));
+						_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel486(TM) SX processor"));
 						break;
 					case 3:
-						StringCchCopy(tszCpuName, _countof(tszCpuName), _T("IntelDX2(TM) processor"));
+						_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("IntelDX2(TM) processor"));
 						break;
 					case 4:
-						StringCchCopy(tszCpuName, _countof(tszCpuName), _T("Intel486(TM) processor"));
+						_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel486(TM) processor"));
 						break;
 					case 5:
-						StringCchCopy(tszCpuName, _countof(tszCpuName), _T("IntelSX2(TM) processor"));
+						_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("IntelSX2(TM) processor"));
 						break;
 					case 7:
-						StringCchCopy(tszCpuName, _countof(tszCpuName), _T("Writeback Enhanced IntelDX2(TM) processor"));
+						_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Writeback Enhanced IntelDX2(TM) processor"));
 						break;
 					case 8:
-						StringCchCopy(tszCpuName, _countof(tszCpuName), _T("IntelDX4(TM) processor"));
+						_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("IntelDX4(TM) processor"));
 						break;
 					default:
-						StringCchCopy(tszCpuName, _countof(tszCpuName), _T("Intel 486 processor"));
+						_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel 486 processor"));
 						break;
 				}
 				break;
 			case 5:		// pentium
-				StringCchCopy(tszCpuName, _countof(tszCpuName), _T("Intel Pentium(R) processor"));
+				_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel Pentium(R) processor"));
 				break;
 			case 6:		// pentium II and family
 				switch( nModel )
 				{
 					case 1:
-						StringCchCopy(tszCpuName, _countof(tszCpuName), _T("Intel Pentium(R) Pro processor"));
+						_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel Pentium(R) Pro processor"));
 						break;
 					case 3:
-						StringCchCopy(tszCpuName, _countof(tszCpuName), _T("Intel Pentium(R) II processor, model 3"));
+						_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel Pentium(R) II processor, model 3"));
 						break;
 					case 5:
 					case 7:
@@ -393,7 +393,7 @@ void CCpuInfo::GetOldIntelName()
 
 						if( bIsCeleron )
 						{
-							StringCchCopy(tszCpuName, _countof(tszCpuName), _T("Intel Celeron(TM) processor, model 5"));
+							_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel Celeron(TM) processor, model 5"));
 						}
 						else
 						{
@@ -401,31 +401,31 @@ void CCpuInfo::GetOldIntelName()
 							{
 								if( nModel == 5 )
 								{
-									StringCchCopy(tszCpuName, _countof(tszCpuName), _T("Intel Pentium(R) II Xeon(TM) processor"));
+									_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel Pentium(R) II Xeon(TM) processor"));
 								}
 								else
 								{
-									StringCchCopy(tszCpuName, _countof(tszCpuName), _T("Intel Pentium(R) III Xeon(TM) processor"));
+									_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel Pentium(R) III Xeon(TM) processor"));
 								}
 							}
 							else
 							{
 								if( nModel == 5 )
 								{
-									StringCchCopy(tszCpuName, _countof(tszCpuName), _T("Intel Pentium(R) II processor, model 5"));
+									_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel Pentium(R) II processor, model 5"));
 								}
 								else
 								{
-									StringCchCopy(tszCpuName, _countof(tszCpuName), _T("Intel Pentium(R) III processor"));
+									_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel Pentium(R) III processor"));
 								}
 							}
 						}
 						break;
 					case 6:
-						StringCchCopy(tszCpuName, _countof(tszCpuName), _T("Intel Celeron(TM) processor, model 6"));
+						_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel Celeron(TM) processor, model 6"));
 						break;
 					case 8:
-						StringCchCopy(tszCpuName, _countof(tszCpuName), _T("Intel Pentium(R) III Coppermine processor"));
+						_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel Pentium(R) III Coppermine processor"));
 						break;
 					default:
 					{
@@ -438,11 +438,11 @@ void CCpuInfo::GetOldIntelName()
 
 						if( nBrandIndex < BRANDTABLESIZE )
 						{
-							StringCchCopy(tszCpuName, _countof(tszCpuName), brand_table[nBrandIndex].pszBrand);
+							_tcscpy_s(tszCpuName, _countof(tszCpuName), brand_table[nBrandIndex].pszBrand);
 						}
 						else
 						{
-							StringCchCopy(tszCpuName, _countof(tszCpuName), _T("Unknown Genuine Intel processor"));
+							_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Unknown Genuine Intel processor"));
 						}
 						break;
 					}
@@ -452,7 +452,7 @@ void CCpuInfo::GetOldIntelName()
 		if( (m_dwSignature & MMX_FLAG) == MMX_FLAG )
 		{
 			if( tszCpuName && _tcslen(tszCpuName) > 0 )
-				StringCchPrintf(m_Cpu.m_tszProcessorName, _countof(m_Cpu.m_tszProcessorName), _T("%s with MMX"), tszCpuName);
+				_stprintf_s(m_Cpu.m_tszProcessorName, _countof(m_Cpu.m_tszProcessorName), _T("%s with MMX"), tszCpuName);
 			else m_Cpu.m_tszProcessorName[0] = '\0';
 		}
 	}

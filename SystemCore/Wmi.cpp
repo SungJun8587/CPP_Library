@@ -116,7 +116,7 @@ BOOL CWmi::Connect(TCHAR *ptszHost, TCHAR *ptszUserName, TCHAR *ptszUserPass)
 	}
 	else
 	{
-		StringCchPrintfW(wszBuffer, _countof(wszBuffer), L"\\\\%s\\ROOT\\CIMV2", pwszHost);
+		swprintf_s(wszBuffer, _countof(wszBuffer), L"\\\\%s\\ROOT\\CIMV2", pwszHost);
 
 		hr = m_pIWbemLocator->ConnectServer(
 			_bstr_t(wszBuffer),			// Object path of WMI namespace
@@ -182,7 +182,7 @@ int CWmi::ExecQuery(const TCHAR *ptszQuery)
 
 	if( !m_pIWbemServices ) return -1;
 
-	StringCchPrintf(tszReqQuery, _countof(tszReqQuery), _T("SELECT * FROM %s"), ptszQuery);
+	_stprintf_s(tszReqQuery, _countof(tszReqQuery), _T("SELECT * FROM %s"), ptszQuery);
 
 	hr = m_pIWbemServices->ExecQuery(
 		bstr_t(L"WQL"),
@@ -271,9 +271,9 @@ BOOL CWmi::GetProperties(int nIndex, const TCHAR *ptszProperty, TCHAR *ptszValue
 	if( vtVal.vt == VT_BSTR )
 	{
 #ifdef _UNICODE	
-		StringCchCopy(ptszValue, dwSize - 1, OLE2W(vtVal.bstrVal));
+		_tcscpy_s(ptszValue, dwSize - 1, OLE2W(vtVal.bstrVal));
 #else
-		StringCchCopy(ptszValue, dwSize - 1, OLE2A(vtVal.bstrVal));
+		_tcscpy_s(ptszValue, dwSize - 1, OLE2A(vtVal.bstrVal));
 #endif
 	}
 

@@ -244,7 +244,9 @@ typedef enum WindowsVersion
    WindowsServer2016,
    WindowsServer2019,
    WindowsServer2022,
-   Windows11
+   Windows11_21H2,
+   Windows11_22H2,
+   Windows11_23H2,
 } WindowsVersion;
 
 //***************************************************************************

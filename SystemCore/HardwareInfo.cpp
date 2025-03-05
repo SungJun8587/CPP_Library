@@ -23,7 +23,7 @@ void ChangeDataFormat(const __int64& nData, TCHAR *ptszFormat)
 	}
 
 	if( (0 <= nNumConversions) && (nNumConversions <= NUMFORMATTERS) )
-		StringCchPrintf(ptszFormat, NUMERIC_STRING_LEN, _T("%0.2f%s"), dblBase, tszFormatters[nNumConversions]);
+		_stprintf_s(ptszFormat, NUMERIC_STRING_LEN, _T("%0.2f%s"), dblBase, tszFormatters[nNumConversions]);
 }
 
 //***************************************************************************
@@ -64,9 +64,9 @@ BOOL CBiosInfo::GetInformation(CWmi &Wmi)
 	if( vtManufacturer.vt == VT_BSTR )
 	{
 #ifdef _UNICODE	
-		StringCchCopy(m_Bios.m_tszManufacturer, _countof(m_Bios.m_tszManufacturer), OLE2W(vtManufacturer.bstrVal));
+		_tcscpy_s(m_Bios.m_tszManufacturer, _countof(m_Bios.m_tszManufacturer), OLE2W(vtManufacturer.bstrVal));
 #else
-		StringCchCopy(m_Bios.m_tszManufacturer, _countof(m_Bios.m_tszManufacturer), OLE2A(vtManufacturer.bstrVal));
+		_tcscpy_s(m_Bios.m_tszManufacturer, _countof(m_Bios.m_tszManufacturer), OLE2A(vtManufacturer.bstrVal));
 #endif
 	}
 
@@ -79,9 +79,9 @@ BOOL CBiosInfo::GetInformation(CWmi &Wmi)
 	if( vtSmVersion.vt == VT_BSTR )
 	{
 #ifdef _UNICODE	
-		StringCchCopy(m_Bios.m_tszSmVersion, _countof(m_Bios.m_tszSmVersion), OLE2W(vtSmVersion.bstrVal));
+		_tcscpy_s(m_Bios.m_tszSmVersion, _countof(m_Bios.m_tszSmVersion), OLE2W(vtSmVersion.bstrVal));
 #else
-		StringCchCopy(m_Bios.m_tszSmVersion, _countof(m_Bios.m_tszSmVersion), OLE2A(vtSmVersion.bstrVal));
+		_tcscpy_s(m_Bios.m_tszSmVersion, _countof(m_Bios.m_tszSmVersion), OLE2A(vtSmVersion.bstrVal));
 #endif
 	}
 
@@ -94,9 +94,9 @@ BOOL CBiosInfo::GetInformation(CWmi &Wmi)
 	if( vtVersion.vt == VT_BSTR )
 	{
 #ifdef _UNICODE	
-		StringCchCopy(m_Bios.m_tszVersion, _countof(m_Bios.m_tszVersion), OLE2W(vtVersion.bstrVal));
+		_tcscpy_s(m_Bios.m_tszVersion, _countof(m_Bios.m_tszVersion), OLE2W(vtVersion.bstrVal));
 #else
-		StringCchCopy(m_Bios.m_tszVersion, _countof(m_Bios.m_tszVersion), OLE2A(vtVersion.bstrVal));
+		_tcscpy_s(m_Bios.m_tszVersion, _countof(m_Bios.m_tszVersion), OLE2A(vtVersion.bstrVal));
 #endif
 	}
 
@@ -109,9 +109,9 @@ BOOL CBiosInfo::GetInformation(CWmi &Wmi)
 	if( vtIdentificationCode.vt == VT_BSTR )
 	{
 #ifdef _UNICODE	
-		StringCchCopy(m_Bios.m_tszIdentificationCode, _countof(m_Bios.m_tszIdentificationCode), OLE2W(vtIdentificationCode.bstrVal));
+		_tcscpy_s(m_Bios.m_tszIdentificationCode, _countof(m_Bios.m_tszIdentificationCode), OLE2W(vtIdentificationCode.bstrVal));
 #else
-		StringCchCopy(m_Bios.m_tszIdentificationCode, _countof(m_Bios.m_tszIdentificationCode), OLE2A(vtIdentificationCode.bstrVal));
+		_tcscpy_s(m_Bios.m_tszIdentificationCode, _countof(m_Bios.m_tszIdentificationCode), OLE2A(vtIdentificationCode.bstrVal));
 #endif
 	}
 
@@ -124,9 +124,9 @@ BOOL CBiosInfo::GetInformation(CWmi &Wmi)
 	if( vtSerialNumber.vt == VT_BSTR )
 	{
 #ifdef _UNICODE	
-		StringCchCopy(m_Bios.m_tszSerialNumber, _countof(m_Bios.m_tszSerialNumber), OLE2W(vtSerialNumber.bstrVal));
+		_tcscpy_s(m_Bios.m_tszSerialNumber, _countof(m_Bios.m_tszSerialNumber), OLE2W(vtSerialNumber.bstrVal));
 #else
-		StringCchCopy(m_Bios.m_tszSerialNumber, _countof(m_Bios.m_tszSerialNumber), OLE2A(vtSerialNumber.bstrVal));
+		_tcscpy_s(m_Bios.m_tszSerialNumber, _countof(m_Bios.m_tszSerialNumber), OLE2A(vtSerialNumber.bstrVal));
 #endif
 	}
 
@@ -139,9 +139,9 @@ BOOL CBiosInfo::GetInformation(CWmi &Wmi)
 	if( vtReleaseDate.vt == VT_BSTR )
 	{
 #ifdef _UNICODE	
-		StringCchCopy(m_Bios.m_tszReleaseDate, _countof(m_Bios.m_tszReleaseDate), OLE2W(vtReleaseDate.bstrVal));
+		_tcscpy_s(m_Bios.m_tszReleaseDate, _countof(m_Bios.m_tszReleaseDate), OLE2W(vtReleaseDate.bstrVal));
 #else
-		StringCchCopy(m_Bios.m_tszReleaseDate, _countof(m_Bios.m_tszReleaseDate), OLE2A(vtReleaseDate.bstrVal));
+		_tcscpy_s(m_Bios.m_tszReleaseDate, _countof(m_Bios.m_tszReleaseDate), OLE2A(vtReleaseDate.bstrVal));
 #endif
 	}
 
@@ -186,9 +186,9 @@ BOOL CMainBoardInfo::GetInformation(CWmi &Wmi)
 	if( vtProduct.vt == VT_BSTR )
 	{
 #ifdef _UNICODE	
-		StringCchCopy(m_MainBoard.m_tszProduct, _countof(m_MainBoard.m_tszProduct), OLE2W(vtProduct.bstrVal));
+		_tcscpy_s(m_MainBoard.m_tszProduct, _countof(m_MainBoard.m_tszProduct), OLE2W(vtProduct.bstrVal));
 #else
-		StringCchCopy(m_MainBoard.m_tszProduct, _countof(m_MainBoard.m_tszProduct), OLE2A(vtProduct.bstrVal));
+		_tcscpy_s(m_MainBoard.m_tszProduct, _countof(m_MainBoard.m_tszProduct), OLE2A(vtProduct.bstrVal));
 #endif
 	}
 
@@ -201,9 +201,9 @@ BOOL CMainBoardInfo::GetInformation(CWmi &Wmi)
 	if( vtSerialNumber.vt == VT_BSTR )
 	{
 #ifdef _UNICODE	
-		StringCchCopy(m_MainBoard.m_tszSerialNumber, _countof(m_MainBoard.m_tszSerialNumber), OLE2W(vtSerialNumber.bstrVal));
+		_tcscpy_s(m_MainBoard.m_tszSerialNumber, _countof(m_MainBoard.m_tszSerialNumber), OLE2W(vtSerialNumber.bstrVal));
 #else
-		StringCchCopy(m_MainBoard.m_tszSerialNumber, _countof(m_MainBoard.m_tszSerialNumber), OLE2A(vtSerialNumber.bstrVal));
+		_tcscpy_s(m_MainBoard.m_tszSerialNumber, _countof(m_MainBoard.m_tszSerialNumber), OLE2A(vtSerialNumber.bstrVal));
 #endif
 	}
 
@@ -216,9 +216,9 @@ BOOL CMainBoardInfo::GetInformation(CWmi &Wmi)
 	if( vtManufacturer.vt == VT_BSTR )
 	{
 #ifdef _UNICODE	
-		StringCchCopy(m_MainBoard.m_tszManufacturer, _countof(m_MainBoard.m_tszManufacturer), OLE2W(vtManufacturer.bstrVal));
+		_tcscpy_s(m_MainBoard.m_tszManufacturer, _countof(m_MainBoard.m_tszManufacturer), OLE2W(vtManufacturer.bstrVal));
 #else
-		StringCchCopy(m_MainBoard.m_tszManufacturer, _countof(m_MainBoard.m_tszManufacturer), OLE2A(vtManufacturer.bstrVal));
+		_tcscpy_s(m_MainBoard.m_tszManufacturer, _countof(m_MainBoard.m_tszManufacturer), OLE2A(vtManufacturer.bstrVal));
 #endif
 	}
 
@@ -231,9 +231,9 @@ BOOL CMainBoardInfo::GetInformation(CWmi &Wmi)
 	if( vtDescription.vt == VT_BSTR )
 	{
 #ifdef _UNICODE	
-		StringCchCopy(m_MainBoard.m_tszDescription, _countof(m_MainBoard.m_tszDescription), OLE2W(vtDescription.bstrVal));
+		_tcscpy_s(m_MainBoard.m_tszDescription, _countof(m_MainBoard.m_tszDescription), OLE2W(vtDescription.bstrVal));
 #else
-		StringCchCopy(m_MainBoard.m_tszDescription, _countof(m_MainBoard.m_tszDescription), OLE2A(vtDescription.bstrVal));
+		_tcscpy_s(m_MainBoard.m_tszDescription, _countof(m_MainBoard.m_tszDescription), OLE2A(vtDescription.bstrVal));
 #endif
 	}
 
@@ -311,9 +311,9 @@ BOOL CMemoryInfo::GetInformation(CWmi &Wmi)
 		if( vtBankLabel.vt == VT_BSTR )
 		{
 #ifdef _UNICODE	
-			StringCchCopy(pRam->m_tszBankLabel, _countof(pRam->m_tszBankLabel), OLE2W(vtBankLabel.bstrVal));
+			_tcscpy_s(pRam->m_tszBankLabel, _countof(pRam->m_tszBankLabel), OLE2W(vtBankLabel.bstrVal));
 #else
-			StringCchCopy(pRam->m_tszBankLabel, _countof(pRam->m_tszBankLabel), OLE2A(vtBankLabel.bstrVal));
+			_tcscpy_s(pRam->m_tszBankLabel, _countof(pRam->m_tszBankLabel), OLE2A(vtBankLabel.bstrVal));
 #endif
 		}
 
@@ -326,9 +326,9 @@ BOOL CMemoryInfo::GetInformation(CWmi &Wmi)
 		if( vtName.vt == VT_BSTR )
 		{
 #ifdef _UNICODE	
-			StringCchCopy(pRam->m_tszName, _countof(pRam->m_tszName), OLE2W(vtName.bstrVal));
+			_tcscpy_s(pRam->m_tszName, _countof(pRam->m_tszName), OLE2W(vtName.bstrVal));
 #else
-			StringCchCopy(pRam->m_tszName, _countof(pRam->m_tszName), OLE2A(vtName.bstrVal));
+			_tcscpy_s(pRam->m_tszName, _countof(pRam->m_tszName), OLE2A(vtName.bstrVal));
 #endif
 		}
 
@@ -341,9 +341,9 @@ BOOL CMemoryInfo::GetInformation(CWmi &Wmi)
 		if( vtDeviceLocator.vt == VT_BSTR )
 		{
 #ifdef _UNICODE	
-			StringCchCopy(pRam->m_tszDeviceLocator, _countof(pRam->m_tszDeviceLocator), OLE2W(vtDeviceLocator.bstrVal));
+			_tcscpy_s(pRam->m_tszDeviceLocator, _countof(pRam->m_tszDeviceLocator), OLE2W(vtDeviceLocator.bstrVal));
 #else
-			StringCchCopy(pRam->m_tszDeviceLocator, _countof(pRam->m_tszDeviceLocator), OLE2A(vtDeviceLocator.bstrVal));
+			_tcscpy_s(pRam->m_tszDeviceLocator, _countof(pRam->m_tszDeviceLocator), OLE2A(vtDeviceLocator.bstrVal));
 #endif
 		}
 
@@ -356,9 +356,9 @@ BOOL CMemoryInfo::GetInformation(CWmi &Wmi)
 		if( vtCapacity.vt == VT_BSTR )
 		{
 #ifdef _UNICODE	
-			StringCchCopy(tszCapacity, _countof(tszCapacity), OLE2W(vtCapacity.bstrVal));
+			_tcscpy_s(tszCapacity, _countof(tszCapacity), OLE2W(vtCapacity.bstrVal));
 #else
-			StringCchCopy(tszCapacity, _countof(tszCapacity), OLE2A(vtCapacity.bstrVal));
+			_tcscpy_s(tszCapacity, _countof(tszCapacity), OLE2A(vtCapacity.bstrVal));
 #endif
 
 			if( IsAllNumeric(tszCapacity) )
@@ -420,9 +420,9 @@ BOOL CMemoryInfo::GetInformation(CWmi &Wmi)
 	if( vtFreePhysicalMemory.vt == VT_BSTR )
 	{
 #ifdef _UNICODE	
-		StringCchCopy(tszPhysicalMemory, _countof(tszPhysicalMemory), OLE2W(vtFreePhysicalMemory.bstrVal));
+		_tcscpy_s(tszPhysicalMemory, _countof(tszPhysicalMemory), OLE2W(vtFreePhysicalMemory.bstrVal));
 #else
-		StringCchCopy(tszPhysicalMemory, _countof(tszPhysicalMemory), OLE2A(vtFreePhysicalMemory.bstrVal));
+		_tcscpy_s(tszPhysicalMemory, _countof(tszPhysicalMemory), OLE2A(vtFreePhysicalMemory.bstrVal));
 #endif
 
 		if( IsAllNumeric(tszPhysicalMemory) )
@@ -438,9 +438,9 @@ BOOL CMemoryInfo::GetInformation(CWmi &Wmi)
 	if( vtTotalVirtualMemory.vt == VT_BSTR )
 	{
 #ifdef _UNICODE	
-		StringCchCopy(tszTotalVirtualMemory, _countof(tszTotalVirtualMemory), OLE2W(vtTotalVirtualMemory.bstrVal));
+		_tcscpy_s(tszTotalVirtualMemory, _countof(tszTotalVirtualMemory), OLE2W(vtTotalVirtualMemory.bstrVal));
 #else
-		StringCchCopy(tszTotalVirtualMemory, _countof(tszTotalVirtualMemory), OLE2A(vtTotalVirtualMemory.bstrVal));
+		_tcscpy_s(tszTotalVirtualMemory, _countof(tszTotalVirtualMemory), OLE2A(vtTotalVirtualMemory.bstrVal));
 #endif
 
 		if( IsAllNumeric(tszTotalVirtualMemory) )
@@ -456,9 +456,9 @@ BOOL CMemoryInfo::GetInformation(CWmi &Wmi)
 	if( vtFreeVirtualMemory.vt == VT_BSTR )
 	{
 #ifdef _UNICODE	
-		StringCchCopy(tszFreeVirtualMemory, _countof(tszFreeVirtualMemory), OLE2W(vtFreeVirtualMemory.bstrVal));
+		_tcscpy_s(tszFreeVirtualMemory, _countof(tszFreeVirtualMemory), OLE2W(vtFreeVirtualMemory.bstrVal));
 #else
-		StringCchCopy(tszFreeVirtualMemory, _countof(tszFreeVirtualMemory), OLE2A(vtFreeVirtualMemory.bstrVal));
+		_tcscpy_s(tszFreeVirtualMemory, _countof(tszFreeVirtualMemory), OLE2A(vtFreeVirtualMemory.bstrVal));
 #endif
 
 		if( IsAllNumeric(tszFreeVirtualMemory) )
@@ -474,9 +474,9 @@ BOOL CMemoryInfo::GetInformation(CWmi &Wmi)
 	if( vtTotalPageFile.vt == VT_BSTR )
 	{
 #ifdef _UNICODE	
-		StringCchCopy(tszTotalPageFile, _countof(tszTotalPageFile), OLE2W(vtTotalPageFile.bstrVal));
+		_tcscpy_s(tszTotalPageFile, _countof(tszTotalPageFile), OLE2W(vtTotalPageFile.bstrVal));
 #else
-		StringCchCopy(tszTotalPageFile, _countof(tszTotalPageFile), OLE2A(vtTotalPageFile.bstrVal));
+		_tcscpy_s(tszTotalPageFile, _countof(tszTotalPageFile), OLE2A(vtTotalPageFile.bstrVal));
 #endif
 
 		if( IsAllNumeric(tszTotalPageFile) )
@@ -492,9 +492,9 @@ BOOL CMemoryInfo::GetInformation(CWmi &Wmi)
 	if( vtFreePageFile.vt == VT_BSTR )
 	{
 #ifdef _UNICODE	
-		StringCchCopy(tszFreePageFile, _countof(tszFreePageFile), OLE2W(vtFreePageFile.bstrVal));
+		_tcscpy_s(tszFreePageFile, _countof(tszFreePageFile), OLE2W(vtFreePageFile.bstrVal));
 #else
-		StringCchCopy(tszFreePageFile, _countof(tszFreePageFile), OLE2A(vtFreePageFile.bstrVal));
+		_tcscpy_s(tszFreePageFile, _countof(tszFreePageFile), OLE2A(vtFreePageFile.bstrVal));
 #endif
 
 		if( IsAllNumeric(tszFreePageFile) )
@@ -513,76 +513,76 @@ void CMemoryInfo::FormFactorFormatDesc(DWORD dwFormFactor, TCHAR *ptszFormFactor
 	switch( dwFormFactor )
 	{
 		case 0:
-			StringCchCopy(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("Unknown"));
+			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("Unknown"));
 			break;
 		case 1:
-			StringCchCopy(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("Other"));
+			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("Other"));
 			break;
 		case 2:
-			StringCchCopy(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("SIP"));
+			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("SIP"));
 			break;
 		case 3:
-			StringCchCopy(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("DIP"));
+			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("DIP"));
 			break;
 		case 4:
-			StringCchCopy(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("ZIP"));
+			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("ZIP"));
 			break;
 		case 5:
-			StringCchCopy(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("SOJ"));
+			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("SOJ"));
 			break;
 		case 6:
-			StringCchCopy(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("Proprietary"));
+			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("Proprietary"));
 			break;
 		case 7:
-			StringCchCopy(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("SIMM"));
+			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("SIMM"));
 			break;
 		case 8:
-			StringCchCopy(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("DIMM"));
+			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("DIMM"));
 			break;
 		case 9:
-			StringCchCopy(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("TSOP"));
+			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("TSOP"));
 			break;
 		case 10:
-			StringCchCopy(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("PGA"));
+			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("PGA"));
 			break;
 		case 11:
-			StringCchCopy(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("RIMM"));
+			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("RIMM"));
 			break;
 		case 12:
-			StringCchCopy(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("SODIMM"));
+			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("SODIMM"));
 			break;
 		case 13:
-			StringCchCopy(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("SRIMM"));
+			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("SRIMM"));
 			break;
 		case 14:
-			StringCchCopy(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("SMD"));
+			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("SMD"));
 			break;
 		case 15:
-			StringCchCopy(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("SSMP"));
+			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("SSMP"));
 			break;
 		case 16:
-			StringCchCopy(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("QFP"));
+			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("QFP"));
 			break;
 		case 17:
-			StringCchCopy(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("TQFP"));
+			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("TQFP"));
 			break;
 		case 18:
-			StringCchCopy(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("SOIC"));
+			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("SOIC"));
 			break;
 		case 19:
-			StringCchCopy(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("LCC"));
+			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("LCC"));
 			break;
 		case 20:
-			StringCchCopy(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("PLCC"));
+			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("PLCC"));
 			break;
 		case 21:
-			StringCchCopy(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("BGA"));
+			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("BGA"));
 			break;
 		case 22:
-			StringCchCopy(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("FPBGA"));
+			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("FPBGA"));
 			break;
 		case 23:
-			StringCchCopy(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("LGA"));
+			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("LGA"));
 			break;
 		default:
 			ptszFormFactor[0] = '\0';
@@ -597,70 +597,70 @@ void CMemoryInfo::MemoryTypeFormatDesc(DWORD dwMemoryType, TCHAR *ptszMemoryType
 	switch( dwMemoryType )
 	{
 		case 0:
-			StringCchCopy(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("Unknown"));
+			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("Unknown"));
 			break;
 		case 1:
-			StringCchCopy(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("Other"));
+			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("Other"));
 			break;
 		case 2:
-			StringCchCopy(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("DRAM"));
+			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("DRAM"));
 			break;
 		case 3:
-			StringCchCopy(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("Synchronous DRAM"));
+			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("Synchronous DRAM"));
 			break;
 		case 4:
-			StringCchCopy(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("Cache DRAM"));
+			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("Cache DRAM"));
 			break;
 		case 5:
-			StringCchCopy(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("EDO"));
+			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("EDO"));
 			break;
 		case 6:
-			StringCchCopy(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("EDRAM"));
+			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("EDRAM"));
 			break;
 		case 7:
-			StringCchCopy(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("VRAM"));
+			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("VRAM"));
 			break;
 		case 8:
-			StringCchCopy(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("SRAM"));
+			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("SRAM"));
 			break;
 		case 9:
-			StringCchCopy(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("RAM"));
+			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("RAM"));
 			break;
 		case 10:
-			StringCchCopy(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("ROM"));
+			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("ROM"));
 			break;
 		case 11:
-			StringCchCopy(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("Flash"));
+			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("Flash"));
 			break;
 		case 12:
-			StringCchCopy(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("EEPROM"));
+			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("EEPROM"));
 			break;
 		case 13:
-			StringCchCopy(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("FEPROM"));
+			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("FEPROM"));
 			break;
 		case 14:
-			StringCchCopy(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("EPROM"));
+			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("EPROM"));
 			break;
 		case 15:
-			StringCchCopy(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("CDRAM"));
+			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("CDRAM"));
 			break;
 		case 16:
-			StringCchCopy(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("3DRAM"));
+			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("3DRAM"));
 			break;
 		case 17:
-			StringCchCopy(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("SDRAM"));
+			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("SDRAM"));
 			break;
 		case 18:
-			StringCchCopy(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("SGRAM"));
+			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("SGRAM"));
 			break;
 		case 19:
-			StringCchCopy(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("RDRAM"));
+			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("RDRAM"));
 			break;
 		case 20:
-			StringCchCopy(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("DDR"));
+			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("DDR"));
 			break;
 		case 21:
-			StringCchCopy(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("DDR-2"));
+			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("DDR-2"));
 			break;
 		default:
 			ptszMemoryType[0] = '\0';
@@ -723,9 +723,9 @@ BOOL CHdDiskInfo::GetInformation(CWmi &Wmi)
 		if( vtModel.vt == VT_BSTR )
 		{
 #ifdef _UNICODE	
-			StringCchCopy(pHdDisk->m_tszModel, _countof(pHdDisk->m_tszModel), OLE2W(vtModel.bstrVal));
+			_tcscpy_s(pHdDisk->m_tszModel, _countof(pHdDisk->m_tszModel), OLE2W(vtModel.bstrVal));
 #else
-			StringCchCopy(pHdDisk->m_tszModel, _countof(pHdDisk->m_tszModel), OLE2A(vtModel.bstrVal));
+			_tcscpy_s(pHdDisk->m_tszModel, _countof(pHdDisk->m_tszModel), OLE2A(vtModel.bstrVal));
 #endif
 		}
 
@@ -738,9 +738,9 @@ BOOL CHdDiskInfo::GetInformation(CWmi &Wmi)
 		if( vtName.vt == VT_BSTR )
 		{
 #ifdef _UNICODE	
-			StringCchCopy(pHdDisk->m_tszName, _countof(pHdDisk->m_tszName), OLE2W(vtName.bstrVal));
+			_tcscpy_s(pHdDisk->m_tszName, _countof(pHdDisk->m_tszName), OLE2W(vtName.bstrVal));
 #else
-			StringCchCopy(pHdDisk->m_tszName, _countof(pHdDisk->m_tszName), OLE2A(vtName.bstrVal));
+			_tcscpy_s(pHdDisk->m_tszName, _countof(pHdDisk->m_tszName), OLE2A(vtName.bstrVal));
 #endif
 		}
 
@@ -753,9 +753,9 @@ BOOL CHdDiskInfo::GetInformation(CWmi &Wmi)
 		if( vtManufacturer.vt == VT_BSTR )
 		{
 #ifdef _UNICODE	
-			StringCchCopy(pHdDisk->m_tszManufacturer, _countof(pHdDisk->m_tszManufacturer), OLE2W(vtManufacturer.bstrVal));
+			_tcscpy_s(pHdDisk->m_tszManufacturer, _countof(pHdDisk->m_tszManufacturer), OLE2W(vtManufacturer.bstrVal));
 #else
-			StringCchCopy(pHdDisk->m_tszManufacturer, _countof(pHdDisk->m_tszManufacturer), OLE2A(vtManufacturer.bstrVal));
+			_tcscpy_s(pHdDisk->m_tszManufacturer, _countof(pHdDisk->m_tszManufacturer), OLE2A(vtManufacturer.bstrVal));
 #endif
 		}
 
@@ -768,9 +768,9 @@ BOOL CHdDiskInfo::GetInformation(CWmi &Wmi)
 		if( vtDescription.vt == VT_BSTR )
 		{
 #ifdef _UNICODE	
-			StringCchCopy(pHdDisk->m_tszDescription, _countof(pHdDisk->m_tszDescription), OLE2W(vtDescription.bstrVal));
+			_tcscpy_s(pHdDisk->m_tszDescription, _countof(pHdDisk->m_tszDescription), OLE2W(vtDescription.bstrVal));
 #else
-			StringCchCopy(pHdDisk->m_tszDescription, _countof(pHdDisk->m_tszDescription), OLE2A(vtDescription.bstrVal));
+			_tcscpy_s(pHdDisk->m_tszDescription, _countof(pHdDisk->m_tszDescription), OLE2A(vtDescription.bstrVal));
 #endif
 		}
 
@@ -783,9 +783,9 @@ BOOL CHdDiskInfo::GetInformation(CWmi &Wmi)
 		if( vtSize.vt == VT_BSTR )
 		{
 #ifdef _UNICODE	
-			StringCchCopy(tszTotalSize, _countof(tszTotalSize), OLE2W(vtSize.bstrVal));
+			_tcscpy_s(tszTotalSize, _countof(tszTotalSize), OLE2W(vtSize.bstrVal));
 #else
-			StringCchCopy(tszTotalSize, _countof(tszTotalSize), OLE2A(vtSize.bstrVal));
+			_tcscpy_s(tszTotalSize, _countof(tszTotalSize), OLE2A(vtSize.bstrVal));
 #endif
 
 			if( IsAllNumeric(tszTotalSize) )
@@ -856,9 +856,9 @@ BOOL CDriveInfo::GetInformation(CWmi &Wmi)
 		if( vtName.vt == VT_BSTR )
 		{
 #ifdef _UNICODE	
-			StringCchCopy(pDrive->m_tszName, _countof(pDrive->m_tszName), OLE2W(vtName.bstrVal));
+			_tcscpy_s(pDrive->m_tszName, _countof(pDrive->m_tszName), OLE2W(vtName.bstrVal));
 #else
-			StringCchCopy(pDrive->m_tszName, _countof(pDrive->m_tszName), OLE2A(vtName.bstrVal));
+			_tcscpy_s(pDrive->m_tszName, _countof(pDrive->m_tszName), OLE2A(vtName.bstrVal));
 #endif
 		}
 
@@ -871,9 +871,9 @@ BOOL CDriveInfo::GetInformation(CWmi &Wmi)
 		if( vtFileSystem.vt == VT_BSTR )
 		{
 #ifdef _UNICODE	
-			StringCchCopy(pDrive->m_tszFileSystem, _countof(pDrive->m_tszFileSystem), OLE2W(vtFileSystem.bstrVal));
+			_tcscpy_s(pDrive->m_tszFileSystem, _countof(pDrive->m_tszFileSystem), OLE2W(vtFileSystem.bstrVal));
 #else
-			StringCchCopy(pDrive->m_tszFileSystem, _countof(pDrive->m_tszFileSystem), OLE2A(vtFileSystem.bstrVal));
+			_tcscpy_s(pDrive->m_tszFileSystem, _countof(pDrive->m_tszFileSystem), OLE2A(vtFileSystem.bstrVal));
 #endif
 		}
 
@@ -886,9 +886,9 @@ BOOL CDriveInfo::GetInformation(CWmi &Wmi)
 		if( vtSize.vt == VT_BSTR )
 		{
 #ifdef _UNICODE	
-			StringCchCopy(tszTotalSpace, _countof(tszTotalSpace), OLE2W(vtSize.bstrVal));
+			_tcscpy_s(tszTotalSpace, _countof(tszTotalSpace), OLE2W(vtSize.bstrVal));
 #else
-			StringCchCopy(tszTotalSpace, _countof(tszTotalSpace), OLE2A(vtSize.bstrVal));
+			_tcscpy_s(tszTotalSpace, _countof(tszTotalSpace), OLE2A(vtSize.bstrVal));
 #endif
 
 			if( IsAllNumeric(tszTotalSpace) )
@@ -907,9 +907,9 @@ BOOL CDriveInfo::GetInformation(CWmi &Wmi)
 		if( vtFreeSpace.vt == VT_BSTR )
 		{
 #ifdef _UNICODE	
-			StringCchCopy(tszFreeSpace, _countof(tszFreeSpace), OLE2W(vtFreeSpace.bstrVal));
+			_tcscpy_s(tszFreeSpace, _countof(tszFreeSpace), OLE2W(vtFreeSpace.bstrVal));
 #else
-			StringCchCopy(tszFreeSpace, _countof(tszFreeSpace), OLE2A(vtFreeSpace.bstrVal));
+			_tcscpy_s(tszFreeSpace, _countof(tszFreeSpace), OLE2A(vtFreeSpace.bstrVal));
 #endif
 
 			if( IsAllNumeric(tszFreeSpace) )
@@ -966,10 +966,10 @@ BOOL CSoundCardInfo::GetInformation()
 
 		if( waveOutGetDevCaps(0, &wavCaps, uWavCaps) == MMSYSERR_NOERROR )
 		{
-			StringCchCopy(m_SoundCard.m_tszProductName, _countof(m_SoundCard.m_tszProductName), wavCaps.szPname);
+			_tcscpy_s(m_SoundCard.m_tszProductName, _countof(m_SoundCard.m_tszProductName), wavCaps.szPname);
 
 			GetAudioDevCompanyName(wavCaps.wMid, tszCompany);
-			StringCchCopy(m_SoundCard.m_tszCompanyName, _countof(m_SoundCard.m_tszCompanyName), tszCompany);
+			_tcscpy_s(m_SoundCard.m_tszCompanyName, _countof(m_SoundCard.m_tszCompanyName), tszCompany);
 
 			m_SoundCard.m_bHasSeparateLRVolCtrl = (wavCaps.dwSupport & WAVECAPS_VOLUME) ? TRUE : FALSE;
 			m_SoundCard.m_bHasVolCtrl = (wavCaps.dwSupport & AUXCAPS_VOLUME) ? TRUE : FALSE;
@@ -986,435 +986,435 @@ void CSoundCardInfo::GetAudioDevCompanyName(int nCompany, TCHAR *ptszCompany) co
 	switch( nCompany )
 	{
 		case MM_MICROSOFT:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Microsoft Corporation"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Microsoft Corporation"));
 			break;
 		case MM_CREATIVE:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Creative Labs, Inc"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Creative Labs, Inc"));
 			break;
 		case MM_MEDIAVISION:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Media Vision, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Media Vision, Inc."));
 			break;
 		case MM_FUJITSU:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Fujitsu Corp."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Fujitsu Corp."));
 			break;
 		case MM_ARTISOFT:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Artisoft, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Artisoft, Inc."));
 			break;
 		case MM_TURTLE_BEACH:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Turtle Beach, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Turtle Beach, Inc."));
 			break;
 		case MM_IBM:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("IBM Corporation"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("IBM Corporation"));
 			break;
 		case MM_VOCALTEC:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Vocaltec LTD."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Vocaltec LTD."));
 			break;
 		case MM_ROLAND:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Roland"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Roland"));
 			break;
 		case MM_DSP_SOLUTIONS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("DSP Solutions, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("DSP Solutions, Inc."));
 			break;
 		case MM_NEC:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("NEC"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("NEC"));
 			break;
 		case MM_ATI:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("ATI"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("ATI"));
 			break;
 		case MM_WANGLABS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Wang Laboratories, Inc"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Wang Laboratories, Inc"));
 			break;
 		case MM_TANDY:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Tandy Corporation"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Tandy Corporation"));
 			break;
 		case MM_VOYETRA:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Voyetra"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Voyetra"));
 			break;
 		case MM_ANTEX:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Antex Electronics Corporation"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Antex Electronics Corporation"));
 			break;
 		case MM_ICL_PS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("ICL Personal Systems"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("ICL Personal Systems"));
 			break;
 		case MM_INTEL:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Intel Corporation"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Intel Corporation"));
 			break;
 		case MM_GRAVIS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Advanced Gravis"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Advanced Gravis"));
 			break;
 		case MM_VAL:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Video Associates Labs, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Video Associates Labs, Inc."));
 			break;
 		case MM_INTERACTIVE:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("InterActive Inc"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("InterActive Inc"));
 			break;
 		case MM_YAMAHA:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Yamaha Corporation of America"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Yamaha Corporation of America"));
 			break;
 		case MM_EVEREX:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Everex Systems, Inc"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Everex Systems, Inc"));
 			break;
 		case MM_ECHO:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Echo Speech Corporation"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Echo Speech Corporation"));
 			break;
 		case MM_SIERRA:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Sierra Semiconductor Corp"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Sierra Semiconductor Corp"));
 			break;
 		case MM_CAT:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Computer Aided Technologies"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Computer Aided Technologies"));
 			break;
 		case MM_APPS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("APPS Software International"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("APPS Software International"));
 			break;
 		case MM_DSP_GROUP:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("DSP Group, Inc"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("DSP Group, Inc"));
 			break;
 		case MM_MELABS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("MicroEngineering Labs"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("MicroEngineering Labs"));
 			break;
 		case MM_COMPUTER_FRIENDS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Computer Friends, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Computer Friends, Inc."));
 			break;
 		case MM_ESS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("ESS Technology"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("ESS Technology"));
 			break;
 		case MM_AUDIOFILE:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Audio, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Audio, Inc."));
 			break;
 		case MM_MOTOROLA:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Motorola, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Motorola, Inc."));
 		case MM_CANOPUS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Canopus, co., Ltd."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Canopus, co., Ltd."));
 			break;
 		case MM_EPSON:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Seiko Epson Corporation"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Seiko Epson Corporation"));
 			break;
 		case MM_TRUEVISION:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Truevision"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Truevision"));
 			break;
 		case MM_AZTECH:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Aztech Labs, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Aztech Labs, Inc."));
 			break;
 		case MM_VIDEOLOGIC:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Videologic"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Videologic"));
 			break;
 		case MM_SCALACS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("SCALACS"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("SCALACS"));
 			break;
 		case MM_KORG:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Korg Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Korg Inc."));
 			break;
 		case MM_APT:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Audio Processing Technology"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Audio Processing Technology"));
 			break;
 		case MM_ICS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Integrated Circuit Systems, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Integrated Circuit Systems, Inc."));
 			break;
 		case MM_ITERATEDSYS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Iterated Systems, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Iterated Systems, Inc."));
 			break;
 		case MM_METHEUS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Metheus"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Metheus"));
 			break;
 		case MM_LOGITECH:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Logitech, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Logitech, Inc."));
 			break;
 		case MM_WINNOV:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Winnov, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Winnov, Inc."));
 			break;
 		case MM_NCR:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("NCR Corporation"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("NCR Corporation"));
 			break;
 		case MM_EXAN:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("EXAN"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("EXAN"));
 			break;
 		case MM_AST:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("AST Research Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("AST Research Inc."));
 			break;
 		case MM_WILLOWPOND:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Willow Pond Corporation"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Willow Pond Corporation"));
 			break;
 		case MM_SONICFOUNDRY:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Sonic Foundry"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Sonic Foundry"));
 			break;
 		case MM_VITEC:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Vitec Multimedia"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Vitec Multimedia"));
 			break;
 		case MM_MOSCOM:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("MOSCOM Corporation"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("MOSCOM Corporation"));
 			break;
 		case MM_SILICONSOFT:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Silicon Soft, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Silicon Soft, Inc."));
 			break;
 		case MM_SUPERMAC:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Supermac"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Supermac"));
 			break;
 		case MM_AUDIOPT:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Audio Processing Technology"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Audio Processing Technology"));
 			break;
 		case MM_SPEECHCOMP:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Speech Compression"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Speech Compression"));
 			break;
 		case MM_AHEAD:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Ahead, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Ahead, Inc."));
 			break;
 		case MM_DOLBY:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Dolby Laboratories"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Dolby Laboratories"));
 			break;
 		case MM_OKI:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("OKI"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("OKI"));
 			break;
 		case MM_AURAVISION:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("AuraVision Corporation"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("AuraVision Corporation"));
 			break;
 		case MM_OLIVETTI:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Ing C. Olivetti & C., S.p.A."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Ing C. Olivetti & C., S.p.A."));
 			break;
 		case MM_IOMAGIC:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("I/O Magic Corporation"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("I/O Magic Corporation"));
 			break;
 		case MM_MATSUSHITA:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Matsushita Electric Industrial Co., LTD."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Matsushita Electric Industrial Co., LTD."));
 			break;
 		case MM_CONTROLRES:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Control Resources Limited"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Control Resources Limited"));
 			break;
 		case MM_XEBEC:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Xebec Multimedia Solutions Limited"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Xebec Multimedia Solutions Limited"));
 			break;
 		case MM_NEWMEDIA:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("New Media Corporation"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("New Media Corporation"));
 			break;
 		case MM_NMS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Natural MicroSystems"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Natural MicroSystems"));
 			break;
 		case MM_LYRRUS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Lyrrus Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Lyrrus Inc."));
 			break;
 		case MM_COMPUSIC:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Compusic"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Compusic"));
 			break;
 		case MM_OPTI:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("OPTI Computers Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("OPTI Computers Inc."));
 			break;
 		case MM_ADLACC:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Adlib Accessories Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Adlib Accessories Inc."));
 			break;
 		case MM_COMPAQ:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Compaq Computer Corp."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Compaq Computer Corp."));
 			break;
 		case MM_DIALOGIC:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Dialogic Corporation"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Dialogic Corporation"));
 			break;
 		case MM_INSOFT:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("InSoft, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("InSoft, Inc."));
 			break;
 		case MM_MPTUS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("M.P. Technologies, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("M.P. Technologies, Inc."));
 			break;
 		case MM_WEITEK:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Weitek"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Weitek"));
 			break;
 		case MM_LERNOUT_AND_HAUSPIE:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Lernout & Hauspie"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Lernout & Hauspie"));
 			break;
 		case MM_QCIAR:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Quanta Computer Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Quanta Computer Inc."));
 			break;
 		case MM_APPLE:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Apple Computer, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Apple Computer, Inc."));
 			break;
 		case MM_DIGITAL:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Digital Equipment Corporation"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Digital Equipment Corporation"));
 			break;
 		case MM_MOTU:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Mark of the Unicorn"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Mark of the Unicorn"));
 			break;
 		case MM_WORKBIT:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Workbit Corporation"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Workbit Corporation"));
 			break;
 		case MM_OSITECH:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Ositech Communications Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Ositech Communications Inc."));
 			break;
 		case MM_MIRO:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("miro Computer Products AG"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("miro Computer Products AG"));
 			break;
 		case MM_CIRRUSLOGIC:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Cirrus Logic"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Cirrus Logic"));
 			break;
 		case MM_ISOLUTION:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("ISOLUTION  B.V."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("ISOLUTION  B.V."));
 			break;
 		case MM_HORIZONS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Horizons Technology, Inc"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Horizons Technology, Inc"));
 			break;
 		case MM_CONCEPTS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Computer Concepts Ltd"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Computer Concepts Ltd"));
 			break;
 		case MM_VTG:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Voice Technologies Group, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Voice Technologies Group, Inc."));
 			break;
 		case MM_RADIUS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Radius"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Radius"));
 			break;
 		case MM_ROCKWELL:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Rockwell International"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Rockwell International"));
 			break;
 			//case MM_XYZ:
 			//	_tcscpy( ptszCompany, _T("Co. XYZ for testing") );
 			//	break;
 		case MM_OPCODE:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Opcode Systems"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Opcode Systems"));
 			break;
 		case MM_VOXWARE:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Voxware Inc"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Voxware Inc"));
 			break;
 		case MM_NORTHERN_TELECOM:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Northern Telecom Limited"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Northern Telecom Limited"));
 			break;
 		case MM_APICOM:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("APICOM"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("APICOM"));
 			break;
 		case MM_GRANDE:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Grande Software"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Grande Software"));
 			break;
 		case MM_ADDX:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("ADDX"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("ADDX"));
 			break;
 		case MM_WILDCAT:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Wildcat Canyon Software"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Wildcat Canyon Software"));
 			break;
 		case MM_RHETOREX:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Rhetorex Inc"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Rhetorex Inc"));
 			break;
 		case MM_BROOKTREE:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Brooktree Corporation"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Brooktree Corporation"));
 			break;
 		case MM_ENSONIQ:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("ENSONIQ Corporation"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("ENSONIQ Corporation"));
 			break;
 		case MM_FAST:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("///FAST Multimedia AG"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("///FAST Multimedia AG"));
 			break;
 		case MM_NVIDIA:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("NVidia Corporation"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("NVidia Corporation"));
 			break;
 		case MM_OKSORI:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("OKSORI Co., Ltd."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("OKSORI Co., Ltd."));
 			break;
 		case MM_DIACOUSTICS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("DiAcoustics, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("DiAcoustics, Inc."));
 			break;
 		case MM_GULBRANSEN:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Gulbransen, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Gulbransen, Inc."));
 			break;
 		case MM_KAY_ELEMETRICS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Kay Elemetrics, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Kay Elemetrics, Inc."));
 			break;
 		case MM_CRYSTAL:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Crystal Semiconductor Corporation"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Crystal Semiconductor Corporation"));
 			break;
 		case MM_SPLASH_STUDIOS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Splash Studios"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Splash Studios"));
 			break;
 		case MM_QUARTERDECK:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Quarterdeck Corporation"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Quarterdeck Corporation"));
 			break;
 		case MM_TDK:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("TDK Corporation"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("TDK Corporation"));
 			break;
 		case MM_DIGITAL_AUDIO_LABS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Digital Audio Labs, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Digital Audio Labs, Inc."));
 			break;
 		case MM_SEERSYS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Seer Systems, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Seer Systems, Inc."));
 			break;
 		case MM_PICTURETEL:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("PictureTel Corporation"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("PictureTel Corporation"));
 			break;
 		case MM_ATT_MICROELECTRONICS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("AT&T Microelectronics"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("AT&T Microelectronics"));
 			break;
 		case MM_OSPREY:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Osprey Technologies, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Osprey Technologies, Inc."));
 			break;
 		case MM_MEDIATRIX:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Mediatrix Peripherals"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Mediatrix Peripherals"));
 			break;
 		case MM_SOUNDESIGNS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("SounDesignS M.C.S. Ltd."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("SounDesignS M.C.S. Ltd."));
 			break;
 		case MM_ALDIGITAL:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("A.L. Digital Ltd."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("A.L. Digital Ltd."));
 			break;
 		case MM_SPECTRUM_SIGNAL_PROCESSING:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Spectrum Signal Processing, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Spectrum Signal Processing, Inc."));
 			break;
 		case MM_ECS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Electronic Courseware Systems, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Electronic Courseware Systems, Inc."));
 			break;
 		case MM_AMD:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("AMD"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("AMD"));
 			break;
 		case MM_COREDYNAMICS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Core Dynamics"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Core Dynamics"));
 			break;
 		case MM_CANAM:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("CANAM Computers"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("CANAM Computers"));
 			break;
 		case MM_SOFTSOUND:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Softsound, Ltd."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Softsound, Ltd."));
 			break;
 		case MM_NORRIS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Norris Communications, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Norris Communications, Inc."));
 			break;
 		case MM_DDD:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Danka Data Devices"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Danka Data Devices"));
 			break;
 		case MM_EUPHONICS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("EuPhonics"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("EuPhonics"));
 			break;
 		case MM_PRECEPT:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Precept Software, Inc."));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Precept Software, Inc."));
 			break;
 		case MM_CRYSTAL_NET:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Crystal Net Corporation"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Crystal Net Corporation"));
 			break;
 		case MM_CHROMATIC:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Chromatic Research, Inc"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Chromatic Research, Inc"));
 			break;
 		case MM_VOICEINFO:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Voice Information Systems, Inc"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Voice Information Systems, Inc"));
 			break;
 		case MM_VIENNASYS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Vienna Systems"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Vienna Systems"));
 			break;
 		case MM_CONNECTIX:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Connectix Corporation"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Connectix Corporation"));
 			break;
 		case MM_GADGETLABS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Gadget Labs LLC"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Gadget Labs LLC"));
 			break;
 		case MM_FRONTIER:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Frontier Design Group LLC"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Frontier Design Group LLC"));
 			break;
 		case MM_VIONA:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Viona Development GmbH"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Viona Development GmbH"));
 			break;
 		case MM_CASIO:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Casio Computer Co., LTD"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Casio Computer Co., LTD"));
 			break;
 		case MM_DIAMONDMM:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Diamond Multimedia"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Diamond Multimedia"));
 			break;
 		case MM_S3:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("S3"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("S3"));
 			break;
 		case MM_FRAUNHOFER_IIS:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Fraunhofer"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Fraunhofer"));
 			break;
 		default:
-			StringCchCopy(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Unknown"));
+			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Unknown"));
 			break;
 	}
 }
@@ -1513,7 +1513,7 @@ BOOL CVideoCardInfo::GetInformation()
 					{
 						ptszDeviceClsid = ptszDeviceClsid + _tcslen(WIN_CONTROL_VIDEO_REGEX);
 
-						StringCchPrintf(tszSubKey, _countof(tszSubKey), _T("%s\\%s"), WIN_CONTROL_VIDEO_KEY, ptszDeviceClsid);
+						_stprintf_s(tszSubKey, _countof(tszSubKey), _T("%s\\%s"), WIN_CONTROL_VIDEO_KEY, ptszDeviceClsid);
 
 						tszDeviceDesc[0] = '\0';
 						tszDriverDesc[0] = '\0';
@@ -1555,7 +1555,7 @@ BOOL CVideoCardInfo::GetInformation()
 													dwCount = 0;
 													while( dwCount < dwValueLen )
 													{
-														StringCchPrintf(tszValue, _countof(tszValue), _T("%s%c"), tszValue, *(tszVideoValue + dwCount));
+														_stprintf_s(tszValue, _countof(tszValue), _T("%s%c"), tszValue, *(tszVideoValue + dwCount));
 														dwCount++;
 													}
 												}
@@ -1563,12 +1563,12 @@ BOOL CVideoCardInfo::GetInformation()
 											}
 											case REG_SZ:
 											{
-												StringCchCopy(tszValue, _countof(tszValue), tszVideoValue);
+												_tcscpy_s(tszValue, _countof(tszValue), tszVideoValue);
 												break;
 											}
 											case REG_MULTI_SZ:
 											{
-												StringCchCopy(tszValue, _countof(tszValue), tszVideoValue);
+												_tcscpy_s(tszValue, _countof(tszValue), tszVideoValue);
 												break;
 											}
 											default:
@@ -1577,22 +1577,22 @@ BOOL CVideoCardInfo::GetInformation()
 									}
 
 									if( _tcscmp(tszVideoName, WIN_VIDEO_DEVICEDESC_NAME) == 0 )
-										StringCchCopy(tszDeviceDesc, _countof(tszDeviceDesc), tszValue);
+										_tcscpy_s(tszDeviceDesc, _countof(tszDeviceDesc), tszValue);
 
 									if( _tcscmp(tszVideoName, WIN_VIDEO_DRIVERDESC_NAME) == 0 )
-										StringCchCopy(tszDriverDesc, _countof(tszDriverDesc), tszValue);
+										_tcscpy_s(tszDriverDesc, _countof(tszDriverDesc), tszValue);
 
 									if( _tcscmp(tszVideoName, WIN_VIDEO_ADAPTERSTRING_NAME) == 0 )
-										StringCchCopy(tszAdapterString, _countof(tszAdapterString), tszValue);
+										_tcscpy_s(tszAdapterString, _countof(tszAdapterString), tszValue);
 
 									if( _tcscmp(tszVideoName, WIN_VIDEO_CHIPTYPE_NAME) == 0 )
-										StringCchCopy(tszChipType, _countof(tszChipType), tszValue);
+										_tcscpy_s(tszChipType, _countof(tszChipType), tszValue);
 
 									if( _tcscmp(tszVideoName, WIN_VIDEO_DACTYPE_NAME) == 0 )
-										StringCchCopy(tszDacType, _countof(tszDacType), tszValue);
+										_tcscpy_s(tszDacType, _countof(tszDacType), tszValue);
 
 									if( _tcscmp(tszVideoName, WIN_VIDEO_INSTALLEDDISPLAYDRIVERS_NAME) == 0 )
-										StringCchCopy(tszDisplayDrivers, _countof(tszDisplayDrivers), tszValue);
+										_tcscpy_s(tszDisplayDrivers, _countof(tszDisplayDrivers), tszValue);
 
 									if( _tcscmp(tszVideoName, WIN_VIDEO_MEMORYSIZE_NAME) == 0 )
 									{
@@ -1609,20 +1609,20 @@ BOOL CVideoCardInfo::GetInformation()
 								}
 
 								if( tszDeviceDesc && _tcslen(tszDeviceDesc) > 0 )
-									StringCchCopy(tszDescription, _countof(tszDescription), tszDeviceDesc);
+									_tcscpy_s(tszDescription, _countof(tszDescription), tszDeviceDesc);
 
 								if( tszDriverDesc && _tcslen(tszDriverDesc) > 0 )
-									StringCchCopy(tszDescription, _countof(tszDescription), tszDriverDesc);
+									_tcscpy_s(tszDescription, _countof(tszDescription), tszDriverDesc);
 
 								if( tszAdapterString && _tcslen(tszAdapterString) > 0 )
 								{
 									pVideoCard = new HWINFO_VIDEOCARD;
 
-									StringCchCopy(pVideoCard->m_tszDescription, _countof(pVideoCard->m_tszDescription), tszDescription);
-									StringCchCopy(pVideoCard->m_tszAdapterString, _countof(pVideoCard->m_tszAdapterString), tszAdapterString);
-									StringCchCopy(pVideoCard->m_tszChipType, _countof(pVideoCard->m_tszChipType), tszChipType);
-									StringCchCopy(pVideoCard->m_tszDacType, _countof(pVideoCard->m_tszDacType), tszDacType);
-									StringCchCopy(pVideoCard->m_tszDisplayDrivers, _countof(pVideoCard->m_tszDisplayDrivers), tszDisplayDrivers);
+									_tcscpy_s(pVideoCard->m_tszDescription, _countof(pVideoCard->m_tszDescription), tszDescription);
+									_tcscpy_s(pVideoCard->m_tszAdapterString, _countof(pVideoCard->m_tszAdapterString), tszAdapterString);
+									_tcscpy_s(pVideoCard->m_tszChipType, _countof(pVideoCard->m_tszChipType), tszChipType);
+									_tcscpy_s(pVideoCard->m_tszDacType, _countof(pVideoCard->m_tszDacType), tszDacType);
+									_tcscpy_s(pVideoCard->m_tszDisplayDrivers, _countof(pVideoCard->m_tszDisplayDrivers), tszDisplayDrivers);
 
 									pVideoCard->m_lMemorySize = lMemorySize;
 
@@ -1686,7 +1686,7 @@ BOOL CVideoCardInfo::GetInformation()
 					{
 						ptszDeviceClsid = ptszDeviceClsid + _tcslen(NT_CONTROL_VIDEO_REGEX);
 
-						StringCchPrintf(tszSubKey, _countof(tszSubKey), _T("%s\\%s"), NT_CONTROL_VIDEO_KEY, ptszDeviceClsid);
+						_stprintf_s(tszSubKey, _countof(tszSubKey), _T("%s\\%s"), NT_CONTROL_VIDEO_KEY, ptszDeviceClsid);
 
 						tszDeviceDesc[0] = '\0';
 						tszDriverDesc[0] = '\0';
@@ -1730,7 +1730,7 @@ BOOL CVideoCardInfo::GetInformation()
 													dwCount = 0;
 													while( dwCount < dwValueLen )
 													{
-														StringCchPrintf(tszValue, _countof(tszValue), _T("%s%c"), tszValue, *(tszVideoValue + dwCount));
+														_stprintf_s(tszValue, _countof(tszValue), _T("%s%c"), tszValue, *(tszVideoValue + dwCount));
 														dwCount++;
 													}
 												}
@@ -1738,12 +1738,12 @@ BOOL CVideoCardInfo::GetInformation()
 											}
 											case REG_SZ:
 											{
-												StringCchCopy(tszValue, _countof(tszValue), tszVideoValue);
+												_tcscpy_s(tszValue, _countof(tszValue), tszVideoValue);
 												break;
 											}
 											case REG_MULTI_SZ:
 											{
-												StringCchCopy(tszValue, _countof(tszValue), tszVideoValue);
+												_tcscpy_s(tszValue, _countof(tszValue), tszVideoValue);
 												break;
 											}
 											default:
@@ -1752,22 +1752,22 @@ BOOL CVideoCardInfo::GetInformation()
 									}
 
 									if( _tcscmp(tszVideoName, NT_VIDEO_DEVICEDESC_NAME) == 0 )
-										StringCchCopy(tszDeviceDesc, _countof(tszDeviceDesc), tszValue);
+										_tcscpy_s(tszDeviceDesc, _countof(tszDeviceDesc), tszValue);
 
 									if( _tcscmp(tszVideoName, NT_VIDEO_DRIVERDESC_NAME) == 0 )
-										StringCchCopy(tszDriverDesc, _countof(tszDriverDesc), tszValue);
+										_tcscpy_s(tszDriverDesc, _countof(tszDriverDesc), tszValue);
 
 									if( _tcscmp(tszVideoName, NT_VIDEO_ADAPTERSTRING_NAME) == 0 )
-										StringCchCopy(tszAdapterString, _countof(tszAdapterString), tszValue);
+										_tcscpy_s(tszAdapterString, _countof(tszAdapterString), tszValue);
 
 									if( _tcscmp(tszVideoName, NT_VIDEO_CHIPTYPE_NAME) == 0 )
-										StringCchCopy(tszChipType, _countof(tszChipType), tszValue);
+										_tcscpy_s(tszChipType, _countof(tszChipType), tszValue);
 
 									if( _tcscmp(tszVideoName, NT_VIDEO_DACTYPE_NAME) == 0 )
-										StringCchCopy(tszDacType, _countof(tszDacType), tszValue);
+										_tcscpy_s(tszDacType, _countof(tszDacType), tszValue);
 
 									if( _tcscmp(tszVideoName, NT_VIDEO_INSTALLEDDISPLAYDRIVERS_NAME) == 0 )
-										StringCchCopy(tszDisplayDrivers, _countof(tszDisplayDrivers), tszValue);
+										_tcscpy_s(tszDisplayDrivers, _countof(tszDisplayDrivers), tszValue);
 
 									if( _tcscmp(tszVideoName, NT_VIDEO_MEMORYSIZE_NAME) == 0 )
 									{
@@ -1784,20 +1784,20 @@ BOOL CVideoCardInfo::GetInformation()
 								}
 
 								if( tszDeviceDesc && _tcslen(tszDeviceDesc) > 0 )
-									StringCchCopy(tszDescription, _countof(tszDescription), tszDeviceDesc);
+									_tcscpy_s(tszDescription, _countof(tszDescription), tszDeviceDesc);
 
 								if( tszDriverDesc && _tcslen(tszDriverDesc) > 0 )
-									StringCchCopy(tszDescription, _countof(tszDescription), tszDriverDesc);
+									_tcscpy_s(tszDescription, _countof(tszDescription), tszDriverDesc);
 
 								if( tszAdapterString && _tcslen(tszAdapterString) > 0 )
 								{
 									pVideoCard = new HWINFO_VIDEOCARD;
 
-									StringCchCopy(pVideoCard->m_tszDescription, _countof(pVideoCard->m_tszDescription), tszDescription);
-									StringCchCopy(pVideoCard->m_tszAdapterString, _countof(pVideoCard->m_tszAdapterString), tszAdapterString);
-									StringCchCopy(pVideoCard->m_tszChipType, _countof(pVideoCard->m_tszChipType), tszChipType);
-									StringCchCopy(pVideoCard->m_tszDacType, _countof(pVideoCard->m_tszDacType), tszDacType);
-									StringCchCopy(pVideoCard->m_tszDisplayDrivers, _countof(pVideoCard->m_tszDisplayDrivers), tszDisplayDrivers);
+									_tcscpy_s(pVideoCard->m_tszDescription, _countof(pVideoCard->m_tszDescription), tszDescription);
+									_tcscpy_s(pVideoCard->m_tszAdapterString, _countof(pVideoCard->m_tszAdapterString), tszAdapterString);
+									_tcscpy_s(pVideoCard->m_tszChipType, _countof(pVideoCard->m_tszChipType), tszChipType);
+									_tcscpy_s(pVideoCard->m_tszDacType, _countof(pVideoCard->m_tszDacType), tszDacType);
+									_tcscpy_s(pVideoCard->m_tszDisplayDrivers, _countof(pVideoCard->m_tszDisplayDrivers), tszDisplayDrivers);
 
 									pVideoCard->m_lMemorySize = lMemorySize;
 
@@ -1895,9 +1895,9 @@ BOOL CNetworkCardInfo::GetInformation(CWmi &Wmi)
 			if( vtDescription.vt == VT_BSTR )
 			{
 #ifdef _UNICODE	
-				StringCchCopy(pNetworkCard->m_tszDescription, _countof(pNetworkCard->m_tszDescription), OLE2W(vtDescription.bstrVal));
+				_tcscpy_s(pNetworkCard->m_tszDescription, _countof(pNetworkCard->m_tszDescription), OLE2W(vtDescription.bstrVal));
 #else
-				StringCchCopy(pNetworkCard->m_tszDescription, _countof(pNetworkCard->m_tszDescription), OLE2A(vtDescription.bstrVal));
+				_tcscpy_s(pNetworkCard->m_tszDescription, _countof(pNetworkCard->m_tszDescription), OLE2A(vtDescription.bstrVal));
 #endif
 			}
 
@@ -1964,9 +1964,9 @@ BOOL CCdromInfo::GetInformation(CWmi &Wmi)
 		if( vtName.vt == VT_BSTR )
 		{
 #ifdef _UNICODE	
-			StringCchCopy(pCdrom->m_tszName, _countof(pCdrom->m_tszName), OLE2W(vtName.bstrVal));
+			_tcscpy_s(pCdrom->m_tszName, _countof(pCdrom->m_tszName), OLE2W(vtName.bstrVal));
 #else
-			StringCchCopy(pCdrom->m_tszName, _countof(pCdrom->m_tszName), OLE2A(vtName.bstrVal));
+			_tcscpy_s(pCdrom->m_tszName, _countof(pCdrom->m_tszName), OLE2A(vtName.bstrVal));
 #endif
 		}
 
@@ -1979,9 +1979,9 @@ BOOL CCdromInfo::GetInformation(CWmi &Wmi)
 		if( vtManufacturer.vt == VT_BSTR )
 		{
 #ifdef _UNICODE	
-			StringCchCopy(pCdrom->m_tszManufacturer, _countof(pCdrom->m_tszManufacturer), OLE2W(vtManufacturer.bstrVal));
+			_tcscpy_s(pCdrom->m_tszManufacturer, _countof(pCdrom->m_tszManufacturer), OLE2W(vtManufacturer.bstrVal));
 #else
-			StringCchCopy(pCdrom->m_tszManufacturer, _countof(pCdrom->m_tszManufacturer), OLE2A(vtManufacturer.bstrVal));
+			_tcscpy_s(pCdrom->m_tszManufacturer, _countof(pCdrom->m_tszManufacturer), OLE2A(vtManufacturer.bstrVal));
 #endif
 		}
 
@@ -1994,9 +1994,9 @@ BOOL CCdromInfo::GetInformation(CWmi &Wmi)
 		if( vtDescription.vt == VT_BSTR )
 		{
 #ifdef _UNICODE	
-			StringCchCopy(pCdrom->m_tszDescription, _countof(pCdrom->m_tszDescription), OLE2W(vtDescription.bstrVal));
+			_tcscpy_s(pCdrom->m_tszDescription, _countof(pCdrom->m_tszDescription), OLE2W(vtDescription.bstrVal));
 #else
-			StringCchCopy(pCdrom->m_tszDescription, _countof(pCdrom->m_tszDescription), OLE2A(vtDescription.bstrVal));
+			_tcscpy_s(pCdrom->m_tszDescription, _countof(pCdrom->m_tszDescription), OLE2A(vtDescription.bstrVal));
 #endif
 		}
 
@@ -2041,9 +2041,9 @@ BOOL CKeyBoardInfo::GetInformation(CWmi &Wmi)
 	if( vtDescription.vt == VT_BSTR )
 	{
 #ifdef _UNICODE	
-		StringCchCopy(m_KeyBoard.m_tszDescription, _countof(m_KeyBoard.m_tszDescription), OLE2W(vtDescription.bstrVal));
+		_tcscpy_s(m_KeyBoard.m_tszDescription, _countof(m_KeyBoard.m_tszDescription), OLE2W(vtDescription.bstrVal));
 #else
-		StringCchCopy(m_KeyBoard.m_tszDescription, _countof(m_KeyBoard.m_tszDescription), OLE2A(vtDescription.bstrVal));
+		_tcscpy_s(m_KeyBoard.m_tszDescription, _countof(m_KeyBoard.m_tszDescription), OLE2A(vtDescription.bstrVal));
 #endif
 	}
 
@@ -2066,34 +2066,34 @@ void CKeyBoardInfo::DetectKbType()
 	switch( nRetType )
 	{
 		case 1:
-			StringCchCopy(tszKeyBoardType, _countof(tszKeyBoardType), _T("IBM PC/XT or compatible (83-key)"));
+			_tcscpy_s(tszKeyBoardType, _countof(tszKeyBoardType), _T("IBM PC/XT or compatible (83-key)"));
 			break;
 		case 2:
-			StringCchCopy(tszKeyBoardType, _countof(tszKeyBoardType), _T("Olivetti \"ICO\" (102-key)"));
+			_tcscpy_s(tszKeyBoardType, _countof(tszKeyBoardType), _T("Olivetti \"ICO\" (102-key)"));
 			break;
 		case 3:
-			StringCchCopy(tszKeyBoardType, _countof(tszKeyBoardType), _T("IBM PC/AT (84-key) or similar"));
+			_tcscpy_s(tszKeyBoardType, _countof(tszKeyBoardType), _T("IBM PC/AT (84-key) or similar"));
 			break;
 		case 4:
-			StringCchCopy(tszKeyBoardType, _countof(tszKeyBoardType), _T("IBM enhanced (101- or 102-key)"));
+			_tcscpy_s(tszKeyBoardType, _countof(tszKeyBoardType), _T("IBM enhanced (101- or 102-key)"));
 			break;
 		case 5:
-			StringCchCopy(tszKeyBoardType, _countof(tszKeyBoardType), _T("Nokia 1050 and similar"));
+			_tcscpy_s(tszKeyBoardType, _countof(tszKeyBoardType), _T("Nokia 1050 and similar"));
 			break;
 		case 6:
-			StringCchCopy(tszKeyBoardType, _countof(tszKeyBoardType), _T("Nokia 9140 and similar"));
+			_tcscpy_s(tszKeyBoardType, _countof(tszKeyBoardType), _T("Nokia 9140 and similar"));
 			break;
 		case 7:
-			StringCchCopy(tszKeyBoardType, _countof(tszKeyBoardType), _T("Japanese"));
+			_tcscpy_s(tszKeyBoardType, _countof(tszKeyBoardType), _T("Japanese"));
 			break;
 		case 8:
-			StringCchCopy(tszKeyBoardType, _countof(tszKeyBoardType), _T("IBM PC/AT or compatible (101-key)"));
+			_tcscpy_s(tszKeyBoardType, _countof(tszKeyBoardType), _T("IBM PC/AT or compatible (101-key)"));
 			break;
 		default:
-			StringCchCopy(tszKeyBoardType, _countof(tszKeyBoardType), _T("Unknown"));
+			_tcscpy_s(tszKeyBoardType, _countof(tszKeyBoardType), _T("Unknown"));
 	}
 
-	StringCchCopy(m_KeyBoard.m_tszType, _countof(m_KeyBoard.m_tszType), tszKeyBoardType);
+	_tcscpy_s(m_KeyBoard.m_tszType, _countof(m_KeyBoard.m_tszType), tszKeyBoardType);
 }
 
 //***************************************************************************
@@ -2131,9 +2131,9 @@ BOOL CMouseInfo::GetInformation(CWmi &Wmi)
 	if( vtName.vt == VT_BSTR )
 	{
 #ifdef _UNICODE	
-		StringCchCopy(m_Mouse.m_tszName, _countof(m_Mouse.m_tszName), OLE2W(vtName.bstrVal));
+		_tcscpy_s(m_Mouse.m_tszName, _countof(m_Mouse.m_tszName), OLE2W(vtName.bstrVal));
 #else
-		StringCchCopy(m_Mouse.m_tszName, _countof(m_Mouse.m_tszName), OLE2A(vtName.bstrVal));
+		_tcscpy_s(m_Mouse.m_tszName, _countof(m_Mouse.m_tszName), OLE2A(vtName.bstrVal));
 #endif
 	}
 
@@ -2146,9 +2146,9 @@ BOOL CMouseInfo::GetInformation(CWmi &Wmi)
 	if( vtManufacturer.vt == VT_BSTR )
 	{
 #ifdef _UNICODE	
-		StringCchCopy(m_Mouse.m_tszManufacturer, _countof(m_Mouse.m_tszManufacturer), OLE2W(vtManufacturer.bstrVal));
+		_tcscpy_s(m_Mouse.m_tszManufacturer, _countof(m_Mouse.m_tszManufacturer), OLE2W(vtManufacturer.bstrVal));
 #else
-		StringCchCopy(m_Mouse.m_tszManufacturer, _countof(m_Mouse.m_tszManufacturer), OLE2A(vtManufacturer.bstrVal));
+		_tcscpy_s(m_Mouse.m_tszManufacturer, _countof(m_Mouse.m_tszManufacturer), OLE2A(vtManufacturer.bstrVal));
 #endif
 	}
 
@@ -2161,9 +2161,9 @@ BOOL CMouseInfo::GetInformation(CWmi &Wmi)
 	if( vtDescription.vt == VT_BSTR )
 	{
 #ifdef _UNICODE	
-		StringCchCopy(m_Mouse.m_tszDescription, _countof(m_Mouse.m_tszDescription), OLE2W(vtDescription.bstrVal));
+		_tcscpy_s(m_Mouse.m_tszDescription, _countof(m_Mouse.m_tszDescription), OLE2W(vtDescription.bstrVal));
 #else
-		StringCchCopy(m_Mouse.m_tszDescription, _countof(m_Mouse.m_tszDescription), OLE2A(vtDescription.bstrVal));
+		_tcscpy_s(m_Mouse.m_tszDescription, _countof(m_Mouse.m_tszDescription), OLE2A(vtDescription.bstrVal));
 #endif
 	}
 
@@ -2223,9 +2223,9 @@ BOOL CMonitorInfo::GetInformation(CWmi &Wmi)
 		if( vtManufacturer.vt == VT_BSTR )
 		{
 #ifdef _UNICODE	
-			StringCchCopy(pMonitor->m_tszManufacturer, _countof(pMonitor->m_tszManufacturer), OLE2W(vtManufacturer.bstrVal));
+			_tcscpy_s(pMonitor->m_tszManufacturer, _countof(pMonitor->m_tszManufacturer), OLE2W(vtManufacturer.bstrVal));
 #else
-			StringCchCopy(pMonitor->m_tszManufacturer, _countof(pMonitor->m_tszManufacturer), OLE2A(vtManufacturer.bstrVal));
+			_tcscpy_s(pMonitor->m_tszManufacturer, _countof(pMonitor->m_tszManufacturer), OLE2A(vtManufacturer.bstrVal));
 #endif
 		}
 
@@ -2238,9 +2238,9 @@ BOOL CMonitorInfo::GetInformation(CWmi &Wmi)
 		if( vtDescription.vt == VT_BSTR )
 		{
 #ifdef _UNICODE	
-			StringCchCopy(pMonitor->m_tszDescription, _countof(pMonitor->m_tszDescription), OLE2W(vtDescription.bstrVal));
+			_tcscpy_s(pMonitor->m_tszDescription, _countof(pMonitor->m_tszDescription), OLE2W(vtDescription.bstrVal));
 #else
-			StringCchCopy(pMonitor->m_tszDescription, _countof(pMonitor->m_tszDescription), OLE2A(vtDescription.bstrVal));
+			_tcscpy_s(pMonitor->m_tszDescription, _countof(pMonitor->m_tszDescription), OLE2A(vtDescription.bstrVal));
 #endif
 		}
 

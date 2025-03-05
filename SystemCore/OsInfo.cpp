@@ -337,8 +337,12 @@ void COsInfo::DetectWindowsVersion()
 											m_nWinVersion = Windows10_21H2;
 									else if(dwBuildNumber == 19045)
 											m_nWinVersion = Windows10_22H2;
-									else if( dwBuildNumber >= 22000 )
-										m_nWinVersion = Windows11;
+									else if( dwBuildNumber == 22000 )
+										m_nWinVersion = Windows11_21H2;
+									else if( dwBuildNumber == 22621 )
+										m_nWinVersion = Windows11_22H2;
+									else if( dwBuildNumber == 22631 )
+										m_nWinVersion = Windows11_23H2;
 								}
 								else
 								{
@@ -757,17 +761,17 @@ void COsInfo::DetectWindowsServicePack()
 		// Test for SP6 versus SP6a.
 		lRetCode = RegOpenKeyEx(HKEY_LOCAL_MACHINE, _T("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Hotfix\\Q246009"), 0, KEY_QUERY_VALUE, &hKey);
 		if( lRetCode == ERROR_SUCCESS )
-			StringCchPrintf(m_tszServicePack, _countof(m_tszServicePack), _T("Service Pack 6a (Build %d)"), m_Osvi.dwBuildNumber & 0xFFFF);
+			_stprintf_s(m_tszServicePack, _countof(m_tszServicePack), _T("Service Pack 6a (Build %d)"), m_Osvi.dwBuildNumber & 0xFFFF);
 		else // Windows NT 4.0 prior to SP6a
 		{
-			StringCchPrintf(m_tszServicePack, _countof(m_tszServicePack), _T("%s (Build %d)"), m_Osvi.szCSDVersion, m_Osvi.dwBuildNumber & 0xFFFF);
+			_stprintf_s(m_tszServicePack, _countof(m_tszServicePack), _T("%s (Build %d)"), m_Osvi.szCSDVersion, m_Osvi.dwBuildNumber & 0xFFFF);
 		}
 
 		RegCloseKey(hKey);
 	}
 	else // Windows NT 3.51 and earlier or Windows 2000 and later
 	{
-		StringCchPrintf(m_tszServicePack, _countof(m_tszServicePack), _T("%s (Build %d)"), m_Osvi.szCSDVersion, m_Osvi.dwBuildNumber & 0xFFFF);
+		_stprintf_s(m_tszServicePack, _countof(m_tszServicePack), _T("%s (Build %d)"), m_Osvi.szCSDVersion, m_Osvi.dwBuildNumber & 0xFFFF);
 	}
 }
 
@@ -818,97 +822,100 @@ bool COsInfo::Is64bitPlatform() const
 }
 
 //***************************************************************************
-//
+// Windows 10 이후로 내부 버전은 10.0으로 고정, 빌드 번호만 증가
+// Windows 10 / 11의 업데이트는 연도 기반(YYH1, YYH2) 명명법 사용
+// Windows 10 빌드 19045까지가 최종 버전(Windows 10 22H2)
+// Windows 11은 빌드 22000 이상(현재 22631까지 출시됨)
 void COsInfo::DetectDescription()
 {
 	switch( GetWindowsVersion() )
 	{
 		case Windows:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows"));
 			break;
 		case Windows32s:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows 32s"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 32s"));
 			break;
 		case Windows95:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows 95"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 95"));
 			break;
 		case Windows95OSR2:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows 95 SR2"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 95 SR2"));
 			break;
 		case Windows98:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows 98"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 98"));
 			break;
 		case Windows98SE:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows 98 SE"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 98 SE"));
 			break;
 		case WindowsMillennium:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows Me"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Me"));
 			break;
 		case WindowsNT351:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows NT 3.51"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows NT 3.51"));
 			break;
 		case WindowsNT40:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows NT 4.0"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows NT 4.0"));
 			break;
 		case WindowsNT40Server:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows NT 4.0 Server"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows NT 4.0 Server"));
 			break;
 		case Windows2000:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows 2000"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 2000"));
 			break;
 		case WindowsXP:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows XP"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows XP"));
 			break;
 		case WindowsXPProfessionalx64:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows XP Professional x64"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows XP Professional x64"));
 			break;
 		case WindowsHomeServer:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows Home Server"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Home Server"));
 			break;
 		case WindowsServer2003:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2003"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2003"));
 			break;
 		case WindowsServer2003R2:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2003 R2"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2003 R2"));
 			break;
 		case WindowsVista:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows Vista"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Vista"));
 			break;
 		case WindowsVistaSP1:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows Vista SP1"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Vista SP1"));
 			break;
 		case WindowsVistaSP2:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows Vista SP2"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Vista SP2"));
 			break;
 		case WindowsServer2008:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2008"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2008"));
 			break;
 		case WindowsServer2008SP2:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2008 SP2"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2008 SP2"));
 			break;
 		case WindowsServer2008R2:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2008 R2"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2008 R2"));
 			break;
 		case WindowsServer2008R2SP2:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2008 R2 SP2"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2008 R2 SP2"));
 			break;
 		case Windows7:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows 7"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 7"));
 			break;
 		case Windows7SP1:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows 7 SP1"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 7 SP1"));
 			break;
 		case WindowsServer2012:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2012"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2012"));
 			break;
 		case Windows8:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows 8"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 8"));
 			break;
 		case WindowsServer2012R2:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2012 R2"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2012 R2"));
 			break;
 		case Windows81:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows 8.1"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 8.1"));
 			break;
 		case Windows10:
 		case Windows10_1511:
@@ -920,101 +927,107 @@ void COsInfo::DetectDescription()
 		case Windows10_1903:
 		case Windows10_1909:
 		case Windows10_2004:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows 10"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 10"));
 			break;
 		case Windows10_20H2:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows 10 20H2"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 10 20H2"));
 			break;
 		case Windows10_21H1:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows 10 21H1"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 10 21H1"));
 			break;
 		case Windows10_21H2:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows 10 21H2"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 10 21H2"));
 			break;
 		case Windows10_22H2:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows 10 22H2"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 10 22H2"));
 			break;
 		case WindowsServer2016:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2016"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2016"));
 			break;
 		case WindowsServer2019:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2019"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2019"));
 			break;
 		case WindowsServer2022:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2022"));
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2022"));
 			break;
-		case Windows11:
-			StringCchCopy(m_tszDescription, _countof(m_tszDescription), _T("Windows 11"));
+		case Windows11_21H2:
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 11 21H2"));
+			break;
+		case Windows11_22H2:
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 11 22H2"));
+			break;
+		case Windows11_23H2:
+			_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 11 23H2"));
 			break;
 	}
 
 	switch( GetWindowsEdition() )
 	{
 		case EditionUnknown:
-			StringCchCat(m_tszDescription, _countof(m_tszDescription), _T("[Edition unknown Edition]"));
+			_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Edition unknown Edition]"));
 			break;
 		case Workstation:
-			StringCchCat(m_tszDescription, _countof(m_tszDescription), _T("[Workstation Edition]"));
+			_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Workstation Edition]"));
 			break;
 		case Server:
-			StringCchCat(m_tszDescription, _countof(m_tszDescription), _T("[Server Edition]"));
+			_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Server Edition]"));
 			break;
 		case AdvancedServer:
-			StringCchCat(m_tszDescription, _countof(m_tszDescription), _T("[Advanced Server Edition]"));
+			_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Advanced Server Edition]"));
 			break;
 		case Home:
-			StringCchCat(m_tszDescription, _countof(m_tszDescription), _T("[Home Edition]"));
+			_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Home Edition]"));
 			break;
 		case Ultimate:
-			StringCchCat(m_tszDescription, _countof(m_tszDescription), _T("[Ultimate Edition]"));
+			_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Ultimate Edition]"));
 			break;
 		case HomeBasic:
-			StringCchCat(m_tszDescription, _countof(m_tszDescription), _T("[Home Basic Edition]"));
+			_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Home Basic Edition]"));
 			break;
 		case HomePremium:
-			StringCchCat(m_tszDescription, _countof(m_tszDescription), _T("[Home Premium Edition]"));
+			_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Home Premium Edition]"));
 			break;
 		case Enterprise:
-			StringCchCat(m_tszDescription, _countof(m_tszDescription), _T("[Enterprise Edition]"));
+			_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Enterprise Edition]"));
 			break;
 		case HomeBasic_N:
-			StringCchCat(m_tszDescription, _countof(m_tszDescription), _T("[Home Basic N Edition]"));
+			_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Home Basic N Edition]"));
 			break;
 		case Business:
-			StringCchCat(m_tszDescription, _countof(m_tszDescription), _T("[Business Edition]"));
+			_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Business Edition]"));
 			break;
 		case Starter:
-			StringCchCat(m_tszDescription, _countof(m_tszDescription), _T("[Starter Edition]"));
+			_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Starter Edition]"));
 			break;
 		case StandardServer:
-			StringCchCat(m_tszDescription, _countof(m_tszDescription), _T("[Standard Server Edition]"));
+			_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Standard Server Edition]"));
 			break;
 		case EnterpriseServerCore:
-			StringCchCat(m_tszDescription, _countof(m_tszDescription), _T("[Enterprise Server Core Edition]"));
+			_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Enterprise Server Core Edition]"));
 			break;
 		case EnterpriseServerIA64:
-			StringCchCat(m_tszDescription, _countof(m_tszDescription), _T("[Enterprise Server IA64 Edition]"));
+			_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Enterprise Server IA64 Edition]"));
 			break;
 		case Business_N:
-			StringCchCat(m_tszDescription, _countof(m_tszDescription), _T("[Business N Edition]"));
+			_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Business N Edition]"));
 			break;
 		case WebServer:
-			StringCchCat(m_tszDescription, _countof(m_tszDescription), _T("[Web Server Edition]"));
+			_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Web Server Edition]"));
 			break;
 		case ClusterServer:
-			StringCchCat(m_tszDescription, _countof(m_tszDescription), _T("[Cluster Server Edition]"));
+			_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Cluster Server Edition]"));
 			break;
 		case HomeServer:
-			StringCchCat(m_tszDescription, _countof(m_tszDescription), _T("[Home Server Edition]"));
+			_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Home Server Edition]"));
 			break;
 		case Professional:
-			StringCchCat(m_tszDescription, _countof(m_tszDescription), _T("[Professional Edition]"));
+			_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Professional Edition]"));
 			break;
 		case Windows10Home_E:
-			StringCchCat(m_tszDescription, _countof(m_tszDescription), _T("[Home Edition]"));
+			_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Home Edition]"));
 			break;
 		case Windows10Education_E:
-			StringCchCat(m_tszDescription, _countof(m_tszDescription), _T("[Education Edition]"));
+			_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Education Edition]"));
 			break;
 	}
 }

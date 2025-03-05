@@ -33,12 +33,12 @@ BOOL GetVersionLangOfFile(TCHAR *ptszAppName, TCHAR *ptszVersion, TCHAR *ptszLan
 				if( VerQueryValue(pbInfBuff, _T("\\VarFileInfo\\Translation"), (void**)(&pdwLangChar), &uSize) )
 				{
 					if( VerLanguageName(LOWORD(*pdwLangChar), tszResource, sizeof(tszResource)) )
-						StringCchCopy(ptszLanguage, MAX_BUFFER_SIZE, tszResource);
+						_tcscpy_s(ptszLanguage, MAX_BUFFER_SIZE, tszResource);
 
-					StringCchPrintf(tszResource, _countof(tszResource), _T("\\StringFileInfo\\%04X%04X\\FileVersion"), LOWORD(*pdwLangChar), HIWORD(*pdwLangChar));
+					_stprintf_s(tszResource, _countof(tszResource), _T("\\StringFileInfo\\%04X%04X\\FileVersion"), LOWORD(*pdwLangChar), HIWORD(*pdwLangChar));
 
 					if( VerQueryValue(pbInfBuff, tszResource, (void**)(&ptszTempVersion), &uSize) )
-						StringCchCopy(ptszVersion, MAX_BUFFER_SIZE, ptszTempVersion);
+						_tcscpy_s(ptszVersion, MAX_BUFFER_SIZE, ptszTempVersion);
 
 					bResult = true;
 				}
@@ -80,7 +80,7 @@ BOOL CIeInfo::GetInformation()
 
 	if( IsWindowVersion(-1, -1, VER_PLATFORM_WIN32_WINDOWS) )
 	{
-		StringCchPrintf(tszSubKey, _countof(tszSubKey), _T("%s\\%s"), WIN_MICROSOFT_KEY, WIN_IE_KEY);
+		_stprintf_s(tszSubKey, _countof(tszSubKey), _T("%s\\%s"), WIN_MICROSOFT_KEY, WIN_IE_KEY);
 
 		lRetCode = RegOpenKeyEx(HKEY_LOCAL_MACHINE, tszSubKey, 0, KEY_READ, &hKeyIE);
 		if( lRetCode == ERROR_SUCCESS )
@@ -92,7 +92,7 @@ BOOL CIeInfo::GetInformation()
 
 			lRetCode = RegQueryValueEx(hKeyIE, WIN_IE_BUILD_NAME, NULL, &dwNameLen, (LPBYTE)tszBuild, &dwValueLen);
 			if( !((lRetCode != ERROR_SUCCESS) || (dwValueLen > REGISTRY_VALUE_STRLEN)) )
-				StringCchCopy(tszBuild, _countof(tszBuild), _T("UnKnown"));
+				_tcscpy_s(tszBuild, _countof(tszBuild), _T("UnKnown"));
 
 			dwNameLen = sizeof(WIN_IE_VERSION_NAME);
 			dwValueLen = sizeof(tszVersion);
@@ -101,12 +101,12 @@ BOOL CIeInfo::GetInformation()
 
 			lRetCode = RegQueryValueEx(hKeyIE, WIN_IE_VERSION_NAME, NULL, &dwNameLen, (LPBYTE)tszVersion, &dwValueLen);
 			if( !((lRetCode != ERROR_SUCCESS) || (dwValueLen > REGISTRY_VALUE_STRLEN)) )
-				StringCchCopy(tszVersion, _countof(tszVersion), _T("UnKnown"));
+				_tcscpy_s(tszVersion, _countof(tszVersion), _T("UnKnown"));
 		}
 	}
 	else if( IsWindowVersion(-1, -1, VER_PLATFORM_WIN32_NT) )
 	{
-		StringCchPrintf(tszSubKey, _countof(tszSubKey), _T("%s\\%s"), NT_MICROSOFT_KEY, NT_IE_KEY);
+		_stprintf_s(tszSubKey, _countof(tszSubKey), _T("%s\\%s"), NT_MICROSOFT_KEY, NT_IE_KEY);
 
 		lRetCode = RegOpenKeyEx(HKEY_LOCAL_MACHINE, tszSubKey, 0, KEY_READ, &hKeyIE);
 		if( lRetCode == ERROR_SUCCESS )
@@ -118,7 +118,7 @@ BOOL CIeInfo::GetInformation()
 
 			lRetCode = RegQueryValueEx(hKeyIE, NT_IE_BUILD_NAME, NULL, &dwNameLen, (LPBYTE)tszBuild, &dwValueLen);
 			if( (lRetCode != ERROR_SUCCESS) || (dwValueLen > REGISTRY_VALUE_STRLEN) )
-				StringCchCopy(tszBuild, _countof(tszBuild), _T("UnKnown"));
+				_tcscpy_s(tszBuild, _countof(tszBuild), _T("UnKnown"));
 
 			dwNameLen = sizeof(NT_IE_VERSION_NAME);
 			dwValueLen = sizeof(tszVersion);
@@ -127,19 +127,19 @@ BOOL CIeInfo::GetInformation()
 
 			lRetCode = RegQueryValueEx(hKeyIE, NT_IE_VERSION_NAME, NULL, &dwNameLen, (LPBYTE)tszVersion, &dwValueLen);
 			if( (lRetCode != ERROR_SUCCESS) || (dwValueLen > REGISTRY_VALUE_STRLEN) )
-				StringCchCopy(tszVersion, _countof(tszVersion), _T("UnKnown"));
+				_tcscpy_s(tszVersion, _countof(tszVersion), _T("UnKnown"));
 		}
 
 		RegCloseKey(hKeyIE);
 	}
 	else
 	{
-		StringCchCopy(tszBuild, _countof(tszBuild), _T("UnKnown"));
-		StringCchCopy(tszVersion, _countof(tszVersion), _T("UnKnown"));
+		_tcscpy_s(tszBuild, _countof(tszBuild), _T("UnKnown"));
+		_tcscpy_s(tszVersion, _countof(tszVersion), _T("UnKnown"));
 	}
 
-	StringCchCopy(m_Ie.m_tszBuild, _countof(m_Ie.m_tszBuild), tszBuild);
-	StringCchCopy(m_Ie.m_tszVersion, _countof(m_Ie.m_tszVersion), tszVersion);
+	_tcscpy_s(m_Ie.m_tszBuild, _countof(m_Ie.m_tszBuild), tszBuild);
+	_tcscpy_s(m_Ie.m_tszVersion, _countof(m_Ie.m_tszVersion), tszVersion);
 
 	return true;
 }
@@ -175,7 +175,7 @@ BOOL CDirectXInfo::GetInformation()
 
 	if( IsWindowVersion(-1, -1, VER_PLATFORM_WIN32_WINDOWS) )
 	{
-		StringCchPrintf(tszSubKey, _countof(tszSubKey), _T("%s\\%s"), WIN_MICROSOFT_KEY, WIN_DIRECTX_KEY);
+		_stprintf_s(tszSubKey, _countof(tszSubKey), _T("%s\\%s"), WIN_MICROSOFT_KEY, WIN_DIRECTX_KEY);
 
 		lRetCode = RegOpenKeyEx(HKEY_LOCAL_MACHINE, tszSubKey, 0, KEY_READ, &hKeyDirectX);
 		if( lRetCode == ERROR_SUCCESS )
@@ -186,26 +186,26 @@ BOOL CDirectXInfo::GetInformation()
 			lRetCode = RegQueryValueEx(hKeyDirectX, WIN_DIRECTX_INSTALLVER_NAME, NULL, &dwNameLen, (LPBYTE)&qwInstallVersion, &dwValueLen);
 			if( lRetCode == ERROR_SUCCESS )
 			{
-				StringCchPrintf(tszInstallVersion, _countof(tszInstallVersion), _T("%d.%d.%d.%d"), LOBYTE(LOWORD(qwInstallVersion)),
+				_stprintf_s(tszInstallVersion, _countof(tszInstallVersion), _T("%d.%d.%d.%d"), LOBYTE(LOWORD(qwInstallVersion)),
 					HIBYTE(LOWORD(qwInstallVersion)),
 					LOBYTE(HIWORD(qwInstallVersion)),
 					HIBYTE(HIWORD(qwInstallVersion)));
 			}
-			else StringCchCopy(tszInstallVersion, _countof(tszInstallVersion), _T("UnKnown"));
+			else _tcscpy_s(tszInstallVersion, _countof(tszInstallVersion), _T("UnKnown"));
 
 			dwNameLen = sizeof(WIN_DIRECTX_VERSION_NAME);
 			dwValueLen = sizeof(tszVersion);
 
 			lRetCode = RegQueryValueEx(hKeyDirectX, WIN_DIRECTX_VERSION_NAME, NULL, &dwNameLen, (LPBYTE)tszVersion, &dwValueLen);
 			if( (lRetCode != ERROR_SUCCESS) || (dwValueLen > REGISTRY_VALUE_STRLEN) )
-				StringCchCopy(tszVersion, _countof(tszVersion), _T("UnKnown"));
+				_tcscpy_s(tszVersion, _countof(tszVersion), _T("UnKnown"));
 		}
 
 		RegCloseKey(hKeyDirectX);
 	}
 	else if( IsWindowVersion(-1, -1, VER_PLATFORM_WIN32_NT) )
 	{
-		StringCchPrintf(tszSubKey, _countof(tszSubKey), _T("%s\\%s"), NT_MICROSOFT_KEY, NT_DIRECTX_KEY);
+		_stprintf_s(tszSubKey, _countof(tszSubKey), _T("%s\\%s"), NT_MICROSOFT_KEY, NT_DIRECTX_KEY);
 
 		lRetCode = RegOpenKeyEx(HKEY_LOCAL_MACHINE, tszSubKey, 0, KEY_READ, &hKeyDirectX);
 		if( lRetCode == ERROR_SUCCESS )
@@ -216,19 +216,19 @@ BOOL CDirectXInfo::GetInformation()
 			lRetCode = RegQueryValueEx(hKeyDirectX, WIN_DIRECTX_INSTALLVER_NAME, NULL, &dwNameLen, (LPBYTE)&qwInstallVersion, &dwValueLen);
 			if( lRetCode == ERROR_SUCCESS )
 			{
-				StringCchPrintf(tszInstallVersion, _countof(tszInstallVersion), _T("%d.%d.%d.%d"), LOBYTE(LOWORD(qwInstallVersion)),
+				_stprintf_s(tszInstallVersion, _countof(tszInstallVersion), _T("%d.%d.%d.%d"), LOBYTE(LOWORD(qwInstallVersion)),
 					HIBYTE(LOWORD(qwInstallVersion)),
 					LOBYTE(HIWORD(qwInstallVersion)),
 					HIBYTE(HIWORD(qwInstallVersion)));
 			}
-			else StringCchCopy(tszInstallVersion, _countof(tszInstallVersion), _T("UnKnown"));
+			else _tcscpy_s(tszInstallVersion, _countof(tszInstallVersion), _T("UnKnown"));
 
 			dwNameLen = sizeof(NT_DIRECTX_VERSION_NAME);
 			dwValueLen = sizeof(tszVersion);
 
 			lRetCode = RegQueryValueEx(hKeyDirectX, NT_DIRECTX_VERSION_NAME, NULL, &dwNameLen, (LPBYTE)tszVersion, &dwValueLen);
 			if( (lRetCode != ERROR_SUCCESS) || (dwValueLen > REGISTRY_VALUE_STRLEN) )
-				StringCchCopy(tszVersion, _countof(tszVersion), _T("UnKnown"));
+				_tcscpy_s(tszVersion, _countof(tszVersion), _T("UnKnown"));
 		}
 
 		RegCloseKey(hKeyDirectX);
@@ -236,29 +236,29 @@ BOOL CDirectXInfo::GetInformation()
 
 	tszDescription[0] = '\0';
 	if( _tcscmp(tszVersion, _T("4.09.00.0900")) == 0 )
-		StringCchCopy(tszDescription, _countof(tszDescription), _T("DirectX 9.0"));
+		_tcscpy_s(tszDescription, _countof(tszDescription), _T("DirectX 9.0"));
 	else if( _tcscmp(tszVersion, _T("4.09.00.0901")) == 0 )
-		StringCchCopy(tszDescription, _countof(tszDescription), _T("DirectX 9.0a"));
+		_tcscpy_s(tszDescription, _countof(tszDescription), _T("DirectX 9.0a"));
 	else if( _tcscmp(tszVersion, _T("4.09.00.0902")) == 0 )
-		StringCchCopy(tszDescription, _countof(tszDescription), _T("DirectX 9.0b"));
+		_tcscpy_s(tszDescription, _countof(tszDescription), _T("DirectX 9.0b"));
 	else if( _tcscmp(tszVersion, _T("4.09.00.0903")) == 0 )
-		StringCchCopy(tszDescription, _countof(tszDescription), _T("DirectX 9.0c"));
+		_tcscpy_s(tszDescription, _countof(tszDescription), _T("DirectX 9.0c"));
 	else if( _tcscmp(tszVersion, _T("4.09.00.0904")) == 0 )
 	{
 		if( IsWindowVersion(-1, -1, VER_PLATFORM_WIN32_NT) )
 		{
 			if( IsWindowVersion(5, -1, -1) )
-				StringCchCopy(tszDescription, _countof(tszDescription), _T("DirectX 9.0c"));
+				_tcscpy_s(tszDescription, _countof(tszDescription), _T("DirectX 9.0c"));
 			else if( IsWindowVersion(6, 0, -1) )
-				StringCchCopy(tszDescription, _countof(tszDescription), _T("DirectX 10"));
+				_tcscpy_s(tszDescription, _countof(tszDescription), _T("DirectX 10"));
 			else if( IsWindowVersion(6, 1, -1) )
-				StringCchCopy(tszDescription, _countof(tszDescription), _T("DirectX 11"));
+				_tcscpy_s(tszDescription, _countof(tszDescription), _T("DirectX 11"));
 		}
 	}
 
-	StringCchCopy(m_DirectX.m_tszVersion, _countof(m_DirectX.m_tszVersion), tszVersion);
-	StringCchCopy(m_DirectX.m_tszInstallVersion, _countof(m_DirectX.m_tszInstallVersion), tszInstallVersion);
-	StringCchCopy(m_DirectX.m_tszDescription, _countof(m_DirectX.m_tszDescription), tszDescription);
+	_tcscpy_s(m_DirectX.m_tszVersion, _countof(m_DirectX.m_tszVersion), tszVersion);
+	_tcscpy_s(m_DirectX.m_tszInstallVersion, _countof(m_DirectX.m_tszInstallVersion), tszInstallVersion);
+	_tcscpy_s(m_DirectX.m_tszDescription, _countof(m_DirectX.m_tszDescription), tszDescription);
 
 	return true;
 }
@@ -301,7 +301,7 @@ BOOL CJavaVMInfo::GetInformation()
 
  	if( IsWindowVersion(-1, -1, VER_PLATFORM_WIN32_WINDOWS) )
 	{
-		StringCchPrintf(tszSubKey, _countof(tszSubKey), _T("%s"), WIN_MS_JAVAVM_KEY);
+		_stprintf_s(tszSubKey, _countof(tszSubKey), _T("%s"), WIN_MS_JAVAVM_KEY);
 
 		lRetCode = RegOpenKeyEx(HKEY_LOCAL_MACHINE, tszSubKey, 0, KEY_READ, &hKeyJavaVm);
 		if( lRetCode == ERROR_SUCCESS )
@@ -317,7 +317,7 @@ BOOL CJavaVMInfo::GetInformation()
 		}
 		RegCloseKey(hKeyJavaVm);
 
-		StringCchPrintf(tszSubKey, _countof(tszSubKey), _T("%s"), WIN_SUN_JAVAVM_JRE_KEY);
+		_stprintf_s(tszSubKey, _countof(tszSubKey), _T("%s"), WIN_SUN_JAVAVM_JRE_KEY);
 
 		lRetCode = RegOpenKeyEx(HKEY_LOCAL_MACHINE, tszSubKey, 0, KEY_READ, &hKeyEnum);
 		if( lRetCode == ERROR_SUCCESS )
@@ -328,7 +328,7 @@ BOOL CJavaVMInfo::GetInformation()
 
 			while( (lRetCode = RegEnumKeyEx(hKeyEnum, dwIndexEnum, tszGroupName, &dwNameLen, 0, NULL, 0, &MyFileTime)) == ERROR_SUCCESS )
 			{
-				StringCchPrintf(tszSubKey, _countof(tszSubKey), _T("%s\\%s"), WIN_SUN_JAVAVM_JRE_KEY, tszGroupName);
+				_stprintf_s(tszSubKey, _countof(tszSubKey), _T("%s\\%s"), WIN_SUN_JAVAVM_JRE_KEY, tszGroupName);
 
 				lRetCode = RegOpenKeyEx(HKEY_LOCAL_MACHINE, tszSubKey, 0, KEY_READ, &hKeyJavaVm);
 				if( lRetCode == ERROR_SUCCESS )
@@ -359,7 +359,7 @@ BOOL CJavaVMInfo::GetInformation()
 	}
 	else if( IsWindowVersion(-1, -1, VER_PLATFORM_WIN32_NT) )
 	{
-		StringCchPrintf(tszSubKey, _countof(tszSubKey), _T("%s"), NT_MS_JAVAVM_KEY);
+		_stprintf_s(tszSubKey, _countof(tszSubKey), _T("%s"), NT_MS_JAVAVM_KEY);
 
 		lRetCode = RegOpenKeyEx(HKEY_LOCAL_MACHINE, tszSubKey, 0, KEY_READ, &hKeyJavaVm);
 		if( lRetCode == ERROR_SUCCESS )
@@ -375,7 +375,7 @@ BOOL CJavaVMInfo::GetInformation()
 		}
 		RegCloseKey(hKeyJavaVm);
 
-		StringCchPrintf(tszSubKey, _countof(tszSubKey), _T("%s"), NT_SUN_JAVAVM_JRE_KEY);
+		_stprintf_s(tszSubKey, _countof(tszSubKey), _T("%s"), NT_SUN_JAVAVM_JRE_KEY);
 
 		lRetCode = RegOpenKeyEx(HKEY_LOCAL_MACHINE, tszSubKey, 0, KEY_READ, &hKeyEnum);
 		if( lRetCode == ERROR_SUCCESS )
@@ -386,7 +386,7 @@ BOOL CJavaVMInfo::GetInformation()
 
 			while( (lRetCode = RegEnumKeyEx(hKeyEnum, dwIndexEnum, tszGroupName, &dwNameLen, 0, NULL, 0, &MyFileTime)) == ERROR_SUCCESS )
 			{
-				StringCchPrintf(tszSubKey, _countof(tszSubKey), _T("%s\\%s"), NT_SUN_JAVAVM_JRE_KEY, tszGroupName);
+				_stprintf_s(tszSubKey, _countof(tszSubKey), _T("%s\\%s"), NT_SUN_JAVAVM_JRE_KEY, tszGroupName);
 
 				lRetCode = RegOpenKeyEx(HKEY_LOCAL_MACHINE, tszSubKey, 0, KEY_READ, &hKeyJavaVm);
 				if( lRetCode == ERROR_SUCCESS )
@@ -431,7 +431,7 @@ BOOL CJavaVMInfo::GetInformation()
 	if( bIsMCompany )
 	{
 		GetSystemDirectory(tszWindowSystemDir, sizeof(tszWindowSystemDir));
-		StringCchPrintf(tszMsJVMRuntimeLibPath, _countof(tszMsJVMRuntimeLibPath), _T("%s\\*.*"), tszWindowSystemDir);
+		_stprintf_s(tszMsJVMRuntimeLibPath, _countof(tszMsJVMRuntimeLibPath), _T("%s\\*.*"), tszWindowSystemDir);
 
 		hFindFile = FindFirstFile(tszMsJVMRuntimeLibPath, &FindData);
 
@@ -443,7 +443,7 @@ BOOL CJavaVMInfo::GetInformation()
 				if( _tcscmp(FindData.cFileName, _T(".")) != 0 && _tcscmp(FindData.cFileName, _T("..")) != 0
 					&& !(FindData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) )
 				{
-					StringCchPrintf(tszActiveFile, _countof(tszActiveFile), _T("%s"), FindData.cFileName);
+					_stprintf_s(tszActiveFile, _countof(tszActiveFile), _T("%s"), FindData.cFileName);
 					_tcslwr_s(tszActiveFile, _tcslen(tszActiveFile) + 1);
 
 					if( _tcsstr(tszActiveFile, _T("java")) && _tcsstr(tszActiveFile, _T(".vxd")) )
@@ -475,7 +475,7 @@ BOOL CJavaVMInfo::GetInformation()
 
 			GetSystemDirectory(tszWindowSystemDir, sizeof(tszWindowSystemDir));
 
-			StringCchCopy(tszBuffer, _countof(tszBuffer), tszSunJVMRuntimeLibPath);
+			_tcscpy_s(tszBuffer, _countof(tszBuffer), tszSunJVMRuntimeLibPath);
 			ptszBuffer = _tcschr(tszBuffer, ';');
 
 			if( ptszBuffer )
@@ -525,9 +525,9 @@ BOOL CJavaVMInfo::GetVersionMsJVM(TCHAR *ptszMsJVMVersion)
 	TCHAR	tszRuntimeLibFilePath[FULLPATH_STRLEN];
 
 	if( IsWindowVersion(-1, -1, VER_PLATFORM_WIN32_WINDOWS) )
-		StringCchPrintf(tszRuntimeLibFileName, _countof(tszRuntimeLibFileName), _T("%s"), WIN_MS_JAVAVM_RUNDLL_FILENAME);
+		_stprintf_s(tszRuntimeLibFileName, _countof(tszRuntimeLibFileName), _T("%s"), WIN_MS_JAVAVM_RUNDLL_FILENAME);
 	else if( IsWindowVersion(-1, -1, VER_PLATFORM_WIN32_NT) )
-		StringCchPrintf(tszRuntimeLibFileName, _countof(tszRuntimeLibFileName), _T("%s"), NT_MS_JAVAVM_RUNDLL_FILENAME);
+		_stprintf_s(tszRuntimeLibFileName, _countof(tszRuntimeLibFileName), _T("%s"), NT_MS_JAVAVM_RUNDLL_FILENAME);
 	else
 		tszRuntimeLibFileName[0] = '\0';
 
@@ -539,7 +539,7 @@ BOOL CJavaVMInfo::GetVersionMsJVM(TCHAR *ptszMsJVMVersion)
 	else
 	{
 		GetSystemDirectory(tszWindowSystemDir, sizeof(tszWindowSystemDir));
-		StringCchPrintf(tszRuntimeLibFilePath, _countof(tszRuntimeLibFilePath), _T("%s\\%s"), tszWindowSystemDir, tszRuntimeLibFileName);
+		_stprintf_s(tszRuntimeLibFilePath, _countof(tszRuntimeLibFilePath), _T("%s\\%s"), tszWindowSystemDir, tszRuntimeLibFileName);
 
 		if( GetVersionLangOfFile(tszRuntimeLibFilePath, tszVersion, tszLanguage) )
 		{
@@ -548,7 +548,7 @@ BOOL CJavaVMInfo::GetVersionMsJVM(TCHAR *ptszMsJVMVersion)
 				ptszMsJVMVersion[0] = '\0';
 				return false;
 			}
-			else StringCchCopy(ptszMsJVMVersion, JAVAVM_VERSION_STRLEN, tszVersion);
+			else _tcscpy_s(ptszMsJVMVersion, JAVAVM_VERSION_STRLEN, tszVersion);
 		}
 		else
 		{
@@ -579,7 +579,7 @@ BOOL CJavaVMInfo::GetVersionSunJVM(TCHAR *ptszSunJVMVersion)
 
 	if( IsWindowVersion(-1, -1, VER_PLATFORM_WIN32_WINDOWS) )
 	{
-		StringCchPrintf(tszSubKey, _countof(tszSubKey), _T("%s"), WIN_SUN_JAVAVM_PLUGIN_KEY);
+		_stprintf_s(tszSubKey, _countof(tszSubKey), _T("%s"), WIN_SUN_JAVAVM_PLUGIN_KEY);
 
 		lRetCode = RegOpenKeyEx(HKEY_LOCAL_MACHINE, tszSubKey, 0, KEY_READ, &hKeyEnum);
 		if( lRetCode == ERROR_SUCCESS )
@@ -599,7 +599,7 @@ BOOL CJavaVMInfo::GetVersionSunJVM(TCHAR *ptszSunJVMVersion)
 	}
 	else if( IsWindowVersion(-1, -1, VER_PLATFORM_WIN32_NT) )
 	{
-		StringCchPrintf(tszSubKey, _countof(tszSubKey), _T("%s"), NT_SUN_JAVAVM_PLUGIN_KEY);
+		_stprintf_s(tszSubKey, _countof(tszSubKey), _T("%s"), NT_SUN_JAVAVM_PLUGIN_KEY);
 
 		lRetCode = RegOpenKeyEx(HKEY_LOCAL_MACHINE, tszSubKey, 0, KEY_READ, &hKeyEnum);
 		if( lRetCode == ERROR_SUCCESS )
@@ -627,7 +627,7 @@ BOOL CJavaVMInfo::GetVersionSunJVM(TCHAR *ptszSunJVMVersion)
 		ptszSunJVMVersion[0] = '\0';
 		return false;
 	}
-	else StringCchCopy(ptszSunJVMVersion, JAVAVM_VERSION_STRLEN, tszGroupName);
+	else _tcscpy_s(ptszSunJVMVersion, JAVAVM_VERSION_STRLEN, tszGroupName);
 
 	return true;
 }
@@ -697,7 +697,7 @@ BOOL CInstallSwInfo::GetInformation()
 
 		while( (lRetCode = RegEnumKeyEx(hSubKey, dwIndexEnum, tszSubKeyName, &dwNameLen, 0, NULL, 0, &MyFileTime)) == ERROR_SUCCESS )
 		{
-			StringCchPrintf(tszSubKey, _countof(tszSubKey), _T("%s\\%s"), WIN_SOFTWARE_UNINSTALL_KEY, tszSubKeyName);
+			_stprintf_s(tszSubKey, _countof(tszSubKey), _T("%s\\%s"), WIN_SOFTWARE_UNINSTALL_KEY, tszSubKeyName);
 
 			tszDisplayName[0] = '\0';
 			tszInstallSource[0] = '\0';
@@ -736,7 +736,7 @@ BOOL CInstallSwInfo::GetInformation()
 										dwCount = 0;
 										while( dwCount < dwValueLen )
 										{
-											StringCchPrintf(tszValue, _countof(tszValue), _T("%s%c"), tszValue, *(tszSubKeyValue + dwCount));
+											_stprintf_s(tszValue, _countof(tszValue), _T("%s%c"), tszValue, *(tszSubKeyValue + dwCount));
 											dwCount++;
 										}
 									}
@@ -744,12 +744,12 @@ BOOL CInstallSwInfo::GetInformation()
 								}
 								case REG_SZ:
 								{
-									StringCchCopy(tszValue, _countof(tszValue), tszSubKeyValue);
+									_tcscpy_s(tszValue, _countof(tszValue), tszSubKeyValue);
 									break;
 								}
 								case REG_MULTI_SZ:
 								{
-									StringCchCopy(tszValue, _countof(tszValue), tszSubKeyValue);
+									_tcscpy_s(tszValue, _countof(tszValue), tszSubKeyValue);
 									break;
 								}
 								default:
@@ -758,13 +758,13 @@ BOOL CInstallSwInfo::GetInformation()
 						}
 
 						if( _tcscmp(tszSubKeyName, WIN_SOFTWARE_UNINSTALL_DISPLAYNAME_NAME) == 0 )
-							StringCchCopy(tszDisplayName, _countof(tszDisplayName), tszValue);
+							_tcscpy_s(tszDisplayName, _countof(tszDisplayName), tszValue);
 
 						if( _tcscmp(tszSubKeyName, WIN_SOFTWARE_UNINSTALL_INSTALLSOURCE_NAME) == 0 )
-							StringCchCopy(tszInstallSource, _countof(tszInstallSource), tszValue);
+							_tcscpy_s(tszInstallSource, _countof(tszInstallSource), tszValue);
 
 						if( _tcscmp(tszSubKeyName, WIN_SOFTWARE_UNINSTALL_UNINSTALLSTRING_NAME) == 0 )
-							StringCchCopy(tszUninstallString, _countof(tszUninstallString), tszValue);
+							_tcscpy_s(tszUninstallString, _countof(tszUninstallString), tszValue);
 
 						dwPropValueCount++;
 					}
@@ -785,9 +785,9 @@ BOOL CInstallSwInfo::GetInformation()
 						{
 							pInstallSwInfo = new INSTALL_SWINFO;
 
-							StringCchCopy(pInstallSwInfo->m_tszDisplayName, _countof(pInstallSwInfo->m_tszDisplayName), tszDisplayName);
-							StringCchCopy(pInstallSwInfo->m_tszInstallSource, _countof(pInstallSwInfo->m_tszInstallSource), tszInstallSource);
-							StringCchCopy(pInstallSwInfo->m_tszUninstallString, _countof(pInstallSwInfo->m_tszUninstallString), tszUninstallString);
+							_tcscpy_s(pInstallSwInfo->m_tszDisplayName, _countof(pInstallSwInfo->m_tszDisplayName), tszDisplayName);
+							_tcscpy_s(pInstallSwInfo->m_tszInstallSource, _countof(pInstallSwInfo->m_tszInstallSource), tszInstallSource);
+							_tcscpy_s(pInstallSwInfo->m_tszUninstallString, _countof(pInstallSwInfo->m_tszUninstallString), tszUninstallString);
 
 							m_sInstallSwInfoArray.Add(pInstallSwInfo);
 						}
