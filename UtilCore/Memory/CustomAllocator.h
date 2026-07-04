@@ -10,6 +10,10 @@
 
 #pragma once
 
+#ifndef __RAWALLOCATOR_H__
+#include <RawAllocator.h>
+#endif
+
 class BaseAllocator
 {
 public:

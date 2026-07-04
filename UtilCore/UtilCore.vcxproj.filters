@@ -28,6 +28,9 @@
     <Filter Include="Crypto">
       <UniqueIdentifier>{5cbdae29-a61d-478c-a2b7-ee5856aeddef}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Network">
+      <UniqueIdentifier>{13c77aad-394d-416e-9026-a74840fe7026}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Memory\Containers.h">
@@ -205,6 +208,12 @@
     <ClInclude Include="XML\RapidXMLUtil.h">
       <Filter>XML</Filter>
     </ClInclude>
+    <ClInclude Include="Network\SocketUtil.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="RawAllocator.h">
+      <Filter>Memory</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\CustomAllocator.cpp">
@@ -284,9 +293,6 @@
     <ClCompile Include="Memory\Stream.cpp">
       <Filter>Util</Filter>
     </ClCompile>
-    <ClCompile Include="Thread\SRWLock.cpp">
-      <Filter>Thread</Filter>
-    </ClCompile>
     <ClCompile Include="Util\Endian.cpp">
       <Filter>Util</Filter>
     </ClCompile>
@@ -325,6 +331,12 @@
     </ClCompile>
     <ClCompile Include="XML\RapidXMLUtil.cpp">
       <Filter>XML</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\SocketUtil.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Thread\SRWLock.cpp">
+      <Filter>Thread</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

@@ -1,82 +1,119 @@
-
-//***************************************************************************
-// SRWLock.h: interface for the CSRWLock class.
-//
-//***************************************************************************
-
+﻿#pragma once
 #ifndef __SRWLOCK_H__
 #define __SRWLOCK_H__
 
-//***************************************************************************
+#include <windows.h>
+
+// ============================================================
+// RWLock — Windows SRWLock 기반 읽기/쓰기 락 클래스
 //
-class CSRWLock  
+// - 읽기(공유) 락 : 여러 스레드가 동시에 획득 가능
+// - 쓰기(독점) 락 : 한 스레만 획득 가능, 읽기도 블록
+// - SRWLock은 재진입(recursive) 불가 — 같은 스레드 중첩 잠금 시 데드락
+// - ReadLock → WriteLock 승격 불가 — 데드락 유발
+// ============================================================
+
+class CSRWLock
 {
 public:
-	CSRWLock(void);
-	virtual ~CSRWLock(void);
+    CSRWLock();
+    ~CSRWLock();
 
-	void	SharedLock(void);
-	void	SharedUnLock(void);
-	void	ExclusiveLock(void);
-	void	ExclusiveUnLock(void);
+    // 복사/이동 금지 — 락 객체는 고정된 주소를 가져야 함
+    CSRWLock(const CSRWLock&) = delete;
+    CSRWLock& operator=(const CSRWLock&) = delete;
+    CSRWLock(CSRWLock&&) = delete;
+    CSRWLock& operator=(CSRWLock&&) = delete;
 
-protected:
-	CSRWLock(const CSRWLock&);
-	CSRWLock& operator=(const CSRWLock&);
+    // ── 쓰기 락 (Exclusive) ──────────────────────────────────
+    void ExclusiveLock();
+    [[nodiscard]] bool TryExclusiveLock();
+    void ExclusiveUnLock();
 
-	SRWLOCK		m_SRWLock;
-};
+    // ── 읽기 락 (Shared) ─────────────────────────────────────
+    void SharedLock();
+    [[nodiscard]] bool TrySharedLock();
+    void SharedUnLock();
 
-//***************************************************************************
-//
-class CSharedLock
-{
-public:
-	CSharedLock(CSRWLock* pRWLock);
-	~CSharedLock();
+    // ── 조건 변수 연동 ────────────────────────────────────────
+    SRWLOCK* NativeHandle() { return &_srwLock; }
 
 private:
-	CSRWLock		*m_pRWLock;
+    SRWLOCK _srwLock;   // Windows SRWLock 핸들 (포인터 크기, 8 bytes)
 };
 
-//***************************************************************************
-//
-class CExclusiveLock
+
+// ============================================================
+// ExclusiveLockGuard — 쓰기 락 RAII 가드
+// ============================================================
+class ExclusiveLockGuard
 {
 public:
-	CExclusiveLock(CSRWLock* pRWLock);
-	~CExclusiveLock();
+    explicit ExclusiveLockGuard(CSRWLock& lock);
+    ~ExclusiveLockGuard();
+
+    ExclusiveLockGuard(const ExclusiveLockGuard&) = delete;
+    ExclusiveLockGuard& operator=(const ExclusiveLockGuard&) = delete;
 
 private:
-	CSRWLock		*m_pRWLock;
+    CSRWLock& _lock;
 };
 
-//***************************************************************************
-// CSharedLock Construction/Destruction
-//***************************************************************************
 
-inline CSharedLock::CSharedLock( CSRWLock * pRWLock ) : m_pRWLock( pRWLock )
+// ============================================================
+// SharedLockGuard — 읽기 락 RAII 가드
+// ============================================================
+class SharedLockGuard
 {
-	if( m_pRWLock != NULL ) m_pRWLock->SharedLock();
-}
+public:
+    explicit SharedLockGuard(CSRWLock& lock);
+    ~SharedLockGuard();
 
-inline CSharedLock::~CSharedLock()
+    SharedLockGuard(const SharedLockGuard&) = delete;
+    SharedLockGuard& operator=(const SharedLockGuard&) = delete;
+
+private:
+    CSRWLock& _lock;
+};
+
+
+// ============================================================
+// TryExclusiveLockGuard — 쓰기 락 Try RAII 가드
+// ============================================================
+class TryExclusiveLockGuard
 {
-	if( m_pRWLock != NULL ) m_pRWLock->SharedUnLock();
-}
+public:
+    explicit TryExclusiveLockGuard(CSRWLock& lock);
+    ~TryExclusiveLockGuard();
 
-//***************************************************************************
-// CExclusiveLock Construction/Destruction
-//***************************************************************************
+    [[nodiscard]] bool IsAcquired() const { return _acquired; }
 
-inline CExclusiveLock::CExclusiveLock( CSRWLock * pRWLock ) : m_pRWLock( pRWLock )
+    TryExclusiveLockGuard(const TryExclusiveLockGuard&) = delete;
+    TryExclusiveLockGuard& operator=(const TryExclusiveLockGuard&) = delete;
+
+private:
+    CSRWLock& _lock;
+    bool      _acquired;
+};
+
+
+// ============================================================
+// TrySharedLockGuard — 읽기 락 Try RAII 가드
+// ============================================================
+class TrySharedLockGuard
 {
-	if( m_pRWLock != NULL ) m_pRWLock->ExclusiveLock();
-}
+public:
+    explicit TrySharedLockGuard(CSRWLock& lock);
+    ~TrySharedLockGuard();
 
-inline CExclusiveLock::~CExclusiveLock()
-{
-	if( m_pRWLock != NULL ) m_pRWLock->ExclusiveUnLock();
-}
+    [[nodiscard]] bool IsAcquired() const { return _acquired; }
 
-#endif // ndef __SRWLOCK_H__
+    TrySharedLockGuard(const TrySharedLockGuard&) = delete;
+    TrySharedLockGuard& operator=(const TrySharedLockGuard&) = delete;
+
+private:
+    CSRWLock& _lock;
+    bool      _acquired;
+};
+
+#endif // __SRWLOCK_H__

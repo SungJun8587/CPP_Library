@@ -53,9 +53,19 @@ using namespace std;
 // External Library
 /***********************************************************************************************/
 
+/*
+// Tcmalloc 메모리 할당자 선언
 #pragma comment(lib, LIB_NAME("libtcmalloc_minimal"))
-
 #include <gperftools/tcmalloc.h>
+
+// Jemalloc 메모리 할당자 선언
+#pragma comment(lib, LIB_NAME("jemalloc"))
+#include <jemalloc/jemalloc.h>
+
+// Mimalloc 메모리 할당자 선언
+#pragma comment(lib, LIB_NAME("mimalloc"))
+#include <mimalloc.h>
+*/
 
 /***********************************************************************************************/
 

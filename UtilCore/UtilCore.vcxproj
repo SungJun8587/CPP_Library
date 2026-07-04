@@ -58,7 +58,9 @@
     <ClInclude Include="Memory\Singleton.h" />
     <ClInclude Include="Memory\Stream.h" />
     <ClInclude Include="Memory\UnOrderedMap.h" />
+    <ClInclude Include="Network\SocketUtil.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="RawAllocator.h" />
     <ClInclude Include="ServerConfig.h" />
     <ClInclude Include="ServerConnectInfo.h" />
     <ClInclude Include="ServiceSvr.h" />
@@ -108,6 +110,7 @@
     <ClCompile Include="Memory\Memory.cpp" />
     <ClCompile Include="Memory\MemoryPool.cpp" />
     <ClCompile Include="Memory\Stream.cpp" />
+    <ClCompile Include="Network\SocketUtil.cpp" />
     <ClCompile Include="ServerConfig.cpp" />
     <ClCompile Include="ServiceSvr.cpp" />
     <ClCompile Include="pch.cpp">
@@ -214,8 +217,8 @@
     <OutDir>Bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>Bin\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)64D</TargetName>
-    <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.4.4-winx64\include;E:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;E:\GitHub\CPP\Library\ExternalLib\libiconv-1.18\build\include;E:\GitHub\CPP\Library\ExternalLib\openssl-master\include;$(ProjectDir);$(IncludePath)</IncludePath>
-    <LibraryPath>E:\GitHub\CPP\Library\ExternalLib\Bin\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
+    <IncludePath>K:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;K:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;K:\GitHub\CPP\Library\ExternalLib\mysql-8.4.4-winx64\include;K:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;K:\GitHub\CPP\Library\ExternalLib\libiconv-1.18\build\include;K:\GitHub\CPP\Library\ExternalLib\openssl-master\include;$(ProjectDir);$(IncludePath)</IncludePath>
+    <LibraryPath>K:\GitHub\CPP\Library\ExternalLib\Bin\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
     <SourcePath>$(SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -232,8 +235,8 @@
     <OutDir>Bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>Bin\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)64</TargetName>
-    <IncludePath>E:\GitHub\CPP\Library\ExternalLib\gperftools-gperftools-2.12\src\windows;E:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;E:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;E:\GitHub\CPP\Library\ExternalLib\mysql-8.4.4-winx64\include;E:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;E:\GitHub\CPP\Library\ExternalLib\libiconv-1.18\build\include;E:\GitHub\CPP\Library\ExternalLib\openssl-master\include;$(ProjectDir);$(IncludePath)</IncludePath>
-    <LibraryPath>E:\GitHub\CPP\Library\ExternalLib\Bin\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
+    <IncludePath>K:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;K:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;K:\GitHub\CPP\Library\ExternalLib\mysql-8.4.4-winx64\include;K:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;K:\GitHub\CPP\Library\ExternalLib\libiconv-1.18\build\include;K:\GitHub\CPP\Library\ExternalLib\openssl-master\include;$(ProjectDir);$(IncludePath)</IncludePath>
+    <LibraryPath>K:\GitHub\CPP\Library\ExternalLib\Bin\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
     <SourcePath>$(SourcePath)</SourcePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
