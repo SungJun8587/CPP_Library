@@ -19,10 +19,21 @@
 	CDeadLockProfiler* gpDeadLockProfiler = nullptr;
 #endif
 
-class CBaseGlobal
+//***************************************************************************
+// 프로그램 시작시(main 함수)에서 호출
+//	int main() 
+//  {
+//		BaseGlobal::Init();
+//
+//		// 서버 로직
+//
+//		BaseGlobal::Destroy();
+//		return 0;
+//	}
+//
+namespace BaseGlobal
 {
-public:
-	CBaseGlobal()
+	void Init()
 	{
 #ifdef __MEMORY_H__
 		gpMemory = new CMemory();
@@ -37,7 +48,7 @@ public:
 #endif	
 	}
 
-	~CBaseGlobal()
+	void Destroy()
 	{
 #ifdef __MEMORY_H__
 		if( gpMemory != nullptr ) delete gpMemory;
@@ -51,4 +62,4 @@ public:
 		if( gpDeadLockProfiler != nullptr ) delete gpDeadLockProfiler;
 #endif	
 	}
-} GCBaseGlobal;
+}
