@@ -46,6 +46,11 @@
     <ClInclude Include="DB\OdbcConnPool.h" />
     <ClInclude Include="DB\RedisConn.h" />
     <ClInclude Include="EXCEL\XlntUtil.h" />
+    <ClInclude Include="Job\GlobalQueue.h" />
+    <ClInclude Include="Job\Job.h" />
+    <ClInclude Include="Job\JobQueue.h" />
+    <ClInclude Include="Job\JobTimer.h" />
+    <ClInclude Include="Job\LockQueue.h" />
     <ClInclude Include="JSON\RapidJSONUtil.h" />
     <ClInclude Include="Memory\ClusteredMap.h" />
     <ClInclude Include="Memory\Containers.h" />
@@ -53,14 +58,15 @@
     <ClInclude Include="Memory\MemBuffer.h" />
     <ClInclude Include="Memory\Memory.h" />
     <ClInclude Include="Memory\MemoryPool.h" />
+    <ClInclude Include="Memory\MemoryOverride.h" />
     <ClInclude Include="Memory\ObjectPool.h" />
     <ClInclude Include="Memory\OrderedMap.h" />
+    <ClInclude Include="Memory\RawAllocator.h" />
     <ClInclude Include="Memory\Singleton.h" />
     <ClInclude Include="Memory\Stream.h" />
     <ClInclude Include="Memory\UnOrderedMap.h" />
     <ClInclude Include="Network\SocketUtil.h" />
     <ClInclude Include="pch.h" />
-    <ClInclude Include="RawAllocator.h" />
     <ClInclude Include="ServerConfig.h" />
     <ClInclude Include="ServerConnectInfo.h" />
     <ClInclude Include="ServiceSvr.h" />
@@ -103,6 +109,11 @@
     <ClCompile Include="DB\OdbcAsyncSrv.cpp" />
     <ClCompile Include="DB\OdbcConnPool.cpp" />
     <ClCompile Include="EXCEL\XlntUtil.cpp" />
+    <ClCompile Include="Job\GlobalQueue.cpp" />
+    <ClCompile Include="Job\Job.cpp" />
+    <ClCompile Include="Job\JobQueue.cpp" />
+    <ClCompile Include="Job\JobTimer.cpp" />
+    <ClCompile Include="Job\LockQueue.cpp" />
     <ClCompile Include="JSON\RapidJSONUtil.cpp" />
     <ClCompile Include="Memory\ClusteredMap.cpp" />
     <ClCompile Include="Memory\CustomAllocator.cpp" />
@@ -120,7 +131,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Thread\DeadLockProfiler.cpp" />
-    <ClCompile Include="Thread\SpinLock.cpp" />
     <ClCompile Include="Thread\SRWLock.cpp" />
     <ClCompile Include="Thread\ThreadManager.cpp" />
     <ClCompile Include="Util\BaseFile.cpp" />
@@ -145,10 +155,12 @@
     <None Include="DB\DB_ParamAttr.inl" />
     <None Include="DB\MySQL\MySQL_ParamAttr.inl" />
     <None Include="Excel\XlntUtil.inl" />
+    <None Include="Job\JobQueue.inl" />
     <None Include="JSON\RapidJSONUtil.inl" />
     <None Include="Memory\OrderedMap.inl" />
     <None Include="Memory\Singleton.inl" />
     <None Include="Memory\UnOrderedMap.inl" />
+    <None Include="Thread\SpinLock.inl" />
     <None Include="XML\RapidXMLUtil.inl" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

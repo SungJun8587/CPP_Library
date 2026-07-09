@@ -18,7 +18,7 @@
 
 //***************************************************************************
 //
-class CBaseMySQL : public CPoolObj
+class CBaseMySQL : public CMemoryOverride
 {
 public:
 	CBaseMySQL();

@@ -12,7 +12,11 @@
 #include <queue>
 #include <map>
 
-struct st_DBAsyncRq : public CPoolObj		// DB request 기본 구조체
+#ifndef	__MEMORYOVERRIDE_H__
+#include <Memory/MemoryOverride.h>
+#endif
+
+struct st_DBAsyncRq : public CMemoryOverride		// DB request 기본 구조체
 {
 	st_DBAsyncRq()
 	{
@@ -27,7 +31,7 @@ struct st_DBAsyncRq : public CPoolObj		// DB request 기본 구조체
 	bool	bReTry;							// 재시도 여부
 };
 
-struct st_DBAsyncRp : public CPoolObj // DB response 기본 구조체
+struct st_DBAsyncRp : public CMemoryOverride // DB response 기본 구조체
 {
 	st_DBAsyncRp()
 	{

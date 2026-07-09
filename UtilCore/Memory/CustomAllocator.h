@@ -10,8 +10,12 @@
 
 #pragma once
 
+#ifndef __BASEREDEFINEDATATYPE_H__
+#include <BaseRedefineDataType.h>
+#endif
+
 #ifndef __RAWALLOCATOR_H__
-#include <RawAllocator.h>
+#include <Memory/RawAllocator.h>
 #endif
 
 class BaseAllocator

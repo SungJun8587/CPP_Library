@@ -9,14 +9,15 @@
 
 #pragma once
 
-#ifndef _STACK_
-#include <stack>
-#endif
-
 extern thread_local uint32				LThreadId;
+extern thread_local uint64				LEndTickCount;
 
 #ifdef __DEADLOCKPROFILER_H__
-extern thread_local std::stack<int32>	LLockStack;
+	extern thread_local CStack<int32>	LLockStack;
+#endif
+
+#ifdef __JOBQUEUE_H__
+	extern thread_local CJobQueue*		LCurrentJobQueue;
 #endif
 
 #endif // ndef __BASETLS_H__

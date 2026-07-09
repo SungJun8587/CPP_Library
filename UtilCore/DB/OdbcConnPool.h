@@ -7,15 +7,15 @@
 #ifndef __ODBCCONNPOOL_H__
 #define __ODBCCONNPOOL_H__
 
-#ifndef	__OBJECTPOOL_H__
-#include <Memory/ObjectPool.h>
+#ifndef	__MEMORYOVERRIDE_H__
+#include <Memory/MemoryOverride.h>
 #endif
 
 #ifndef	__BASEODBC_H__
 #include <DB/BaseODBC.h>
 #endif
 
-class COdbcConnPool : public CPoolObj
+class COdbcConnPool : public CMemoryOverride
 {
 public:
 	COdbcConnPool(int32& nMaxPoolSize);

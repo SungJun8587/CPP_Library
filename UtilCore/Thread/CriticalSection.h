@@ -7,6 +7,10 @@
 #ifndef __CRITICALSECTION_H__
 #define __CRITICALSECTION_H__
 
+#ifndef __BASEMACRO_H__
+#include <BaseMacro.h>
+#endif
+
 class CCriticalSection
 {
 public:

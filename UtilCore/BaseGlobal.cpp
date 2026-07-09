@@ -11,6 +11,14 @@
 	CMemory* gpMemory = nullptr;
 #endif
 
+#ifdef __GLOBALQUEUE_H__
+	CGlobalQueue* gpGlobalQueue = nullptr;
+#endif
+
+#ifdef __JOBTIMER_H__
+	CJobTimer* gpJobTimer = nullptr;
+#endif
+
 #ifdef __THREADMANAGER_H__
 	CThreadManager* gpThreadManager = nullptr;
 #endif
@@ -39,6 +47,14 @@ namespace BaseGlobal
 		gpMemory = new CMemory();
 #endif
 
+#ifdef __GLOBALQUEUE_H__
+		gpGlobalQueue = new CGlobalQueue();
+#endif
+
+#ifdef __JOBTIMER_H__
+		gpJobTimer = new CJobTimer();
+#endif
+
 #ifdef __THREADMANAGER_H__
 		gpThreadManager = new CThreadManager();
 #endif	
@@ -53,6 +69,14 @@ namespace BaseGlobal
 #ifdef __MEMORY_H__
 		if( gpMemory != nullptr ) delete gpMemory;
 #endif	
+
+#ifdef __GLOBALQUEUE_H__
+		if (gpGlobalQueue != nullptr) delete gpGlobalQueue;
+#endif
+
+#ifdef __JOBTIMER_H__
+		if (gpJobTimer != nullptr) delete gpJobTimer;
+#endif
 
 #ifdef __THREADMANAGER_H__
 		if( gpThreadManager != nullptr ) delete gpThreadManager;

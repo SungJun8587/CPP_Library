@@ -11,7 +11,7 @@
 #include <BaseMySQL.h>
 #endif
 
-class CMySQLConnPool : public CPoolObj
+class CMySQLConnPool : public CMemoryOverride
 {
 public:
 	CMySQLConnPool(int32& nMaxPoolSize);

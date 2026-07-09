@@ -31,6 +31,9 @@
     <Filter Include="Network">
       <UniqueIdentifier>{13c77aad-394d-416e-9026-a74840fe7026}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Job">
+      <UniqueIdentifier>{86278e25-6fe5-40b2-9f00-46ebe202375f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Memory\Containers.h">
@@ -48,7 +51,7 @@
     <ClInclude Include="Memory\MemoryPool.h">
       <Filter>Memory</Filter>
     </ClInclude>
-    <ClInclude Include="Memory\ObjectPool.h">
+    <ClInclude Include="Memory\MemoryOverride.h">
       <Filter>Memory</Filter>
     </ClInclude>
     <ClInclude Include="DB\BaseODBC.h">
@@ -211,8 +214,26 @@
     <ClInclude Include="Network\SocketUtil.h">
       <Filter>Network</Filter>
     </ClInclude>
-    <ClInclude Include="RawAllocator.h">
+    <ClInclude Include="Memory\RawAllocator.h">
       <Filter>Memory</Filter>
+    </ClInclude>
+    <ClInclude Include="Job\Job.h">
+      <Filter>Job</Filter>
+    </ClInclude>
+    <ClInclude Include="Job\JobTimer.h">
+      <Filter>Job</Filter>
+    </ClInclude>
+    <ClInclude Include="Memory\ObjectPool.h">
+      <Filter>Memory</Filter>
+    </ClInclude>
+    <ClInclude Include="Job\LockQueue.h">
+      <Filter>Job</Filter>
+    </ClInclude>
+    <ClInclude Include="Job\JobQueue.h">
+      <Filter>Job</Filter>
+    </ClInclude>
+    <ClInclude Include="Job\GlobalQueue.h">
+      <Filter>Job</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -266,9 +287,6 @@
       <Filter>Thread</Filter>
     </ClCompile>
     <ClCompile Include="BaseTLS.cpp" />
-    <ClCompile Include="Thread\SpinLock.cpp">
-      <Filter>Thread</Filter>
-    </ClCompile>
     <ClCompile Include="Thread\DeadLockProfiler.cpp">
       <Filter>Thread</Filter>
     </ClCompile>
@@ -338,6 +356,21 @@
     <ClCompile Include="Thread\SRWLock.cpp">
       <Filter>Thread</Filter>
     </ClCompile>
+    <ClCompile Include="Job\Job.cpp">
+      <Filter>Job</Filter>
+    </ClCompile>
+    <ClCompile Include="Job\JobTimer.cpp">
+      <Filter>Job</Filter>
+    </ClCompile>
+    <ClCompile Include="Job\JobQueue.cpp">
+      <Filter>Job</Filter>
+    </ClCompile>
+    <ClCompile Include="Job\GlobalQueue.cpp">
+      <Filter>Job</Filter>
+    </ClCompile>
+    <ClCompile Include="Job\LockQueue.cpp">
+      <Filter>Job</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="DB\BaseODBC.inl">
@@ -372,6 +405,12 @@
     </None>
     <None Include="XML\RapidXMLUtil.inl">
       <Filter>XML</Filter>
+    </None>
+    <None Include="Thread\SpinLock.inl">
+      <Filter>Thread</Filter>
+    </None>
+    <None Include="Job\JobQueue.inl">
+      <Filter>Job</Filter>
     </None>
   </ItemGroup>
 </Project>

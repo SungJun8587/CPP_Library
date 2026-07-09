@@ -59,14 +59,19 @@ typedef unsigned __int64	uint64, time64;
 	#endif
 #endif
 
-//template<typename T>
-//using Atomic = std::atomic<T>;
+template<typename T>
+using Atomic = std::atomic<T>;
 
 //using Mutex = std::mutex;
 //using CondVar = std::condition_variable;
 //using SharedLock = std::shared_lock<std::mutex>;
 //using UniqueLock = std::unique_lock<std::mutex>;
 //using LockGuard = std::lock_guard<std::mutex>;
+
+#define USING_SHARED_PTR(name)	using name##Ref = std::shared_ptr<class name>;
+
+USING_SHARED_PTR(CJob);
+USING_SHARED_PTR(CJobQueue);
 
 #define size16(val)		static_cast<int16>(sizeof(val))
 #define size32(val)		static_cast<int32>(sizeof(val))

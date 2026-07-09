@@ -7,8 +7,12 @@
 #ifndef __ORDEREDMAP_H__
 #define __ORDEREDMAP_H__
 
+#ifndef	__MEMORYOVERRIDE_H__
+#include <Memory/MemoryOverride.h>
+#endif
+
 template<typename T1, typename T2>
-class COrderedMap : public CPoolObj
+class COrderedMap : public CMemoryOverride
 {
 public:
 	typedef std::map<T1, T2>				ObjectMap;

@@ -37,6 +37,10 @@
 #include <BaseRedefineDataType.h>
 #endif
 
+#ifndef __CONTAINERS_H__
+#include <Memory/Containers.h>
+#endif
+
 #ifndef __BASETLS_H__
 #include <BaseTLS.h>
 #endif
@@ -52,17 +56,17 @@ private:
 	void Dfs(int32 index);
 
 private:
-	unordered_map<const char*, int32>	_nameToId;
-	unordered_map<int32, const char*>	_idToName;
-	map<int32, set<int32>>				_lockHistory;
+	CUnorderedMap<const char*, int32>	_nameToId;
+	CUnorderedMap<int32, const char*>	_idToName;
+	CMap<int32, CSet<int32>>			_lockHistory; // 그래프의 인접 리스트 구조
 
 	std::mutex	_mutex;
 
 private:
-	vector<int32>	_discoveredOrder;		// 노드가 발견된 순서를 기록하는 배열
+	CVector<int32>	_discoveredOrder;		// 노드가 발견된 순서를 기록하는 배열
 	int32			_discoveredCount = 0;	// 노드가 발견된 순서
-	vector<bool>	_finished;				// Dfs(i)가 종료 되었는지 여부
-	vector<int32>	_parent;
+	CVector<bool>	_finished;				// Dfs(i)가 종료 되었는지 여부
+	CVector<int32>	_parent;
 };
 
 #endif // ndef __DEADLOCKPROFILER_H__

@@ -13,6 +13,14 @@
 	extern class CMemory*	gpMemory;
 #endif
 
+#ifdef __GLOBALQUEUE_H__
+	extern class CGlobalQueue*	gpGlobalQueue;
+#endif
+
+#ifdef __JOBTIMER_H__
+	extern class CJobTimer*		gpJobTimer;
+#endif
+
 #ifdef __THREADMANAGER_H__	
 	extern class CThreadManager*	gpThreadManager;
 #endif

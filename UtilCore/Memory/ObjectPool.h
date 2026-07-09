@@ -1,6 +1,6 @@
 
 //***************************************************************************
-// ObjectPool.h : interface and implementation for the CObjectPool class.
+// ObjectPool.h : Generic Object Pool Template for High-Performance Allocation
 //
 //***************************************************************************
 
@@ -9,63 +9,53 @@
 
 #pragma once
 
-class CPoolObj
+#ifndef	__MEMORYPOOL_H__
+#include <Memory/MemoryPool.h>
+#endif
+
+template<typename Type>
+class CObjectPool
 {
 public:
-	CPoolObj(void) {}
-	virtual ~CPoolObj(void) {}
-
-	void* operator new(size_t size)
+	template<typename... Args>
+	static Type* Pop(Args&&... args)
 	{
-#ifdef TCMALLOC_TCMALLOC_H_
-		return tc_new(size);
+#ifdef _STOMP
+		MemoryHeader* ptr = reinterpret_cast<MemoryHeader*>(StompAllocator::Alloc(s_allocSize));
+		Type* memory = static_cast<Type*>(MemoryHeader::AttachHeader(ptr, s_allocSize));
 #else
-	#ifdef JEMALLOC_H_
-		return je_malloc(size);
-	#else
-		return ::malloc(size);
-	#endif
-#endif
+		Type* memory = static_cast<Type*>(MemoryHeader::AttachHeader(s_pool.Pop(), s_allocSize));
+#endif		
+		new(memory)Type(forward<Args>(args)...); // placement new
+		return memory;
 	}
 
-	void* operator new[](size_t size)
+	static void Push(Type* obj)
 	{
-#ifdef TCMALLOC_TCMALLOC_H_
-		return tc_new(size);
+		obj->~Type();
+#ifdef _STOMP
+		StompAllocator::Release(MemoryHeader::DetachHeader(obj));
 #else
-	#ifdef JEMALLOC_H_
-		return je_malloc(size);
-	#else
-		return ::malloc(size);
-	#endif
+		s_pool.Push(MemoryHeader::DetachHeader(obj));
 #endif
 	}
 
-		void operator delete(void* ptr)
+	template<typename... Args>
+	static shared_ptr<Type> MakeShared(Args&&... args)
 	{
-#ifdef TCMALLOC_TCMALLOC_H_
-		tc_delete(ptr);
-#else	
-	#ifdef JEMALLOC_H_
-		je_free(ptr);
-	#else
-		::free(ptr);
-	#endif
-#endif
+		shared_ptr<Type> ptr = { Pop(forward<Args>(args)...), Push };
+		return ptr;
 	}
 
-	void operator delete[](void* ptr)
-	{
-#ifdef TCMALLOC_TCMALLOC_H_
-		tc_delete(ptr);
-#else	
-	#ifdef JEMALLOC_H_
-		je_free(ptr);
-	#else
-		::free(ptr);
-	#endif
-#endif
-	}
+private:
+	static int32		s_allocSize;
+	static CMemoryPool	s_pool;
 };
+
+template<typename Type>
+int32 CObjectPool<Type>::s_allocSize = sizeof(Type) + sizeof(MemoryHeader);
+
+template<typename Type>
+CMemoryPool CObjectPool<Type>::s_pool{ s_allocSize };
 
 #endif // ndef __OBJECTPOOL_H__
