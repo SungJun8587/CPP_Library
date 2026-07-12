@@ -52,13 +52,12 @@
     <ClInclude Include="Job\JobTimer.h" />
     <ClInclude Include="Job\LockQueue.h" />
     <ClInclude Include="JSON\RapidJSONUtil.h" />
+    <ClInclude Include="Memory\Allocator.h" />
     <ClInclude Include="Memory\ClusteredMap.h" />
     <ClInclude Include="Memory\Containers.h" />
-    <ClInclude Include="Memory\CustomAllocator.h" />
     <ClInclude Include="Memory\MemBuffer.h" />
     <ClInclude Include="Memory\Memory.h" />
     <ClInclude Include="Memory\MemoryPool.h" />
-    <ClInclude Include="Memory\MemoryOverride.h" />
     <ClInclude Include="Memory\ObjectPool.h" />
     <ClInclude Include="Memory\OrderedMap.h" />
     <ClInclude Include="Memory\RawAllocator.h" />
@@ -115,8 +114,8 @@
     <ClCompile Include="Job\JobTimer.cpp" />
     <ClCompile Include="Job\LockQueue.cpp" />
     <ClCompile Include="JSON\RapidJSONUtil.cpp" />
+    <ClCompile Include="Memory\Allocator.cpp" />
     <ClCompile Include="Memory\ClusteredMap.cpp" />
-    <ClCompile Include="Memory\CustomAllocator.cpp" />
     <ClCompile Include="Memory\MemBuffer.cpp" />
     <ClCompile Include="Memory\Memory.cpp" />
     <ClCompile Include="Memory\MemoryPool.cpp" />

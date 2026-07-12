@@ -48,36 +48,15 @@ using namespace std;
 #include <BaseDefine.h>
 #include <BaseRedefineDataType.h>
 
-/***********************************************************************************************/
-// External Library
-/***********************************************************************************************/
-
-/*
-// Tcmalloc 메모리 할당자 선언
-#pragma comment(lib, LIB_NAME("libtcmalloc_minimal"))
-#include <gperftools/tcmalloc.h>
-
-// Jemalloc 메모리 할당자 선언
-#pragma comment(lib, LIB_NAME("jemalloc"))
-#include <jemalloc/jemalloc.h>
-
-// Mimalloc 메모리 할당자 선언
-#pragma comment(lib, LIB_NAME("mimalloc"))
-#include <mimalloc.h>
-*/
-
-/***********************************************************************************************/
-
 #include <Util/BaseFile.h>
 #include <Util/EventLog.h>
 #include <Util/Log.h>
 
 #include <Memory/RawAllocator.h>
-#include <Memory/MemoryOverride.h>
+#include <Memory/Allocator.h>
 #include <Memory/MemoryPool.h>
 #include <Memory/Memory.h>
 #include <Memory/ObjectPool.h>
-#include <Memory/CustomAllocator.h>
 #include <Memory/Containers.h>
 #include <Memory/ClusteredMap.h>
 #include <Memory/OrderedMap.h>

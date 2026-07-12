@@ -9,8 +9,8 @@
 
 #pragma once
 
-#ifndef __CUSTOMALLOCATOR_H__
-#include <Memory/CustomAllocator.h>
+#ifndef	__ALLOCATOR_H__
+#include <Memory/Allocator.h>
 #endif
 
 #include <vector>
@@ -24,25 +24,25 @@
 #include <unordered_map>
 
 // 시퀀스 컨테이너 (Sequence Containers)
-template<class _TMain, class _Ax = CCustomAllocator<_TMain>>
+template<class _TMain, class _Ax = StlAllocator<_TMain>>
 class CVector : public std::vector<_TMain, _Ax> {
 public:
 	using std::vector<_TMain, _Ax>::vector;
 };
 
-template<class _TMain, class _Ax = CCustomAllocator<_TMain>>
+template<class _TMain, class _Ax = StlAllocator<_TMain>>
 class CList : public std::list<_TMain, _Ax> {
 public:
 	using std::list<_TMain, _Ax>::list;
 };
 
-template<class _TMain, class _Ax = CCustomAllocator<_TMain>>
+template<class _TMain, class _Ax = StlAllocator<_TMain>>
 class CForwardList : public std::forward_list<_TMain, _Ax> {
 public:
 	using std::forward_list<_TMain, _Ax>::forward_list;
 };
 
-template<class _TMain, class _Ax = CCustomAllocator<_TMain>>
+template<class _TMain, class _Ax = StlAllocator<_TMain>>
 class CDeque : public std::deque<_TMain, _Ax> {
 public:
 	using std::deque<_TMain, _Ax>::deque;
@@ -67,19 +67,19 @@ public:
 
 
 // 연관 컨테이너 (Associative Containers)
-template<class _Kty, class _Pr = std::less<_Kty>, class _Alloc = CCustomAllocator<_Kty>>
+template<class _Kty, class _Pr = std::less<_Kty>, class _Alloc = StlAllocator<_Kty>>
 class CSet : public std::set<_Kty, _Pr, _Alloc> {
 public:
 	using std::set<_Kty, _Pr, _Alloc>::set;
 };
 
-template<class _Kty, class _TMain, class _Pr = std::less<_Kty>, class _Alloc = CCustomAllocator<std::pair<const _Kty, _TMain>>>
+template<class _Kty, class _TMain, class _Pr = std::less<_Kty>, class _Alloc = StlAllocator<std::pair<const _Kty, _TMain>>>
 class CMap : public std::map<_Kty, _TMain, _Pr, _Alloc> {
 public:
 	using std::map<_Kty, _TMain, _Pr, _Alloc>::map;
 };
 
-template<class _Kty, class _TMain, class _Pr = std::less<_Kty>, class _Alloc = CCustomAllocator<std::pair<const _Kty, _TMain>>>
+template<class _Kty, class _TMain, class _Pr = std::less<_Kty>, class _Alloc = StlAllocator<std::pair<const _Kty, _TMain>>>
 class CMultiMap : public std::multimap<_Kty, _TMain, _Pr, _Alloc> {
 public:
 	using std::multimap<_Kty, _TMain, _Pr, _Alloc>::multimap;
@@ -87,13 +87,13 @@ public:
 
 
 // 정렬되지 않은 연관 컨테이너 (Unordered Associative Containers)
-template<class _Kty, class _Hasher = std::hash<_Kty>, class _Keyeq = std::equal_to<_Kty>, class _Alloc = CCustomAllocator<_Kty>>
+template<class _Kty, class _Hasher = std::hash<_Kty>, class _Keyeq = std::equal_to<_Kty>, class _Alloc = StlAllocator<_Kty>>
 class CUnorderedSet : public std::unordered_set<_Kty, _Hasher, _Keyeq, _Alloc> {
 public:
 	using std::unordered_set<_Kty, _Hasher, _Keyeq, _Alloc>::unordered_set;
 };
 
-template<class _Kty, class _TMain, class _Hasher = std::hash<_Kty>, class _Keyeq = std::equal_to<_Kty>, class _Alloc = CCustomAllocator<std::pair<const _Kty, _TMain>>>
+template<class _Kty, class _TMain, class _Hasher = std::hash<_Kty>, class _Keyeq = std::equal_to<_Kty>, class _Alloc = StlAllocator<std::pair<const _Kty, _TMain>>>
 class CUnorderedMap : public std::unordered_map<_Kty, _TMain, _Hasher, _Keyeq, _Alloc> {
 public:
 	using std::unordered_map<_Kty, _TMain, _Hasher, _Keyeq, _Alloc>::unordered_map;

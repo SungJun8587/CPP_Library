@@ -39,19 +39,7 @@
     <ClInclude Include="Memory\Containers.h">
       <Filter>Memory</Filter>
     </ClInclude>
-    <ClInclude Include="Memory\CustomAllocator.h">
-      <Filter>Memory</Filter>
-    </ClInclude>
     <ClInclude Include="Memory\MemBuffer.h">
-      <Filter>Memory</Filter>
-    </ClInclude>
-    <ClInclude Include="Memory\Memory.h">
-      <Filter>Memory</Filter>
-    </ClInclude>
-    <ClInclude Include="Memory\MemoryPool.h">
-      <Filter>Memory</Filter>
-    </ClInclude>
-    <ClInclude Include="Memory\MemoryOverride.h">
       <Filter>Memory</Filter>
     </ClInclude>
     <ClInclude Include="DB\BaseODBC.h">
@@ -214,9 +202,6 @@
     <ClInclude Include="Network\SocketUtil.h">
       <Filter>Network</Filter>
     </ClInclude>
-    <ClInclude Include="Memory\RawAllocator.h">
-      <Filter>Memory</Filter>
-    </ClInclude>
     <ClInclude Include="Job\Job.h">
       <Filter>Job</Filter>
     </ClInclude>
@@ -235,18 +220,21 @@
     <ClInclude Include="Job\GlobalQueue.h">
       <Filter>Job</Filter>
     </ClInclude>
+    <ClInclude Include="Memory\Allocator.h">
+      <Filter>Memory</Filter>
+    </ClInclude>
+    <ClInclude Include="Memory\Memory.h">
+      <Filter>Memory</Filter>
+    </ClInclude>
+    <ClInclude Include="Memory\MemoryPool.h">
+      <Filter>Memory</Filter>
+    </ClInclude>
+    <ClInclude Include="Memory\RawAllocator.h">
+      <Filter>Memory</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Memory\CustomAllocator.cpp">
-      <Filter>Memory</Filter>
-    </ClCompile>
     <ClCompile Include="Memory\MemBuffer.cpp">
-      <Filter>Memory</Filter>
-    </ClCompile>
-    <ClCompile Include="Memory\Memory.cpp">
-      <Filter>Memory</Filter>
-    </ClCompile>
-    <ClCompile Include="Memory\MemoryPool.cpp">
       <Filter>Memory</Filter>
     </ClCompile>
     <ClCompile Include="DB\BaseODBC.cpp">
@@ -370,6 +358,15 @@
     </ClCompile>
     <ClCompile Include="Job\LockQueue.cpp">
       <Filter>Job</Filter>
+    </ClCompile>
+    <ClCompile Include="Memory\Allocator.cpp">
+      <Filter>Memory</Filter>
+    </ClCompile>
+    <ClCompile Include="Memory\Memory.cpp">
+      <Filter>Memory</Filter>
+    </ClCompile>
+    <ClCompile Include="Memory\MemoryPool.cpp">
+      <Filter>Memory</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

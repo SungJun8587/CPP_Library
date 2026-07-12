@@ -9,8 +9,8 @@
 
 #pragma once
 
-#ifndef __CUSTOMALLOCATOR_H__
-#include <Memory/CustomAllocator.h>
+#ifndef	__ALLOCATOR_H__
+#include <Memory/Allocator.h>
 #endif
 
 #ifndef __DBCOMMON_H__

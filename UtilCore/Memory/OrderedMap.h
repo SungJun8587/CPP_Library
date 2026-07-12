@@ -7,12 +7,12 @@
 #ifndef __ORDEREDMAP_H__
 #define __ORDEREDMAP_H__
 
-#ifndef	__MEMORYOVERRIDE_H__
-#include <Memory/MemoryOverride.h>
+#ifndef	__ALLOCATOR_H__
+#include <Memory/Allocator.h>
 #endif
 
 template<typename T1, typename T2>
-class COrderedMap : public CMemoryOverride
+class COrderedMap : public BaseAllocator
 {
 public:
 	typedef std::map<T1, T2>				ObjectMap;

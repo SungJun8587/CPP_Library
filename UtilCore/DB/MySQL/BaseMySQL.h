@@ -7,6 +7,10 @@
 #ifndef __BASEMYSQL_H__
 #define __BASEMYSQL_H__
 
+#ifndef	__ALLOCATOR_H__
+#include <Memory/Allocator.h>
+#endif
+
 #include <mysql.h>
 #include <mysqld_error.h>
 
@@ -18,7 +22,7 @@
 
 //***************************************************************************
 //
-class CBaseMySQL : public CMemoryOverride
+class CBaseMySQL : public BaseAllocator
 {
 public:
 	CBaseMySQL();

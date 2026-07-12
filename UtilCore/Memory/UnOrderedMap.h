@@ -7,12 +7,12 @@
 #ifndef __UNORDEREDMAP_H__
 #define __UNORDEREDMAP_H__
 
-#ifndef	__MEMORYOVERRIDE_H__
-#include <Memory/MemoryOverride.h>
+#ifndef	__ALLOCATOR_H__
+#include <Memory/Allocator.h>
 #endif
 
 template<typename T1, typename T2>
-class CUnOrderedMap : public CMemoryOverride
+class CUnOrderedMap : public BaseAllocator
 {
 public:
 	typedef std::unordered_map<T1, T2>				ObjectMap;

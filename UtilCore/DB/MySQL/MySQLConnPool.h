@@ -7,11 +7,15 @@
 #ifndef __MYSQLCONNPOOL_H__
 #define __MYSQLCONNPOOL_H__
 
+#ifndef	__ALLOCATOR_H__
+#include <Memory/Allocator.h>
+#endif
+
 #ifndef	__BASEMYSQL_H__
 #include <BaseMySQL.h>
 #endif
 
-class CMySQLConnPool : public CMemoryOverride
+class CMySQLConnPool : public BaseAllocator
 {
 public:
 	CMySQLConnPool(int32& nMaxPoolSize);
