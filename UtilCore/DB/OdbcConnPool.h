@@ -15,7 +15,7 @@
 #include <DB/BaseODBC.h>
 #endif
 
-class COdbcConnPool : public BaseAllocator
+class COdbcConnPool
 {
 public:
 	COdbcConnPool(int32& nMaxPoolSize);

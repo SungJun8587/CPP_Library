@@ -9,7 +9,7 @@
 
 class CMySQLAsyncSrv
 {
-	typedef std::map<uint16, shared_ptr<CDBAsyncSrvHandler>>	COMMAND_MAP;
+	typedef std::map<uint16, std::shared_ptr<CDBAsyncSrvHandler>>	COMMAND_MAP;
 
 	enum
 	{
@@ -22,13 +22,13 @@ public:
 
 	virtual bool	RunningThread();
 
-	shared_ptr<CDBAsyncSrvHandler> Regist(const BYTE command, shared_ptr<CDBAsyncSrvHandler> const handler);
+	std::shared_ptr<CDBAsyncSrvHandler> Regist(const BYTE command, std::shared_ptr<CDBAsyncSrvHandler> const handler);
 
 	int GetQueryQueueSize() {
-		std::shared_lock lockGuard(_mutex); return static_cast<int>(_queueDBAsyncRq.size());
+		std::shared_lock<std::shared_mutex> lockGuard(_mutex); return static_cast<int>(_queueDBAsyncRq.size());
 	}
 	bool IsEmpty() {
-		std::shared_lock lockGuard(_mutex); return _queueDBAsyncRq.empty();
+		std::shared_lock<std::shared_mutex> lockGuard(_mutex); return _queueDBAsyncRq.empty();
 	}
 	int Push(st_DBAsyncRq* pAsyncRq);
 	st_DBAsyncRq* Pop();
@@ -39,21 +39,21 @@ public:
 	void StartIoThreads();
 	bool Action();
 	void StopThread() {
-		_bStopThread.store(true);	// 플래그를 설정하여 루프 종료 
-		_cva.notify_all();			// 모든 대기 스레드를 깨움
+		_bStopThread.store(true);
+		_cva.notify_all();			// 대기 중인 모든 워커 스레드를 일깨워 즉시 안전 종료 유도
 	};
 
-	CMySQLConnPool*	GetAccountConnPool(void);
-	CMySQLConnPool*	GetMySQLConnPool(uint64 m_nID);
-	CMySQLConnPool*	GetLogConnPool();
+	CMySQLConnPool* GetAccountConnPool(void);
+	CMySQLConnPool* GetMySQLConnPool(uint64 m_nID);
+	CMySQLConnPool* GetLogConnPool();
 
-	std::queue<st_DBAsyncRq*>			_queueDBAsyncRq;		// DB 요청 구조체 큐
+	CQueue<st_DBAsyncRq*>				_queueDBAsyncRq;		// DB 요청 구조체 큐
 	COMMAND_MAP							_mapCommand;			// 맵 핸들러
 
 	int32								_nDBCount;				// 접속할 Database 개수
 	bool								_bOpen;					// DB 오픈 여부
 	int32								_nMaxThreadCnt;			// 최대 쓰레드 개수
-	CMySQLConnPool**					_pMySQLConnPools;		// DB Connection Pool
+	CMySQLConnPool** _pMySQLConnPools;		// MySQL Connection Pool
 
 public:
 	static std::shared_ptr<CMySQLAsyncSrv> Instance();
@@ -63,18 +63,8 @@ protected:
 
 private:
 	std::atomic<bool>			_bStopThread;					// 스레드 종료 플래그
-	std::shared_mutex			_mutex;							// 큐 lock
-	std::condition_variable_any _cva;							// shared_mutex와 함께 사용하는 조건 변수
+	std::shared_mutex			_mutex;							// 큐 동기화 Lock
+	std::condition_variable_any _cva;							// shared_mutex 호환 조건 변수
 };
 
-static std::shared_ptr<CMySQLAsyncSrv> dbAsyncSrv_ = 0;
-
-inline std::shared_ptr<CMySQLAsyncSrv> CMySQLAsyncSrv::Instance() {
-	if( !dbAsyncSrv_ )
-		dbAsyncSrv_ = std::make_shared<CMySQLAsyncSrv>();
-
-	return dbAsyncSrv_;
-}
-
 #endif // ndef __MYSQLASYNCSRV__H__
-

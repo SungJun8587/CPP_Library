@@ -43,7 +43,7 @@ bool COdbcConnPool::Init(const EDBClass dbClass, const TCHAR* ptszDSN)
 
 	for( int32 i = 0; i < _nMaxPoolSize; i++ )
 	{
-		_pOdbcConns[i] = new CBaseODBC(dbClass, ptszDSN);
+		_pOdbcConns[i] = xnew<CBaseODBC>(dbClass, ptszDSN);
 		if( !_pOdbcConns[i]->Connect() )
 		{
 			Clear();
@@ -64,12 +64,12 @@ CBaseODBC* COdbcConnPool::GetOdbcConn(int32 nType)
 	if( pOdbcConn == nullptr || !pOdbcConn->IsConnected() )
 	{
 		if( pOdbcConn != nullptr )
-			SAFE_DELETE(pOdbcConn);
+			xdelete(pOdbcConn);
 
-		pOdbcConn = new CBaseODBC(_dbClass, _tszDSN);
+		pOdbcConn = xnew<CBaseODBC>(_dbClass, _tszDSN);
 		if( !pOdbcConn->Connect() )
 		{
-			SAFE_DELETE(pOdbcConn);
+			xdelete(pOdbcConn);
 			_pOdbcConns[nType] = nullptr;
 			return nullptr;
 		}
@@ -89,5 +89,11 @@ CBaseODBC* COdbcConnPool::GetOdbcConn(int32 nType)
 void COdbcConnPool::Clear(void)
 {
 	for( int32 i = 0; i < _nMaxPoolSize; i++ )
-		SAFE_DELETE(_pOdbcConns[i]);
+	{
+		if( _pOdbcConns[i] != nullptr )
+		{
+			xdelete(_pOdbcConns[i]);
+			_pOdbcConns[i] = nullptr; // 안전을 위해 초기화
+		}
+	}
 }

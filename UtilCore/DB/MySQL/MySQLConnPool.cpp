@@ -43,14 +43,14 @@ bool CMySQLConnPool::Init(const char* pszDBHost, const char* pszDBUserId, const 
 {
 	//Clear();
 	strncpy_s(_szDBHost, DATABASE_SERVER_NAME_STRLEN, pszDBHost, _TRUNCATE);
-	strncpy_s(_szDBUserId, DATABASE_DSN_USER_ID_STRLEN, pszDBPasswd, _TRUNCATE);
-	strncpy_s(_szDBPasswd, DATABASE_DSN_USER_PASSWORD_STRLEN, pszDBName, _TRUNCATE);
-	strncpy_s(_szDBName, DATABASE_NAME_STRLEN, pszDBUserId, _TRUNCATE);
+	strncpy_s(_szDBUserId, DATABASE_DSN_USER_ID_STRLEN, pszDBUserId, _TRUNCATE);
+	strncpy_s(_szDBPasswd, DATABASE_DSN_USER_PASSWORD_STRLEN, pszDBPasswd, _TRUNCATE);
+	strncpy_s(_szDBName, DATABASE_NAME_STRLEN, pszDBName, _TRUNCATE);
 	_uiPort = uiPort;
 
 	for( int32 i = 0; i < _nMaxPoolSize; ++i )
 	{
-		_pMySQLConns[i] = new CBaseMySQL(_szDBHost, _szDBUserId, _szDBPasswd, _szDBName, _uiPort);
+		_pMySQLConns[i] = xnew<CBaseMySQL>(_szDBHost, _szDBUserId, _szDBPasswd, _szDBName, _uiPort);
 		if( !_pMySQLConns[i]->Connect() )
 		{
 			Clear();
@@ -87,7 +87,7 @@ bool CMySQLConnPool::Init(const wchar_t* pwszDBHost, const wchar_t* pwszDBUserId
 
 	for( int32 i = 0; i < _nMaxPoolSize; ++i )
 	{
-		_pMySQLConns[i] = new CBaseMySQL(_szDBHost, _szDBUserId, _szDBPasswd, _szDBName, _uiPort);
+		_pMySQLConns[i] = xnew<CBaseMySQL>(_szDBHost, _szDBUserId, _szDBPasswd, _szDBName, _uiPort);
 		if( !_pMySQLConns[i]->Connect() )
 		{
 			Clear();
@@ -112,10 +112,10 @@ CBaseMySQL* CMySQLConnPool::GetMySQLConn(int32 nType)
 			SAFE_DELETE(pMySQLConn);
 		}
 
-		pMySQLConn = new CBaseMySQL(_szDBHost, _szDBUserId, _szDBPasswd, _szDBName, _uiPort);
+		pMySQLConn = xnew<CBaseMySQL>(_szDBHost, _szDBUserId, _szDBPasswd, _szDBName, _uiPort);
 		if( !pMySQLConn->Connect() )
 		{
-			SAFE_DELETE(pMySQLConn);
+			xdelete(pMySQLConn);
 			_pMySQLConns[nType] = nullptr;
 			return nullptr;
 		}
@@ -136,6 +136,10 @@ void CMySQLConnPool::Clear(void)
 {
 	for( int32 i = 0; i < _nMaxPoolSize; ++i )
 	{
-		SAFE_DELETE(_pMySQLConns[i]);
+		if( _pMySQLConns[i] != nullptr )
+		{
+			xdelete(_pMySQLConns[i]); // SAFE_DELETE 대신 xdelete 적용!
+			_pMySQLConns[i] = nullptr;
+		}
 	}
 }

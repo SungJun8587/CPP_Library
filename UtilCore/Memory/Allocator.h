@@ -23,6 +23,10 @@
 #include <RawAllocator.h>
 #endif
 
+#ifndef __MEMORY_H__
+#include <Memory.h>
+#endif
+
 class CMemory;
 extern CMemory* gpMemory;
 

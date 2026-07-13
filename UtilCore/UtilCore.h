@@ -47,6 +47,7 @@ using namespace std;
 
 #include <BaseDefine.h>
 #include <BaseRedefineDataType.h>
+#include <BaseMacro.h>
 
 #include <Util/BaseFile.h>
 #include <Util/EventLog.h>
@@ -64,8 +65,6 @@ using namespace std;
 #include <Memory/Singleton.h>
 #include <Memory/MemBuffer.h>
 #include <Memory/Stream.h>
-
-#include <BaseMacro.h>
 
 #include <Thread/CriticalSection.h>
 #include <Thread/DeadLockProfiler.h>
