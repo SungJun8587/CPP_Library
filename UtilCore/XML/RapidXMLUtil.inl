@@ -109,7 +109,7 @@ inline T CRapidXMLUtil::Deserialize(const std::string& xml)
 {
     T obj;
     _doc.clear();
-    std::vector<char> buffer(xml.begin(), xml.end());
+    CVector<char> buffer(xml.begin(), xml.end());
     buffer.push_back('\0');
 
     try 
@@ -155,7 +155,7 @@ inline void CRapidXMLUtil::GetObject(T& obj, xml_node<>* node)
 //***************************************************************************
 // 기본 데이터 벡터 추가(직렬화)
 template <typename T>
-inline void CRapidXMLUtil::AddVector(const std::vector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName)
+inline void CRapidXMLUtil::AddVector(const CVector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName)
 {
     xml_node<>* containerNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(ptszTagName).c_str()));
     parent->append_node(containerNode);
@@ -176,7 +176,7 @@ inline void CRapidXMLUtil::AddVector(const std::vector<T>& container, xml_node<>
 //***************************************************************************
 // 기본 데이터 벡터 가져오기(역직렬화)
 template <typename T>
-inline void CRapidXMLUtil::GetVector(std::vector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName)
+inline void CRapidXMLUtil::GetVector(CVector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName)
 {
     xml_node<>* containerNode = parent->first_node(TcharToUtf8(ptszTagName).c_str());
     if( containerNode )
@@ -202,7 +202,7 @@ inline void CRapidXMLUtil::GetVector(std::vector<T>& container, xml_node<>* pare
 //***************************************************************************
 // 사용자 정의 객체 벡터 추가(직렬화)
 template <typename T>
-inline void CRapidXMLUtil::AddObjectVector(const std::vector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName)
+inline void CRapidXMLUtil::AddObjectVector(const CVector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName)
 {
     xml_node<>* containerNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(ptszTagName).c_str()));
     parent->append_node(containerNode);
@@ -218,7 +218,7 @@ inline void CRapidXMLUtil::AddObjectVector(const std::vector<T>& container, xml_
 //***************************************************************************
 // 사용자 정의 객체 벡터 가져오기(역직렬화)
 template <typename T>
-inline void CRapidXMLUtil::GetObjectVector(std::vector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName)
+inline void CRapidXMLUtil::GetObjectVector(CVector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName)
 {
     xml_node<>* containerNode = parent->first_node(TcharToUtf8(ptszTagName).c_str());
     if( containerNode )
@@ -235,7 +235,7 @@ inline void CRapidXMLUtil::GetObjectVector(std::vector<T>& container, xml_node<>
 //***************************************************************************
 // 기본 데이터 맵 추가(직렬화)
 template <typename K, typename V>
-inline void CRapidXMLUtil::AddMap(const std::map<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName)
+inline void CRapidXMLUtil::AddMap(const CMap<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName)
 {
     xml_node<>* containerNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(ptszTagName).c_str()));
     parent->append_node(containerNode);
@@ -268,7 +268,7 @@ inline void CRapidXMLUtil::AddMap(const std::map<K, V>& container, xml_node<>* p
 //***************************************************************************
 // 기본 데이터 맵 가져오기(역직렬화)
 template <typename K, typename V>
-inline void CRapidXMLUtil::GetMap(std::map<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName)
+inline void CRapidXMLUtil::GetMap(CMap<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName)
 {
     xml_node<>* containerNode = parent->first_node(TcharToUtf8(ptszTagName).c_str());
     if( containerNode ) 
@@ -312,7 +312,7 @@ inline void CRapidXMLUtil::GetMap(std::map<K, V>& container, xml_node<>* parent,
 //***************************************************************************
 // 사용자 정의 객체 맵 추가(직렬화)
 template <typename K, typename V>
-inline void CRapidXMLUtil::AddObjectMap(const std::map<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName)
+inline void CRapidXMLUtil::AddObjectMap(const CMap<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName)
 {
     xml_node<>* containerNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(ptszTagName).c_str()));
     parent->append_node(containerNode);
@@ -334,7 +334,7 @@ inline void CRapidXMLUtil::AddObjectMap(const std::map<K, V>& container, xml_nod
 //***************************************************************************
 // 사용자 정의 객체 맵 가져오기(역직렬화)
 template <typename K, typename V>
-inline void CRapidXMLUtil::GetObjectMap(std::map<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName)
+inline void CRapidXMLUtil::GetObjectMap(CMap<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName)
 {
     xml_node<>* containerNode = parent->first_node(TcharToUtf8(ptszTagName).c_str());
     if( containerNode ) 

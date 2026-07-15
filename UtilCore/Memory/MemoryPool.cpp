@@ -1,4 +1,5 @@
-﻿//***************************************************************************
+﻿
+//***************************************************************************
 // MemoryPool.cpp
 //
 // 설명 : MemoryPool.h에서 선언한 CMemoryPool의 실제 구현부.
@@ -25,7 +26,7 @@ CMemoryPool::CMemoryPool(int32 allocSize) : _allocSize(allocSize)
 //        raw 메모리로 해제합니다(프로세스 종료/풀 재구성 시 누수 방지).
 CMemoryPool::~CMemoryPool()
 {
-	while (MemoryHeader* memory = static_cast<MemoryHeader*>(::InterlockedPopEntrySList(&_header)))
+	while( MemoryHeader* memory = static_cast<MemoryHeader*>(::InterlockedPopEntrySList(&_header)) )
 		RawAllocator::FreeAligned(memory);
 }
 
@@ -52,7 +53,7 @@ MemoryHeader* CMemoryPool::Pop()
 	MemoryHeader* memory = static_cast<MemoryHeader*>(::InterlockedPopEntrySList(&_header));
 
 	// 풀이 비어있으면 새로 raw 할당
-	if (memory == nullptr)
+	if( memory == nullptr )
 	{
 		memory = reinterpret_cast<MemoryHeader*>(
 			RawAllocator::AllocAligned(static_cast<size_t>(_allocSize), SLIST_ALIGNMENT));

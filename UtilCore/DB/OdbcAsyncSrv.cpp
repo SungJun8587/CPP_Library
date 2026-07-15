@@ -68,13 +68,15 @@ std::shared_ptr<CDBAsyncSrvHandler> COdbcAsyncSrv::Regist(const BYTE command, st
 	return handler;
 }
 
-bool COdbcAsyncSrv::StartService(std::vector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt)
+bool COdbcAsyncSrv::StartService(CVector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt)
 {
 	return InitOdbc(dbNodeVec, nMaxThreadCnt);
 }
 
-bool COdbcAsyncSrv::InitOdbc(std::vector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt)
+bool COdbcAsyncSrv::InitOdbc(CVector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt)
 {
+	_bStopThread.store(false); // 재시작이나 원자적 초기값 보장을 위해 명시적 초기화
+
 	if( 0 == nMaxThreadCnt )
 		_nMaxThreadCnt = static_cast<int32>(SYSTEM::CoreCount());
 	else
@@ -173,6 +175,12 @@ bool COdbcAsyncSrv::Action()
 
 				copyAsyncRq->bReTry = true;
 				int nSize = Push(copyAsyncRq);
+
+				// 만약 쓰레드 종료 중이라 큐에 들어가지 못했다면 메모리 누수 방지를 위해 해제
+				if( _bStopThread.load() && nSize == 0 )
+				{
+					delete copyAsyncRq;
+				}
 
 				LOG_ERROR(_T("Query timeout ReTry... callIdent: [%u], queuesize[%d]"), logIdent, nSize);
 				continue;

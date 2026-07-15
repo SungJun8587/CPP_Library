@@ -45,6 +45,8 @@
 #include <BaseTLS.h>
 #endif
 
+extern thread_local CStack<int32>	LLockStack;
+
 class CDeadLockProfiler
 {
 public:

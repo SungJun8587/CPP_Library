@@ -196,9 +196,9 @@ CXMLNode CXMLNode::FindChild(const TCHAR* ptszKey)
 
 //***************************************************************************
 //
-std::vector<CXMLNode> CXMLNode::FindChildren(const TCHAR* ptszKey)
+CVector<CXMLNode> CXMLNode::FindChildren(const TCHAR* ptszKey)
 {
-	std::vector<CXMLNode> nodes;
+	CVector<CXMLNode> nodes;
 
 	xml_node<>* node = _node->first_node(TcharToUtf8(ptszKey).c_str());
 	while( node )

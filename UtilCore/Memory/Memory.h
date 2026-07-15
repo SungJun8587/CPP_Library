@@ -1,4 +1,5 @@
-﻿//***************************************************************************
+﻿
+//***************************************************************************
 // Memory.h
 //
 // 설명 : 사이즈별 CMemoryPool들을 관리하며, 요청 크기에 맞는 풀을 O(1)로
@@ -25,6 +26,26 @@
 //        (예: 2~4KB)은 배치를 작게 잡아 스레드별 상주 메모리 낭비를
 //        억제합니다. (자세한 임계값은 CMemory.cpp의 DetermineTlsBatchSize
 //        참고)
+//
+//        [풀 인덱스 계산]
+//        "요청 크기 -> 담당 풀 인덱스"는 테이블 조회가 아니라
+//        ComputePoolIndex()의 수식 계산(시프트 연산 + 올림 처리)으로
+//        구합니다. 이전에는 MAX_ALLOC_SIZE+1개 항목의 배열을 두고
+//        조회했었는데, 이 배열은 다른 코드가 L1/L2 캐시를 심하게
+//        오염시킨 상태에서 참조하면 캐시 미스가 날 수 있는 크기였습니다.
+//        수식 계산은 테이블 자체가 없으므로 이런 캐시 미스 가능성이
+//        구조적으로 없습니다.
+//
+//        [이중 반납(Double Free) 방지]
+//        CMemoryPool::Push가 전역 풀에 반납할 때 allocSize를 0으로
+//        표시해 두는 것과 동일하게, CMemory::Release도 TLS 캐시에
+//        반납하기 직전 allocSize를 0으로 표시합니다. 같은 포인터에
+//        Release가 두 번 호출되면 두 번째 호출에서 Release 맨 앞의
+//        ASSERT_CRASH(allocSize > 0)가 즉시 걸립니다. 이 표시가 없으면
+//        이중 반납이 TLS 로컬 free-list를 자기 자신을 가리키는 순환
+//        구조로 만들어, 이후 서로 다른 두 번의 Allocate가 같은 메모리
+//        블록을 동시에 소유하는 조용한 메모리 오염으로 이어질 수 있어
+//        반드시 필요한 처리입니다.
 //
 //        MemoryHeader가 SLIST_ENTRY(= Next 포인터 하나)를 상속하고 있어,
 //        이 Next 필드를 그대로 재사용해 TLS 로컬 free-list를 연결합니다.
@@ -61,7 +82,11 @@
 //              크래시 대신 누수로 저하되도록 방어되어 있습니다.
 //***************************************************************************
 
+#ifndef __MEMORY_H__
+#define __MEMORY_H__
+
 #pragma once
+
 #include "Allocator.h"
 
 class CMemoryPool;
@@ -69,17 +94,18 @@ class CMemoryPool;
 /*-------------
 	CMemory
 
-	설명 : PoolAllocator가 실제로 위임하는 대상. 사이즈별 풀 목록(_pools)과
-	       "요청 크기 -> 담당 풀 인덱스" 매핑 테이블(_poolIndexTable)을
-	       관리하며, 그 위에 스레드 로컬 캐시(TlsCache)를 얹어 핫패스에서의
-	       원자 연산 빈도를 줄입니다.
+	설명 : PoolAllocator가 실제로 위임하는 대상. 사이즈별 풀 목록(_pools)을
+		   관리하며, "요청 크기 -> 담당 풀 인덱스"는 테이블 조회가 아니라
+		   ComputePoolIndex()의 수식 계산으로 O(1)에 구합니다. 그 위에
+		   스레드 로컬 캐시(TlsCache)를 얹어 핫패스에서의 원자 연산
+		   빈도를 줄입니다.
 
-	       BaseAllocator는 상속받지 않습니다. CMemory는 프로그램 시작 시
-	       BaseGlobal::Init()에서 단 한 번만 생성되는 싱글턴이므로, 이
-	       한 번의 할당을 raw 경로로 격리하는 것보다 전역 new/delete를
-	       그대로 쓰는 단순함을 우선했습니다. BaseAllocator는 메모리
-	       모듈과 무관한 다른 기능 클래스들이 필요할 때 상속해 쓰는
-	       범용 유틸리티로 남겨둡니다.
+		   BaseAllocator는 상속받지 않습니다. CMemory는 프로그램 시작 시
+		   BaseGlobal::Init()에서 단 한 번만 생성되는 싱글턴이므로, 이
+		   한 번의 할당을 raw 경로로 격리하는 것보다 전역 new/delete를
+		   그대로 쓰는 단순함을 우선했습니다. BaseAllocator는 메모리
+		   모듈과 무관한 다른 기능 클래스들이 필요할 때 상속해 쓰는
+		   범용 유틸리티로 남겨둡니다.
 ---------------*/
 
 class CMemory
@@ -95,9 +121,8 @@ class CMemory
 
 public:
 	// 설명 : 32~4096 구간을 세 단계(32/128/256 단위)로 나누어 각 크기에 맞는
-	//        CMemoryPool을 생성하고, _poolIndexTable에 "크기 -> 풀 인덱스"
-	//        매핑을 채웁니다. 풀별 TLS 배치 충전/상한 값도 블록 크기
-	//        구간에 따라 함께 결정합니다.
+	//        CMemoryPool을 생성합니다. 풀별 TLS 배치 충전/상한 값도 블록
+	//        크기 구간에 따라 함께 결정해 둡니다.
 	//        (반드시 멀티스레드 환경 진입 전, 단일 스레드 초기화 단계에서
 	//        호출되어야 합니다 - BaseGlobal::Init()에서 가장 먼저 생성)
 	CMemory();
@@ -120,17 +145,27 @@ public:
 	//
 	//        size가 0 이하이거나, 헤더를 더한 계산값이 int32 범위를
 	//        넘어설 정도로 비정상적으로 큰 경우 ASSERT_CRASH로 즉시
-	//        걸러냅니다(오버플로로 인한 음수 allocSize가 _poolIndexTable을
-	//        잘못된 인덱스로 참조하는 것을 막기 위함).
+	//        걸러냅니다(오버플로로 인한 음수 allocSize가 풀 인덱스 계산을
+	//        잘못된 값으로 만드는 것을 막기 위함).
 	// 매개변수 : size - 사용자가 요청한 순수 데이터 크기(헤더 제외)
 	// 반환값   : 사용자가 사용할 데이터 영역 포인터
-	void*	Allocate(int32 size);
+	void* Allocate(int32 size);
 
 	// 설명 : 데이터 포인터로부터 헤더를 역산해 allocSize를 확인한 뒤,
 	//        MAX_ALLOC_SIZE 이하면 스레드 로컬 캐시에 반납합니다. 로컬
 	//        캐시가 해당 풀의 상한을 넘으면 절반을 전역 풀에 배치로
 	//        되돌립니다. MAX_ALLOC_SIZE 초과 시 raw 메모리로 직접
 	//        해제합니다.
+	//
+	//        TLS 캐시로 반납하기 직전 header->allocSize를 0으로 표시해
+	//        둡니다. CMemoryPool::Push가 전역 풀에 반납할 때 하는 것과
+	//        동일한 컨벤션으로, 같은 포인터에 대해 Release가 두 번
+	//        호출되면(이중 반납) 두 번째 호출에서 이 함수 맨 앞의
+	//        ASSERT_CRASH(allocSize > 0)가 즉시 걸립니다. 이 표시가
+	//        없으면 이중 반납이 TLS 로컬 free-list를 자기 자신을
+	//        가리키는 순환 구조로 만들어, 이후 서로 다른 두 번의
+	//        Allocate가 같은 메모리 블록을 동시에 소유하게 되는 조용한
+	//        메모리 오염으로 이어질 수 있습니다.
 	// 매개변수 : ptr - Allocate()가 반환했던 데이터 포인터
 	void	Release(void* ptr);
 
@@ -162,6 +197,21 @@ public:
 	void WarmUp(int32 allocDataSize, int32 count);
 
 private:
+	// 설명 : 요청 크기(헤더 포함, allocSize)로부터 담당 풀의 _pools
+	//        인덱스를 테이블 조회 없이 수식으로 계산합니다. 32/128/256
+	//        단위 구간의 경계값(1024, 2048)에 대해 시프트 연산(나눗셈이
+	//        2의 거듭제곱이므로 >>5/>>7/>>8로 대체)과 올림 처리만으로
+	//        구해지므로, 캐시 미스가 발생할 수 있는 큰 테이블(이전에는
+	//        MAX_ALLOC_SIZE+1개 항목의 배열) 조회를 완전히 없앱니다.
+	//
+	//        이 수식은 생성자의 세 단계 구간 생성 로직(32/128/256 단위,
+	//        1024/2048/4096 경계)과 반드시 일치해야 하므로, 두 로직이
+	//        어긋나지 않도록 생성자에서 매 풀 생성 시 이 함수의 결과와
+	//        실제 _pools 인덱스가 같은지 ASSERT_CRASH로 교차 검증합니다.
+	// 매개변수 : allocSize - 헤더를 포함한 전체 블록 크기 (1 ~ MAX_ALLOC_SIZE)
+	// 반환값   : _pools/TlsCache::buckets에 대응하는 인덱스
+	static int32 ComputePoolIndex(int32 allocSize);
+
 	// 설명 : 블록 크기 구간에 따라 TLS 배치 충전 개수를 결정합니다.
 	//        작고 고빈도인 블록일수록 배치를 크게 잡아 원자 연산 호출
 	//        빈도를 더 많이 줄이고, 크고 드물게 쓰이는 블록일수록 배치를
@@ -181,10 +231,25 @@ private:
 		TlsBucket
 
 		설명 : 스레드별로 하나의 풀 크기에 대응하는 로컬 free-list.
-		       MemoryHeader::Next(SLIST_ENTRY 상속분)를 연결 고리로
-		       재사용하여 단일 연결 리스트를 구성합니다.
+			   MemoryHeader::Next(SLIST_ENTRY 상속분)를 연결 고리로
+			   재사용하여 단일 연결 리스트를 구성합니다.
+
+			   alignas(16)을 붙인 이유: sizeof(TlsBucket)은 16바이트로,
+			   캐시 라인(64바이트)의 정확한 약수입니다. 하지만 포인터
+			   멤버 때문에 이 구조체의 자연 정렬은 8바이트뿐이라, buckets
+			   배열의 시작 주소가 8바이트로만 정렬되고 16바이트로는
+			   정렬되지 않으면 4번째 원소마다 캐시 라인 경계를 걸치게
+			   됩니다(예: 시작 오프셋이 8일 때 4번째 원소는 [56,72)
+			   구간을 차지해 64 지점에서 캐시 라인이 갈립니다). 정렬
+			   요구사항을 16으로 올리면 크기가 이미 16의 배수이므로
+			   패딩을 추가하지 않고도(크기 낭비 없이) 모든 원소가 항상
+			   하나의 캐시 라인 안에 완전히 들어가도록 보장됩니다. 이는
+			   스레드 간 false sharing 방지가 아니라(thread_local이라
+			   원천적으로 스레드 간 공유가 없음), 한 스레드가 DrainBuckets
+			   등에서 여러 버킷을 순회할 때의 단일 스레드 캐시 지역성을
+			   위한 것입니다.
 	---------------*/
-	struct TlsBucket
+	struct alignas(16) TlsBucket
 	{
 		MemoryHeader* freeList = nullptr; // 로컬 free-list 시작 노드
 		int32 count = 0;                  // 현재 로컬에 쌓인 블록 수
@@ -194,11 +259,11 @@ private:
 		TlsCache
 
 		설명 : 스레드마다 하나씩 존재하는(thread_local) 캐시 컨테이너.
-		       POOL_COUNT개의 TlsBucket을 배열로 가지고 있으며, 스레드가
-		       종료될 때 소멸자가 자동 호출되어 로컬에 남은 모든 블록을
-		       전역 CMemoryPool로 반납합니다(워커 스레드 경로). 메인
-		       스레드처럼 자연 종료 시점을 신뢰할 수 없는 경우를 위해
-		       동일한 반납 로직을 FlushCurrentThreadCache()로도 노출합니다.
+			   POOL_COUNT개의 TlsBucket을 배열로 가지고 있으며, 스레드가
+			   종료될 때 소멸자가 자동 호출되어 로컬에 남은 모든 블록을
+			   전역 CMemoryPool로 반납합니다(워커 스레드 경로). 메인
+			   스레드처럼 자연 종료 시점을 신뢰할 수 없는 경우를 위해
+			   동일한 반납 로직을 FlushCurrentThreadCache()로도 노출합니다.
 	---------------*/
 	struct TlsCache
 	{
@@ -225,16 +290,11 @@ private:
 	// 생성된 모든 CMemoryPool 인스턴스 목록 (소멸자에서 일괄 delete)
 	vector<CMemoryPool*> _pools;
 
-	// 메모리 크기 <-> _pools 배열 인덱스
-	// TLS 캐시(TlsCache::buckets)를 배열로 접근하기 위한 O(1) 인덱스 테이블.
-	// int16으로 충분한 범위(POOL_COUNT는 수십 개 수준)라 int32 대비 테이블
-	// 크기를 절반으로 줄여 캐시 라인 적중률을 높입니다.
-	int16 _poolIndexTable[MAX_ALLOC_SIZE + 1];
-
 	// 풀 인덱스별 TLS 배치 충전 개수 / 로컬 캐시 상한.
 	// DetermineTlsBatchSize/DetermineTlsMaxCount로 생성자에서 미리 계산해
 	// 두어, Allocate/Release 핫패스에서는 조건 분기 없이 배열 조회만으로
-	// 즉시 사용합니다.
+	// 즉시 사용합니다. (POOL_COUNT는 수십 개 수준이라 이 정도 크기의
+	// 테이블은 거의 항상 L1 캐시에 상주함)
 	int16 _tlsBatchSizeTable[POOL_COUNT];
 	int16 _tlsMaxCountTable[POOL_COUNT];
 
@@ -242,3 +302,4 @@ private:
 	static thread_local TlsCache _tlsCache;
 };
 
+#endif // ndef __MEMORY_H__

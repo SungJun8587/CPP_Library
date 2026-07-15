@@ -1,4 +1,5 @@
-﻿//***************************************************************************
+﻿
+//***************************************************************************
 // ThreadManager.h : interface for the CThreadManager class.
 //
 // 설명 : 워커 스레드의 생성/보관/join을 관리하는 클래스.
@@ -73,14 +74,14 @@ public:
 	//        명시적으로 flush합니다(자연적인 thread_local 소멸 순서에만
 	//        의존하지 않고, 정리 시점을 코드로 명확히 고정하기 위함).
 	static void DestroyTLS();
-	
+
 	// 스레드 ID 반환 (TLS 활용)
 	static int getThreadID() {
 		return LThreadId;
 	}
 
 private:
-	vector<thread> _threads;
+	CVector<thread> _threads;
 	mutex _lock;
 };
 

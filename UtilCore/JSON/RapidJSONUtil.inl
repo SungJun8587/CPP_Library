@@ -205,7 +205,7 @@ inline T CRapidJSONUtil::GetObject(const _tstring& key) const
 //***************************************************************************
 // 기본 데이터 벡터 추가(직렬화)
 template <typename T>
-inline void CRapidJSONUtil::AddVector(const _tstring& key, const std::vector<T>& vec)
+inline void CRapidJSONUtil::AddVector(const _tstring& key, const CVector<T>& vec)
 {
 	_tValue jsonArray(rapidjson::kArrayType);
 	for( const auto& item : vec )
@@ -219,9 +219,9 @@ inline void CRapidJSONUtil::AddVector(const _tstring& key, const std::vector<T>&
 //***************************************************************************
 // 기본 데이터 벡터 가져오기(역직렬화)
 template <typename T>
-inline std::vector<T> CRapidJSONUtil::GetVector(const _tstring& key)
+inline CVector<T> CRapidJSONUtil::GetVector(const _tstring& key)
 {
-	std::vector<T> result;
+	CVector<T> result;
 	if( !_document.HasMember(key.c_str()) || !_document[key.c_str()].IsArray() )
 	{
 		return result;
@@ -237,7 +237,7 @@ inline std::vector<T> CRapidJSONUtil::GetVector(const _tstring& key)
 //***************************************************************************
 // 사용자 정의 객체 벡터 추가(직렬화)
 template <typename T>
-inline void CRapidJSONUtil::AddObjectVector(const _tstring& key, const std::vector<T>& vec)
+inline void CRapidJSONUtil::AddObjectVector(const _tstring& key, const CVector<T>& vec)
 {
 	_tValue jsonArray(rapidjson::kArrayType);
 	for( const auto& item : vec )
@@ -254,9 +254,9 @@ inline void CRapidJSONUtil::AddObjectVector(const _tstring& key, const std::vect
 //***************************************************************************
 // 사용자 정의 객체 벡터 가져오기(역직렬화)
 template <typename T>
-inline std::vector<T> CRapidJSONUtil::GetObjectVector(const _tstring& key)
+inline CVector<T> CRapidJSONUtil::GetObjectVector(const _tstring& key)
 {
-	std::vector<T> result;
+	CVector<T> result;
 	if( !_document.HasMember(key.c_str()) || !_document[key.c_str()].IsArray() )
 	{
 		return result;
@@ -277,7 +277,7 @@ inline std::vector<T> CRapidJSONUtil::GetObjectVector(const _tstring& key)
 //***************************************************************************
 // 기본 데이터 맵 추가(직렬화)
 template <typename Key, typename Value>
-inline void CRapidJSONUtil::AddMap(const _tstring& key, const std::map<Key, Value>& map)
+inline void CRapidJSONUtil::AddMap(const _tstring& key, const CMap<Key, Value>& map)
 {
 	_tValue jsonObject(rapidjson::kObjectType);
 
@@ -295,9 +295,9 @@ inline void CRapidJSONUtil::AddMap(const _tstring& key, const std::map<Key, Valu
 //***************************************************************************
 // 기본 데이터 맵 가져오기(역직렬화)
 template <typename Key, typename Value>
-inline std::map<Key, Value> CRapidJSONUtil::GetMap(const _tstring& key) const
+inline CMap<Key, Value> CRapidJSONUtil::GetMap(const _tstring& key) const
 {
-	std::map<Key, Value> result;
+	CMap<Key, Value> result;
 
 	if( !_document.HasMember(key.c_str()) || !_document[key.c_str()].IsObject() )
 	{
@@ -318,7 +318,7 @@ inline std::map<Key, Value> CRapidJSONUtil::GetMap(const _tstring& key) const
 //***************************************************************************
 // 사용자 정의 객체 맵 추가(직렬화)
 template <typename Key, typename T>
-inline void CRapidJSONUtil::AddObjectMap(const _tstring& key, const std::map<Key, T>& map)
+inline void CRapidJSONUtil::AddObjectMap(const _tstring& key, const CMap<Key, T>& map)
 {
 	_tValue jsonObject(rapidjson::kObjectType);
 
@@ -338,9 +338,9 @@ inline void CRapidJSONUtil::AddObjectMap(const _tstring& key, const std::map<Key
 //***************************************************************************
 // 사용자 정의 객체 맵 가져오기(역직렬화)
 template <typename Key, typename T>
-inline std::map<Key, T> CRapidJSONUtil::GetObjectMap(const _tstring& key) const
+inline CMap<Key, T> CRapidJSONUtil::GetObjectMap(const _tstring& key) const
 {
-	std::map<Key, T> result;
+	CMap<Key, T> result;
 
 	if( !_document.HasMember(key.c_str()) || !_document[key.c_str()].IsObject() )
 	{

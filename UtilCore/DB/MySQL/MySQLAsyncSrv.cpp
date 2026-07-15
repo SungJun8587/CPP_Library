@@ -74,12 +74,12 @@ std::shared_ptr<CDBAsyncSrvHandler> CMySQLAsyncSrv::Regist(const BYTE command, s
 	return handler;
 }
 
-bool CMySQLAsyncSrv::StartService(std::vector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt)
+bool CMySQLAsyncSrv::StartService(CVector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt)
 {
 	return InitMySQL(dbNodeVec, nMaxThreadCnt);
 }
 
-bool CMySQLAsyncSrv::InitMySQL(std::vector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt)
+bool CMySQLAsyncSrv::InitMySQL(CVector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt)
 {
 	if( 0 == nMaxThreadCnt )
 		_nMaxThreadCnt = static_cast<int32>(SYSTEM::CoreCount());

@@ -44,9 +44,9 @@ bool CServerConfig::Init(const TCHAR* tszServerInfo)
 	_nMaxUser = jsonUtil[_T("MaxUser")];
 	_nKeepAliveSec = jsonUtil[_T("KeepAliveSec")];
 
-	_serverNodeVec = jsonUtil.Deserialize<std::vector<CServerNode>>(_T("ServerNode"));
-	_dbNodeVec = jsonUtil.Deserialize<std::vector<CDBNode>>(_T("DBNode"));
-	_redisNodeVec = jsonUtil.Deserialize<std::vector<CRedisNode>>(_T("RedisNode"));
+	_serverNodeVec = jsonUtil.Deserialize<CVector<CServerNode>>(_T("ServerNode"));
+	_dbNodeVec = jsonUtil.Deserialize<CVector<CDBNode>>(_T("DBNode"));
+	_redisNodeVec = jsonUtil.Deserialize<CVector<CRedisNode>>(_T("RedisNode"));
 
 	return true;
 }

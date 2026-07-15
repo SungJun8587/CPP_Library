@@ -186,28 +186,28 @@ public:
     inline T GetObject(const _tstring& key) const;
 
     template <typename T>
-    inline void AddVector(const _tstring& key, const std::vector<T>& vec);
+    inline void AddVector(const _tstring& key, const CVector<T>& vec);
 
     template <typename T>
-    inline std::vector<T> GetVector(const _tstring& key);
+    inline CVector<T> GetVector(const _tstring& key);
 
     template <typename T>
-    inline void AddObjectVector(const _tstring& key, const std::vector<T>& vec);
+    inline void AddObjectVector(const _tstring& key, const CVector<T>& vec);
 
     template <typename T>
-    inline std::vector<T> GetObjectVector(const _tstring& key);
+    inline CVector<T> GetObjectVector(const _tstring& key);
 
     template <typename Key, typename Value>
-    inline void AddMap(const _tstring& key, const std::map<Key, Value>& map);
+    inline void AddMap(const _tstring& key, const CMap<Key, Value>& map);
 
     template <typename Key, typename Value>
-    inline std::map<Key, Value> GetMap(const _tstring& key) const;
+    inline CMap<Key, Value> GetMap(const _tstring& key) const;
 
     template <typename Key, typename T>
-    inline void AddObjectMap(const _tstring& key, const std::map<Key, T>& map);
+    inline void AddObjectMap(const _tstring& key, const CMap<Key, T>& map);
 
     template <typename Key, typename T>
-    inline std::map<Key, T> GetObjectMap(const _tstring& key) const;
+    inline CMap<Key, T> GetObjectMap(const _tstring& key) const;
 
 private:
     void	Print_DebugInfo(const TCHAR* ptszFormat, ...);
@@ -227,14 +227,14 @@ private:
     struct is_vector : std::false_type {};
 
     template <typename T, typename Alloc>
-    struct is_vector<std::vector<T, Alloc>> : std::true_type {};
+    struct is_vector<CVector<T, Alloc>> : std::true_type {};
 
     // 맵 타입 확인
     template <typename T>
     struct is_map : std::false_type {};
 
     template <typename K, typename V, typename Comp, typename Alloc>
-    struct is_map<std::map<K, V, Comp, Alloc>> : std::true_type {};
+    struct is_map<CMap<K, V, Comp, Alloc>> : std::true_type {};
 
     // T에 ToXML 멤버 함수가 있는지 확인하는 타입 트레이트
     template <typename T, typename = void>

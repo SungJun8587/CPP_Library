@@ -1,5 +1,7 @@
-﻿//***************************************************************************
+﻿
+//***************************************************************************
 // ThreadManager.cpp: implementation of the CThreadManager class.
+//
 //***************************************************************************
 
 #include "pch.h"
@@ -41,12 +43,12 @@ void CThreadManager::CreateThread(function<void(void)> fncCallback)
 
 	// create new thread
 	_threads.push_back(thread([=]()
-	{
-		// set thread id
-		InitTLS();
-		fncCallback();
-		DestroyTLS();
-	}));
+		{
+			// set thread id
+			InitTLS();
+			fncCallback();
+			DestroyTLS();
+		}));
 }
 
 //***************************************************************************

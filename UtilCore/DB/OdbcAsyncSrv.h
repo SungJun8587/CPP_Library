@@ -33,8 +33,8 @@ public:
 	int Push(st_DBAsyncRq* pAsyncRq);
 	st_DBAsyncRq* Pop();
 
-	bool StartService(std::vector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt = 0);
-	bool InitOdbc(std::vector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt);
+	bool StartService(CVector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt = 0);
+	bool InitOdbc(CVector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt);
 
 	void StartIoThreads();
 	bool Action();
@@ -53,7 +53,7 @@ public:
 	int32								_nDBCount;				// 접속할 Database 개수
 	bool								_bOpen;					// DB 오픈 여부
 	int32								_nMaxThreadCnt;			// 최대 쓰레드 개수
-	COdbcConnPool** _pOdbcConnPools;		// DB Connection Pool
+	COdbcConnPool**						_pOdbcConnPools;		// DB Connection Pool
 
 public:
 	static std::shared_ptr<COdbcAsyncSrv> Instance();

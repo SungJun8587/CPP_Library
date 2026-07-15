@@ -33,8 +33,8 @@ public:
 	int Push(st_DBAsyncRq* pAsyncRq);
 	st_DBAsyncRq* Pop();
 
-	bool StartService(std::vector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt = 0);
-	bool InitMySQL(std::vector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt);
+	bool StartService(CVector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt = 0);
+	bool InitMySQL(CVector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt);
 
 	void StartIoThreads();
 	bool Action();

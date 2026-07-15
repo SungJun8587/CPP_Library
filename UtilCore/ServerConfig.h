@@ -25,9 +25,9 @@ public:
 	TCHAR*							GetServerIP(void)				{ return _tszIP; }
 	uint16&							GetServerPort(void)				{ return _nServerPort; }
 
-	std::vector<CServerNode>&		GetServerNodeVec(void)			{ return _serverNodeVec; }
-	std::vector<CDBNode>			GetDBNodeVec(void)				{ return _dbNodeVec; }
-	std::vector<CRedisNode>			GetRedisNodeVec(void)			{ return _redisNodeVec; }
+	CVector<CServerNode>&			GetServerNodeVec(void)			{ return _serverNodeVec; }
+	CVector<CDBNode>				GetDBNodeVec(void)				{ return _dbNodeVec; }
+	CVector<CRedisNode>				GetRedisNodeVec(void)			{ return _redisNodeVec; }
 
 	CServerNode&					GetServerNode(int16& nID)		{ return _serverNodeVec[nID-1]; }
 	CDBNode&						GetDBNode(int16& nID)			{ return _dbNodeVec[nID-1]; }	
@@ -72,9 +72,9 @@ private:
 	int32						_nKeepAliveSec;
 	int32						_nMaxUser;
 
-	std::vector<CServerNode>	_serverNodeVec;
-	std::vector<CDBNode>		_dbNodeVec;
-	std::vector<CRedisNode>		_redisNodeVec;
+	CVector<CServerNode>		_serverNodeVec;
+	CVector<CDBNode>			_dbNodeVec;
+	CVector<CRedisNode>			_redisNodeVec;
 };
 
 #endif // ndef __SERVERCONFIG_H__

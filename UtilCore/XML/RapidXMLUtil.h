@@ -77,7 +77,7 @@ public:
 	const TCHAR*		GetStringValue(const TCHAR* defaultValue = _T(""));
 
 	CXMLNode				FindChild(const TCHAR* ptszKey);
-	std::vector<CXMLNode>	FindChildren(const TCHAR* ptszKey);
+	CVector<CXMLNode>	FindChildren(const TCHAR* ptszKey);
 
 private:
 	//***************************************************************************
@@ -212,28 +212,28 @@ public:
 	inline void GetObject(T& obj, xml_node<>* node);
 
 	template <typename T>
-	inline void AddVector(const std::vector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName = VectorName);
+	inline void AddVector(const CVector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName = VectorName);
 
 	template <typename T>
-	inline void GetVector(std::vector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName = VectorName);
+	inline void GetVector(CVector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName = VectorName);
 
 	template <typename T>
-	inline void AddObjectVector(const std::vector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName = VectorName);
+	inline void AddObjectVector(const CVector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName = VectorName);
 
 	template <typename T>
-	inline void GetObjectVector(std::vector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName = VectorName);
+	inline void GetObjectVector(CVector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName = VectorName);
 
 	template <typename K, typename V>
-	inline void AddMap(const std::map<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName = MapName);
+	inline void AddMap(const CMap<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName = MapName);
 
 	template <typename K, typename V>
-	inline void GetMap(std::map<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName = MapName);
+	inline void GetMap(CMap<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName = MapName);
 
 	template <typename K, typename V>
-	inline void AddObjectMap(const std::map<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName = MapName);
+	inline void AddObjectMap(const CMap<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName = MapName);
 
 	template <typename K, typename V>
-	inline void GetObjectMap(std::map<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName = MapName);
+	inline void GetObjectMap(CMap<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName = MapName);
 
 	template <typename T, typename std::enable_if<std::is_arithmetic<T>::value>::type* = nullptr>
 	inline void AddValue(const T& value, xml_node<>* parent, const TCHAR* ptszTagName = ItemName);
@@ -332,7 +332,7 @@ private:
 	struct is_vector : std::false_type {};
 
 	template <typename T, typename Alloc>
-	struct is_vector<std::vector<T, Alloc>> : std::true_type {};
+	struct is_vector<CVector<T, Alloc>> : std::true_type {};
 
 	// ∏  ≈∏¿‘ »Æ¿Œ
 	template <typename T>

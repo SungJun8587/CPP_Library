@@ -228,7 +228,7 @@
     <OutDir>Bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>Bin\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)64D</TargetName>
-    <IncludePath>K:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;K:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;K:\GitHub\CPP\Library\ExternalLib\mysql-8.4.4-winx64\include;K:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;K:\GitHub\CPP\Library\ExternalLib\libiconv-1.18\build\include;K:\GitHub\CPP\Library\ExternalLib\openssl-master\include;$(ProjectDir);$(IncludePath)</IncludePath>
+    <IncludePath>K:\GitHub\CPP\Library\ExternalLib\mimalloc-main\include;K:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;K:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;K:\GitHub\CPP\Library\ExternalLib\mysql-8.4.4-winx64\include;K:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;K:\GitHub\CPP\Library\ExternalLib\libiconv-1.18\build\include;K:\GitHub\CPP\Library\ExternalLib\openssl-master\include;$(ProjectDir);$(IncludePath)</IncludePath>
     <LibraryPath>K:\GitHub\CPP\Library\ExternalLib\Bin\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
     <SourcePath>$(SourcePath)</SourcePath>
   </PropertyGroup>
@@ -246,7 +246,7 @@
     <OutDir>Bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>Bin\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)64</TargetName>
-    <IncludePath>K:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;K:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;K:\GitHub\CPP\Library\ExternalLib\mysql-8.4.4-winx64\include;K:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;K:\GitHub\CPP\Library\ExternalLib\libiconv-1.18\build\include;K:\GitHub\CPP\Library\ExternalLib\openssl-master\include;$(ProjectDir);$(IncludePath)</IncludePath>
+    <IncludePath>K:\GitHub\CPP\Library\ExternalLib\mimalloc-main\include;K:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;K:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;K:\GitHub\CPP\Library\ExternalLib\mysql-8.4.4-winx64\include;K:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;K:\GitHub\CPP\Library\ExternalLib\libiconv-1.18\build\include;K:\GitHub\CPP\Library\ExternalLib\openssl-master\include;$(ProjectDir);$(IncludePath)</IncludePath>
     <LibraryPath>K:\GitHub\CPP\Library\ExternalLib\Bin\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
     <SourcePath>$(SourcePath)</SourcePath>
   </PropertyGroup>

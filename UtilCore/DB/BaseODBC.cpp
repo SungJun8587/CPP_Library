@@ -227,13 +227,13 @@ bool CBaseODBC::IsConnected()
 {
 	if( m_hConn == SQL_NULL_HDBC ) return false;
 
-	int32		nConnDead = SQL_CD_FALSE;
+	SQLUINTEGER	uiConnDead = SQL_CD_FALSE;
 	SQLINTEGER	nLen = 0;
 
-	if( SQL_SUCCESS != SQLGetConnectAttr(m_hConn, SQL_ATTR_CONNECTION_DEAD, &nConnDead, SQL_IS_UINTEGER, &nLen) )
+	if( SQL_SUCCESS != SQLGetConnectAttr(m_hConn, SQL_ATTR_CONNECTION_DEAD, &uiConnDead, SQL_IS_UINTEGER, &nLen) )
 		return false;
 
-	if( SQL_CD_TRUE == nConnDead )
+	if( SQL_CD_TRUE == uiConnDead )
 		return false;
 
 	return true;
