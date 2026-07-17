@@ -129,10 +129,7 @@ public:
 	{
 		if( _pPool != nullptr && _nAllocatedIndex != -1 && _pConn != nullptr )
 		{
-			// [핵심 보정] 생성 시점에서 PopFreeSlotIndex(1) + GetOdbcConn(1) = 총 2를 올렸으므로,
-			// 소멸 시점에는 풀에 소유권을 완벽히 반환(카운트 0 복원)하기 위해 두 번 해제해 줍니다.
-			_pPool->ReleaseOdbcConn(_nAllocatedIndex); // 카운트 2 -> 1
-			_pPool->ReleaseOdbcConn(_nAllocatedIndex); // 카운트 1 -> 0 (풀 반환 완료)
+			_pPool->ReleaseOdbcConn(_nAllocatedIndex);
 		}
 	}
 

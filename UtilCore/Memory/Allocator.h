@@ -19,7 +19,10 @@
 
 #pragma once
 
-#include "RawAllocator.h"
+#ifndef	__RAWALLOCATOR_H__
+#include <Memory/RawAllocator.h>
+#endif
+
 #include <new>           // std::align_val_t (BaseAllocator의 확장 정렬 new/delete)
 #include <unordered_map> // StompAllocator의 크기별 free-list 맵
 #include <shared_mutex>  // StompAllocator의 크기별 free-list 맵 보호(읽기 다중/쓰기 단일 락)

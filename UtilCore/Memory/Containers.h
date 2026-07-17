@@ -23,6 +23,7 @@
 #include <unordered_set>
 #include <unordered_map>
 
+//***************************************************************************
 // 시퀀스 컨테이너 (Sequence Containers)
 template<class _TMain, class _Ax = StlAllocator<_TMain>>
 class CVector : public std::vector<_TMain, _Ax> {
@@ -48,7 +49,7 @@ public:
 	using std::deque<_TMain, _Ax>::deque;
 };
 
-
+//***************************************************************************
 // 컨테이너 어댑터 (Container Adapters)
 template<class _TMain, class _Container = CDeque<_TMain>>
 class CQueue : public std::queue<_TMain, _Container> {
@@ -65,7 +66,7 @@ public:
 	using std::stack<_TMain, _Container>::stack;
 };
 
-
+//***************************************************************************
 // 연관 컨테이너 (Associative Containers)
 template<class _Kty, class _Pr = std::less<_Kty>, class _Alloc = StlAllocator<_Kty>>
 class CSet : public std::set<_Kty, _Pr, _Alloc> {
@@ -85,7 +86,7 @@ public:
 	using std::multimap<_Kty, _TMain, _Pr, _Alloc>::multimap;
 };
 
-
+//***************************************************************************
 // 정렬되지 않은 연관 컨테이너 (Unordered Associative Containers)
 template<class _Kty, class _Hasher = std::hash<_Kty>, class _Keyeq = std::equal_to<_Kty>, class _Alloc = StlAllocator<_Kty>>
 class CUnorderedSet : public std::unordered_set<_Kty, _Hasher, _Keyeq, _Alloc> {

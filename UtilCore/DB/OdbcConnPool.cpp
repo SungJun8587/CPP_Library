@@ -158,30 +158,19 @@ void COdbcConnPool::ReleaseOdbcConn(int32 nType)
 //***************************************************************************
 // 현재 완전히 비어있어서 독점 사용 가능한 슬롯의 인덱스를 반환합니다. (없으면 -1)
 //***************************************************************************
-int32 COdbcConnPool::PopFreeSlotIndex(void)
-{
-	for( int32 i = 0; i < _nMaxPoolSize; i++ )
-	{
-		// 1차 거름망: 이미 다른 비즈니스 스레드가 참조 중이라면 락 없이 빠르게 패스
-		if( _pRefCount[i].load(std::memory_order_acquire) > 0 ) continue;
-
-		// [동기화 핵심] 개별 슬롯의 스핀락을 획득하여 헬스체크 스레드 및 타 스레드의 개입을 차단
-		SpinLockGuard<SpinLockPreset::Default> guard(_slotLocks[i]);
-
-		// 2차 검문: 락 내부에서 참조 카운트가 여전히 0인지 재검증
-		if( _pRefCount[i].load(std::memory_order_acquire) == 0 )
-		{
-			// 3차 검문: 락 내부에서 커넥션 객체가 존재하고 실제 유효하게 연결된 상태인지 최종 검증
+int32 COdbcConnPool::PopFreeSlotIndex(void) {
+	for( int32 i = 0; i < _nMaxPoolSize; ++i ) {
+		int32 expected = 0;
+		// 락 없이 원자적 선점 시도
+		if( _pRefCount[i].compare_exchange_strong(expected, 1, std::memory_order_acq_rel) ) {
 			CBaseODBC* pConn = _pOdbcConns[i].load(std::memory_order_acquire);
-			if( pConn != nullptr && pConn->IsConnected() )
-			{
-				// 참조 카운트를 1로 올려 완벽하게 내 것으로 독점 선점 확정
-				_pRefCount[i].store(1, std::memory_order_release);
-				return i;
-			}
+			if( pConn && pConn->IsConnected() ) return i;
+
+			// 연결 실패 시 원복
+			_pRefCount[i].store(0, std::memory_order_release);
 		}
 	}
-	return -1; // 현재 이용 가능한 깨끗한 커넥션이 풀에 없음
+	return -1;
 }
 
 //***************************************************************************

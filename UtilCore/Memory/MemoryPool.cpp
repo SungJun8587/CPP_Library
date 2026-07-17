@@ -10,29 +10,29 @@
 
 #include "pch.h"
 #include "MemoryPool.h"
-#include "RawAllocator.h"
 
-/*-----------------
-	CMemoryPool
-------------------*/
+//***************************************************************************
+// Construction/Destruction 
+//***************************************************************************
 
+//***************************************************************************
 // 설명 : 고정 블록 크기를 기록하고 Lock-free SLIST 헤더를 초기화합니다.
 CMemoryPool::CMemoryPool(int32 allocSize) : _allocSize(allocSize)
 {
 	::InitializeSListHead(&_header);
 }
 
-// 설명 : 소멸 시 SLIST에 남아있는 모든 블록을 순서대로 꺼내어 실제
-//        raw 메모리로 해제합니다(프로세스 종료/풀 재구성 시 누수 방지).
+//***************************************************************************
+// 설명 : 소멸 시 SLIST에 남아있는 모든 블록을 순서대로 꺼내어 실제 raw 메모리로 해제합니다(프로세스 종료/풀 재구성 시 누수 방지).
 CMemoryPool::~CMemoryPool()
 {
 	while( MemoryHeader* memory = static_cast<MemoryHeader*>(::InterlockedPopEntrySList(&_header)) )
 		RawAllocator::FreeAligned(memory);
 }
 
+//***************************************************************************
 // 설명 : 블록을 "미사용" 상태로 표시(allocSize = 0)한 뒤 Lock-free SLIST에
-//        되돌립니다. Interlocked 연산이므로 별도의 락 없이 여러 스레드가
-//        동시에 호출해도 안전합니다.
+//        되돌립니다.
 void CMemoryPool::Push(MemoryHeader* ptr)
 {
 	ptr->allocSize = 0;
@@ -43,11 +43,9 @@ void CMemoryPool::Push(MemoryHeader* ptr)
 	_reserveCount.fetch_add(1);
 }
 
+//***************************************************************************
 // 설명 : SLIST에서 블록을 하나 꺼냅니다. 비어있으면 RawAllocator를 통해
 //        새 블록을 할당합니다(라이브러리 자동 분기 + 정렬 보장).
-//        꺼내온 블록이 정상적으로 반납된 상태였는지(allocSize == 0)를
-//        ASSERT_CRASH로 검증하여, 이중 반납(double free) 등으로 인한
-//        상태 오염을 조기에 잡아냅니다.
 MemoryHeader* CMemoryPool::Pop()
 {
 	MemoryHeader* memory = static_cast<MemoryHeader*>(::InterlockedPopEntrySList(&_header));

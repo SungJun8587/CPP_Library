@@ -87,7 +87,13 @@
 
 #pragma once
 
-#include "Allocator.h"
+#ifndef	__ALLOCATOR_H__
+#include <Memory/Allocator.h>
+#endif
+
+#ifndef	__MEMORYPOOL_H__
+#include <Memory/MemoryPool.h>
+#endif
 
 class CMemoryPool;
 
