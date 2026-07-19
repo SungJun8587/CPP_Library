@@ -66,6 +66,7 @@ using namespace std;
 #include <Memory/MemBuffer.h>
 #include <Memory/Stream.h>
 
+#include <Thread/CacheAlignment.h>
 #include <Thread/CriticalSection.h>
 #include <Thread/DeadLockProfiler.h>
 #include <Thread/SpinLock.h>

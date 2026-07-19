@@ -17,6 +17,10 @@
 #include <cstdio>
 #include <exception>
 
+#ifndef __CACHEALIGNMENT_H__
+#include <Thread/CacheAlignment.h>
+#endif
+
 //***************************************************************************
 //  Platform: CPU pause hint
 //***************************************************************************
@@ -65,16 +69,6 @@
         SPINLOCK_DEBUG_BREAK();                                     \
         std::terminate();                                           \
     } while (false)
-
-//***************************************************************************
-//  Platform: cache line size
-//***************************************************************************
-#if defined(__cpp_lib_hardware_interference_size) && __cpp_lib_hardware_interference_size >= 201703L
-    #include <new>
-    inline constexpr std::size_t kCacheLineSize = std::hardware_destructive_interference_size;
-#else
-    inline constexpr std::size_t kCacheLineSize = 64;
-#endif
 
 //***************************************************************************
 //  [1] SpinLock

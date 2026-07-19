@@ -23,7 +23,8 @@ CMemoryPool::CMemoryPool(int32 allocSize) : _allocSize(allocSize)
 }
 
 //***************************************************************************
-// 설명 : 소멸 시 SLIST에 남아있는 모든 블록을 순서대로 꺼내어 실제 raw 메모리로 해제합니다(프로세스 종료/풀 재구성 시 누수 방지).
+// 설명 : 소멸 시 SLIST에 남아있는 모든 블록을 꺼내어 raw 메모리로 실제
+//        해제합니다(프로세스 종료/풀 재구성 시 누수 방지).
 CMemoryPool::~CMemoryPool()
 {
 	while( MemoryHeader* memory = static_cast<MemoryHeader*>(::InterlockedPopEntrySList(&_header)) )

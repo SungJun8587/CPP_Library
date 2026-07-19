@@ -69,6 +69,7 @@
     <ClInclude Include="ServerConfig.h" />
     <ClInclude Include="ServerConnectInfo.h" />
     <ClInclude Include="ServiceSvr.h" />
+    <ClInclude Include="Thread\CacheAlignment.h" />
     <ClInclude Include="Thread\CriticalSection.h" />
     <ClInclude Include="Thread\DeadLockProfiler.h" />
     <ClInclude Include="Thread\LockGuard.h" />

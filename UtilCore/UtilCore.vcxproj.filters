@@ -232,6 +232,9 @@
     <ClInclude Include="Memory\RawAllocator.h">
       <Filter>Memory</Filter>
     </ClInclude>
+    <ClInclude Include="Thread\CacheAlignment.h">
+      <Filter>Thread</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">
