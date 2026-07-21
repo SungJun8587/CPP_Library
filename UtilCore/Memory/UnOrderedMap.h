@@ -11,33 +11,26 @@
 #include <Memory/Allocator.h>
 #endif
 
+#include <unordered_map>
+#include <shared_mutex>
+
 template<typename T1, typename T2>
 class CUnOrderedMap : public BaseAllocator
 {
 public:
-	typedef std::unordered_map<T1, T2>				ObjectMap;
-	typedef typename ObjectMap::iterator	ObjectMapIter;
+	typedef std::unordered_map<T1, T2> ObjectMap;
 
 public:
 	CUnOrderedMap(void);
 	virtual	~CUnOrderedMap(void);
 
-	bool				InsertObject(T1& key, T2& object);
-	bool				InsertAndUpdateObject(T1& key, T2& object);
+	bool				InsertObject(const T1& key, const T2& object);
+	bool				InsertAndUpdateObject(const T1& key, const T2& object);
 
-	ObjectMapIter		FindObject(T1& key);
-	bool				FindObject(T1& key, T2& object);
+	bool				FindObject(const T1& key, T2& outObject);
+	bool				EraseObject(const T1& key);
 
-	bool				EraseObject(T1& key);
-
-	ObjectMap& GetObjectMap(void) {
-		return _objectMap;
-	}
-	std::shared_mutex& GetLock(void) {
-		return _mutex;
-	}
-	int					GetSize();
-	ObjectMapIter		GetEnd();
+	int32				GetSize();
 	bool				IsEmpty();
 
 	void				Clear(void) {

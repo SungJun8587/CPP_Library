@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // OdbcAsyncSrv.cpp : implementation of the COdbcAsyncSrv class.
 //
@@ -6,17 +6,19 @@
 
 #include "pch.h"
 #include "OdbcAsyncSrv.h"
+#include <algorithm>
 
 extern CThreadManager* gpThreadManager;
 
-// [¹ö±× ¼öÁ¤] Meyers' Singleton ±¸Á¶ º¯°æÀ¸·Î ÄÄÆÄÀÏ·¯ ·¹º§¿¡¼­ 100% ¸ÖÆ¼½º·¹µå ¾ÈÀü¼º º¸Àå
+// [ë™ì‹œì„± ë³´ì¥] Meyers' Singleton: C++11ë¶€í„° í•¨ìˆ˜ ë‚´ static ì§€ì—­ ë³€ìˆ˜ ì´ˆê¸°í™”ëŠ”
+// ì»´íŒŒì¼ëŸ¬ì— ì˜í•´ 100% ìŠ¤ë ˆë“œ ì•ˆì „í•˜ê²Œ(magic statics) ë³´ì¥ëœë‹¤.
 std::shared_ptr<COdbcAsyncSrv> COdbcAsyncSrv::Instance() {
 	static std::shared_ptr<COdbcAsyncSrv> instance = std::make_shared<COdbcAsyncSrv>();
 	return instance;
 }
 
 //***************************************************************************
-// Construction/Destruction 
+// Construction/Destruction
 //***************************************************************************
 
 COdbcAsyncSrv::COdbcAsyncSrv()
@@ -32,18 +34,7 @@ COdbcAsyncSrv::~COdbcAsyncSrv()
 {
 	StopThread();
 	Clear();
-
-	if( _pOdbcConnPools != nullptr )
-	{
-		for( int32 i = 0; i < _nDBCount; i++ )
-		{
-			if( _pOdbcConnPools[i] != nullptr )
-			{
-				delete _pOdbcConnPools[i]; // xnew ´ëÀÀ ¾ÈÀü ¼Ò¸ê
-			}
-		}
-		SAFE_DELETE_ARRAY(_pOdbcConnPools);
-	}
+	ClearOdbcPools();
 
 	_nMaxThreadCnt = 0;
 	_bOpen = false;
@@ -52,7 +43,7 @@ COdbcAsyncSrv::~COdbcAsyncSrv()
 
 void COdbcAsyncSrv::Clear()
 {
-	std::unique_lock<std::shared_mutex> lockGuard(_mutex);
+	std::unique_lock<std::mutex> lockGuard(_mutex);
 
 	while( !_queueDBAsyncRq.empty() )
 	{
@@ -60,6 +51,24 @@ void COdbcAsyncSrv::Clear()
 		_queueDBAsyncRq.pop();
 		if( pAsyncRq != nullptr ) SAFE_DELETE(pAsyncRq);
 	}
+}
+
+//***************************************************************************
+// _pOdbcConnPools ë°°ì—´ì˜ ê° í’€ì„ ì•ˆì „í•˜ê²Œ í•´ì œí•œë‹¤.
+// InitOdbcê°€ ì¤‘ê°„ì— ì‹¤íŒ¨í–ˆì„ ë•Œ(ì¼ë¶€ë§Œ ìƒì„±ëœ ìƒíƒœ)ì™€, ì†Œë©¸ì ì–‘ìª½ì—ì„œ ê³µìš©ìœ¼ë¡œ í˜¸ì¶œëœë‹¤.
+// COdbcConnPoolì€ BaseAllocatorë¥¼ ìƒì†í•˜ë¯€ë¡œ operator deleteê°€ ì´ë¯¸ RawAllocator
+// ê²½ë¡œë¡œ ì˜¤ë²„ë¼ì´ë“œë˜ì–´ ìˆë‹¤ - ì¦‰ í‰ë²”í•œ delete(SAFE_DELETE)ë§Œìœ¼ë¡œ ì¶©ë¶„í•˜ë©°
+// xdeleteê°€ í•„ìš” ì—†ë‹¤.
+//***************************************************************************
+void COdbcAsyncSrv::ClearOdbcPools()
+{
+	if( _pOdbcConnPools == nullptr ) return;
+
+	for( int32 i = 0; i < _nDBCount; i++ )
+	{
+		SAFE_DELETE(_pOdbcConnPools[i]);
+	}
+	SAFE_DELETE_ARRAY(_pOdbcConnPools);
 }
 
 std::shared_ptr<CDBAsyncSrvHandler> COdbcAsyncSrv::Regist(const BYTE command, std::shared_ptr<CDBAsyncSrvHandler> const handler)
@@ -73,9 +82,12 @@ bool COdbcAsyncSrv::StartService(CVector<CDBNode> dbNodeVec, const int32 nMaxThr
 	return InitOdbc(dbNodeVec, nMaxThreadCnt);
 }
 
+//***************************************************************************
+// DB ë…¸ë“œë³„ COdbcConnPoolì„ ìƒì„±/ì´ˆê¸°í™”í•œë‹¤.
+//***************************************************************************
 bool COdbcAsyncSrv::InitOdbc(CVector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt)
 {
-	_bStopThread.store(false); // Àç½ÃÀÛÀÌ³ª ¿øÀÚÀû ÃÊ±â°ª º¸ÀåÀ» À§ÇØ ¸í½ÃÀû ÃÊ±âÈ­
+	_bStopThread.store(false); // ì¬ì‹œì‘ ì‹œë‚˜ë¦¬ì˜¤ ëŒ€ë¹„ ì¢…ë£Œ í”Œë˜ê·¸ ì´ˆê¸°í™”
 
 	if( 0 == nMaxThreadCnt )
 		_nMaxThreadCnt = static_cast<int32>(SYSTEM::CoreCount());
@@ -86,24 +98,34 @@ bool COdbcAsyncSrv::InitOdbc(CVector<CDBNode> dbNodeVec, const int32 nMaxThreadC
 	if( _nDBCount <= 0 )
 		return true;
 
-	_pOdbcConnPools = new COdbcConnPool * [_nDBCount];
-	int32 nIdx = 0;
+	// ë°°ì—´ì„ ê°’ ì´ˆê¸°í™”(0)í•´ ë‘ì–´, ì¤‘ê°„ì— ì‹¤íŒ¨í•´ë„ ClearOdbcPools()ê°€
+	// ì•„ì§ ìƒì„±ë˜ì§€ ì•Šì€ ìŠ¬ë¡¯ì„ ì“°ë ˆê¸° í¬ì¸í„°ë¡œ deleteí•˜ëŠ” ì¼ì´ ì—†ë„ë¡ í•œë‹¤.
+	_pOdbcConnPools = new COdbcConnPool * [_nDBCount]();
 
+	// ì¬ì—°ê²° ì›Œì»¤ ìˆ˜ë¥¼ í’€ í¬ê¸°(= DB ë¹„ë™ê¸° ì›Œì»¤ ìŠ¤ë ˆë“œ ìˆ˜) ëŒ€ë¹„ ë¹„ë¡€í•´ì„œ ì‚°ì •í•œë‹¤.
+	// (í’€ í¬ê¸°ì˜ 10~25% ê¶Œì¥, ìµœì†Œ 4 â€” DB ì¬ì‹œì‘ ë“± ëŒ€ëŸ‰ ë™ì‹œ ì¥ì•  ë³µêµ¬ ì†ë„ë¥¼ ìœ„í•¨)
+	COdbcConnPool::TReconnectConfig reconnectCfg;
+	reconnectCfg.nWorkerCount = std::max(4, _nMaxThreadCnt / 4);
+
+	int32 nIdx = 0;
 	for( auto& iter : dbNodeVec )
 	{
 		if( nIdx >= _nDBCount ) break;
 
+		// COdbcConnPoolì´ BaseAllocatorë¥¼ ìƒì†í•˜ë¯€ë¡œ operator newê°€ ì´ë¯¸ RawAllocator
+		// ê²½ë¡œë¡œ ì˜¤ë²„ë¼ì´ë“œë˜ì–´ ìˆë‹¤ - í‰ë²”í•œ newë¡œë„ ì‹¤íŒ¨ ì‹œ nullptrì„ ë°˜í™˜í•œë‹¤.
 		_pOdbcConnPools[nIdx] = new COdbcConnPool(_nMaxThreadCnt);
 		if( nullptr == _pOdbcConnPools[nIdx] )
 		{
 			LOG_ERROR(_T("Failed to alloc COdbcConnPool"));
+			ClearOdbcPools(); // ì´ë¯¸ ë§Œë“¤ì–´ì§„ í’€ë“¤ê¹Œì§€ í•¨ê»˜ ì •ë¦¬
 			return false;
 		}
 
-		if( false == _pOdbcConnPools[nIdx]->Init(iter._dbClass, iter._tszDSN) )
+		if( false == _pOdbcConnPools[nIdx]->Init(iter._dbClass, iter._tszDSN, reconnectCfg) )
 		{
 			LOG_ERROR(_T("Failed to Initialize COdbcConnPool"));
-			Clear();
+			ClearOdbcPools();
 			return false;
 		}
 		++nIdx;
@@ -119,9 +141,10 @@ void COdbcAsyncSrv::StartIoThreads()
 
 	for( int32 i = 0; i < _nMaxThreadCnt; i++ )
 	{
-		// [¹ö±× ¼öÁ¤] ¶÷´Ù [=] º¹»ç Ä¸Ã³·Î ÀÎÇÑ ¼ö¸í ÁÖ±â ´ó±Û¸µ ¹®Á¦¸¦ ¹æÁöÇÏ±â À§ÇØ 
-		// ¸í½ÃÀûÀ¸·Î ¾ÈÀüÇÑ ¸â¹ö ÇÔ¼ö Æ÷ÀÎÅÍ ¹ÙÀÎµù ÆĞÅÏ Àü´Ş
-		gpThreadManager->CreateThread(std::bind(&COdbcAsyncSrv::RunningThread, this));
+		// [ì„±ëŠ¥] std::bindëŠ” ë‚´ë¶€ì ìœ¼ë¡œ íƒ€ì… ì†Œê±°ëœ í˜¸ì¶œ ê°ì²´ë¥¼ ë§Œë“¤ì–´ ì»´íŒŒì¼ëŸ¬ ì¸ë¼ì¸ ìµœì í™”ê°€
+		// ì˜ ë“¤ì–´ê°€ì§€ ì•ŠëŠ” ê²½ìš°ê°€ ë§ë‹¤. thisë§Œ ìº¡ì²˜í•˜ëŠ” ëŒë‹¤ê°€ ë” ê°€ë³ê³ , COdbcConnPoolì˜
+		// ì›Œì»¤ ìŠ¤ë ˆë“œë“¤([this](){ ... })ê³¼ë„ ìŠ¤íƒ€ì¼ì´ ì¼ì¹˜í•œë‹¤.
+		gpThreadManager->CreateThread([this]() { RunningThread(); });
 	}
 }
 
@@ -142,7 +165,7 @@ bool COdbcAsyncSrv::Action()
 		st_DBAsyncRq* pAsyncRq = Pop();
 		if( pAsyncRq == nullptr )
 		{
-			continue; // Á¾·á ½ÅÈ£ È°¼ºÈ­ ½Ã ·çÇÁ Å»Ãâ Èå¸§ À¯µµ
+			continue; // ì¢…ë£Œ ì‹ í˜¸ë¡œ ê¹¨ì–´ë‚œ ê²½ìš° ë£¨í”„ íƒˆì¶œ íë¦„ìœ¼ë¡œ ì§„í–‰
 		}
 
 		COMMAND_MAP::iterator it = _mapCommand.find(pAsyncRq->callIdent);
@@ -168,18 +191,24 @@ bool COdbcAsyncSrv::Action()
 				if( 300 <= endTick - startTick )
 					LOG_WARNING(_T("Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"), endTick - startTick, cumulateCallCnt++, static_cast<int>(Ret), pAsyncRq->callIdent);
 
-				st_DBAsyncRq* copyAsyncRq = new st_DBAsyncRq{ *pAsyncRq };
-				uint16 logIdent = pAsyncRq->callIdent; // [¹ö±× ¼öÁ¤] Use-After-Free ¹æÁö¸¦ À§ÇØ »çÀü¿¡ º¸°ü
+				// [ë²„ê·¸ ìˆ˜ì •] st_DBAsyncRqëŠ” callIdentë³„ë¡œ ì‹¤ì œ ì¿¼ë¦¬ ë°ì´í„°ë¥¼ ë‹´ì€ íŒŒìƒ êµ¬ì¡°ì²´ì˜
+				// ë² ì´ìŠ¤ íƒ€ì…ì´ë‹¤(2ë°”ì´íŠ¸ì§œë¦¬ í—¤ë” êµ¬ì¡°ì²´ê°€ ê·¸ëŒ€ë¡œ ì“°ì¼ ë¦¬ ì—†ê³ , ProcessAsyncCallì´
+				// callIdentë¡œ ì‹¤ì œ íŒŒìƒ íƒ€ì…ì„ ìºìŠ¤íŒ…í•´ì„œ ì“°ëŠ” êµ¬ì¡°). ê¸°ì¡´ ì½”ë“œì˜
+				// `new st_DBAsyncRq{ *pAsyncRq }`ëŠ” ë² ì´ìŠ¤ íƒ€ì…ìœ¼ë¡œ ë³µì‚¬í•˜ë¯€ë¡œ íŒŒìƒ í´ë˜ìŠ¤ì— ìˆëŠ”
+				// ì‹¤ì œ ì¿¼ë¦¬ íŒŒë¼ë¯¸í„°ê°€ ì „ë¶€ ì˜ë ¤ë‚˜ê°€ëŠ” ì˜¤ë¸Œì íŠ¸ ìŠ¬ë¼ì´ì‹± ë²„ê·¸ì˜€ë‹¤ â€” ì¬ì‹œë„ëœ ì¿¼ë¦¬ê°€
+				// ì›ë˜ íŒŒë¼ë¯¸í„°ë¥¼ ìƒì–´ë²„ë¦° ì±„ë¡œ ë‹¤ì‹œ ì‹¤í–‰ëì„ ê²ƒì´ë‹¤.
+				// ë³µì‚¬ë³¸ì„ ìƒˆë¡œ ë§Œë“¤ í•„ìš” ì—†ì´ ì›ë³¸ ê°ì²´ë¥¼ ê·¸ëŒ€ë¡œ ì¬ì‚¬ìš©í•´ ì¬ì‹œë„ í”Œë˜ê·¸ë§Œ ì„¸íŒ…í•˜ê³ 
+				// ì¬íì‰í•œë‹¤. ìŠ¬ë¼ì´ì‹± ë²„ê·¸ê°€ ì‚¬ë¼ì§€ëŠ” ê²ƒì€ ë¬¼ë¡ , íƒ€ì„ì•„ì›ƒ ì¬ì‹œë„ ê²½ë¡œ(ì´ë¯¸ DBê°€
+				// ì§€ì—°ë˜ê³  ìˆëŠ” ìƒí™©)ì—ì„œ ë¶ˆí•„ìš”í•œ heap í• ë‹¹/í•´ì œ í•œ ìŒë„ ì—†ì–´ì§„ë‹¤.
+				uint16 logIdent = pAsyncRq->callIdent;
+				pAsyncRq->bReTry = true;
 
-				SAFE_DELETE(pAsyncRq);
+				int nSize = Push(pAsyncRq);
 
-				copyAsyncRq->bReTry = true;
-				int nSize = Push(copyAsyncRq);
-
-				// ¸¸¾à ¾²·¹µå Á¾·á ÁßÀÌ¶ó Å¥¿¡ µé¾î°¡Áö ¸øÇß´Ù¸é ¸Ş¸ğ¸® ´©¼ö ¹æÁö¸¦ À§ÇØ ÇØÁ¦
-				if( _bStopThread.load() && nSize == 0 )
+				// ì¢…ë£Œ ì‹ í˜¸ê°€ ì´ë¯¸ ì¼œì§„ ìƒíƒœë¼ íì— ë“¤ì–´ê°€ì§€ ëª»í–ˆë‹¤ë©´(Pushê°€ 0ì„ ë°˜í™˜) ì§ì ‘ í•´ì œ
+				if( nSize == 0 )
 				{
-					delete copyAsyncRq;
+					SAFE_DELETE(pAsyncRq);
 				}
 
 				LOG_ERROR(_T("Query timeout ReTry... callIdent: [%u], queuesize[%d]"), logIdent, nSize);
@@ -187,9 +216,15 @@ bool COdbcAsyncSrv::Action()
 			}
 		}
 
+#if defined(_DEBUG)
 		uint64 endTick = _GetTickCount();
 		if( 300 <= endTick - startTick )
 			LOG_WARNING(_T("Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"), endTick - startTick, cumulateCallCnt++, static_cast<int>(Ret), pAsyncRq->callIdent);
+#else
+		uint64 endTick = _GetTickCount();
+		if( 1000 <= endTick - startTick )
+			LOG_WARNING(_T("Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"), endTick - startTick, cumulateCallCnt++, static_cast<int>(Ret), pAsyncRq->callIdent);
+#endif
 
 		SAFE_DELETE(pAsyncRq);
 	}
@@ -199,15 +234,19 @@ bool COdbcAsyncSrv::Action()
 
 int COdbcAsyncSrv::Push(st_DBAsyncRq* pAsyncRq)
 {
-	std::unique_lock<std::shared_mutex> lockGuard(_mutex);
+	int queueSize = 0;
+	{
+		std::unique_lock<std::mutex> lockGuard(_mutex);
 
-	if( _bStopThread.load() ) return 0;
+		if( _bStopThread.load() ) return 0;
 
-	_queueDBAsyncRq.push(pAsyncRq);
-	int queueSize = static_cast<int>(_queueDBAsyncRq.size());
+		_queueDBAsyncRq.push(pAsyncRq);
+		queueSize = static_cast<int>(_queueDBAsyncRq.size());
+	} // [ì„±ëŠ¥] notify ì „ì— ë½ì„ ë¨¼ì € í•´ì œí•´, ê¹¨ì–´ë‚œ ì›Œì»¤ê°€ ì¦‰ì‹œ ë½ì„ ì¡ì§€ ëª»í•˜ê³ 
+	  // ë‹¤ì‹œ ì ë“œëŠ” ë¶ˆí•„ìš”í•œ ì»¨í…ìŠ¤íŠ¸ ìŠ¤ìœ„ì¹­(lock-and-wake-under-lock)ì„ í”¼í•œë‹¤.
 
-	// [¼º´É ÃÖÀûÈ­] µ¥ÀÌÅÍ°¡ ÇÏ³ª µé¾î¿ÔÀ¸¹Ç·Î ´ë±â ÁßÀÎ ¼ö¸¹Àº ½º·¹µå¸¦ ´Ù ±ú¿ìÁö ¾Ê°í 
-	// Á¤È®È÷ 'ÀÛ¾÷À» Ã³¸®ÇÒ ÇÑ °³ÀÇ ¿öÄ¿ ½º·¹µå'¸¸ ±ú¿ìµµ·Ï notify_one()À¸·Î ±³Ã¼ÇÏ¿© ÄÁÅØ½ºÆ® ½ºÀ§Äª ÃÖ¼ÒÈ­
+	// [ë™ì‹œì„± ìµœì í™”] ë°ì´í„°ê°€ í•˜ë‚˜ ë“¤ì–´ì™”ìœ¼ë¯€ë¡œ ëª¨ë“  ëŒ€ê¸° ì›Œì»¤ ìŠ¤ë ˆë“œë¥¼ ë‹¤ ê¹¨ìš°ì§€ ì•Šê³ ,
+	// ì •í™•íˆ 'ì‘ì—…ì„ ì²˜ë¦¬í•  ìˆ˜ ìˆëŠ” ì›Œì»¤ í•˜ë‚˜'ë§Œ ê¹¨ìš°ë„ë¡ notify_one()ìœ¼ë¡œ ëŒ€ì²´í•´ ì»¨í…ìŠ¤íŠ¸ ìŠ¤ìœ„ì¹­ ìµœì†Œí™”
 	_cva.notify_one();
 
 	return queueSize;
@@ -216,12 +255,12 @@ int COdbcAsyncSrv::Push(st_DBAsyncRq* pAsyncRq)
 st_DBAsyncRq* COdbcAsyncSrv::Pop()
 {
 	static int queueCount = 2;
-	std::unique_lock<std::shared_mutex> lockGuard(_mutex);
+	std::unique_lock<std::mutex> lockGuard(_mutex);
 
-	// Å¥°¡ ¿ÏÀüÈ÷ ºñ¾îÀÖ°Å³ª Á¾·á ½ÅÈ£°¡ µé¾î¿Ã ¶§±îÁö ¿Ïº®ÇÏ°Ô Lock ÇÁ¸®Â¡ ´ë±â
+	// íì— ë°ì´í„°ê°€ ë“¤ì–´ì˜¤ê±°ë‚˜ ì¢…ë£Œ ì‹ í˜¸ê°€ ì¼œì§ˆ ë•Œê¹Œì§€ ëŒ€ê¸°í•˜ë©° Lock ìŠ¤í“¨ë¦¬ì–´ìŠ¤ ì›¨ì´í¬ì—… ë°©ì§€
 	_cva.wait(lockGuard, [this]() { return !_queueDBAsyncRq.empty() || _bStopThread.load(); });
 
-	// ¼­¹ö Á¾·á °úÁ¤ÀÌ°í Å¥°¡ ºñ¾îÀÖ´Ù¸é Áï½Ã ¾ÈÀü ¹İÈ¯
+	// ì¢…ë£Œ ìƒíƒœì´ê³  íë„ ë¹„ì–´ìˆë‹¤ë©´ ì¦‰ì‹œ nullptr ë°˜í™˜
 	if( _bStopThread.load() && _queueDBAsyncRq.empty() ) return nullptr;
 
 	st_DBAsyncRq* pAsyncRq = _queueDBAsyncRq.front();
@@ -236,7 +275,7 @@ st_DBAsyncRq* COdbcAsyncSrv::Pop()
 		LOG_WARNING(_T("Async DB Call Queue size... : [%d]"), static_cast<int>(_queueDBAsyncRq.size()));
 	}
 
-	// [¹ö±× Á¦°Å] ¼ÒºñÀÚ°¡ ´Ù¸¥ ¼ÒºñÀÚ¸¦ ¹«ÀÛÀ§·Î ´Ù ±ú¿ì´ø ºÒÇÊ¿äÇÑ °íºñ¿ë notify_all() È£Ãâ Á¦°Å
+	// [ì£¼ì˜] ì†Œë¹„ìê°€ ë‹¤ë¥¸ ì†Œë¹„ìë¥¼ ê¹¨ìš°ëŠ” ê²ƒì€ ë¶ˆí•„ìš”í•˜ë¯€ë¡œ notify_all() í˜¸ì¶œí•˜ì§€ ì•ŠìŒ
 
 	return pAsyncRq;
 }

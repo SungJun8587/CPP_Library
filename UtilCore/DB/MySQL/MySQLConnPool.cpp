@@ -116,20 +116,26 @@ bool CMySQLConnPool::Init(const wchar_t* pwszDBHost, const wchar_t* pwszDBUserId
 	StopReconnectWorkers();
 	Clear();
 
+	// [버그 수정] WideCharToMultiByte가 반환하는 nLength는 널 종료 문자를 포함한
+	// 필요 바이트 수다. 기존 코드는 `STRLEN < nLength - 1`로 검사했는데, 이는
+	// nLength가 STRLEN + 1일 때(즉 버퍼 크기보다 정확히 1바이트 더 필요한 경우)를
+	// 거부하지 못해 아래 WideCharToMultiByte 변환 호출에서 버퍼를 1바이트 오버런하는
+	// off-by-one 버그였다. `STRLEN < nLength`로 비교해야 널 종료 문자를 포함한
+	// 전체 필요 크기가 버퍼 크기를 넘는 경우를 정확히 거부한다.
 	int nLength = WideCharToMultiByte(CP_ACP, 0, pwszDBHost, -1, NULL, 0, NULL, NULL);
-	if( nLength == 0 || DATABASE_SERVER_NAME_STRLEN < (size_t)nLength - 1 ) return false;
+	if( nLength == 0 || DATABASE_SERVER_NAME_STRLEN < (size_t)nLength ) return false;
 	if( WideCharToMultiByte(CP_ACP, 0, pwszDBHost, -1, _szDBHost, nLength, NULL, NULL) == 0 ) return false;
 
 	nLength = WideCharToMultiByte(CP_ACP, 0, pwszDBUserId, -1, NULL, 0, NULL, NULL);
-	if( nLength == 0 || DATABASE_DSN_USER_ID_STRLEN < (size_t)nLength - 1 ) return false;
+	if( nLength == 0 || DATABASE_DSN_USER_ID_STRLEN < (size_t)nLength ) return false;
 	if( WideCharToMultiByte(CP_ACP, 0, pwszDBUserId, -1, _szDBUserId, nLength, NULL, NULL) == 0 ) return false;
 
 	nLength = WideCharToMultiByte(CP_ACP, 0, pwszDBPasswd, -1, NULL, 0, NULL, NULL);
-	if( nLength == 0 || DATABASE_DSN_USER_PASSWORD_STRLEN < (size_t)nLength - 1 ) return false;
+	if( nLength == 0 || DATABASE_DSN_USER_PASSWORD_STRLEN < (size_t)nLength ) return false;
 	if( WideCharToMultiByte(CP_ACP, 0, pwszDBPasswd, -1, _szDBPasswd, nLength, NULL, NULL) == 0 ) return false;
 
 	nLength = WideCharToMultiByte(CP_ACP, 0, pwszDBName, -1, NULL, 0, NULL, NULL);
-	if( nLength == 0 || DATABASE_NAME_STRLEN < (size_t)nLength - 1 ) return false;
+	if( nLength == 0 || DATABASE_NAME_STRLEN < (size_t)nLength ) return false;
 	if( WideCharToMultiByte(CP_ACP, 0, pwszDBName, -1, _szDBName, nLength, NULL, NULL) == 0 ) return false;
 
 	_uiPort = uiPort;

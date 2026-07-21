@@ -1,4 +1,5 @@
-﻿//***************************************************************************
+﻿
+//***************************************************************************
 // OdbcConnPool.h : interface for the COdbcConnPool class.
 //
 //***************************************************************************
@@ -12,10 +13,6 @@
 
 #ifndef __CONTAINERS_H__
 #include <Memory/Containers.h>
-#endif
-
-#ifndef __CACHEALIGNMENT_H__
-#include <Thread/CacheAlignment.h>
 #endif
 
 #ifndef __SPINLOCK_H__
@@ -33,7 +30,12 @@
 #include <mutex>
 #include <condition_variable>
 
-class COdbcConnPool
+// [할당자 선택] COdbcConnPool은 DB 노드당 1개씩, 서버 기동 시 딱 한 번만 생성되는
+// 객체다(핫패스 아님). Allocator.h의 설계 구분에 따르면 이런 "크거나 드물게 생성되는
+// 객체"는 고빈도 핫패스용 PoolAllocator(xnew/xdelete)가 아니라 BaseAllocator를
+// 상속해 RawAllocator 경로로 분리하는 것이 맞다. BaseAllocator는 데이터 멤버가 없고
+// non-virtual 함수만 상속되므로 vptr 등 추가 오버헤드도 없다.
+class COdbcConnPool : public BaseAllocator
 {
 private:
 	// 격리 대기 중인(참조가 남아 즉시 삭제 못하는) 오래된 커넥션 정보

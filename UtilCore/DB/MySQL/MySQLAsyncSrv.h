@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // MySQLAsyncSrv.h : interface for the CMySQLAsyncSrv class.
 //
@@ -40,19 +40,19 @@ public:
 	bool Action();
 	void StopThread() {
 		_bStopThread.store(true);
-		_cva.notify_all();			// ´ë±â ÁßÀÎ ¸ğµç ¿öÄ¿ ½º·¹µå¸¦ ÀÏ±ú¿ö Áï½Ã ¾ÈÀü Á¾·á À¯µµ
+		_cva.notify_all();			// ëŒ€ê¸° ì¤‘ì¸ ëª¨ë“  ì›Œì»¤ ìŠ¤ë ˆë“œë¥¼ ì¼ê¹¨ì›Œ ì¦‰ì‹œ ì•ˆì „ ì¢…ë£Œ ìœ ë„
 	};
 
 	CMySQLConnPool* GetAccountConnPool(void);
 	CMySQLConnPool* GetMySQLConnPool(uint64 m_nID);
 	CMySQLConnPool* GetLogConnPool();
 
-	CQueue<st_DBAsyncRq*>				_queueDBAsyncRq;		// DB ¿äÃ» ±¸Á¶Ã¼ Å¥
-	COMMAND_MAP							_mapCommand;			// ¸Ê ÇÚµé·¯
+	CQueue<st_DBAsyncRq*>				_queueDBAsyncRq;		// DB ìš”ì²­ êµ¬ì¡°ì²´ í
+	COMMAND_MAP							_mapCommand;			// ë§µ í•¸ë“¤ëŸ¬
 
-	int32								_nDBCount;				// Á¢¼ÓÇÒ Database °³¼ö
-	bool								_bOpen;					// DB ¿ÀÇÂ ¿©ºÎ
-	int32								_nMaxThreadCnt;			// ÃÖ´ë ¾²·¹µå °³¼ö
+	int32								_nDBCount;				// ì ‘ì†í•  Database ê°œìˆ˜
+	bool								_bOpen;					// DB ì˜¤í”ˆ ì—¬ë¶€
+	int32								_nMaxThreadCnt;			// ìµœëŒ€ ì“°ë ˆë“œ ê°œìˆ˜
 	CMySQLConnPool** _pMySQLConnPools;		// MySQL Connection Pool
 
 public:
@@ -62,9 +62,9 @@ protected:
 	void		Clear(void);
 
 private:
-	std::atomic<bool>			_bStopThread;					// ½º·¹µå Á¾·á ÇÃ·¡±×
-	std::shared_mutex			_mutex;							// Å¥ µ¿±âÈ­ Lock
-	std::condition_variable_any _cva;							// shared_mutex È£È¯ Á¶°Ç º¯¼ö
+	std::atomic<bool>			_bStopThread;					// ìŠ¤ë ˆë“œ ì¢…ë£Œ í”Œë˜ê·¸
+	std::shared_mutex			_mutex;							// í ë™ê¸°í™” Lock
+	std::condition_variable_any _cva;							// shared_mutex í˜¸í™˜ ì¡°ê±´ ë³€ìˆ˜
 };
 
 #endif // ndef __MYSQLASYNCSRV__H__

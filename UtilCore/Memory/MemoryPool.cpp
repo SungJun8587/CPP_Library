@@ -16,7 +16,9 @@
 //***************************************************************************
 
 //***************************************************************************
-// 설명 : 고정 블록 크기를 기록하고 Lock-free SLIST 헤더를 초기화합니다.
+// 설명 : 이 풀이 다룰 고정 블록 크기(allocSize)를 지정하고, SLIST 헤더를
+//        초기화합니다.
+// 매개변수 : allocSize - 이 풀에서 다룰 고정 블록 크기(헤더 포함, 바이트)
 CMemoryPool::CMemoryPool(int32 allocSize) : _allocSize(allocSize)
 {
 	::InitializeSListHead(&_header);
@@ -32,8 +34,9 @@ CMemoryPool::~CMemoryPool()
 }
 
 //***************************************************************************
-// 설명 : 블록을 "미사용" 상태로 표시(allocSize = 0)한 뒤 Lock-free SLIST에
-//        되돌립니다.
+// 설명 : 블록을 사용 종료 표시(allocSize = 0)한 뒤 Lock-free SLIST에
+//        되돌립니다. 통계용 카운터(useCount/reserveCount)도 함께 갱신합니다.
+// 매개변수 : ptr - 반납할 메모리 블록(헤더) 포인터
 void CMemoryPool::Push(MemoryHeader* ptr)
 {
 	ptr->allocSize = 0;
@@ -45,8 +48,10 @@ void CMemoryPool::Push(MemoryHeader* ptr)
 }
 
 //***************************************************************************
-// 설명 : SLIST에서 블록을 하나 꺼냅니다. 비어있으면 RawAllocator를 통해
-//        새 블록을 할당합니다(라이브러리 자동 분기 + 정렬 보장).
+// 설명 : SLIST에서 블록을 하나 꺼냅니다. 풀이 비어있으면 raw 메모리를
+//        새로 할당하여 반환합니다(풀은 "최대 크기 제한 없는 동적 확장형"
+//        프리리스트로 동작).
+// 반환값 : 사용 가능한 메모리 블록(헤더) 포인터
 MemoryHeader* CMemoryPool::Pop()
 {
 	MemoryHeader* memory = static_cast<MemoryHeader*>(::InterlockedPopEntrySList(&_header));

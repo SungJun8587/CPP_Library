@@ -24,6 +24,7 @@
 | 격리(Quarantine) 큐 | 교체된 낡은 커넥션에 참조가 남아있으면 즉시 삭제하지 않고 격리 후 안전할 때 삭제 |
 | Safe Leak | 프로세스 종료 시점까지 참조가 남은 커넥션은 삭제를 포기(누수)하여 UAF 크래시를 방지 |
 | False sharing 방지 | `_slotLocks`를 캐시라인 정렬된 `SpinLockDefault[]`로 구성 |
+| 할당자 분리 | `COdbcConnPool` 자신은 `BaseAllocator` 상속으로 RawAllocator 경로를, 내부 `CBaseODBC` 커넥션은 `xnew`/`xdelete`(PoolAllocator)로 별도 관리 (§10 참고) |
 
 ## 3. 멤버 변수 설명
 
@@ -288,3 +289,72 @@ pool.SetReconnectConfig(newCfg);
 - `OdbcConnGuard`를 사용하지 않고 `GetOdbcConn`/`ReleaseOdbcConn`을 직접 짝지어 호출할 수도 있으나,
   예외 발생 시 반납 누락 위험이 있으므로 가드 사용을 권장한다.
 - 풀 소멸 시 `~COdbcConnPool()`이 헬스체크/재연결 스레드를 먼저 종료한 뒤 `Clear()`로 자원을 정리한다.
+
+### 9.1 여러 DB를 다루는 실제 서비스 통합 패턴
+
+계정 DB, 게임 DB, 로그 DB처럼 DB가 여러 개인 서비스에서는 `COdbcConnPool`을 DB 노드 수만큼
+배열로 만들어 두고, DB 비동기 워커 스레드들이 공용 요청 큐에서 작업을 꺼내 필요한 풀을
+선택해 쓰는 구조가 일반적이다.
+
+```cpp
+// DB 노드 개수만큼 풀을 생성 (예: 계정 DB, 게임 DB, 로그 DB)
+COdbcConnPool** pOdbcConnPools = new COdbcConnPool*[nDBCount](); // 값 초기화 필수
+
+// 재연결 워커 수는 각 풀 크기(= DB 비동기 워커 스레드 수) 대비 비례 산정 (§7.4)
+COdbcConnPool::TReconnectConfig reconnectCfg;
+reconnectCfg.nWorkerCount = std::max(4, nMaxThreadCnt / 4);
+
+for( int32 i = 0; i < nDBCount; ++i )
+{
+    // COdbcConnPool이 BaseAllocator를 상속하므로 평범한 new로도 RawAllocator 경로를 타고,
+    // 실패 시 예외 대신 nullptr을 반환한다 (§10 참고)
+    pOdbcConnPools[i] = new COdbcConnPool(nMaxThreadCnt);
+    if( pOdbcConnPools[i] == nullptr || !pOdbcConnPools[i]->Init(dbClass[i], dsn[i], reconnectCfg) )
+    {
+        // 실패 시 이미 만든 풀들까지 함께 정리 (부분 생성 상태로 방치하지 않음)
+        break;
+    }
+}
+```
+
+- 배열은 `new COdbcConnPool*[nDBCount]()`처럼 반드시 값 초기화해서, 중간에 생성이 실패했을 때
+  아직 만들어지지 않은 뒷부분 슬롯이 쓰레기 포인터로 남아 있다가 정리 시점에 잘못 delete되는
+  사고를 막는다.
+- 각 풀은 독립된 `COdbcConnPool` 인스턴스이므로 DB별로 서로 다른 DSN/재연결 정책을 줄 수 있다.
+- DB 비동기 워커 스레드 수(`nMaxThreadCnt`)와 풀 크기를 동일하게 맞추면, 워커 스레드 각각이
+  항상 자기 몫의 슬롯을 확보할 수 있어 `PopFreeSlotIndex()` 실패(풀 고갈)를 구조적으로 방지한다.
+
+## 10. 할당자(Allocator) 설계
+
+`COdbcConnPool`은 `class COdbcConnPool : public BaseAllocator`로 선언되어 있다. 즉 이
+클래스를 직접 `new`/`delete`하면(예: 위 §9.1의 `new COdbcConnPool(nMaxThreadCnt)`) 전역
+`::operator new`/`delete`가 아니라 `BaseAllocator`가 오버라이드한 `operator new`/`delete`가
+호출되어, 프로젝트의 `RawAllocator`(mimalloc/jemalloc/tcmalloc/malloc 중 컴파일 타임 선택) 경로를
+탄다.
+
+### 10.1 왜 PoolAllocator(xnew/xdelete)가 아니라 BaseAllocator인가
+
+프로젝트의 할당자 계층은 용도가 명확히 나뉜다.
+
+| 할당자 | 설계 목적 | `COdbcConnPool`과의 적합성 |
+|---|---|---|
+| `PoolAllocator` (→ `xnew`/`xdelete`) | 실서비스 핫패스(패킷, 세션 등 고빈도 할당/해제) | 부적합 — 풀 자체는 DB 노드당 1개, 서버 기동 시 한 번만 생성됨 |
+| `BaseAllocator` | 크기가 크거나 드물게 생성되는 객체를 풀과 분리 | 적합 — 위 프로필과 정확히 일치 |
+
+`BaseAllocator`는 데이터 멤버가 없고 상속되는 함수도 모두 non-virtual이라, 상속해도
+`COdbcConnPool` 인스턴스에 vptr 등 추가 메모리 오버헤드가 붙지 않는다.
+
+### 10.2 내부 `CBaseODBC` 커넥션은 별도로 `xnew`/`xdelete` 유지
+
+풀 "껍데기"(`COdbcConnPool` 자신)와 달리, 그 안에서 관리하는 실제 ODBC 커넥션(`CBaseODBC`)은
+`Init()`의 초기 채움과 `TryReconnect()`의 재연결 시마다(네트워크 장애가 잦으면 상대적으로
+자주) 반복적으로 생성/삭제된다. 이쪽은 여전히 `xnew<CBaseODBC>(...)` / `xdelete(...)`
+(`PoolAllocator` 경로)를 그대로 사용한다 — 같은 클래스 계층 안에서도 "이 객체를 만드는 빈도"에
+따라 할당자를 다르게 선택한 것이다.
+
+### 10.3 `make_shared`로 생성하는 타입에는 적용 무의미
+
+`BaseAllocator` 상속이 효과를 가지려면 해당 타입이 **직접 `new 타입(...)`** 형태로 생성돼야
+한다. `std::make_shared<T>()`는 컨트롤 블록과 객체를 하나로 묶어 자체 할당 경로로 확보하고
+`T`의 `operator new`를 거치지 않으므로, 그런 방식으로 생성되는 타입에 `BaseAllocator`를
+상속해도 효과가 없다 (`COdbcConnPool`은 위 예시처럼 직접 `new`되므로 해당 사항 없음).

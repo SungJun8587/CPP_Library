@@ -1,4 +1,5 @@
-﻿//***************************************************************************
+﻿
+//***************************************************************************
 // MySQLConnPool.h : interface for the CMySQLConnPool class.
 //
 //***************************************************************************
@@ -33,7 +34,13 @@
 #include <mutex>
 #include <condition_variable>
 
-class CMySQLConnPool
+// [할당자 선택] CMySQLConnPool은 DB 노드당 1개씩, 서버 기동 시 딱 한 번만 생성되는
+// 객체다(핫패스 아님). Allocator.h의 설계 구분에 따르면 이런 "크거나 드물게 생성되는
+// 객체"는 고빈도 핫패스용 PoolAllocator(xnew/xdelete)가 아니라 BaseAllocator를
+// 상속해 RawAllocator 경로로 분리하는 것이 맞다(COdbcConnPool과 동일한 근거).
+// BaseAllocator는 데이터 멤버가 없고 non-virtual 함수만 상속되므로 vptr 등
+// 추가 오버헤드도 없다.
+class CMySQLConnPool : public BaseAllocator
 {
 private:
 	// =========================================================================
