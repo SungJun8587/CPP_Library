@@ -15,6 +15,10 @@
 #include <Memory/Containers.h>
 #endif
 
+#ifndef __CACHEALIGNMENT_H__
+#include <Thread/CacheAlignment.h>
+#endif
+
 #ifndef __SPINLOCK_H__
 #include <Thread/SpinLock.h>
 #endif
@@ -42,7 +46,7 @@ private:
 	struct TQuarantineItem
 	{
 		CBaseODBC* pConn;                  // 격리 대상 커넥션
-		std::atomic<int32>* pRefCount;     // 감시할 참조 카운트 주소
+		std::atomic<int32>* pRefCount;     // 감시할 참조 카운트 주소 (CachePaddedAtomic<int32>::value)
 		std::chrono::steady_clock::time_point lastLogTime; // 마지막 경고 로그 시각
 	};
 
@@ -138,34 +142,39 @@ protected:
 	std::atomic<int32>			_nBackoffMaxShift;
 	std::atomic<int32>			_nBackoffJitterMs;
 
-	// [불변 조건] 아래 배열들은 생성자에서 단 1회만 할당한다.
-	// 격리 큐가 &_pRefCount[i] 주소를 저장하므로 런타임 재할당 금지.
-	std::unique_ptr<std::atomic<CBaseODBC*>[]>	_pOdbcConns; // 슬롯별 커넥션 포인터
-	std::unique_ptr<std::atomic<int32>[]>		_pRefCount;  // 슬롯별 참조 카운트
+	// [불변 조건] 아래 unique_ptr 배열들은 생성자에서 단 1회만 할당한다.
+	// 격리 큐가 각 슬롯의 참조 카운트 주소(&_pRefCount[i].value)를 저장하므로,
+	// Init() 도중을 포함해 런타임 중에 절대 임의로든 재할당(make_unique 등)해서는 안 된다.
+	//
+	// CachePaddedAtomic<T>로 감싸 슬롯 하나당 캐시라인 하나를 점유하도록 강제했다. 서로 다른
+	// 슬롯을 동시에 다루는 스레드들이 false sharing으로 서로의 캐시라인을 무효화시키는 것을 막는다.
+	std::unique_ptr<CachePaddedAtomic<CBaseODBC*>[]>	_pOdbcConns; // 슬롯별 실제 커넥션 포인터
+	std::unique_ptr<CachePaddedAtomic<int32>[]>		_pRefCount;  // 슬롯 사용중/이탈 여부를 원자적으로 관리하는 참조 카운터 배열 (가장 핫한 배열)
 
-	std::unique_ptr<SpinLockDefault[]>			_slotLocks;  // 슬롯별 교체 보호 락 (false sharing 방지 정렬)
+	// 캐시 라인 정렬(alignas) 및 크기 고정 패딩이 적용된 SpinLockDefault로 채용하여 슬롯 간의 false sharing을 방지한다.
+	std::unique_ptr<SpinLockDefault[]>			_slotLocks;  // 각 커넥션 슬롯 자체 교체 시점을 보호하기 위한 슬롯 스핀락 배열
 
-	std::unique_ptr<std::atomic<bool>[]>		_pReconnecting;       // 슬롯별 재연결 진행 중 여부 (중복 디스패치 방지)
-	std::unique_ptr<std::atomic<int64>[]>		_pNextRetryAllowedMs; // 슬롯별 다음 재시도 허용 시각
-	std::unique_ptr<std::atomic<int32>[]>		_pRetryFailCount;     // 슬롯별 연속 실패 횟수
+	std::unique_ptr<CachePaddedAtomic<bool>[]>			_pReconnecting;       // 슬롯별 "현재 재연결 워커가 처리 중" 여부 (중복 디스패치 방지)
+	std::unique_ptr<CachePaddedAtomic<int64>[]>		_pNextRetryAllowedMs; // 슬롯별 "이 시각 이후에만 재시도 허용" (백오프)
+	std::unique_ptr<CachePaddedAtomic<int32>[]>		_pRetryFailCount;     // 슬롯별 연속 재연결 실패 횟수 (백오프 지수 계산용)
 
-	CThreadManager				_healthCheckThreadMgr;       // 헬스체크 스레드 매니저
-	std::atomic<bool>			_bStopHealthCheck;           // 헬스체크 중단 신호
-	int32						_nHealthCheckIntervalMs;     // 헬스체크 주기 (기본 500ms)
+	CThreadManager				_healthCheckThreadMgr;       // 백그라운드 감시 스레드를 관리하는 매니저
+	std::atomic<bool>			_bStopHealthCheck;           // 헬스체크 루프 중단 신호 플래그
+	int32						_nHealthCheckIntervalMs;     // 헬스체크 주기 (기본값 500ms)
 
-	std::atomic<uint32>		_nNextSlotHint;              // PopFreeSlotIndex 탐색 시작 힌트
+	std::atomic<uint32>		_nNextSlotHint;              // PopFreeSlotIndex 탐색 시작상 힌트 (슬롯별 경합 분산)
 
-	CThreadManager				_reconnectWorkerMgr;         // 재연결 워커 스레드 매니저
-	std::atomic<bool>			_bStopReconnectWorkers;      // 워커 전체 종료 신호
-	std::atomic<int32>			_nCurrentWorkerCount;        // 현재 워커 스레드 수
-	std::atomic<int32>			_nDesiredWorkerCount;        // 목표 워커 스레드 수
+	CThreadManager				_reconnectWorkerMgr;         // 재연결 워커 스레드들을 관리하는 매니저
+	std::atomic<bool>			_bStopReconnectWorkers;      // 재연결 워커 전체 종료 신호 (Shutdown 전용)
+	std::atomic<int32>			_nCurrentWorkerCount;        // 현재 실제로 떠 있는(혹은 떠 있어야 할) 재연결 워커 스레드 수
+	std::atomic<int32>			_nDesiredWorkerCount;        // SetWorkerCount로 갱신되는 목표 워커 스레드 수
 
-	std::mutex					_reconnectQueueMutex;        // 재연결 대기열 보호 뮤텍스
-	std::condition_variable	_reconnectQueueCv;           // 대기열 작업/워커 수 변경 알림
-	std::queue<int32>			_reconnectPendingSlots;      // 재연결 대기 슬롯 인덱스 큐
+	std::mutex					_reconnectQueueMutex;        // 재연결 대기열 보호용 뮤텍스
+	std::condition_variable	_reconnectQueueCv;           // 대기열에 새 작업이 들어왔거나 워커 수 목표가 바뀌었음을 알리는 조건 변수
+	std::queue<int32>			_reconnectPendingSlots;      // 재연결이 필요한 슬롯 인덱스 대기열
 
-	SpinLockDefault				_globalQuarantineLock;       // 격리 큐 보호 락
-	std::queue<TQuarantineItem>	_quarantineQueue;            // 지연 삭제 대기 커넥션 큐
+	SpinLockDefault				_globalQuarantineLock;       // 격리 큐에 대한 전역 접근을 보호하는 스핀락
+	std::queue<TQuarantineItem>	_quarantineQueue;            // 참조 카운트가 남아 있는 오래된 커넥션들을 지연 삭제 대기시키는 큐
 };
 
 class OdbcConnGuard

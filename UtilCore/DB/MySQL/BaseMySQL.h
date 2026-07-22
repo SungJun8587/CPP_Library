@@ -57,7 +57,7 @@ public:
 	bool		Prepare(const wchar_t* pwszSQL);
 
 	bool		PrepareBindParam(const MYSQL_BIND* pbindParams);
-	bool		PrepareBindParam(const std::vector<MYSQL_BIND>& bindParams);
+	bool		PrepareBindParam(const CVector<MYSQL_BIND>& bindParams);
 	bool		PrepareAttSet(enum enum_stmt_attr_type attr_type, const void* attr);
 	bool		PrepareExecute(uint64_t* pnIdx = nullptr);
 

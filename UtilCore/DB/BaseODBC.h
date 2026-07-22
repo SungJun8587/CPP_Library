@@ -1,4 +1,4 @@
-
+癤�
 //***************************************************************************
 // BaseODBC.h : interface for the CBaseODBC class.
 //
@@ -50,7 +50,7 @@ public:
 	void		UnBindColStmt(void);
 
 	//***************************************************************************
-	// 바인딩 관련
+	//    琯      
 	// - IoType = SQL_PARAM_INPUT | SQL_PARAM_OUTPUT | SQL_PARAM_INPUTOUTPUT
 	// - SqlType = SQL_CHAR | SQL_VARCHAR | SQL_INT | SQL_BIGINT | SQL_NUMERIC | SQL_DATETIME | ...
 	// - RetSize = SQL_NTS | SQL_NULL_DATA | SQL_DEFAULT_PARAM | SQL_LEN_DATA_AT_EXEC | SQL_DATA_AT_EXEC
@@ -88,21 +88,21 @@ public:
 	bool		BindCol(int32 iColIndex, SQLSMALLINT targetType, int64& tValue, SQLLEN& lRetSize);
 	bool		BindCol(int32 iColIndex, SQLSMALLINT targetType, uint64& tValue, SQLLEN& lRetSize);
 
-	// Fetch 후에 값을 읽어온다.
+	// Fetch  커        棘 쨈 .
 	template< typename _TMain >
 	bool		GetData(int32 iColNum, _TMain& tValue);
 	bool		GetData(int32 iColNum, TCHAR* ptszData, int32& iBuffSize);
 
 	bool		PrepareQuery(const TCHAR* ptszQueryInfo);
-	bool		Execute();									// 준비된 SQL 구문의 실행
-	bool		ExecDirect(const TCHAR* ptszQueryInfo);		// SQL 구문을 바로 실행
+	bool		Execute();									//  曼   SQL            
+	bool		ExecDirect(const TCHAR* ptszQueryInfo);		// SQL         慕      
 	bool		BulkOperations(SQLSMALLINT operation);
 
 	bool		SetStmtAttr(SQLINTEGER fAttribute, SQLPOINTER rgbValue, SQLINTEGER cbValueMax);
 	bool		AllSets(LONG_PTR nQueryResultRecordSize, LONG_PTR nMaxRowSize);
 
 	bool		Fetch(void);
-	SQLRETURN	GetFetch(void);								//!< SQLFetch (외부 처리용)
+	SQLRETURN	GetFetch(void);								//!< SQLFetch ( 甁  처    )
 	SQLRETURN	MoreResults(void);
 	SQLINTEGER	GetFetchedRows(void) {
 		return m_nFetchedRows[0];
@@ -112,10 +112,10 @@ public:
 	bool		Commit();
 	bool		Rollback();
 
-	short		GetNumCols();		// 열 수
-	int64		RowCount();			// insert, update, delete, select(모든 레코드 Fetch 후에 RowCount 적용됨)에 영향 받은 행 수
-	long		RowNumber();		// 현재 커서의 행번호
-	bool		DescribeCol(int32 iColNum, COL_DESCRIPTION& ColDescription); // 열 정보
+	short		GetNumCols();		//      
+	int64		RowCount();			// insert, update, delete, select(       湄  Fetch  커  RowCount      )                  
+	long		RowNumber();		//      커        호
+	bool		DescribeCol(int32 iColNum, COL_DESCRIPTION& ColDescription); //        
 
 private:
 	SQLHENV		m_hEnv;

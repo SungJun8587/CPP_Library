@@ -464,7 +464,7 @@ bool CBaseMySQL::PrepareBindParam(const MYSQL_BIND* pbindParams)
 
 //***************************************************************************
 //
-bool CBaseMySQL::PrepareBindParam(const std::vector<MYSQL_BIND>& bindParams)
+bool CBaseMySQL::PrepareBindParam(const CVector<MYSQL_BIND>& bindParams)
 {
 	if( m_pStmt == nullptr )
 	{

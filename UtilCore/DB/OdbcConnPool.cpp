@@ -6,8 +6,6 @@
 
 #include "pch.h"
 #include "OdbcConnPool.h"
-#include <random>
-#include <algorithm>
 
 constexpr int32 WAIT_TIMEOUT_MS = 100;          // 슬롯 교체 시 사용 중 스레드 이탈 대기 상한
 constexpr int64 LOG_ALERT_INTERVAL_MS = 300000; // 격리 큐 정체 경고 로그 최소 주기 (5분)
@@ -31,21 +29,21 @@ COdbcConnPool::COdbcConnPool(int32 nMaxPoolSize)
 	, _nDesiredWorkerCount(0)
 {
 	// unique_ptr 배열은 생성자에서 딱 1회만 할당 (주소 안정성 보장)
-	_pOdbcConns = std::make_unique<std::atomic<CBaseODBC*>[]>(_nMaxPoolSize);
-	_pRefCount = std::make_unique<std::atomic<int32>[]>(_nMaxPoolSize);
+	_pOdbcConns = std::make_unique<CachePaddedAtomic<CBaseODBC*>[]>(_nMaxPoolSize);
+	_pRefCount = std::make_unique<CachePaddedAtomic<int32>[]>(_nMaxPoolSize);
 	_slotLocks = std::make_unique<SpinLockDefault[]>(_nMaxPoolSize); // 캐시라인 정렬로 false sharing 방지
 
-	_pReconnecting = std::make_unique<std::atomic<bool>[]>(_nMaxPoolSize);
-	_pNextRetryAllowedMs = std::make_unique<std::atomic<int64>[]>(_nMaxPoolSize);
-	_pRetryFailCount = std::make_unique<std::atomic<int32>[]>(_nMaxPoolSize);
+	_pReconnecting = std::make_unique<CachePaddedAtomic<bool>[]>(_nMaxPoolSize);
+	_pNextRetryAllowedMs = std::make_unique<CachePaddedAtomic<int64>[]>(_nMaxPoolSize);
+	_pRetryFailCount = std::make_unique<CachePaddedAtomic<int32>[]>(_nMaxPoolSize);
 
 	for( int32 i = 0; i < _nMaxPoolSize; i++ )
 	{
-		_pOdbcConns[i].store(nullptr, std::memory_order_relaxed);
-		_pRefCount[i].store(0, std::memory_order_relaxed);
-		_pReconnecting[i].store(false, std::memory_order_relaxed);
-		_pNextRetryAllowedMs[i].store(0, std::memory_order_relaxed);
-		_pRetryFailCount[i].store(0, std::memory_order_relaxed);
+		_pOdbcConns[i].value.store(nullptr, std::memory_order_relaxed);
+		_pRefCount[i].value.store(0, std::memory_order_relaxed);
+		_pReconnecting[i].value.store(false, std::memory_order_relaxed);
+		_pNextRetryAllowedMs[i].value.store(0, std::memory_order_relaxed);
+		_pRetryFailCount[i].value.store(0, std::memory_order_relaxed);
 	}
 	memset(&_tszDSN[0], 0, sizeof(_tszDSN));
 }
@@ -118,7 +116,7 @@ bool COdbcConnPool::Init(const EDBClass dbClass, const TCHAR* ptszDSN,
 			return false;
 		}
 
-		_pOdbcConns[i].store(pConn, std::memory_order_release); // release로 게시
+		_pOdbcConns[i].value.store(pConn, std::memory_order_release); // release로 게시
 	}
 
 	StartHealthCheckThread();
@@ -160,15 +158,15 @@ CBaseODBC* COdbcConnPool::GetOdbcConn(int32 nType)
 	}
 
 	// 1. 참조 카운트를 낙관적으로 먼저 증가시켜, 재연결 워커가 삭제/재할당하지 못하도록 선점
-	_pRefCount[nType].fetch_add(1, std::memory_order_relaxed);
+	_pRefCount[nType].value.fetch_add(1, std::memory_order_relaxed);
 
 	// 2. acquire로 최신 포인터 로드
-	CBaseODBC* pOdbcConn = _pOdbcConns[nType].load(std::memory_order_acquire);
+	CBaseODBC* pOdbcConn = _pOdbcConns[nType].value.load(std::memory_order_acquire);
 
 	// 3. 무효 상태면 선점 취소 후 nullptr 반환 (헬스체크가 감지해 재연결 위임)
 	if( pOdbcConn == nullptr || !pOdbcConn->IsConnected() )
 	{
-		_pRefCount[nType].fetch_sub(1, std::memory_order_release);
+		_pRefCount[nType].value.fetch_sub(1, std::memory_order_release);
 		LOG_DEBUG(_T("GetOdbcConn: slot(%d) not ready, awaiting background reconnect"), nType);
 		return nullptr;
 	}
@@ -182,7 +180,7 @@ CBaseODBC* COdbcConnPool::GetOdbcConn(int32 nType)
 CBaseODBC* COdbcConnPool::GetPooledConnUnsafe(int32 nType) const
 {
 	if( !IsValidIndex(nType) ) return nullptr;
-	return _pOdbcConns[nType].load(std::memory_order_acquire);
+	return _pOdbcConns[nType].value.load(std::memory_order_acquire);
 }
 
 //***************************************************************************
@@ -192,7 +190,7 @@ void COdbcConnPool::ReleaseOdbcConn(int32 nType)
 {
 	if( !IsValidIndex(nType) ) return;
 	// 카운트가 0이 되면 헬스체크/재연결 워커가 감지해 재활용 가능
-	_pRefCount[nType].fetch_sub(1, std::memory_order_release);
+	_pRefCount[nType].value.fetch_sub(1, std::memory_order_release);
 }
 
 //***************************************************************************
@@ -205,11 +203,11 @@ int32 COdbcConnPool::PopFreeSlotIndex(void) {
 		int32 i = static_cast<int32>((nStart + k) % _nMaxPoolSize);
 
 		int32 expected = 0;
-		if( _pRefCount[i].compare_exchange_strong(expected, 1, std::memory_order_acq_rel) ) {
-			CBaseODBC* pConn = _pOdbcConns[i].load(std::memory_order_acquire);
+		if( _pRefCount[i].value.compare_exchange_strong(expected, 1, std::memory_order_acq_rel) ) {
+			CBaseODBC* pConn = _pOdbcConns[i].value.load(std::memory_order_acquire);
 			if( pConn && pConn->IsConnected() ) return i;
 
-			_pRefCount[i].store(0, std::memory_order_release); // 잘못 선점한 슬롯 되돌림
+			_pRefCount[i].value.store(0, std::memory_order_release); // 잘못 선점한 슬롯 되돌림
 		}
 	}
 	return -1;
@@ -221,7 +219,7 @@ int32 COdbcConnPool::PopFreeSlotIndex(void) {
 void COdbcConnPool::ApplyReconnectedConn(int32 nType, CBaseODBC* pNewConn)
 {
 	// 대기 중 슬롯이 다시 사용 중으로 바뀌었다면 새 자원 폐기
-	if( _pRefCount[nType].load(std::memory_order_acquire) > 0 )
+	if( _pRefCount[nType].value.load(std::memory_order_acquire) > 0 )
 	{
 		xdelete(pNewConn);
 		return;
@@ -231,8 +229,8 @@ void COdbcConnPool::ApplyReconnectedConn(int32 nType, CBaseODBC* pNewConn)
 	CBaseODBC* pOldConn = nullptr;
 	{
 		SpinLockGuard<SpinLockPreset::Default> guard(_slotLocks[nType]);
-		pOldConn = _pOdbcConns[nType].load(std::memory_order_acquire);
-		_pOdbcConns[nType].store(pNewConn, std::memory_order_release);
+		pOldConn = _pOdbcConns[nType].value.load(std::memory_order_acquire);
+		_pOdbcConns[nType].value.store(pNewConn, std::memory_order_release);
 	}
 
 	if( pOldConn == nullptr ) return;
@@ -241,7 +239,7 @@ void COdbcConnPool::ApplyReconnectedConn(int32 nType, CBaseODBC* pNewConn)
 	auto startTime = std::chrono::steady_clock::now();
 	bool bTimeout = false;
 
-	while( _pRefCount[nType].load(std::memory_order_acquire) > 0 )
+	while( _pRefCount[nType].value.load(std::memory_order_acquire) > 0 )
 	{
 		auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
 			std::chrono::steady_clock::now() - startTime).count();
@@ -261,7 +259,7 @@ void COdbcConnPool::ApplyReconnectedConn(int32 nType, CBaseODBC* pNewConn)
 
 		auto now = std::chrono::steady_clock::now();
 		SpinLockGuard<SpinLockPreset::Default> qGuard(_globalQuarantineLock);
-		_quarantineQueue.push({ pOldConn, &_pRefCount[nType], now });
+		_quarantineQueue.push({ pOldConn, &_pRefCount[nType].value, now });
 	}
 	else
 	{
@@ -283,7 +281,7 @@ int64 COdbcConnPool::NowMs(void)
 //***************************************************************************
 bool COdbcConnPool::IsRetryAllowed(int32 nType) const
 {
-	int64 nNextAllowed = _pNextRetryAllowedMs[nType].load(std::memory_order_acquire);
+	int64 nNextAllowed = _pNextRetryAllowedMs[nType].value.load(std::memory_order_acquire);
 	return NowMs() >= nNextAllowed;
 }
 
@@ -293,7 +291,7 @@ bool COdbcConnPool::IsRetryAllowed(int32 nType) const
 //***************************************************************************
 void COdbcConnPool::OnReconnectFailed(int32 nType)
 {
-	int32 nFailCount = _pRetryFailCount[nType].fetch_add(1, std::memory_order_acq_rel) + 1;
+	int32 nFailCount = _pRetryFailCount[nType].value.fetch_add(1, std::memory_order_acq_rel) + 1;
 
 	int32 nMaxShift = _nBackoffMaxShift.load(std::memory_order_relaxed);
 	int32 nShift = std::min(nFailCount, nMaxShift);
@@ -310,7 +308,7 @@ void COdbcConnPool::OnReconnectFailed(int32 nType)
 	std::uniform_int_distribution<int32> jitterDist(0, std::max(nJitterMax, 0));
 	nDelayMs += jitterDist(rng);
 
-	_pNextRetryAllowedMs[nType].store(NowMs() + nDelayMs, std::memory_order_release);
+	_pNextRetryAllowedMs[nType].value.store(NowMs() + nDelayMs, std::memory_order_release);
 
 	LOG_DEBUG(_T("OnReconnectFailed: slot(%d) failCount(%d), next retry in %lldms"),
 		nType, nFailCount, static_cast<long long>(nDelayMs));
@@ -321,8 +319,8 @@ void COdbcConnPool::OnReconnectFailed(int32 nType)
 //***************************************************************************
 void COdbcConnPool::OnReconnectSucceeded(int32 nType)
 {
-	_pRetryFailCount[nType].store(0, std::memory_order_relaxed);
-	_pNextRetryAllowedMs[nType].store(0, std::memory_order_release);
+	_pRetryFailCount[nType].value.store(0, std::memory_order_relaxed);
+	_pNextRetryAllowedMs[nType].value.store(0, std::memory_order_release);
 }
 
 //***************************************************************************
@@ -382,15 +380,15 @@ void COdbcConnPool::HealthCheckLoop(void)
 		// PART B: 죽은 슬롯 스캔 및 재연결 디스패치 (블로킹 없음)
 		for( int32 i = 0; i < _nMaxPoolSize && !_bStopHealthCheck.load(std::memory_order_relaxed); i++ )
 		{
-			if( _pRefCount[i].load(std::memory_order_acquire) > 0 ) continue;      // 사용 중이면 패스
+			if( _pRefCount[i].value.load(std::memory_order_acquire) > 0 ) continue;      // 사용 중이면 패스
 
-			CBaseODBC* pCur = _pOdbcConns[i].load(std::memory_order_acquire);
+			CBaseODBC* pCur = _pOdbcConns[i].value.load(std::memory_order_acquire);
 			if( pCur != nullptr && pCur->IsConnected() ) continue;                 // 정상 연결이면 패스
 
 			if( !IsRetryAllowed(i) ) continue;                                     // 백오프 대기 중이면 패스
 
 			bool bExpected = false;
-			if( !_pReconnecting[i].compare_exchange_strong(bExpected, true, std::memory_order_acq_rel) )
+			if( !_pReconnecting[i].value.compare_exchange_strong(bExpected, true, std::memory_order_acq_rel) )
 				continue;                                                          // 이미 처리 중이면 패스
 
 			EnqueueReconnect(i); // 실제 재연결은 워커 풀에 위임
@@ -473,9 +471,9 @@ void COdbcConnPool::ReconnectWorkerLoop(void)
 		}
 
 		// 대기 중 슬롯이 이미 다시 사용 중이면 재연결 불필요
-		if( _pRefCount[nType].load(std::memory_order_acquire) > 0 )
+		if( _pRefCount[nType].value.load(std::memory_order_acquire) > 0 )
 		{
-			_pReconnecting[nType].store(false, std::memory_order_release);
+			_pReconnecting[nType].value.store(false, std::memory_order_release);
 			continue;
 		}
 
@@ -484,14 +482,14 @@ void COdbcConnPool::ReconnectWorkerLoop(void)
 		if( pNewConn == nullptr )
 		{
 			OnReconnectFailed(nType); // 실패 시 백오프 적용, 다음 헬스체크 순회에서 재큐잉
-			_pReconnecting[nType].store(false, std::memory_order_release);
+			_pReconnecting[nType].value.store(false, std::memory_order_release);
 			continue;
 		}
 
 		ApplyReconnectedConn(nType, pNewConn);
 		OnReconnectSucceeded(nType);
 
-		_pReconnecting[nType].store(false, std::memory_order_release);
+		_pReconnecting[nType].value.store(false, std::memory_order_release);
 	}
 }
 
@@ -617,14 +615,14 @@ void COdbcConnPool::Clear(void)
 
 	for( int32 i = 0; i < _nMaxPoolSize; i++ )
 	{
-		CBaseODBC* pConn = _pOdbcConns[i].load(std::memory_order_acquire);
+		CBaseODBC* pConn = _pOdbcConns[i].value.load(std::memory_order_acquire);
 		if( pConn == nullptr ) continue;
 
 		auto startTime = std::chrono::steady_clock::now();
 		bool bTimeout = false;
 
 		// 사용 중인 스레드가 이탈할 때까지 대기
-		while( _pRefCount[i].load(std::memory_order_acquire) > 0 )
+		while( _pRefCount[i].value.load(std::memory_order_acquire) > 0 )
 		{
 			auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
 				std::chrono::steady_clock::now() - startTime).count();
@@ -639,17 +637,17 @@ void COdbcConnPool::Clear(void)
 
 		if( bTimeout )
 		{
-			LOG_ERROR(_T("Clear: Slot(%d) refcount is zombie (%d). Moving to quarantine."), i, _pRefCount[i].load());
+			LOG_ERROR(_T("Clear: Slot(%d) refcount is zombie (%d). Moving to quarantine."), i, _pRefCount[i].value.load());
 
 			SpinLockGuard<SpinLockPreset::Default> qGuard(_globalQuarantineLock);
-			_quarantineQueue.push({ pConn, &_pRefCount[i], now });
+			_quarantineQueue.push({ pConn, &_pRefCount[i].value, now });
 		}
 		else
 		{
 			xdelete(pConn); // 참조 없음, 즉시 삭제
 		}
 
-		_pOdbcConns[i].store(nullptr, std::memory_order_relaxed);
+		_pOdbcConns[i].value.store(nullptr, std::memory_order_relaxed);
 	}
 
 	// 셧다운 시점 격리 큐 처리 (락-밖 소멸 유지)
