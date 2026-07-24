@@ -1,5 +1,8 @@
 # COdbcConnPool 설계 문서
 
+> 이 문서는 `COdbcConnPool`을 중심으로 작성되었으며, 그 위에서 큐+워커로 동작하는
+> 비동기 서비스 계층 `COdbcAsyncSrv`(§11)까지 함께 다룬다.
+
 ## 1. 개념
 
 `COdbcConnPool`은 고정 크기의 ODBC 커넥션을 미리 생성해두고, 슬롯 단위로 대여/반납하며,
@@ -23,7 +26,7 @@
 | 동적 워커 수 조정 | `SetReconnectConfig`로 런타임 중 재연결 워커 수/백오프 정책을 조정 가능 |
 | 격리(Quarantine) 큐 | 교체된 낡은 커넥션에 참조가 남아있으면 즉시 삭제하지 않고 격리 후 안전할 때 삭제 |
 | Safe Leak | 프로세스 종료 시점까지 참조가 남은 커넥션은 삭제를 포기(누수)하여 UAF 크래시를 방지 |
-| False sharing 방지 | `_slotLocks`를 캐시라인 정렬된 `SpinLockDefault[]`로 구성 |
+| False sharing 방지 | 슬롯별 원자 배열(`_pOdbcConns`, `_pRefCount`, `_pReconnecting`, `_pNextRetryAllowedMs`, `_pRetryFailCount`)을 `CachePaddedAtomic<T>[]`로, `_slotLocks`를 캐시라인 정렬된 `SpinLockDefault[]`로 구성해 슬롯 간 캐시라인 공유를 차단 |
 | 할당자 분리 | `COdbcConnPool` 자신은 `BaseAllocator` 상속으로 RawAllocator 경로를, 내부 `CBaseODBC` 커넥션은 `xnew`/`xdelete`(PoolAllocator)로 별도 관리 (§10 참고) |
 
 ## 3. 멤버 변수 설명
@@ -49,15 +52,17 @@
 ### 슬롯 배열 (생성자에서 단 1회만 할당되는 불변 배열)
 | 변수 | 설명 |
 |---|---|
-| `_pOdbcConns` | 슬롯별 실제 커넥션 포인터 (`std::atomic<CBaseODBC*>[]`) |
-| `_pRefCount` | 슬롯별 참조 카운트 |
+| `_pOdbcConns` | 슬롯별 실제 커넥션 포인터 (`CachePaddedAtomic<CBaseODBC*>[]`) |
+| `_pRefCount` | 슬롯별 참조 카운트 (`CachePaddedAtomic<int32>[]`, 가장 핫한 배열) |
 | `_slotLocks` | 슬롯별 교체(swap) 보호용 스핀락 배열 |
-| `_pReconnecting` | 슬롯별 "재연결 워커가 처리 중" 플래그 (중복 디스패치 방지) |
-| `_pNextRetryAllowedMs` | 슬롯별 다음 재시도 허용 시각 (백오프) |
-| `_pRetryFailCount` | 슬롯별 연속 재연결 실패 횟수 |
+| `_pReconnecting` | 슬롯별 "재연결 워커가 처리 중" 플래그 (`CachePaddedAtomic<bool>[]`, 중복 디스패치 방지) |
+| `_pNextRetryAllowedMs` | 슬롯별 다음 재시도 허용 시각 (`CachePaddedAtomic<int64>[]`, 백오프) |
+| `_pRetryFailCount` | 슬롯별 연속 재연결 실패 횟수 (`CachePaddedAtomic<int32>[]`) |
 
-> `_quarantineQueue`가 `&_pRefCount[i]` 주소를 그대로 저장하므로, 위 배열들은 런타임 중
-> 재할당(make_unique 재호출 등)이 절대 금지된다.
+> `_quarantineQueue`가 `&_pRefCount[i].value` 주소를 그대로 저장하므로, 위 배열들은 런타임 중
+> 재할당(make_unique 재호출 등)이 절대 금지된다. 각 슬롯이 `CachePaddedAtomic<T>`로 캐시라인
+> 하나씩을 점유해, 서로 다른 슬롯을 동시에 다루는 스레드들이 false sharing으로 서로의
+> 캐시라인을 무효화시키는 것을 막는다.
 
 ### 헬스체크 / 재연결 워커
 | 변수 | 설명 |
@@ -298,7 +303,7 @@ pool.SetReconnectConfig(newCfg);
 
 ```cpp
 // DB 노드 개수만큼 풀을 생성 (예: 계정 DB, 게임 DB, 로그 DB)
-COdbcConnPool** pOdbcConnPools = new COdbcConnPool*[nDBCount](); // 값 초기화 필수
+COdbcConnPool** pOdbcConnPools = new COdbcConnPool*[nDBCount](); // 값 초기화로 모든 슬롯을 nullptr로 둔다
 
 // 재연결 워커 수는 각 풀 크기(= DB 비동기 워커 스레드 수) 대비 비례 산정 (§7.4)
 COdbcConnPool::TReconnectConfig reconnectCfg;
@@ -311,15 +316,14 @@ for( int32 i = 0; i < nDBCount; ++i )
     pOdbcConnPools[i] = new COdbcConnPool(nMaxThreadCnt);
     if( pOdbcConnPools[i] == nullptr || !pOdbcConnPools[i]->Init(dbClass[i], dsn[i], reconnectCfg) )
     {
-        // 실패 시 이미 만든 풀들까지 함께 정리 (부분 생성 상태로 방치하지 않음)
+        // 이미 만든 풀들까지 함께 정리(ClearOdbcPools)한 뒤 실패 처리
         break;
     }
 }
 ```
 
-- 배열은 `new COdbcConnPool*[nDBCount]()`처럼 반드시 값 초기화해서, 중간에 생성이 실패했을 때
-  아직 만들어지지 않은 뒷부분 슬롯이 쓰레기 포인터로 남아 있다가 정리 시점에 잘못 delete되는
-  사고를 막는다.
+- 배열을 `new COdbcConnPool*[nDBCount]()`처럼 값 초기화해 두면, 아직 만들어지지 않은
+  슬롯도 항상 `nullptr` 상태로 유지되어 정리 루틴이 모든 인덱스를 안전하게 순회할 수 있다.
 - 각 풀은 독립된 `COdbcConnPool` 인스턴스이므로 DB별로 서로 다른 DSN/재연결 정책을 줄 수 있다.
 - DB 비동기 워커 스레드 수(`nMaxThreadCnt`)와 풀 크기를 동일하게 맞추면, 워커 스레드 각각이
   항상 자기 몫의 슬롯을 확보할 수 있어 `PopFreeSlotIndex()` 실패(풀 고갈)를 구조적으로 방지한다.
@@ -357,4 +361,50 @@ for( int32 i = 0; i < nDBCount; ++i )
 `BaseAllocator` 상속이 효과를 가지려면 해당 타입이 **직접 `new 타입(...)`** 형태로 생성돼야
 한다. `std::make_shared<T>()`는 컨트롤 블록과 객체를 하나로 묶어 자체 할당 경로로 확보하고
 `T`의 `operator new`를 거치지 않으므로, 그런 방식으로 생성되는 타입에 `BaseAllocator`를
-상속해도 효과가 없다 (`COdbcConnPool`은 위 예시처럼 직접 `new`되므로 해당 사항 없음).
+상속해도 효과가 없다 (`COdbcConnPool`은 위 예시처럼 직접 `new`되므로 해당 사항 없음. 반면
+§11의 `COdbcAsyncSrv`는 `make_shared`로 생성되는 진짜 싱글턴이라 해당
+사항이다).
+
+## 11. 비동기 서비스 계층 — `COdbcAsyncSrv`
+
+풀(`COdbcConnPool`) 위에, DB 노드별로 풀을 배열로 들고 공용 요청 큐 +
+워커 스레드 풀로 쿼리를 비동기 처리하는 서비스 계층이다.
+
+### 11.1 구조 요약
+
+- `Regist(callIdent, handler)`로 명령어별 핸들러를 등록해두면, `Push()`로 큐에 들어온
+  `st_DBAsyncRq` 요청을 워커 스레드들이 `Pop()` → `callIdent`로 핸들러 조회 → 실행한다.
+  핸들러 조회는 `std::unordered_map`을 사용해 매 쿼리마다의 조회 비용을 O(1) 평균으로 유지한다.
+- DB 노드 수만큼 `COdbcConnPool*` 배열(`_pOdbcConnPools`)을 두고,
+  `GetAccountOdbcConnPool()`/`GetOdbcConnPool(id)`/`GetLogOdbcConnPool()`로
+  용도별 풀을 가져다 쓴다 (§9.1 참고). 배열은 값 초기화되어 있고, 정리 전용 함수
+  `ClearOdbcPools()`가 소멸자와 초기화 실패 경로 양쪽에서 공용으로
+  각 풀을 안전하게 해제한다.
+- `Instance()`는 `std::make_shared`로 생성되는 진짜 싱글턴이다 — `T::operator new`를
+  거치지 않으므로 `BaseAllocator` 상속은 이 클래스에는 적용하지 않는다(§10.3).
+- 큐 동기화는 `std::mutex` + `std::condition_variable`로 이루어진다. `Push()`는 큐 조작을
+  마치고 락을 해제한 뒤 `notify_one()`을 호출해, 깨어난 워커가 곧바로 락을 잡을 수 있게 한다.
+- `st_DBAsyncRq`는 `callIdent`별로 실제 쿼리 데이터를 담은 파생 구조체(예:
+  `CONSUMER_DATA_BATCH_REQ`)의 베이스이며 `virtual` 소멸자를 가진다 — 베이스 포인터로
+  삭제해도 파생 소멸자가 정확히 호출된다. 또한 `st_DBAsyncRq`는 `BaseAllocator`를 상속해,
+  이 계열 요청 구조체를 만드는 `new`/삭제하는 `SAFE_DELETE`가 모두 자동으로 RawAllocator
+  경로를 탄다.
+- 쿼리가 타임아웃되어 처음 재시도될 때는 원본 요청 객체를 그대로 재사용해 `bReTry` 플래그만
+  세팅한 뒤 재큐잉한다 — 파생 구조체를 통째로 다시 할당하지 않는다. 재큐잉이 실패하면(서비스
+  종료 시점과 겹친 경우) 해당 객체는 직접 해제된다.
+- `InitOdbc`는 호출 시작 시 `_bStopThread`를 `false`로 재설정해, `StopThread()`
+  이후 서비스를 다시 시작하는 시나리오에서도 워커 스레드들이 정상적으로 큐를 처리한다.
+  또한 각 DB 노드의 풀을 생성할 때 `TReconnectConfig.nWorkerCount`를
+  `max(4, nMaxThreadCnt / 4)`로 산정해 전달함으로써, 재연결 워커 수가 풀 크기(= DB 비동기
+  워커 스레드 수)에 비례하도록 한다.
+- `Action()`의 지연 쿼리 경고는 빌드 구성에 따라 임계값이 다르다 — 디버그 빌드는 300ms,
+  릴리즈 빌드는 1000ms 이상 걸린 쿼리에 대해 경고 로그를 남긴다.
+- `Clear()`는 DB 요청 큐를 비우는 역할만 담당한다. 등록된 핸들러(`_mapCommand`)는
+  `Clear()`의 영향을 받지 않으므로, 초기화가 중간에 실패해 `Clear()`가 호출되어도
+  `Regist()`로 등록해둔 핸들러는 그대로 유지된다.
+
+### 11.2 스레드 생성
+
+`StartIoThreads()`는 `_nMaxThreadCnt`개의 워커 스레드를 람다(`[this]() { RunningThread(); }`)로
+생성한다. 각 워커는 `RunningThread()` → `Action()`으로 이어지는 루프를 돌며 큐에서 요청을
+꺼내 처리한다.
