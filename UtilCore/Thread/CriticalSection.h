@@ -48,5 +48,27 @@ private:
 	CRITICAL_SECTION m_csSync;
 };
 
+class CCSLockGuard
+{
+public:
+	explicit CCSLockGuard(CCriticalSection& criticalSection)
+		: m_criticalSection(criticalSection)
+	{
+		m_criticalSection.Lock();
+	}
+
+	virtual ~CCSLockGuard(void)
+	{
+		m_criticalSection.Unlock();
+	}
+
+private:
+	// 복사 및 대입 연산자 차단 (유일한 락 소유권 보장)
+	CCSLockGuard(const CCSLockGuard& rhs);
+	CCSLockGuard& operator=(const CCSLockGuard& rhs);
+
+	CCriticalSection& m_criticalSection;
+};
+
 #endif // ndef __CRITICALSECTION_H__
 

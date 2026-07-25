@@ -50,7 +50,7 @@ bool CEventLog::EventLog(const TCHAR* ptszLog, bool bFlag)
 
 	dwHighCount = dwWritten = 0;
 
-	CLockGuard<CCriticalSection> lockGuard(m_kLock);
+	CCSLockGuard lockGuard(m_kLock);
 
 	GetLocalTime(&stime);
 
@@ -96,7 +96,7 @@ bool CEventLog::EventLog(bool bFlag, const TCHAR* ptszFormat, ...)
 
 	SYSTEMTIME	stime;
 
-	CLockGuard<CCriticalSection> lockGuard(m_kLock);
+	CCSLockGuard lockGuard(m_kLock);
 
 	GetLocalTime(&stime);
 

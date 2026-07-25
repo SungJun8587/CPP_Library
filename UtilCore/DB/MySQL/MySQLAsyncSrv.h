@@ -56,13 +56,14 @@ public:
 	int32								_nDBCount;				// 연결된 Database 개수
 	bool								_bOpen;					// DB 서비스 오픈 여부
 	int32								_nMaxThreadCnt;			// 최대 DB 비동기 워커 스레드 수 (= 각 CMySQLConnPool의 nMaxPoolSize로도 사용)
-	CMySQLConnPool** _pMySQLConnPools;		// DB별 Connection Pool 배열
+	CMySQLConnPool**					_pMySQLConnPools;		// DB별 Connection Pool 배열
 
 public:
 	static std::shared_ptr<CMySQLAsyncSrv> Instance();
 
 protected:
 	void		Clear(void);				// DB 요청 큐 정리
+	void		FlushRemainingTasks();		// 프로그램 종료 전 큐에 남은 작업을 마저 처리하는 함수 
 	void		ClearMySQLConnPools(void);	// _pMySQLConnPools 배열의 각 풀을 안전하게 해제 (Init 실패/소멸자 공용)
 
 private:

@@ -32,6 +32,9 @@ COdbcAsyncSrv::COdbcAsyncSrv()
 
 COdbcAsyncSrv::~COdbcAsyncSrv()
 {
+	// 프로그램 종료 시점에 잔여 큐 데이터를 먼저 비우고 종료
+	FlushRemainingTasks();
+
 	StopThread();
 	Clear();
 	ClearOdbcPools();
@@ -51,6 +54,57 @@ void COdbcAsyncSrv::Clear()
 		_queueDBAsyncRq.pop();
 		if( pAsyncRq != nullptr ) SAFE_DELETE(pAsyncRq);
 	}
+}
+
+void COdbcAsyncSrv::FlushRemainingTasks()
+{
+	LOG_INFO(_T("Main program requested to flush remaining async DB tasks..."));
+
+	// 1. 새로운 푸시를 막고 워커 스레드 중지 플래그 설정
+	_bStopThread.store(true);
+	_cva.notify_all();
+
+	// 2. 큐에 남아있는 작업들을 안전하게 임시 큐로 이동
+	CQueue<st_DBAsyncRq*> tempQueue;
+	{
+		std::unique_lock<std::mutex> lockGuard(_mutex);
+		tempQueue = std::move(_queueDBAsyncRq);
+	}
+
+	int32 remainingCount = static_cast<int32>(tempQueue.size());
+	if( remainingCount > 0 )
+	{
+		LOG_INFO(_T("Processing %d remaining DB requests in main thread..."), remainingCount);
+
+		// 3. 메인 스레드에서 직접 동기 처리
+		while( !tempQueue.empty() )
+		{
+			st_DBAsyncRq* pAsyncRq = tempQueue.front();
+			tempQueue.pop();
+
+			if( pAsyncRq == nullptr ) continue;
+
+			COMMAND_MAP::iterator it = _mapCommand.find(pAsyncRq->callIdent);
+			if( it != _mapCommand.end() )
+			{
+				std::shared_ptr<CDBAsyncSrvHandler> command = it->second;
+				EDBReturnType Ret = command->ProcessAsyncCall(pAsyncRq);
+
+				if( Ret != EDBReturnType::OK )
+				{
+					LOG_ERROR(_T("Failed to process task during manual flush... callIdent: [%u]"), pAsyncRq->callIdent);
+				}
+			}
+			else
+			{
+				LOG_ERROR(_T("Error not found command handler for task... callIdent: [%u]"), pAsyncRq->callIdent);
+			}
+
+			SAFE_DELETE(pAsyncRq);
+		}
+	}
+
+	LOG_INFO(_T("Manual flush completed. All tasks processed."));
 }
 
 //***************************************************************************

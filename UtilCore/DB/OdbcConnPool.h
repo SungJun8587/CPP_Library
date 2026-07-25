@@ -71,12 +71,12 @@ public:
 		const TReconnectConfig& reconnectConfig = TReconnectConfig{});
 
 	// 참조 카운트 증가 후 슬롯(nType)의 커넥션을 획득/반환
-	CBaseODBC* GetOdbcConn(int32 nType);
+	CBaseODBC*	GetOdbcConn(int32 nType);
 	void		ReleaseOdbcConn(int32 nType);
 
 	// PopFreeSlotIndex가 이미 예약한 슬롯을 참조 카운트 변화 없이 조회 (OdbcConnGuard 전용)
 	// 주의: 반드시 PopFreeSlotIndex로 슬롯을 선점한 상태에서만 호출
-	CBaseODBC* GetPooledConnUnsafe(int32 nType) const;
+	CBaseODBC*	GetPooledConnUnsafe(int32 nType) const;
 
 	int32		GetMaxPoolSize(void) const { return _nMaxPoolSize; }
 	int32		PopFreeSlotIndex(void);

@@ -72,7 +72,6 @@
     <ClInclude Include="Thread\CacheAlignment.h" />
     <ClInclude Include="Thread\CriticalSection.h" />
     <ClInclude Include="Thread\DeadLockProfiler.h" />
-    <ClInclude Include="Thread\LockGuard.h" />
     <ClInclude Include="Thread\SpinLock.h" />
     <ClInclude Include="Thread\SRWLock.h" />
     <ClInclude Include="Thread\ThreadManager.h" />

@@ -157,9 +157,6 @@
     <ClInclude Include="Util\Endian.h">
       <Filter>Util</Filter>
     </ClInclude>
-    <ClInclude Include="Thread\LockGuard.h">
-      <Filter>Thread</Filter>
-    </ClInclude>
     <ClInclude Include="Util\ShellUtil.h">
       <Filter>Util</Filter>
     </ClInclude>

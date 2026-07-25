@@ -15,10 +15,6 @@
 #include "Thread/CriticalSection.h"
 #endif
 
-#ifndef __LOCKGUARD_H__
-#include "Thread/LockGuard.h"
-#endif
-
 #define EVENTLOG_MAX_BUFFER_SIZE 4095
 #define TERMINATOR_STRLEN 1
 

@@ -69,6 +69,33 @@ void CThreadManager::JoinThreads()
 }
 
 //***************************************************************************
+// 설명 : 생성된 스레드 목록의 뒤에서부터 지정된 개수만큼 스레드가 
+//         종료될 때까지 대기(join)한 뒤 목록에서 안전하게 제거합니다.
+void CThreadManager::JoinLastThreads(size_t count)
+{
+	lock_guard<mutex> lock(_lock);
+
+	if( count == 0 || _threads.empty() ) return;
+
+	// 실제로 조인할 개수 결정 (요청한 개수가 전체 스레드 수보다 많으면 전체로 조정)
+	size_t actualCount = std::min(count, _threads.size());
+	size_t startIndex = _threads.size() - actualCount;
+
+	// 1. 뒤에서부터 지정된 개수만큼 스레드 Join 수행
+	for( size_t i = startIndex; i < _threads.size(); ++i )
+	{
+		if( _threads[i].joinable() )
+		{
+			_threads[i].join();
+		}
+	}
+
+	// 2. 조인된 스레드들을 벡터에서 안전하게 제거 (메모리 정리 및 중복 조인 방지)
+	// _threads 벡터의 뒤쪽(startIndex 위치부터 끝까지)을 통째로 잘라냅니다.
+	_threads.erase(_threads.begin() + startIndex, _threads.end());
+}
+
+//***************************************************************************
 // 설명 : 스레드 로컬 ID(LThreadId)를 발급합니다. SThreadId는 모든 스레드가
 //        공유하는 원자적 카운터로, 스레드마다 겹치지 않는 ID를 순차 부여.
 void CThreadManager::InitTLS()

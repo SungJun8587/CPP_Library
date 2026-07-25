@@ -61,6 +61,10 @@ public:
 	// 매개변수 : function - 스레드에서 실행할 콜백
 	void CreateThread(function<void(void)> function);
 
+	// 설명 : 생성된 스레드 목록의 뒤에서부터 지정된 개수만큼 스레드가 
+	//         종료될 때까지 대기(join)한 뒤 목록에서 안전하게 제거합니다.
+	void JoinLastThreads(size_t count);
+
 	// 설명 : 보유 중인 모든 워커 스레드가 종료될 때까지 대기(join)한 뒤
 	//        목록을 비웁니다. 이 함수가 반환된 시점에는 모든 워커 스레드의
 	//        thread_local 자원(TlsCache 포함)이 이미 정리 완료된 상태입니다.
