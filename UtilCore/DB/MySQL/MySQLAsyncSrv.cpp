@@ -62,6 +62,7 @@ void CMySQLAsyncSrv::FlushRemainingTasks()
 	// 1. 새로운 푸시를 막고 워커 스레드 중지 플래그 설정
 	_bStopThread.store(true);
 	_cva.notify_all();
+	_cvProducer.notify_all(); // 대기 중이던 생산자도 함께 깨워 종료 조건을 확인시킴
 
 	// 2. 큐에 남아있는 작업들을 안전하게 임시 큐로 이동
 	CQueue<st_DBAsyncRq*> tempQueue;
@@ -289,6 +290,7 @@ bool CMySQLAsyncSrv::Action()
 			LOG_WARNING(_T("Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"), endTick - startTick, cumulateCallCnt++, static_cast<int>(Ret), pAsyncRq->callIdent);
 #endif
 
+		CMySQLAsyncSrv::Instance()->SubOutstandingRequest();
 		SAFE_DELETE(pAsyncRq);
 	}
 
@@ -318,27 +320,35 @@ int CMySQLAsyncSrv::Push(st_DBAsyncRq* pAsyncRq)
 st_DBAsyncRq* CMySQLAsyncSrv::Pop()
 {
 	static int queueCount = 2;
-	std::unique_lock<std::mutex> lockGuard(_mutex);
-
-	// 큐에 데이터가 들어오거나 종료 신호가 켜질 때까지 대기하며 Lock 스퓨리어스 웨이크업 방지
-	_cva.wait(lockGuard, [this]() { return !_queueDBAsyncRq.empty() || _bStopThread.load(); });
-
-	// 종료 상태이고 큐도 비어있다면 즉시 nullptr 반환
-	if( _bStopThread.load() && _queueDBAsyncRq.empty() ) return nullptr;
-
-	st_DBAsyncRq* pAsyncRq = _queueDBAsyncRq.front();
-	_queueDBAsyncRq.pop();
-
-	if( MAX_WARNING_QUERY_QUEUE_SIZE <= _queueDBAsyncRq.size() && _queueDBAsyncRq.size() <= MAX_WARNING_QUERY_QUEUE_SIZE + 10 )
-		LOG_ERROR(_T("Async DB Call Queue size... : [%d]"), static_cast<int>(_queueDBAsyncRq.size()));
-
-	if( _queueDBAsyncRq.size() > queueCount )
+	st_DBAsyncRq* pAsyncRq = nullptr;
 	{
-		queueCount = (int)_queueDBAsyncRq.size();
-		LOG_WARNING(_T("Async DB Call Queue size... : [%d]"), static_cast<int>(_queueDBAsyncRq.size()));
-	}
+		std::unique_lock<std::mutex> lockGuard(_mutex);
 
-	// [주의] 소비자가 다른 소비자를 깨우는 것은 불필요하므로 notify_all() 호출하지 않음
+		// 큐에 데이터가 들어오거나 종료 신호가 켜질 때까지 대기하며 Lock 스퓨리어스 웨이크업 방지
+		_cva.wait(lockGuard, [this]() { return !_queueDBAsyncRq.empty() || _bStopThread.load(); });
+
+		// 종료 상태이고 큐도 비어있다면 즉시 nullptr 반환
+		if( _bStopThread.load() && _queueDBAsyncRq.empty() ) return nullptr;
+
+		pAsyncRq = _queueDBAsyncRq.front();
+		_queueDBAsyncRq.pop();
+
+		if( MAX_WARNING_QUERY_QUEUE_SIZE <= _queueDBAsyncRq.size() && _queueDBAsyncRq.size() <= MAX_WARNING_QUERY_QUEUE_SIZE + 10 )
+			LOG_ERROR(_T("Async DB Call Queue size... : [%d]"), static_cast<int>(_queueDBAsyncRq.size()));
+
+		if( _queueDBAsyncRq.size() > queueCount )
+		{
+			queueCount = (int)_queueDBAsyncRq.size();
+			LOG_WARNING(_T("Async DB Call Queue size... : [%d]"), static_cast<int>(_queueDBAsyncRq.size()));
+		}
+
+		// [주의] 소비자가 다른 소비자를 깨우는 것은 불필요하므로 notify_all() 호출하지 않음
+	} // [Back-pressure] 락 해제 후 notify — Push()와 동일한 이유로 lock-and-wake-under-lock을 피한다.
+
+	// [Back-pressure] 항목을 하나 꺼내 공간이 하나 생겼으므로, WaitPushCapacity()에서
+	// 대기 중인 생산자 스레드 하나를 깨운다. 이 알림이 없으면 큐가 줄어들어도 대기 중인
+	// 생산자가 영원히 깨어나지 못한다.
+	_cvProducer.notify_one();
 
 	return pAsyncRq;
 }

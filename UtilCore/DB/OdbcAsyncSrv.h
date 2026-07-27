@@ -36,6 +36,29 @@ public:
 	int Push(st_DBAsyncRq* pAsyncRq);
 	st_DBAsyncRq* Pop();
 
+	// [Back-pressure] 큐 크기가 지정한 최대 용량(maxCapacity)을 초과할 경우, 공간이 생길 때까지 대기한다.
+	// Pop()이 항목을 꺼낼 때마다 _cvProducer를 깨워주므로, 워커가 소비하는 속도를 넘어서는
+	// 프로듀서를 여기서 자연스럽게 막아 큐가 무한정 커지는 것을 방지한다.
+	void WaitPushCapacity(size_t maxCapacity) {
+		std::unique_lock<std::mutex> lock(_mutex);
+		_cvProducer.wait(lock, [this, maxCapacity]() {
+			return _queueDBAsyncRq.size() < maxCapacity || _bStopThread.load();
+		});
+	}
+
+	// 외부에서 미완료 요청 수를 안전하게 조회하거나 조작할 수 있는 인터페이스
+	int32 GetOutstandingRequests() const {
+		return _nOutstandingRequests.load(std::memory_order_relaxed);
+	}
+
+	void AddOutstandingRequest() {
+		_nOutstandingRequests.fetch_add(1, std::memory_order_relaxed);
+	}
+
+	void SubOutstandingRequest() {
+		_nOutstandingRequests.fetch_sub(1, std::memory_order_relaxed);
+	}
+
 	bool StartService(CVector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt = 0);
 	bool InitOdbc(CVector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt);
 
@@ -44,6 +67,7 @@ public:
 	void StopThread() {
 		_bStopThread.store(true);
 		_cva.notify_all();			// 대기 중인 모든 워커 스레드를 깨워 종료 조건을 확인시킴
+		_cvProducer.notify_all();	// 대기 중인 모든 생산자 스레드도 깨워 종료시킴
 	};
 
 	COdbcConnPool* GetAccountOdbcConnPool(void);
@@ -63,18 +87,16 @@ public:
 
 protected:
 	void		Clear(void);			// DB 요청 큐 정리
-	void		FlushRemainingTasks();	// 프로그램 종료 전 큐에 남은 작업을 마저 처리하는 함수 
+	void		FlushRemainingTasks();	// 프로그램 종료 전 큐에 남은 작업을 마저 처리하는 함수
 	void		ClearOdbcPools(void);	// _pOdbcConnPools 배열의 각 풀을 안전하게 해제 (Init 실패/소멸자 공용)
 
 private:
 	std::atomic<bool>			_bStopThread;					// 스레드 종료 플래그
-	// [성능] Push/Pop은 매 DB 요청마다 항상 배타적으로(unique_lock) 잠그는 핫패스이고,
-	// 공유 잠금(shared_lock)은 모니터링용 GetQueryQueueSize/IsEmpty에서만 드물게 쓰인다.
-	// shared_mutex는 리더-라이터 상태 관리 비용 때문에 배타적 잠금 자체가 std::mutex보다 무겁고,
-	// condition_variable_any도 락 타입 소거(type erasure) 오버헤드가 있어 condition_variable보다 느리다.
-	// 따라서 굳이 shared_mutex를 쓸 이점이 없어 표준 mutex/condition_variable로 교체한다.
+	std::atomic<int32>          _nOutstandingRequests{ 0 };		// 미완료 요청 수 카운터 캡슐화
+
 	std::mutex					_mutex;							// 큐 lock
-	std::condition_variable	_cva;							// 큐 대기용 조건 변수
+	std::condition_variable		_cva;							// 워커 대기용 조건 변수
+	std::condition_variable		_cvProducer;					// [Back-pressure] 큐 공간 부족으로 대기 중인 생산자용 조건 변수
 };
 
 #endif // ndef __ODBCASYNCSRV__H__

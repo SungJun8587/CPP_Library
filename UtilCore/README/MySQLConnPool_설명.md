@@ -459,8 +459,12 @@ for( int32 i = 0; i < nDBCount; ++i )
 ### 11.3 종료 시 잔여 작업 처리 — `FlushRemainingTasks()`
 
 프로세스 종료 등으로 워커 스레드들을 더 기다릴 수 없는 상황에서, 큐에 남은 요청들을
-비동기 워커 대신 호출한 스레드(메인 스레드)가 직접 동기적으로 마저 처리하고 싶을 때 쓰는
-함수다.
+비동기 워커 대신 동기적으로 마저 처리하기 위한 함수다. `~CMySQLAsyncSrv()` 소멸자
+맨 앞에서, `StopThread()`(워커 종료)·`Clear()`(요청 큐 정리)·`ClearMySQLConnPools()`(커넥션
+풀 해제)보다 먼저 호출한다 — 워커를 세우거나 커넥션 풀을 해제하기 전에 남은 요청을
+먼저 다 처리해 둠으로써, 아직 처리되지 않은 요청이 워커 종료·풀 해제와 타이밍이 겹쳐
+유실되거나(요청이 처리되지 못한 채 `Clear()`로 그냥 비워짐) 이미 해제된 풀을 참조하는
+일이 없게 한다.
 
 1. `_bStopThread`를 `true`로 설정하고 `_cva.notify_all()`을 호출해, 이후 새 `Push()`를 막고
    대기 중이던 워커들이 종료 조건을 확인하도록 깨운다.
@@ -479,3 +483,48 @@ for( int32 i = 0; i < nDBCount; ++i )
   `FlushRemainingTasks()` 실행 중에도 다른 스레드가 `GetQueryQueueSize()`/`IsEmpty()` 같은
   조회 함수를 호출하는 것 자체는 안전하다 (다만 이미 `_bStopThread`가 켜진 뒤라 `Push()`는
   더 이상 큐에 쌓이지 않는다).
+
+### 11.4 요청 큐 백프레셔 — `WaitPushCapacity()`
+
+`_queueDBAsyncRq`는 크기 상한이 없는 큐다. 지금까지는 `MAX_WARNING_QUERY_QUEUE_SIZE`(10만 건)를
+넘기면 경고 로그만 남길 뿐, 실제로 큐가 계속 커지는 것을 막지는 못했다 — 워커의 처리 속도보다
+`Push()`가 더 빠른 상황이 지속되면 큐가 무한정 쌓여 메모리를 소모할 수 있다. `WaitPushCapacity()`는
+이 문제를 해결하기 위한 백프레셔(back-pressure) 장치로, "생산자(요청을 넣는 쪽)를 큐 크기 기준으로
+직접 감속시키는" 방식이다.
+
+**추가된 요소**
+
+- `_cvProducer` (`std::condition_variable`) — 큐 공간 부족으로 대기 중인 생산자 전용 조건 변수.
+  워커 대기용 `_cva`와 분리되어 있어, 소비자(워커)를 깨우는 알림과 생산자를 깨우는 알림이
+  서로 불필요하게 섞이지 않는다.
+- `WaitPushCapacity(size_t maxCapacity)` (public, 인라인) — 큐 크기가 `maxCapacity` 미만이 될
+  때까지, 또는 `_bStopThread`가 켜질 때까지 `_cvProducer`에서 대기한다. 호출부는 `Push()` 앞에서
+  이 함수를 호출해 큐가 일정 크기 이하로 유지되도록 스스로 속도를 늦출 수 있다.
+
+**깨우는 지점**
+
+| 지점 | 동작 |
+|---|---|
+| `Pop()` | 워커가 항목을 하나 꺼내 공간이 하나 생길 때마다 `_cvProducer.notify_one()`으로 대기 중인 생산자 하나를 깨움. `Push()`와 동일하게 `_mutex` 잠금을 해제한 뒤(블록 스코프 종료 후) notify하여 lock-and-wake-under-lock을 피함 |
+| `StopThread()` | `_cva.notify_all()`과 함께 `_cvProducer.notify_all()`도 호출해, 대기 중이던 모든 생산자가 종료 조건(`_bStopThread`)을 확인하고 빠져나가게 함 |
+| `FlushRemainingTasks()` | 종료 플래그를 세우는 1단계에서 `_cva.notify_all()`과 함께 `_cvProducer.notify_all()`도 함께 호출해, 대기 중인 생산자가 flush 과정에 걸려 무한 대기하지 않도록 함 |
+
+**동작 원리**
+
+1. 생산자 스레드가 `WaitPushCapacity(maxCapacity)`를 호출하면, 큐 크기가 `maxCapacity` 미만이
+   될 때까지 블로킹 대기한다 (조건이 이미 만족되면 즉시 반환).
+2. 워커가 `Pop()`으로 큐를 소비할 때마다 대기 중인 생산자 하나가 깨어나 조건을 재검사한다.
+3. 조건을 만족하면 대기를 빠져나와 `Push()`를 호출해 요청을 큐에 넣는다.
+4. 서비스 종료(`StopThread()`/`FlushRemainingTasks()`) 시에는 큐 크기와 무관하게 즉시 깨어나
+   대기 상태에서 빠져나온다 — `_bStopThread`가 조건식에 포함되어 있기 때문이다.
+
+**설계 포인트**
+
+- `Pop()`은 이제 `unique_lock`을 전체 함수 스코프가 아니라 블록으로 감싸, 큐 조작이 끝나는
+  즉시 락을 해제한 뒤 `_cvProducer.notify_one()`을 호출한다. 락을 쥔 채로 notify하면 깨어난
+  생산자가 곧바로 락을 잡지 못하고 다시 잠드는 컨텍스트 스위칭 낭비가 생기므로, `Push()`에서
+  이미 쓰던 것과 동일한 패턴을 `Pop()`에도 맞춘 것이다.
+- `WaitPushCapacity()` 자체는 큐에 넣는 동작(`Push()`)을 수행하지 않는다 — 순수하게 "지금
+  넣어도 되는 상태인지"를 기다리는 게이트 역할만 하며, 실제 `Push()` 호출은 별도로 해야 한다.
+- `maxCapacity`는 호출부에서 자유롭게 정할 수 있는 값이라, 상황(DB 노드별 처리량, 요청
+  긴급도 등)에 따라 다른 상한을 적용할 수 있다.
