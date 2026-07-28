@@ -94,6 +94,9 @@ void CMySQLAsyncSrv::FlushRemainingTasks()
 				{
 					LOG_ERROR(_T("Failed to process task during manual flush... callIdent: [%u]"), pAsyncRq->callIdent);
 				}
+
+				// Action()과 동일하게, 요청이 최종적으로 처리(성공/실패 불문)되었으므로 카운터 감소
+				SubOutstandingRequest();
 			}
 			else
 			{
@@ -290,7 +293,7 @@ bool CMySQLAsyncSrv::Action()
 			LOG_WARNING(_T("Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"), endTick - startTick, cumulateCallCnt++, static_cast<int>(Ret), pAsyncRq->callIdent);
 #endif
 
-		CMySQLAsyncSrv::Instance()->SubOutstandingRequest();
+		SubOutstandingRequest(); // Action()은 항상 싱글턴 인스턴스 자신의 메서드로만 호출되므로 Instance()를 다시 거칠 필요가 없다
 		SAFE_DELETE(pAsyncRq);
 	}
 

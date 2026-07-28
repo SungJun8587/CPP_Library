@@ -101,6 +101,9 @@ void COdbcAsyncSrv::FlushRemainingTasks()
 				LOG_ERROR(_T("Error not found command handler for task... callIdent: [%u]"), pAsyncRq->callIdent);
 			}
 
+			// Action()의 정상 종료 경로와 동일하게, 이 경로로 처리를 마친 요청도
+			// 여기서 최종적으로 끝난 것이므로 카운터를 맞춰 감소시킨다.
+			SubOutstandingRequest();
 			SAFE_DELETE(pAsyncRq);
 		}
 	}
@@ -246,6 +249,15 @@ bool COdbcAsyncSrv::Action()
 				if( 300 <= endTick - startTick )
 					LOG_WARNING(_T("Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"), endTick - startTick, cumulateCallCnt++, static_cast<int>(Ret), pAsyncRq->callIdent);
 
+				// [버그 수정] st_DBAsyncRq는 callIdent별로 실제 쿼리 데이터를 담은 파생 구조체의
+				// 베이스 타입이다(2바이트짜리 헤더 구조체가 그대로 쓰일 리 없고, ProcessAsyncCall이
+				// callIdent로 실제 파생 타입을 캐스팅해서 쓰는 구조). 기존 코드의
+				// `new st_DBAsyncRq{ *pAsyncRq }`는 베이스 타입으로 복사하므로 파생 클래스에 있는
+				// 실제 쿼리 파라미터가 전부 잘려나가는 오브젝트 슬라이싱 버그였다 — 재시도된 쿼리가
+				// 원래 파라미터를 잃어버린 채로 다시 실행됐을 것이다.
+				// 복사본을 새로 만들 필요 없이 원본 객체를 그대로 재사용해 재시도 플래그만 세팅하고
+				// 재큐잉한다. 슬라이싱 버그가 사라지는 것은 물론, 타임아웃 재시도 경로(이미 DB가
+				// 지연되고 있는 상황)에서 불필요한 heap 할당/해제 한 쌍도 없어진다.
 				uint16 logIdent = pAsyncRq->callIdent;
 				pAsyncRq->bReTry = true;
 
@@ -272,7 +284,7 @@ bool COdbcAsyncSrv::Action()
 			LOG_WARNING(_T("Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"), endTick - startTick, cumulateCallCnt++, static_cast<int>(Ret), pAsyncRq->callIdent);
 #endif
 
-		COdbcAsyncSrv::Instance()->SubOutstandingRequest();
+		SubOutstandingRequest(); // 이 요청은 여기서 최종적으로 끝난다 (this는 항상 싱글턴 인스턴스)
 		SAFE_DELETE(pAsyncRq);
 	}
 

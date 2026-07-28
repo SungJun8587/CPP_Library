@@ -59,7 +59,7 @@ public:
 
 	template< typename _TMain >
 	bool		BindParamInput(_TMain& tValue);
-	bool		BindParamInput(const TCHAR* ptszValue);
+	bool		BindParamInput(const TCHAR* ptszValue, SQLLEN* StrLen_or_Ind = nullptr);
 
 	template< typename _TMain >
 	bool		BindParamInput(int32 iParamIndex, _TMain& tValue);
@@ -79,7 +79,7 @@ public:
 
 	template< typename _TMain >
 	bool		BindCol(_TMain& tValue);
-	bool		BindCol(TCHAR* ptszValue, int32& iBuffSize);
+	bool		BindCol(TCHAR* ptszValue, int32& iBuffSize, SQLLEN* StrLen_or_Ind=nullptr);
 
 	template< typename _TMain >
 	bool		BindCol(int32 iColIndex, _TMain& tValue, SQLLEN& lRetSize);

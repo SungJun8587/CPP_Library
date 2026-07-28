@@ -528,3 +528,46 @@ for( int32 i = 0; i < nDBCount; ++i )
   넣어도 되는 상태인지"를 기다리는 게이트 역할만 하며, 실제 `Push()` 호출은 별도로 해야 한다.
 - `maxCapacity`는 호출부에서 자유롭게 정할 수 있는 값이라, 상황(DB 노드별 처리량, 요청
   긴급도 등)에 따라 다른 상한을 적용할 수 있다.
+
+### 11.5 미완료 요청 수 카운터 — `Outstanding Requests`
+
+큐에 들어간 뒤 아직 최종적으로 끝나지 않은 요청이 몇 개인지를 별도의 원자 카운터로
+추적하는 기능이다. 큐 크기(`GetQueryQueueSize()`)는 "아직 워커가 꺼내가지 않은 개수"만
+보여주는 반면, 이 카운터는 "꺼내갔지만 아직 완전히 끝나지 않은 것"까지 포함해 실제로
+시스템에 떠 있는 요청 수를 나타낸다.
+
+**추가된 요소**
+
+| 멤버 | 설명 |
+|---|---|
+| `_nOutstandingRequests` (`std::atomic<int32>`) | 미완료 요청 수 카운터. 기본값 0으로 초기화 |
+| `GetOutstandingRequests() const` | 현재 값을 조회 (`memory_order_relaxed`) |
+| `AddOutstandingRequest()` | 카운터를 1 증가 (`memory_order_relaxed`) — 요청을 생성해 `Push()`하는 외부 호출부가 사용 |
+| `SubOutstandingRequest()` | 카운터를 1 감소 (`memory_order_relaxed`) — 요청이 최종적으로 끝나는 지점에서 클래스 내부(`Action()`, `FlushRemainingTasks()`)가 호출 |
+
+세 함수 모두 헤더에 인라인으로 정의되어 있고, 단순 증감 카운터라서 `memory_order_relaxed`로
+충분하다 — 다른 메모리 접근과의 순서를 보장할 필요 없이 카운트 값 자체만 정확하면 되기
+때문이다.
+
+**감소 시점 — 두 경로 모두에서 "최종적으로 끝날 때"만 호출**
+
+- `Action()`: 워커 루프에서 요청을 완전히 처리(성공이든, 타임아웃 재시도가 아닌 최종 실패든)한
+  뒤, `SAFE_DELETE(pAsyncRq)` 직전에 `SubOutstandingRequest()`를 호출한다. 싱글턴 인스턴스
+  자신의 메서드 안에서 호출되는 것이므로 `CMySQLAsyncSrv::Instance()->`를 다시 거치지 않고
+  암묵적 `this`로 바로 호출한다.
+- `FlushRemainingTasks()`: 종료 시점에 메인 스레드가 남은 요청을 동기 처리하는 루프에서도,
+  핸들러를 찾아 `ProcessAsyncCall()`을 실행한 경우(성공/실패 불문) `SubOutstandingRequest()`를
+  호출한 뒤 `SAFE_DELETE`한다. `Action()`과 동일한 기준으로 카운터를 관리해, 정상 종료 경로든
+  강제 flush 경로든 요청이 "처리를 시도해 끝난" 시점에 항상 카운터가 감소한다.
+
+**카운터를 건드리지 않는 유일한 경로**
+
+- `Action()`의 `_mapCommand.end() == it`(핸들러를 찾지 못한 경우)와, `FlushRemainingTasks()`의
+  동일한 분기(`else` — 핸들러 없음) 양쪽 모두 `SubOutstandingRequest()`를 호출하지 않는다.
+  이 경로는 `callIdent`에 대응하는 핸들러가 애초에 등록되어 있지 않은, 설정 누락에 가까운
+  예외적 상황이다. 카운터가 안 맞는 상태로 남을 수 있음을 인지한 채로, 정상적인 운영에서는
+  거의 발생하지 않는 경로이므로 의도적으로 그대로 두었다.
+- 타임아웃으로 재큐잉되는 경로(`Ret == TIMEOUT && bReTry == false` → `Push()`로 재투입)는
+  "최종적으로 끝난" 것이 아니라 다시 큐로 돌아가는 것이므로 이 시점에는 감소시키지 않는다 —
+  재큐잉된 요청이 이후 다시 `Action()`을 통과할 때(성공하든 최종 실패하든) 그때 비로소
+  `SubOutstandingRequest()`가 호출된다.

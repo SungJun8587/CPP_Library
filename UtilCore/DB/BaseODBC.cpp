@@ -538,12 +538,12 @@ bool CBaseODBC::BindParameter(SQLUSMALLINT ipar, SQLSMALLINT fParamType, SQLSMAL
 
 //***************************************************************************
 //	
-bool CBaseODBC::BindParamInput(const TCHAR* ptszValue)
+bool CBaseODBC::BindParamInput(const TCHAR* ptszValue, SQLLEN* StrLen_or_Ind)
 {
 	CDBParamAttr& dbParam = m_DBParamAttrMgr((TCHAR*)ptszValue);
 
 	SQLRETURN nRet = SQLBindParameter(m_hStmt, ++m_nParamNum, SQL_PARAM_INPUT, dbParam.m_nCDataType, dbParam.m_nSqlDataType, dbParam.m_nParamSize,
-		0, dbParam.m_ptrBuff, dbParam.m_nBuffSize, NULL);
+		0, dbParam.m_ptrBuff, dbParam.m_nBuffSize, StrLen_or_Ind);
 	if( SQL_SUCCESS != nRet )
 	{
 		TCHAR	tszMessage[SQL_MAX_MESSAGE_LENGTH] = { 0, };
@@ -705,11 +705,11 @@ bool CBaseODBC::BindCol(SQLUSMALLINT ColumnNumber, SQLSMALLINT TargetType, SQLPO
 
 //***************************************************************************
 //	
-bool CBaseODBC::BindCol(TCHAR* ptszValue, int32& iBuffSize)
+bool CBaseODBC::BindCol(TCHAR* ptszValue, int32& iBuffSize, SQLLEN* StrLen_or_Ind)
 {
 	CDBColAttr& dbCol = m_DBColAttrMgr(ptszValue, iBuffSize);
 
-	SQLRETURN nRet = SQLBindCol(m_hStmt, ++m_nColNum, dbCol.m_nTargetType, dbCol.m_ptrBuff, dbCol.m_nBuffSize, NULL);
+	SQLRETURN nRet = SQLBindCol(m_hStmt, ++m_nColNum, dbCol.m_nTargetType, dbCol.m_ptrBuff, dbCol.m_nBuffSize, StrLen_or_Ind);
 	if( SQL_SUCCESS != nRet )
 	{
 		TCHAR	tszMessage[SQL_MAX_MESSAGE_LENGTH] = { 0, };

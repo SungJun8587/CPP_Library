@@ -43,10 +43,13 @@ public:
 		std::unique_lock<std::mutex> lock(_mutex);
 		_cvProducer.wait(lock, [this, maxCapacity]() {
 			return _queueDBAsyncRq.size() < maxCapacity || _bStopThread.load();
-		});
+			});
 	}
 
-	// 외부에서 미완료 요청 수를 안전하게 조회하거나 조작할 수 있는 인터페이스
+	// 외부에서 미완료 요청 수를 안전하게 조회하거나 조작할 수 있는 인터페이스.
+	// Push() 이전에 호출부가 AddOutstandingRequest()를 직접 호출하는 것을 전제로 하며,
+	// 요청이 최종적으로 끝나는 모든 경로(Action()의 정상 종료, FlushRemainingTasks()의
+	// 동기 처리)에서 SubOutstandingRequest()가 짝을 맞춰 호출된다.
 	int32 GetOutstandingRequests() const {
 		return _nOutstandingRequests.load(std::memory_order_relaxed);
 	}
@@ -92,7 +95,7 @@ protected:
 
 private:
 	std::atomic<bool>			_bStopThread;					// 스레드 종료 플래그
-	std::atomic<int32>          _nOutstandingRequests{ 0 };		// 미완료 요청 수 카운터 캡슐화
+	std::atomic<int32>			_nOutstandingRequests{ 0 };		// 미완료 요청 수 카운터 (캡슐화된 getter/add/sub로만 접근)
 
 	std::mutex					_mutex;							// 큐 lock
 	std::condition_variable		_cva;							// 워커 대기용 조건 변수

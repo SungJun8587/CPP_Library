@@ -219,8 +219,8 @@ public:
 	OdbcConnGuard& operator=(const OdbcConnGuard&) = delete;
 
 private:
-	COdbcConnPool* _pPool;
-	CBaseODBC* _pConn;
+	COdbcConnPool*	_pPool;
+	CBaseODBC*		_pConn;
 	int32			_nAllocatedIndex;
 };
 

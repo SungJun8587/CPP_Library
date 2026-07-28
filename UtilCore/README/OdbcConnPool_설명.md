@@ -463,3 +463,33 @@ pAsyncSrv->Push(pRequest);
 - 성능 측면에서는 `Pop()`마다 추가되는 `notify_one()` 호출 하나뿐이다. 대기 중인
   생산자가 없으면(가장 흔한 경우) 조건 변수 `notify`는 사실상 비용이 거의 없는 연산이라
   핫패스인 `Pop()`에 유의미한 오버헤드를 주지 않는다.
+
+### 11.5 미완료 요청 카운터 — Outstanding Requests
+
+큐에 들어갔지만 아직 끝까지 처리되지 않은 요청이 몇 개인지 외부에서 조회할 수 있도록,
+`_nOutstandingRequests`(원자 정수)와 이를 캡슐화한 세 개의 인터페이스를 제공한다.
+
+| 함수 | 설명 |
+|---|---|
+| `AddOutstandingRequest()` | 카운터를 1 증가 (`Push()` 이전에 호출부가 직접 호출) |
+| `SubOutstandingRequest()` | 카운터를 1 감소 |
+| `GetOutstandingRequests()` | 현재 카운터 값 조회 |
+
+`SubOutstandingRequest()`는 요청이 최종적으로 끝나는 모든 경로에서 짝을 맞춰 호출된다 —
+`Action()`에서 요청이 성공하거나, 재시도 없이 실패하거나, 재시도 후 다시 실패해
+끝나는 시점(지연 경고 로그 직후, `SAFE_DELETE(pAsyncRq)` 직전)과, `FlushRemainingTasks()`가
+종료 시점에 남은 요청을 동기 처리하고 `SAFE_DELETE`하기 직전 양쪽 모두에서 호출된다.
+타임아웃으로 재시도되어 `continue`로 다시 큐에 들어가는 경로는 아직 요청이 끝난 게
+아니므로 호출되지 않고, 같은 요청이 나중에 다시 루프를 돌 때 최종적으로 한 번만
+호출된다.
+
+- `_mapCommand`에서 핸들러를 찾지 못해 즉시 `SAFE_DELETE`하고 넘어가는 경로에는
+  `SubOutstandingRequest()` 호출이 없다 — 등록되지 않은 `callIdent`가 들어오는 것은
+  설정 오류에 가까운 예외적 상황으로 간주해 카운터 정합성보다 별도 처리 없이
+  로그만 남기도록 되어 있다.
+- `AddOutstandingRequest()`를 호출하는 지점은 이 파일들 안에는 없다 — `Push()`
+  이전에 호출부(요청을 생성하는 쪽)가 직접 호출하는 것을 전제로 한 설계다.
+- `Action()`과 `FlushRemainingTasks()`는 항상 싱글턴 인스턴스(`Instance()`)의
+  메서드로 호출되므로, 내부에서 `SubOutstandingRequest()`를 그냥 `this`로 호출해도
+  (`COdbcAsyncSrv::Instance()->SubOutstandingRequest()`로 다시 조회할 필요 없이)
+  항상 같은 카운터를 가리킨다.
