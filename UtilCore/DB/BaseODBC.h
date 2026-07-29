@@ -41,7 +41,11 @@ public:
 		return (m_hEnv != SQL_NULL_HENV && m_hConn != SQL_NULL_HDBC && m_hStmt != SQL_NULL_HSTMT ? TRUE : FALSE);
 	}
 	EDBClass    GetDBClass() { return m_DbClass; }
-	bool        DBMSInfo(TCHAR* ptszServerName, TCHAR* ptszDBMSName, TCHAR* ptszDBMSVersion);
+
+	bool		GetServerName(TCHAR* ptszServerName, int32 nBufferLength);
+	bool		GetDBMSName(TCHAR* ptszDBMSName, int32 nBufferLength);
+	bool		GetDBMSVersion(TCHAR* ptszDBMSVersion, int32 nBufferLength);
+	bool        GetServerCharacterSet(TCHAR* ptszCharset, int32 nBufferLength);
 
 	bool		InitStmtHandle(const int64 lQueryTimeOut = DATABASE_DEFAULT_QUERY_TIMEOUT);
 	void		FreeStmt(SQLUSMALLINT Option);
@@ -50,59 +54,60 @@ public:
 	void		UnBindColStmt(void);
 
 	//***************************************************************************
-	//    ε      
-	// - IoType = SQL_PARAM_INPUT | SQL_PARAM_OUTPUT | SQL_PARAM_INPUTOUTPUT
-	// - SqlType = SQL_CHAR | SQL_VARCHAR | SQL_INT | SQL_BIGINT | SQL_NUMERIC | SQL_DATETIME | ...
-	// - RetSize = SQL_NTS | SQL_NULL_DATA | SQL_DEFAULT_PARAM | SQL_LEN_DATA_AT_EXEC | SQL_DATA_AT_EXEC
-
+	//
+	// - fParamType = SQL_PARAM_INPUT | SQL_PARAM_OUTPUT | SQL_PARAM_INPUTOUTPUT
+	// - fCType = SQL_C_LONG | SQL_C_CHAR | ...
+	// - fSqlType = SQL_CHAR | SQL_VARCHAR | SQL_INT | SQL_BIGINT | SQL_NUMERIC | SQL_DATETIME | ...
+	// - pcbValue = SQL_NTS | SQL_NULL_DATA | SQL_DEFAULT_PARAM | SQL_LEN_DATA_AT_EXEC | SQL_DATA_AT_EXEC
 	bool        BindParameter(SQLUSMALLINT ipar, SQLSMALLINT fParamType, SQLSMALLINT fCType, SQLSMALLINT fSqlType, SQLULEN cbColDef, SQLSMALLINT ibScale, SQLPOINTER rgbValue, SQLLEN cbValueMax, SQLLEN* pcbValue);
 
 	template< typename _TMain >
 	bool		BindParamInput(_TMain& tValue);
-	bool		BindParamInput(const TCHAR* ptszValue, SQLLEN* StrLen_or_Ind = nullptr);
+	bool		BindParamInput(const TCHAR* ptszValue, SQLLEN* plDataLength=nullptr);
 
 	template< typename _TMain >
 	bool		BindParamInput(int32 iParamIndex, _TMain& tValue);
-	bool		BindParamInput(int32 iParamIndex, const TCHAR* ptszValue, SQLLEN& lRetSize);
-	bool		BindParamInput(int32 iParamIndex, const BYTE* pbData, int32 iSize, SQLLEN& lRetSize);
+	bool		BindParamInput(int32 iParamIndex, const TCHAR* ptszValue, SQLLEN& lDataLength);
+	bool		BindParamInput(int32 iParamIndex, const BYTE* pbData, int32 nBufferLength, SQLLEN& lDataLength);
 
 	template< typename _TMain >
 	bool		BindParamOutput(_TMain& tValue);
-	bool		BindParamOutput(TCHAR* ptszValue, int32& iBuffSize);
+	bool		BindParamOutput(TCHAR* ptszValue, int32& nBufferLength);
 
 	template< typename _TMain >
 	bool		BindParamOutput(int32 iParamIndex, _TMain& tValue);
-	bool		BindParamOutput(int32 iParamIndex, TCHAR* ptszValue, int32& iBuffSize, SQLLEN& lRetSize);
-	bool		BindParamOutput(int32 iParamIndex, BYTE* pbData, int32 iSize, SQLLEN& lRetSize);
+	bool		BindParamOutput(int32 iParamIndex, TCHAR* ptszValue, int32& nBufferLength, SQLLEN& lDataLength);
+	bool		BindParamOutput(int32 iParamIndex, BYTE* pbData, int32 nBufferLength, SQLLEN& lDataLength);
 
-	bool		BindCol(SQLUSMALLINT ColumnNumber, SQLSMALLINT TargetType, SQLPOINTER TargetValue, SQLLEN BufferLength, SQLLEN* StrLen_or_Ind);
+	bool		BindCol(SQLUSMALLINT ColumnNumber, SQLSMALLINT TargetType, SQLPOINTER TargetValue, SQLLEN BufferLength, SQLLEN* plDataLength);
 
 	template< typename _TMain >
 	bool		BindCol(_TMain& tValue);
-	bool		BindCol(TCHAR* ptszValue, int32& iBuffSize, SQLLEN* StrLen_or_Ind=nullptr);
+	bool		BindCol(TCHAR* ptszValue, int32& nBufferLength, SQLLEN* plDataLength = nullptr);
 
 	template< typename _TMain >
-	bool		BindCol(int32 iColIndex, _TMain& tValue, SQLLEN& lRetSize);
-	bool		BindCol(int32 iColIndex, TCHAR* ptszValue, int32& iBuffSize, SQLLEN& lRetSize);
+	bool		BindCol(int32 iColIndex, _TMain& tValue, SQLLEN& lDataLength);
+	bool		BindCol(int32 iColIndex, TCHAR* ptszValue, int32& nBufferLength, SQLLEN& lDataLength);
 	
-	bool		BindCol(int32 iColIndex, SQLSMALLINT targetType, int64& tValue, SQLLEN& lRetSize);
-	bool		BindCol(int32 iColIndex, SQLSMALLINT targetType, uint64& tValue, SQLLEN& lRetSize);
+	bool		BindCol(int32 iColIndex, SQLSMALLINT targetType, int64& tValue, SQLLEN& lDataLength);
+	bool		BindCol(int32 iColIndex, SQLSMALLINT targetType, uint64& tValue, SQLLEN& lDataLength);
 
-	// Fetch  Ŀ        о ´ .
+	bool		GetData(SQLUSMALLINT ColumnNumber, SQLSMALLINT TargetType, SQLPOINTER TargetValue, SQLLEN BufferLength, SQLLEN* plDataLength);
+
 	template< typename _TMain >
 	bool		GetData(int32 iColNum, _TMain& tValue);
-	bool		GetData(int32 iColNum, TCHAR* ptszData, int32& iBuffSize);
+	bool		GetData(int32 iColNum, TCHAR* ptszData, int32& nBufferLength);
 
 	bool		PrepareQuery(const TCHAR* ptszQueryInfo);
-	bool		Execute();									//  غ   SQL            
-	bool		ExecDirect(const TCHAR* ptszQueryInfo);		// SQL         ٷ      
+	bool		Execute();									     
+	bool		ExecDirect(const TCHAR* ptszQueryInfo);
 	bool		BulkOperations(SQLSMALLINT operation);
 
 	bool		SetStmtAttr(SQLINTEGER fAttribute, SQLPOINTER rgbValue, SQLINTEGER cbValueMax);
 	bool		AllSets(LONG_PTR nQueryResultRecordSize, LONG_PTR nMaxRowSize);
 
 	bool		Fetch(void);
-	SQLRETURN	GetFetch(void);								//!< SQLFetch ( ܺ  ó    )
+	SQLRETURN	GetFetch(void);								
 	SQLRETURN	MoreResults(void);
 	SQLINTEGER	GetFetchedRows(void) {
 		return m_nFetchedRows[0];
@@ -112,10 +117,10 @@ public:
 	bool		Commit();
 	bool		Rollback();
 
-	short		GetNumCols();		//      
-	int64		RowCount();			// insert, update, delete, select(       ڵ  Fetch  Ŀ  RowCount      )                  
-	long		RowNumber();		//      Ŀ        ȣ
-	bool		DescribeCol(int32 iColNum, COL_DESCRIPTION& ColDescription); //        
+	short		GetNumCols();		    
+	int64		RowCount();			               
+	long		RowNumber();		
+	bool		DescribeCol(int32 iColNum, COL_DESCRIPTION& ColDescription); 
 
 private:
 	SQLHENV		m_hEnv;
@@ -133,7 +138,6 @@ private:
 
 	TCHAR		m_tszDSN[DATABASE_DSN_STRLEN];
 	TCHAR		m_tszQueryInfo[SQL_MAX_MESSAGE_LENGTH];
-	TCHAR		m_tszLastError[DATABASE_ERRORMSG_STRLEN];
 };
 
 #include "BaseODBC.inl"

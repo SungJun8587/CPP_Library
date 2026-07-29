@@ -36,7 +36,7 @@
 
 | 함수 | 반환값 | 설명 |
 |---|---|---|
-| `Connect(connectTimeout, readTimeout, writeTimeout, pluginDir)` | `bool` | `mysql_init` 후 옵션(플러그인 경로, 각종 타임아웃)을 설정하고 `mysql_real_connect`로 접속. 이미 연결돼 있으면 즉시 `true`. 접속 성공 시 문자셋을 적용하거나 서버 기본값을 로그로 남김. 예외 발생 시 `Disconnect()` 후 `false`. |
+| `Connect(connectTimeout, readTimeout, writeTimeout, pluginDir)` | `bool` | `mysql_init` 후 옵션(플러그인 경로, 각종 타임아웃)을 설정하고 `mysql_real_connect`로 접속. 이미 연결돼 있으면 즉시 `true`. 접속 성공 시 `m_szCharacterSet`이 지정돼 있으면 `mysql_set_character_set()`으로 적용하고, 지정돼 있지 않으면 `GetHostInfo`/`GetServerInfo`/`GetServerVersion`/`GetCharacterSetName`을 호출해 조합한 서버 정보를 디버그 로그로 남김. 예외 발생 시 `Disconnect()` 후 `false`. |
 | `Disconnect()` | `bool` | `mysql_close`로 연결 종료, 핸들을 `nullptr`로, 플래그를 `false`로 리셋. 항상 `true` 반환. |
 | `StmtClose()` | `void` | `m_pStmt`가 있으면 `mysql_stmt_close` 호출. |
 | `FreeResult(res)` | `void` | 전달된 `MYSQL_RES*`가 있으면 `mysql_free_result` 호출. |
@@ -47,8 +47,13 @@
 
 | 함수 | 반환값 | 설명 |
 |---|---|---|
-| `GetServerInfo(ptszServerInfo)` | `bool` | `mysql_get_server_info` / `mysql_get_host_info` / `mysql_get_server_version`을 조합해 문자열로 포맷 후 `TCHAR` 버퍼에 기록(유니코드 빌드 시 변환 포함). |
-| `GetClientInfo(ptszClientInfo)` | `bool` | `mysql_get_client_info` / `mysql_get_client_version`을 조합해 동일한 방식으로 기록. |
+| `GetServerInfo(ptszServerInfo, nBufferLength)` | `bool` | `mysql_get_server_info()`로 서버 버전 문자열을 가져와 `TCHAR` 버퍼에 기록(유니코드 빌드 시 `MultiByteToWideChar` 변환). 미연결 시 `false`. |
+| `GetHostInfo(ptszHostInfo, nBufferLength)` | `bool` | `mysql_get_host_info()`로 호스트 연결 정보(주소 및 연결 방식)를 가져와 동일한 방식으로 기록. 미연결 시 `false`. |
+| `GetServerVersion(ulServerVersion)` | `bool` | `mysql_get_server_version()`으로 서버 버전 정수값을 가져와 참조 인자에 대입. 미연결 시 `false`. |
+| `GetClientInfo(ptszClientInfo, nBufferLength)` | `bool` | `mysql_get_client_info()`로 클라이언트 라이브러리 버전 문자열을 가져와 동일한 방식으로 기록. |
+| `GetClientVersion(ulClientVersion)` | `bool` | `mysql_get_client_version()`으로 클라이언트 라이브러리 버전 정수값을 가져와 참조 인자에 대입. |
+
+> 5개 함수 각각은 해당 libmysql API 하나만 단독으로 호출한다. 서버 정보를 종합해서 한 줄로 로깅하는 동작은 이 함수들 자체가 아니라 `Connect()` 성공 시 캐릭터셋이 지정되지 않은 경우에 한해 `Connect()` 내부에서 위 함수들을 조합 호출하여 이루어진다.
 
 #### 문자셋
 

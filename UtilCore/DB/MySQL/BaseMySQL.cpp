@@ -119,9 +119,17 @@ bool CBaseMySQL::Connect(const uint32 uiConnectTimeOut, const uint32 uiReadTimeO
 		}
 		else
 		{
-			TCHAR	tszCharacterSetName[DATABASE_CHARACTERSET_STRLEN];
-			GetCharacterSetName(tszCharacterSetName);
-			LOG_DEBUG(_T("%s, mysql default character_set is (%s)"), __TFUNCTION__, tszCharacterSetName);
+			TCHAR tszServerInfo[128] = { 0, };
+			TCHAR tszHostInfo[128] = { 0, };
+			unsigned long ulServerVersion = 0;
+			TCHAR tszCharacterSetName[128] = { 0, };
+
+			bool bServerInfoResult = GetServerInfo(tszServerInfo, _countof(tszServerInfo));
+			bool bHostInfoResult = GetHostInfo(tszHostInfo, _countof(tszHostInfo));
+			bool bVersionResult = GetServerVersion(ulServerVersion);
+			bool bCharsetResult = GetCharacterSetName(tszCharacterSetName, _countof(tszCharacterSetName));
+			if( bServerInfoResult && bHostInfoResult && bVersionResult && bCharsetResult)
+				LOG_DEBUG(_T("%s, Server: %s, DBMS: MySQL, Version: %s, Charset: %s"), __TFUNCTION__, tszHostInfo, tszServerInfo, tszCharacterSetName);
 		}
 	}
 	catch( ... )
@@ -153,7 +161,11 @@ bool CBaseMySQL::Disconnect()
 //
 void CBaseMySQL::StmtClose()
 {
-	if( m_pStmt ) mysql_stmt_close(m_pStmt);
+	if( m_pStmt )
+	{
+		mysql_stmt_close(m_pStmt);
+		m_pStmt = nullptr;
+	}
 }
 
 //***************************************************************************
@@ -179,24 +191,23 @@ bool CBaseMySQL::IsConnected()
 
 //***************************************************************************
 //
-bool CBaseMySQL::GetServerInfo(TCHAR* ptszServerInfo)
+/// @brief MySQL 서버 버전을 문자열 형태로 가져옴
+/// @param ptszServerInfo - 서버 버전 정보를 저장할 버퍼 (출력)
+/// @param nBufferLength - 버퍼 크기 (TCHAR 단위)
+/// @return 성공 시 true, 실패 시 false
+bool CBaseMySQL::GetServerInfo(TCHAR* ptszServerInfo, int32 nBufferLength)
 {
-	if( !m_bConnected ) return false;
-
-	char szServerDescInfo[DATABASE_BUFFER_SIZE];
+	if( !m_bConnected || ptszServerInfo == nullptr || nBufferLength <= 0 ) return false;
 
 	const char* pszServerInfo = mysql_get_server_info(m_pConn);
-	const char* pszHostInfo = mysql_get_host_info(m_pConn);
-	unsigned long ulServerVersion = mysql_get_server_version(m_pConn);
-
-	sprintf_s(szServerDescInfo, DATABASE_BUFFER_SIZE, "ServerInfo[%s], HostInfo[%s], ServerVersion[%ul]", pszServerInfo, pszHostInfo, ulServerVersion);
+	if( !pszServerInfo ) return false;
 
 #ifdef _UNICODE
-	int nLength = MultiByteToWideChar(CP_ACP, 0, (LPSTR)szServerDescInfo, -1, NULL, 0);
-	if( nLength == 0 || DATABASE_CHARACTERSET_STRLEN < nLength ) return false;
-	if( MultiByteToWideChar(CP_ACP, 0, (LPSTR)szServerDescInfo, -1, ptszServerInfo, nLength) == 0 ) return false;
+	int nLength = MultiByteToWideChar(CP_ACP, 0, pszServerInfo, -1, NULL, 0);
+	if( nLength == 0 || nBufferLength < nLength ) return false;
+	if( MultiByteToWideChar(CP_ACP, 0, pszServerInfo, -1, ptszServerInfo, nLength) == 0 ) return false;
 #else
-	strncpy_s(ptszServerInfo, DATABASE_BUFFER_SIZE, szServerDescInfo, _TRUNCATE);
+	strncpy_s(ptszServerInfo, nBufferLength, pszServerInfo, _TRUNCATE);
 #endif
 
 	return true;
@@ -204,23 +215,60 @@ bool CBaseMySQL::GetServerInfo(TCHAR* ptszServerInfo)
 
 //***************************************************************************
 //
-bool CBaseMySQL::GetClientInfo(TCHAR* ptszClientInfo)
+/// @brief MySQL 호스트 연결 정보(주소 및 연결 방식)를 가져옴
+/// @param ptszHostInfo - 호스트 정보를 저장할 버퍼 (출력)
+/// @param nBufferLength - 버퍼 크기 (TCHAR 단위)
+/// @return 성공 시 true, 실패 시 false
+bool CBaseMySQL::GetHostInfo(TCHAR* ptszHostInfo, int32 nBufferLength)
+{
+	if( !m_bConnected || ptszHostInfo == nullptr || nBufferLength <= 0 ) return false;
+
+	const char* pszHostInfo = mysql_get_host_info(m_pConn);
+	if( !pszHostInfo ) return false;
+
+#ifdef _UNICODE
+	int nLength = MultiByteToWideChar(CP_ACP, 0, pszHostInfo, -1, NULL, 0);
+	if( nLength == 0 || nBufferLength < nLength ) return false;
+	if( MultiByteToWideChar(CP_ACP, 0, pszHostInfo, -1, ptszHostInfo, nLength) == 0 ) return false;
+#else
+	strncpy_s(ptszHostInfo, nBufferLength, pszHostInfo, _TRUNCATE);
+#endif
+
+	return true;
+}
+
+//***************************************************************************
+//
+/// @brief MySQL 서버 버전 정수값을 가져옴
+/// @param ulServerVersion - 서버 버전 숫자를 저장할 변수 참조 (출력)
+/// @return 성공 시 true, 실패 시 false
+bool CBaseMySQL::GetServerVersion(unsigned long& ulServerVersion)
 {
 	if( !m_bConnected ) return false;
 
-	char szClientDescInfo[DATABASE_BUFFER_SIZE];
+	ulServerVersion = mysql_get_server_version(m_pConn);
+	return true;
+}
+
+//***************************************************************************
+//
+/// @brief MySQL 클라이언트 라이브러리 정보 문자열을 가져옴
+/// @param ptszClientInfo - 클라이언트 정보를 저장할 버퍼 (출력)
+/// @param nBufferLength - 버퍼 크기 (TCHAR 단위)
+/// @return 성공 시 true, 실패 시 false
+bool CBaseMySQL::GetClientInfo(TCHAR* ptszClientInfo, int32 nBufferLength)
+{
+	if( ptszClientInfo == nullptr || nBufferLength <= 0 ) return false;
 
 	const char* pszClientInfo = mysql_get_client_info();
-	unsigned long ulClientVersion = mysql_get_client_version();
-
-	sprintf_s(szClientDescInfo, DATABASE_BUFFER_SIZE, "ClientInfo[%s], ClientVersion[%ul]", pszClientInfo, ulClientVersion);
+	if( !pszClientInfo ) return false;
 
 #ifdef _UNICODE
-	int nLength = MultiByteToWideChar(CP_ACP, 0, (LPSTR)szClientDescInfo, -1, NULL, 0);
-	if( nLength == 0 || DATABASE_CHARACTERSET_STRLEN < nLength ) return false;
-	if( MultiByteToWideChar(CP_ACP, 0, (LPSTR)szClientDescInfo, -1, ptszClientInfo, nLength) == 0 ) return false;
+	int nLength = MultiByteToWideChar(CP_ACP, 0, pszClientInfo, -1, NULL, 0);
+	if( nLength == 0 || nBufferLength < nLength ) return false;
+	if( MultiByteToWideChar(CP_ACP, 0, pszClientInfo, -1, ptszClientInfo, nLength) == 0 ) return false;
 #else
-	strncpy_s(ptszClientInfo, DATABASE_BUFFER_SIZE, szClientDescInfo, _TRUNCATE);
+	strncpy_s(ptszClientInfo, nBufferLength, pszClientInfo, _TRUNCATE);
 #endif
 
 	return true;
@@ -228,14 +276,36 @@ bool CBaseMySQL::GetClientInfo(TCHAR* ptszClientInfo)
 
 //***************************************************************************
 //
-bool CBaseMySQL::SetCharacterSetName(const TCHAR* ptszCharacterSetName)
+/// @brief MySQL 클라이언트 라이브러리 버전 정수값을 가져옴
+/// @param ulClientVersion - 클라이언트 버전 숫자를 저장할 변수 참조 (출력)
+/// @return 성공 시 true, 실패 시 false
+bool CBaseMySQL::GetClientVersion(unsigned long& ulClientVersion)
 {
+	ulClientVersion = mysql_get_client_version();
+	return true;
+}
+
+//***************************************************************************
+//
+/// @brief MySQL 연결에 사용할 캐릭터셋 이름을 설정
+/// @param ptszCharacterSetName - 설정할 캐릭터셋 이름 문자열
+/// @param nBufferLength - 입력된 문자열 버퍼의 크기 (TCHAR 단위, 생략 가능 시 기본값 활용)
+/// @return 성공 시 true, 실패 시 false
+bool CBaseMySQL::SetCharacterSetName(const TCHAR* ptszCharacterSetName, int32 nBufferLength)
+{
+	if( ptszCharacterSetName == nullptr || nBufferLength <= 0 ) return false;
+
 #ifdef _UNICODE	
-	int nLength = WideCharToMultiByte(CP_ACP, 0, ptszCharacterSetName, -1, NULL, 0, NULL, NULL);
-	if( nLength == 0 || sizeof(m_szCharacterSet) < (size_t)nLength ) return false;
-	if( WideCharToMultiByte(CP_ACP, 0, ptszCharacterSetName, -1, m_szCharacterSet, nLength, NULL, NULL) == 0 ) return false;
+	// 유니코드(UTF-16) 문자열을 멀티바이트(ANSI/UTF-8 등)로 변환
+	int nLength = WideCharToMultiByte(CP_ACP, 0, ptszCharacterSetName, nBufferLength, NULL, 0, NULL, NULL);
+	if( nLength == 0 || DATABASE_CHARACTERSET_STRLEN < nLength ) return false;
+
+	if( WideCharToMultiByte(CP_ACP, 0, ptszCharacterSetName, nBufferLength, m_szCharacterSet, DATABASE_CHARACTERSET_STRLEN, NULL, NULL) == 0 )
+		return false;
 #else
-	strncpy_s(m_szCharacterSet, DATABASE_CHARACTERSET_STRLEN, ptszCharacterSetName, _TRUNCATE);
+	// 멀티바이트 문자열 안전한 복사
+	if( strncpy_s(m_szCharacterSet, DATABASE_CHARACTERSET_STRLEN, ptszCharacterSetName, _TRUNCATE) != 0 )
+		return false;
 #endif
 
 	return true;
@@ -243,21 +313,32 @@ bool CBaseMySQL::SetCharacterSetName(const TCHAR* ptszCharacterSetName)
 
 //***************************************************************************
 //
-bool CBaseMySQL::GetCharacterSetName(TCHAR* ptszCharacterSetName)
+/// @brief MySQL 연결의 캐릭터셋 이름을 가져옴
+/// @param ptszCharacterSetName - 캐릭터셋 이름을 저장할 버퍼 (출력)
+/// @param nBufferLength - 버퍼 크기 (TCHAR 단위)
+/// @return 성공 시 true, 실패 시 false
+bool CBaseMySQL::GetCharacterSetName(TCHAR* ptszCharacterSetName, int32 nBufferLength)
 {
-	if( !m_bConnected ) return false;
+	if( !m_bConnected || ptszCharacterSetName == nullptr || nBufferLength <= 0 ) return false;
 
+	// m_szCharacterSet에 설정된 값이 없으면 현재 연결된 기본 캐릭터셋을 가져와 저장
 	if( !m_szCharacterSet || strlen(m_szCharacterSet) < 1 )
 	{
-		strncpy_s(m_szCharacterSet, DATABASE_CHARACTERSET_STRLEN, mysql_character_set_name(m_pConn), _TRUNCATE);
+		const char* pszCurrentCharset = mysql_character_set_name(m_pConn);
+		if( pszCurrentCharset )
+		{
+			strncpy_s(m_szCharacterSet, DATABASE_CHARACTERSET_STRLEN, pszCurrentCharset, _TRUNCATE);
+		}
 	}
 
+	if( !m_szCharacterSet ) return false;
+
 #ifdef _UNICODE	
-	int nLength = MultiByteToWideChar(CP_ACP, 0, (LPSTR)m_szCharacterSet, -1, NULL, 0);
-	if( nLength == 0 || DATABASE_CHARACTERSET_STRLEN < nLength ) return false;
-	if( MultiByteToWideChar(CP_ACP, 0, (LPSTR)m_szCharacterSet, -1, ptszCharacterSetName, nLength) == 0 ) return false;
+	int nLength = MultiByteToWideChar(CP_ACP, 0, m_szCharacterSet, -1, NULL, 0);
+	if( nLength == 0 || nBufferLength < nLength ) return false;
+	if( MultiByteToWideChar(CP_ACP, 0, m_szCharacterSet, -1, ptszCharacterSetName, nLength) == 0 ) return false;
 #else
-	strncpy_s(ptszCharacterSetName, DATABASE_CHARACTERSET_STRLEN, m_szCharacterSet, _TRUNCATE);
+	strncpy_s(ptszCharacterSetName, nBufferLength, m_szCharacterSet, _TRUNCATE);
 #endif
 
 	return true;
