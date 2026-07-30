@@ -77,7 +77,6 @@ typedef struct _SH_REGISTRY_INFO
 } SH_REGISTRY_INFO, * PSH_REGISTRY_INFO;
 
 bool	IsAbleFile(const TCHAR* ptszSourceFullPath, const SH_APPLY_FILEINFO ShApplyFileInfo);
-
 bool	CreateDirectoryRecursive(const TCHAR* ptszFolder);
 bool	RemoveDirectoryRecursive(const TCHAR* ptszFolder, const bool  bSelfDel = TRUE);
 bool	CopyFileRecursive(const TCHAR* ptszSourceFolder, const TCHAR* ptszDestFolder, const SH_APPLY_FILEINFO& ShApplyFileInfo);
@@ -98,7 +97,9 @@ bool	IsRegKey(const HKEY hKey, const TCHAR* ptszSubKey);
 
 HANDLE	GetFileHandleDuplicate(TCHAR* ptszDestFullPath, TCHAR* ptszDestFileNameExt, const TCHAR* ptszFullPath);
 
+#if defined(USE_MEMBUFFER)
 bool	GetProductKeyExtract(CMemBuffer<TCHAR>& TProductKey, const BYTE* pbDigitalProductID, const DWORD dwLength, const bool bIsExtractBytesRange);
+#endif
 
 #endif // ndef __SHELLUTIL_H__
 

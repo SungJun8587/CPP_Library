@@ -23,7 +23,7 @@ CJobTimer* gpJobTimer = nullptr;
 CThreadManager* gpThreadManager = nullptr;
 #endif
 
-#ifdef __DEADLOCKPROFILER_H__
+#if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
 CDeadLockProfiler* gpDeadLockProfiler = nullptr;
 #endif
 
@@ -81,7 +81,7 @@ namespace BaseGlobal
 		gpThreadManager = new CThreadManager();
 #endif	
 
-#ifdef __DEADLOCKPROFILER_H__
+#if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
 		gpDeadLockProfiler = new CDeadLockProfiler();
 #endif	
 	}
@@ -100,7 +100,7 @@ namespace BaseGlobal
 		if( gpThreadManager != nullptr ) delete gpThreadManager;
 #endif	
 
-#ifdef __DEADLOCKPROFILER_H__
+#if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
 		if( gpDeadLockProfiler != nullptr ) delete gpDeadLockProfiler;
 #endif	
 

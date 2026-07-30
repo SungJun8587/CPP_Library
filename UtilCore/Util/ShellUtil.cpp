@@ -14,9 +14,7 @@ bool IsAbleFile(const TCHAR* ptszSourceFullPath, const SH_APPLY_FILEINFO ShApply
 	size_t		nTokenCount = 0;
 	size_t		nIndex = 0;
 	TCHAR		tszTime[FILEATT_DATETIME_STRLEN];
-	TCHAR*		ptszApplyExt = nullptr;
-
-	CMemBuffer<TCHAR>* pTDestination = nullptr;
+	TCHAR* ptszApplyExt = nullptr;
 
 	SYSTEMTIME	stLocal;
 
@@ -665,6 +663,7 @@ HANDLE GetFileHandleDuplicate(TCHAR* ptszDestFullPath, TCHAR* ptszDestFileNameEx
 	return hFile;
 }
 
+#if defined(USE_MEMBUFFER)
 //***************************************************************************
 //
 bool GetProductKeyExtract(CMemBuffer<TCHAR>& TProductKey, const BYTE* pbDigitalProductID, const DWORD dwLength, const bool bIsExtractBytesRange)
@@ -772,4 +771,4 @@ bool GetProductKeyExtract(CMemBuffer<TCHAR>& TProductKey, const BYTE* pbDigitalP
 
 	return true;
 }
-
+#endif

@@ -49,7 +49,7 @@ namespace SpinLockDetail
 template <typename Preset>
 void SpinLock<Preset>::Lock(const char* name) noexcept
 {
-#if defined(_DEBUG) && defined(__THREADMANAGER_H__)
+#if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
     if (name) gpDeadLockProfiler->PushLock(name);
 #endif
 
@@ -73,7 +73,7 @@ template <typename Preset>
 void SpinLock<Preset>::Unlock(const char* name) noexcept
 {
     _locked.store(false, std::memory_order_release);
-#if defined(_DEBUG) && defined(__THREADMANAGER_H__)
+#if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
     if (name) gpDeadLockProfiler->PopLock(name);
 #endif
 }
@@ -87,7 +87,7 @@ void SpinLock<Preset>::Unlock(const char* name) noexcept
 template <typename Preset>
 void RWSpinLock<Preset>::ReadLock(const char* name) noexcept
 {
-#if defined(_DEBUG) && defined(__THREADMANAGER_H__)
+#if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
     if (name) gpDeadLockProfiler->PushLock(name);
 #endif
 
@@ -129,7 +129,7 @@ bool RWSpinLock<Preset>::TryReadLock(const char* name) noexcept
             _state.fetch_sub(RWSpinLockBits::READER_ONE, std::memory_order_relaxed);
             SPINLOCK_FATAL("RWSpinLock::TryReadLock - reader count overflow (max 32767)");
         }
-#if defined(_DEBUG) && defined(__THREADMANAGER_H__)
+#if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
         // 락 획득 성공 시에만 프로파일러에 이력을 기록한다.
         if (name) gpDeadLockProfiler->PushLock(name);
 #endif
@@ -143,7 +143,7 @@ template <typename Preset>
 void RWSpinLock<Preset>::ReadUnlock(const char* name) noexcept
 {
     _state.fetch_sub(RWSpinLockBits::READER_ONE, std::memory_order_release);
-#if defined(_DEBUG) && defined(__THREADMANAGER_H__)
+#if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
     if (name) gpDeadLockProfiler->PopLock(name);
 #endif
 }
@@ -153,7 +153,7 @@ void RWSpinLock<Preset>::ReadUnlock(const char* name) noexcept
 template <typename Preset>
 void RWSpinLock<Preset>::WriteLock(const char* name) noexcept
 {
-#if defined(_DEBUG) && defined(__THREADMANAGER_H__)
+#if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
     if (name) gpDeadLockProfiler->PushLock(name);
 #endif
 
@@ -217,7 +217,7 @@ bool RWSpinLock<Preset>::TryWriteLock(const char* name) noexcept
             std::memory_order_acquire, std::memory_order_relaxed))
         return false;
 
-#if defined(_DEBUG) && defined(__THREADMANAGER_H__)
+#if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
     // 락 획득 성공 시에만 프로파일러에 이력을 기록한다.
     if (name) gpDeadLockProfiler->PushLock(name);
 #endif
@@ -228,7 +228,7 @@ template <typename Preset>
 void RWSpinLock<Preset>::WriteUnlock(const char* name) noexcept
 {
     _state.fetch_sub(RWSpinLockBits::WRITER_ONE + RWSpinLockBits::WRITE_LOCKED, std::memory_order_release);
-#if defined(_DEBUG) && defined(__THREADMANAGER_H__)
+#if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
     if (name) gpDeadLockProfiler->PopLock(name);
 #endif
 }

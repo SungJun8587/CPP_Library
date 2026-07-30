@@ -25,7 +25,9 @@
     <ClInclude Include="BaseRedefineDataType.h" />
     <ClInclude Include="BaseTLS.h" />
     <ClInclude Include="Crypto\CryptoUtil.h" />
-    <ClInclude Include="DB\AdoDB.h" />
+    <ClInclude Include="DB\ADO\AdoAsyncSrv.h" />
+    <ClInclude Include="DB\ADO\AdoConnPool.h" />
+    <ClInclude Include="DB\ADO\AdoDB.h" />
     <ClInclude Include="DB\BaseODBC.h" />
     <ClInclude Include="DB\DBAsyncSrv.h" />
     <ClInclude Include="DB\DBBind.h" />
@@ -96,7 +98,9 @@
     <ClCompile Include="BaseGlobal.cpp" />
     <ClCompile Include="BaseTLS.cpp" />
     <ClCompile Include="Crypto\CryptoUtil.cpp" />
-    <ClCompile Include="DB\AdoDB.cpp" />
+    <ClCompile Include="DB\ADO\AdoAsyncSrv.cpp" />
+    <ClCompile Include="DB\ADO\AdoConnPool.cpp" />
+    <ClCompile Include="DB\ADO\AdoDB.cpp" />
     <ClCompile Include="DB\BaseODBC.cpp" />
     <ClCompile Include="DB\DBBind.cpp" />
     <ClCompile Include="DB\DBModel.cpp" />

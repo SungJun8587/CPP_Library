@@ -29,7 +29,7 @@
 	extern class CThreadManager*	gpThreadManager;
 #endif
 
-#ifdef __DEADLOCKPROFILER_H__
+#if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
 	class CDeadLockProfiler;
 	extern class CDeadLockProfiler* gpDeadLockProfiler;
 #endif

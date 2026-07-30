@@ -163,7 +163,11 @@ void StompAllocator::Release(void* ptr)
 //        맞는 메모리 풀을 찾아 블록을 반환합니다.
 void* PoolAllocator::Alloc(int32 size)
 {
+#if defined(USE_GPMEMORY)
 	return gpMemory->Allocate(size);
+#else
+	return ::operator new(size);
+#endif
 }
 
 //***************************************************************************
@@ -172,5 +176,9 @@ void* PoolAllocator::Alloc(int32 size)
 //        판별합니다.
 void PoolAllocator::Release(void* ptr)
 {
+#if defined(USE_GPMEMORY)
 	gpMemory->Release(ptr);
+#else
+	::operator delete(ptr);
+#endif
 }

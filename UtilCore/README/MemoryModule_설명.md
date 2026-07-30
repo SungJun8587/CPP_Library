@@ -35,6 +35,9 @@
 
 디버그 빌드(_STOMP): CMemory::Allocate/Release가 StompAllocator로 대체됨
                      (VirtualAlloc 기반 페이지 가드, 오버런 즉시 크래시)
+
+USE_GPMEMORY 미정의 빌드: PoolAllocator가 gpMemory를 전혀 참조하지 않고
+                         ::operator new/delete로 직접 위임됨 (풀 시스템 자체가 빠짐)
 ```
 
 ## 3. 계층별 역할
@@ -94,6 +97,8 @@ public:
 ### 3.4 PoolAllocator — 실서비스 핫패스
 
 평상시 게임 로직 코드가 사용하는 유일한 경로입니다. `gpMemory`(전역 `CMemory` 싱글턴)에게 위임하며, `xnew`/`xdelete`, `StlAllocator`를 통해 자동으로 이 경로를 타게 됩니다.
+
+**`USE_GPMEMORY` 매크로 게이트**: `PoolAllocator::Alloc`/`Release`는 `#if defined(USE_GPMEMORY)`로 감싸져 있어, 이 매크로가 정의된 빌드에서만 실제로 `gpMemory->Allocate`/`Release`(풀 경로)로 위임합니다. 정의되지 않은 빌드에서는 `::operator new`/`::operator delete`로 직접 폴백하여, 이 모듈이 `CMemory`/`gpMemory`를 전혀 참조하지 않고도 컴파일·동작할 수 있습니다(예: 메모리 풀 시스템 전체를 아직 링크하지 않은 초기 통합 단계나, 풀 경로를 배제하고 싶은 단위 테스트 빌드). 이 매크로가 꺼져 있으면 `xnew`/`xdelete`/`StlAllocator`가 여전히 동일한 API로 동작하되 내부적으로는 표준 힙을 그대로 쓰게 되므로, 풀링/락프리/TLS 캐시 이점은 전부 사라집니다.
 
 `xnew<Type>(args...)`는 생성자 인자를 `std::forward` 대신 `static_cast<Args&&>(args)...`로 직접 전달합니다. 의미상 완전히 동일한 perfect forwarding이지만, 라이브러리 함수 호출 형태 자체를 없애 초당 수백만 번 불릴 수 있는 이 경로에서 인라인 여부를 컴파일러 재량에 맡기지 않습니다.
 
@@ -201,6 +206,7 @@ xdelete(p);                    // 소멸자 호출 → PoolAllocator::Release �
 - **`thread_local TlsCache` 소멸자**: 스레드가 종료되면 MSVC가 자동으로 `TlsCache`의 소멸자를 호출합니다. 이 소멸자에서 로컬에 남은 모든 블록을 원래 속했던 전역 `CMemoryPool`로 되돌립니다. 이 처리가 없으면 스레드가 죽을 때마다 로컬 캐시에 있던 메모리가 다른 스레드에서 재사용되지 못하고 사실상 누수처럼 방치됩니다.
 - **`TlsCache`는 `CMemory`의 nested class**이므로 C++11부터 `CMemory`의 private 멤버(`_pools`)에 별도의 `friend` 선언 없이 접근할 수 있습니다.
 - **`DrainBuckets`의 `gpMemory` null 체크**: 정해진 파괴 순서 규약을 지키지 않는 스레드(뒤에서 설명할 "그 외 스레드")가 프로세스 종료 시점 근처에 뒤늦게 종료되어 `gpMemory`가 이미 파괴된 뒤 `TlsCache` 소멸자가 호출되는 극단적인 상황을 대비해, `gpMemory`가 `nullptr`이면 반납을 시도하지 않고 조용히 반환합니다. 이 경우 남은 블록은 정상 반납되지 못하지만(누수), 프로세스 종료 시점이므로 OS가 결국 회수하며, use-after-free로 크래시가 나는 것보다 안전합니다.
+- **`DrainBuckets`도 `USE_GPMEMORY`로 게이트됨**: 함수 본문 전체가 `#if defined(USE_GPMEMORY)`로 감싸여 있어, 이 매크로가 꺼진 빌드에서는 반납 로직 자체가 컴파일되지 않고 빈 함수가 됩니다. `PoolAllocator`가 애초에 `gpMemory`를 참조하지 않는 빌드(위 3.4절)에서는 TLS 캐시에 쌓일 블록 자체가 없으므로 자연스러운 대칭입니다.
 - **`TlsBucket`의 정렬(`alignas(16)`)**: `TlsBucket`은 `thread_local`이라 스레드 간 false sharing은 원천적으로 없지만, 한 스레드가 `DrainBuckets` 등에서 `buckets[POOL_COUNT]` 배열을 순회할 때의 캐시 지역성은 별개 문제입니다. `sizeof(TlsBucket)`은 16바이트로 캐시 라인(64바이트)의 정확한 약수지만, 포인터 멤버 때문에 자연 정렬이 8바이트뿐이라 배열 시작 주소가 16바이트로 정렬되지 않으면 4번째 원소마다 캐시 라인 경계를 걸치게 됩니다. `alignas(16)`을 붙이면 크기가 이미 16의 배수라 패딩 없이(메모리 낭비 없이) 모든 원소가 항상 하나의 캐시 라인 안에 완전히 들어가도록 보장됩니다.
 
 ### 워밍업(Warm-up)
@@ -261,6 +267,7 @@ xdelete(p);                    // 소멸자 호출 → PoolAllocator::Release �
 | TLS 캐시 상주 메모리 | 스레드마다 최대 `Σ(각 풀의 TLS 상한)`개 블록이 로컬에 상주할 수 있음. 크기 구간별로 배치/상한을 차등화(5-1절)해 균등 적용 대비 상주량을 낮췄지만, 스레드 수가 많은 서버에서는 여전히 전체 상주 메모리량이 늘어날 수 있음 |
 | 정적 소멸 순서 문제 | `thread_local TlsCache`의 소멸자가 `gpMemory->_pools`를 참조하므로 전역 시스템 파괴 순서가 정확해야 함. `BaseGlobal::Destroy()`의 파괴 순서 + `CMemory::FlushCurrentThreadCache()` + `ThreadManager::DestroyTLS()`의 명시적 flush로 안전하게 관리됨(5-2절 참고). `CThreadManager` 밖에서 만들어진 스레드가 `PoolAllocator`를 쓰는 경우 동일한 규칙을 수동으로 지켜야 하며, 지키지 못하더라도 `DrainBuckets`의 `gpMemory` null 체크가 크래시를 누수로 완화함 |
 | 입력 검증 범위 | `Allocate(size)`는 `size <= 0`이거나 오버플로가 발생할 정도로 큰 `size`를 `ASSERT_CRASH`로 걸러내지만, 이는 명백히 잘못된 호출부 버그를 조기에 드러내기 위한 것이지 임의의 악의적 입력을 견디는 방어 계층은 아님 |
+| `USE_GPMEMORY` 빌드 분기 | `PoolAllocator`(및 `DrainBuckets`)가 이 매크로로 게이트되어 있어, 정의 여부에 따라 `xnew`/`StlAllocator`가 풀 경로를 탈지 표준 힙(`::operator new`/`delete`)으로 직접 갈지가 전체 빌드 단위로 갈림. 매크로를 잘못 끈 채 배포하면 풀링/락프리/TLS 캐시 이점이 조용히 전부 사라지므로 빌드 구성 관리가 필요함 |
 
 ## 7. 사용 가이드 요약
 
@@ -270,6 +277,7 @@ xdelete(p);                    // 소멸자 호출 → PoolAllocator::Release �
 - **raw 할당 라이브러리 변경**: `RawAllocator.h`를 건드릴 필요 없이, 원하는 라이브러리 헤더만 먼저 include하면 매크로 감지로 자동 전환됨.
 - **서버 시작 시점 지연 스파이크 완화**: 자주 쓰이는 주요 크기에 한해 `CMemory::WarmUp(allocDataSize, count)`를 선별적으로 호출.
 - **`CThreadManager` 밖에서 만든 스레드가 `PoolAllocator`를 쓸 경우**: 그 스레드 종료 직전 반드시 `CMemory::FlushCurrentThreadCache()`를 직접 호출.
+- **메모리 풀 시스템을 아직 연결하지 않은 빌드(단위 테스트 등)**: `USE_GPMEMORY`를 정의하지 않으면 `xnew`/`xdelete`/`StlAllocator`가 `gpMemory` 없이도 표준 힙으로 동작함(대신 풀링/락프리 이점은 없음).
 
 ## 8. Containers.h — STL 컨테이너 래퍼
 

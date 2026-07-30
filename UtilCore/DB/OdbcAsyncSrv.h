@@ -7,6 +7,10 @@
 #ifndef __ODBCASYNCSRV__H__
 #define __ODBCASYNCSRV__H__
 
+#ifndef	__ODBCCONNPOOL_H__
+#include <DB/OdbcConnPool.h>
+#endif
+
 class COdbcAsyncSrv
 {
 	// 매 DB 비동기 호출마다(핫패스) 조회되므로 O(log n) 트리 탐색인 std::map 대신

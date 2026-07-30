@@ -12,7 +12,10 @@
 #include "Memory.h"
 
 // gpMemory : 전역 CMemory 싱글턴 포인터 (실제 정의는 BaseGlobal.cpp)
-extern CMemory* gpMemory;
+
+#if defined(USE_GPMEMORY)
+	extern CMemory* gpMemory;
+#endif
 
 // 스레드마다 독립적으로 존재하는 TLS 캐시 인스턴스 정의
 thread_local CMemory::TlsCache CMemory::_tlsCache;
@@ -156,6 +159,7 @@ CMemory::~CMemory()
 // 매개변수 : buckets - 비워낼 TlsBucket 배열 (크기 POOL_COUNT)
 void CMemory::DrainBuckets(TlsBucket* buckets)
 {
+#if defined(USE_GPMEMORY)
 	if( gpMemory == nullptr )
 		return;
 
@@ -172,6 +176,7 @@ void CMemory::DrainBuckets(TlsBucket* buckets)
 		buckets[i].freeList = nullptr;
 		buckets[i].count = 0;
 	}
+#endif
 }
 
 //***************************************************************************

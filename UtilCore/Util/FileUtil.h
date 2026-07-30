@@ -56,14 +56,12 @@ bool		IsUTF8WithoutBom(const void* pBuffer, const size_t BuffSize);
 #ifdef _WIN32
 EEncoding	GetFileEncodingType(const TCHAR* ptszFullPath);
 
+#if defined(USE_MEMBUFFER)
 bool		ReadFile(CMemBuffer<BYTE>& byteDestination, const TCHAR* ptszFullPath);
 bool		ReadFileMap(CMemBuffer<BYTE>& byteDestination, const TCHAR* ptszFullPath);
 
 bool		ReadFile(CMemBuffer<TCHAR>& tDestination, const TCHAR* ptszFullPath);
 bool		ReadFileMap(CMemBuffer<TCHAR>& tDestination, const TCHAR* ptszFullPath);
-
-bool		ReadFile(_tstring& destString, const TCHAR* ptszFullPath);
-bool		ReadFileMap(_tstring& destString, const TCHAR* ptszFullPath);
 
 bool		SaveFile(const TCHAR* ptszFullPath, const BYTE* pbBuffer, const DWORD dwLength);
 bool		SaveAnsiFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize);
@@ -71,6 +69,10 @@ bool		SaveUnicodeBEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, cons
 bool		SaveUnicodeLEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize);
 bool		SaveUTF8BOMFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize);
 bool		SaveUTF8NOBOMFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize);
+#endif
+
+bool		ReadFile(_tstring& destString, const TCHAR* ptszFullPath);
+bool		ReadFileMap(_tstring& destString, const TCHAR* ptszFullPath);
 
 bool		GetFileInfoTime(const TCHAR* ptszFilePath, const int nCase, SYSTEMTIME& stLocal);
 bool		IsExistFile(const TCHAR* ptszFilePath);

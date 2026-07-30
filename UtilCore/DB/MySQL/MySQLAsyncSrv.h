@@ -7,6 +7,10 @@
 #ifndef __MYSQLASYNCSRV__H__
 #define __MYSQLASYNCSRV__H__
 
+#ifndef	__MYSQLCONNPOOL_H__
+#include <DB/MySQL/MySQLConnPool.h>
+#endif
+
 class CMySQLAsyncSrv
 {
 	// 매 DB 비동기 호출마다(핫패스) 조회되므로 O(log n) 트리 탐색인 std::map 대신

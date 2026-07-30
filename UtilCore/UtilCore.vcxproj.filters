@@ -34,6 +34,9 @@
     <Filter Include="Job">
       <UniqueIdentifier>{86278e25-6fe5-40b2-9f00-46ebe202375f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="DB\ADO">
+      <UniqueIdentifier>{9ce0ceff-384e-4b4b-a2bb-bd3c88850848}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Memory\Containers.h">
@@ -91,9 +94,6 @@
     <ClInclude Include="ServiceSvr.h" />
     <ClInclude Include="Memory\Singleton.h">
       <Filter>Memory</Filter>
-    </ClInclude>
-    <ClInclude Include="DB\AdoDB.h">
-      <Filter>DB</Filter>
     </ClInclude>
     <ClInclude Include="ServerConnectInfo.h" />
     <ClInclude Include="Thread\ThreadManager.h">
@@ -232,6 +232,15 @@
     <ClInclude Include="Thread\CacheAlignment.h">
       <Filter>Thread</Filter>
     </ClInclude>
+    <ClInclude Include="DB\ADO\AdoAsyncSrv.h">
+      <Filter>DB\ADO</Filter>
+    </ClInclude>
+    <ClInclude Include="DB\ADO\AdoConnPool.h">
+      <Filter>DB\ADO</Filter>
+    </ClInclude>
+    <ClInclude Include="DB\ADO\AdoDB.h">
+      <Filter>DB\ADO</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">
@@ -268,9 +277,6 @@
     <ClCompile Include="BaseGlobal.cpp" />
     <ClCompile Include="ServerConfig.cpp" />
     <ClCompile Include="ServiceSvr.cpp" />
-    <ClCompile Include="DB\AdoDB.cpp">
-      <Filter>DB</Filter>
-    </ClCompile>
     <ClCompile Include="Thread\ThreadManager.cpp">
       <Filter>Thread</Filter>
     </ClCompile>
@@ -367,6 +373,15 @@
     </ClCompile>
     <ClCompile Include="Memory\MemoryPool.cpp">
       <Filter>Memory</Filter>
+    </ClCompile>
+    <ClCompile Include="DB\ADO\AdoAsyncSrv.cpp">
+      <Filter>DB\ADO</Filter>
+    </ClCompile>
+    <ClCompile Include="DB\ADO\AdoConnPool.cpp">
+      <Filter>DB\ADO</Filter>
+    </ClCompile>
+    <ClCompile Include="DB\ADO\AdoDB.cpp">
+      <Filter>DB\ADO</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

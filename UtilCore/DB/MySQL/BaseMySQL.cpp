@@ -117,20 +117,18 @@ bool CBaseMySQL::Connect(const uint32 uiConnectTimeOut, const uint32 uiReadTimeO
 				LOG_ERROR(_T("%s, ErrorMsg : %s"), __TFUNCTION__, tszMessage);
 			}
 		}
-		else
-		{
-			TCHAR tszServerInfo[128] = { 0, };
-			TCHAR tszHostInfo[128] = { 0, };
-			unsigned long ulServerVersion = 0;
-			TCHAR tszCharacterSetName[128] = { 0, };
 
-			bool bServerInfoResult = GetServerInfo(tszServerInfo, _countof(tszServerInfo));
-			bool bHostInfoResult = GetHostInfo(tszHostInfo, _countof(tszHostInfo));
-			bool bVersionResult = GetServerVersion(ulServerVersion);
-			bool bCharsetResult = GetCharacterSetName(tszCharacterSetName, _countof(tszCharacterSetName));
-			if( bServerInfoResult && bHostInfoResult && bVersionResult && bCharsetResult)
-				LOG_DEBUG(_T("%s, Server: %s, DBMS: MySQL, Version: %s, Charset: %s"), __TFUNCTION__, tszHostInfo, tszServerInfo, tszCharacterSetName);
-		}
+		TCHAR tszHostInfo[128] = { 0, };
+		TCHAR tszServerInfo[128] = { 0, };
+		unsigned long ulServerVersion = 0;
+		TCHAR tszCharacterSetName[128] = { 0, };
+
+		bool bServerInfoResult = GetServerInfo(tszServerInfo, _countof(tszServerInfo));
+		bool bHostInfoResult = GetHostInfo(tszHostInfo, _countof(tszHostInfo));
+		bool bVersionResult = GetServerVersion(ulServerVersion);
+		bool bCharsetResult = GetCharacterSetName(tszCharacterSetName, _countof(tszCharacterSetName));
+		if( bServerInfoResult && bHostInfoResult && bVersionResult && bCharsetResult )
+			LOG_DEBUG(_T("%s, Server: %s, DBMS: MySQL, Version: %s, Charset: %s"), __TFUNCTION__, tszHostInfo, tszServerInfo, tszCharacterSetName);
 	}
 	catch( ... )
 	{
@@ -288,23 +286,31 @@ bool CBaseMySQL::GetClientVersion(unsigned long& ulClientVersion)
 //***************************************************************************
 //
 /// @brief MySQL 연결에 사용할 캐릭터셋 이름을 설정
-/// @param ptszCharacterSetName - 설정할 캐릭터셋 이름 문자열
-/// @param nBufferLength - 입력된 문자열 버퍼의 크기 (TCHAR 단위, 생략 가능 시 기본값 활용)
+/// @param ptszCharacterSetName - 설정할 캐릭터셋 이름 문자열 버퍼
+/// @param nBufferLength - 입력된 문자열 버퍼의 크기 (TCHAR 단위)
 /// @return 성공 시 true, 실패 시 false
 bool CBaseMySQL::SetCharacterSetName(const TCHAR* ptszCharacterSetName, int32 nBufferLength)
 {
-	if( ptszCharacterSetName == nullptr || nBufferLength <= 0 ) return false;
+	if( ptszCharacterSetName == nullptr || nBufferLength <= 0 )
+		return false;
+
+	// nBufferLength(버퍼 할당 크기) 범위 내에서 실제 문자열 데이터의 길이를 안전하게 구함 (널 문자 제외)
+	int32 nDataLength = static_cast<int32>(_tcsnlen(ptszCharacterSetName, nBufferLength));
+	if( nDataLength <= 0 )
+		return false;
 
 #ifdef _UNICODE	
-	// 유니코드(UTF-16) 문자열을 멀티바이트(ANSI/UTF-8 등)로 변환
-	int nLength = WideCharToMultiByte(CP_ACP, 0, ptszCharacterSetName, nBufferLength, NULL, 0, NULL, NULL);
-	if( nLength == 0 || DATABASE_CHARACTERSET_STRLEN < nLength ) return false;
+	// 유니코드(UTF-16) 문자열을 MySQL에서 사용하는 UTF-8 멀티바이트로 변환
+	// cchWideChar에는 실제 데이터 길이(nDataLength)를 전달합니다.
+	int nLength = WideCharToMultiByte(CP_UTF8, 0, ptszCharacterSetName, nDataLength, NULL, 0, NULL, NULL);
+	if( nLength <= 0 || static_cast<size_t>(nLength) >= _countof(m_szCharacterSet) )
+		return false;
 
-	if( WideCharToMultiByte(CP_ACP, 0, ptszCharacterSetName, nBufferLength, m_szCharacterSet, DATABASE_CHARACTERSET_STRLEN, NULL, NULL) == 0 )
+	if( WideCharToMultiByte(CP_UTF8, 0, ptszCharacterSetName, nDataLength, m_szCharacterSet, static_cast<int>(_countof(m_szCharacterSet)), NULL, NULL) == 0 )
 		return false;
 #else
-	// 멀티바이트 문자열 안전한 복사
-	if( strncpy_s(m_szCharacterSet, DATABASE_CHARACTERSET_STRLEN, ptszCharacterSetName, _TRUNCATE) != 0 )
+	// 멀티바이트 문자열 안전한 복사 (실제 데이터 길이 기준)
+	if( strncpy_s(m_szCharacterSet, _countof(m_szCharacterSet), ptszCharacterSetName, nDataLength) != 0 )
 		return false;
 #endif
 
@@ -322,21 +328,24 @@ bool CBaseMySQL::GetCharacterSetName(TCHAR* ptszCharacterSetName, int32 nBufferL
 	if( !m_bConnected || ptszCharacterSetName == nullptr || nBufferLength <= 0 ) return false;
 
 	// m_szCharacterSet에 설정된 값이 없으면 현재 연결된 기본 캐릭터셋을 가져와 저장
-	if( !m_szCharacterSet || strlen(m_szCharacterSet) < 1 )
+	if( strlen(m_szCharacterSet) < 1 )
 	{
 		const char* pszCurrentCharset = mysql_character_set_name(m_pConn);
 		if( pszCurrentCharset )
 		{
-			strncpy_s(m_szCharacterSet, DATABASE_CHARACTERSET_STRLEN, pszCurrentCharset, _TRUNCATE);
+			strncpy_s(m_szCharacterSet, _countof(m_szCharacterSet), pszCurrentCharset, _TRUNCATE);
 		}
 	}
 
-	if( !m_szCharacterSet ) return false;
+	if( strlen(m_szCharacterSet) < 1 ) return false;
 
 #ifdef _UNICODE	
-	int nLength = MultiByteToWideChar(CP_ACP, 0, m_szCharacterSet, -1, NULL, 0);
+	// m_szCharacterSet은 SetCharacterSetName()에서 CP_UTF8로 저장되므로 동일한 코드페이지로 복원
+	int nLength = MultiByteToWideChar(CP_UTF8, 0, m_szCharacterSet, -1, NULL, 0);
 	if( nLength == 0 || nBufferLength < nLength ) return false;
-	if( MultiByteToWideChar(CP_ACP, 0, m_szCharacterSet, -1, ptszCharacterSetName, nLength) == 0 ) return false;
+
+	// 출력 버퍼 크기로 nBufferLength 전달
+	if( MultiByteToWideChar(CP_UTF8, 0, m_szCharacterSet, -1, ptszCharacterSetName, nBufferLength) == 0 ) return false;
 #else
 	strncpy_s(ptszCharacterSetName, nBufferLength, m_szCharacterSet, _TRUNCATE);
 #endif
@@ -361,7 +370,11 @@ bool CBaseMySQL::GetCharacterSetInfo(MY_CHARSET_INFO& charset)
 //
 bool CBaseMySQL::GetEscapeString(char* pszDest, const char* pszSrc, int32 iLen)
 {
-	if( mysql_real_escape_string(m_pConn, pszDest, pszSrc, iLen) != 0 ) return false;
+	if( !m_bConnected || pszDest == nullptr || pszSrc == nullptr ) return false;
+
+	// mysql_real_escape_string()의 반환값은 성공/실패 플래그가 아니라 이스케이프된 문자열의 길이이므로
+	// (빈 문자열 입력 시 정상적으로도 0을 반환) 반환값으로 성공 여부를 판단하지 않는다.
+	mysql_real_escape_string(m_pConn, pszDest, pszSrc, iLen);
 
 	return true;
 }

@@ -104,7 +104,6 @@ using namespace std;
 #include <ServerConfig.h>
 
 #include <DB/DBCommon.h>
-#include <DB/AdoDB.h>
 #include <DB/BaseODBC.h>
 #include <DB/DBBind.h>
 #include <DB/DBModel.h>
@@ -114,6 +113,10 @@ using namespace std;
 #include <DB/DBAsyncSrv.h>
 #include <DB/OdbcConnPool.h>
 #include <DB/OdbcAsyncSrv.h>
+
+#include <DB/ADO/AdoDB.h>
+#include <DB/ADO/AdoConnPool.h>
+#include <DB/ADO/AdoAsyncSrv.h>
 
 #include <DB/MySQL/BaseMySQL.h>
 #include <DB/MySQL/MySQLConnPool.h>

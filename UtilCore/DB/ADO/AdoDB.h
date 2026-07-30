@@ -25,13 +25,14 @@ public:
 	CAdoDB();
 	virtual				~CAdoDB();
 
-	int					DBConnect(LPCTSTR lptszConnstring, const int nTimeOut);
+	int					Connect(const EDBClass dbClass, LPCTSTR lptszConnstring, const int nTimeOut);
 	void				ConCancel();
 	void				ConRollbackTrans();
 	void				ConCommitTrans();
 	long				ConBeginTrans();
 	void				ConClose();
 	BOOL				GetDBCon();
+	EDBClass			GetDBClass() const { return m_DbClass; }
 
 	BOOL				Open(LPCTSTR lptszSourceBuf, const long lOption = -1);
 	BOOL				Execute(LPCTSTR lptszSourceBuf, const long lOption = -1);
@@ -57,9 +58,27 @@ public:
 	_RecordsetPtr		GetRecPointer();
 	int					GetRecCount();
 	int					GetFieldCount();
+
 	void				GetFieldByIndex(_variant_t x, LPTSTR lptszValue, int nValueLen);
+	void				GetFieldByIndex(_variant_t x, long& lFieldValue);
+	void				GetFieldByIndex(_variant_t x, int32& nFieldValue);
+	void				GetFieldByIndex(_variant_t x, ulong& ulFieldValue);
+	void				GetFieldByIndex(_variant_t x, uint32& uFieldValue);
+	void				GetFieldByIndex(_variant_t x, double& dblFieldValue);
+	void				GetFieldByIndex(_variant_t x, _tstring& strFieldValue);
+
 	void				GetFieldByName(LPCTSTR lptszFieldName, LPTSTR lptszValue, int nValueLen);
 	void				GetFieldByName(LPCTSTR lptszFieldName, long& lFieldValue);
+	void				GetFieldByName(LPCTSTR lptszFieldName, int32& nFieldValue);
+	void				GetFieldByName(LPCTSTR lptszFieldName, ulong& ulFieldValue);
+	void				GetFieldByName(LPCTSTR lptszFieldName, uint32& uFieldValue);
+	void				GetFieldByName(LPCTSTR lptszFieldName, double& dblFieldValue);
+	void				GetFieldByName(LPCTSTR lptszFieldName, _tstring& strFieldValue);
+
+	BOOL				GetHostInfo(LPTSTR lptszOut, int nMaxLen);
+	BOOL				GetDBMSName(LPTSTR lptszOut, int nMaxLen);
+	BOOL				GetServerVersion(LPTSTR pszVersion, int nMaxLen);
+	BOOL				GetCharacterSetName(LPTSTR lptszOut, int nMaxLen);
 
 private:
 	BOOL				ISRSCon();
@@ -68,6 +87,8 @@ private:
 	BOOL				ISConnect();
 
 private:
+	EDBClass			m_DbClass;
+
 	_RecordsetPtr		m_pRs;
 	_CommandPtr			m_pCmd;
 	_ConnectionPtr		m_pCon;

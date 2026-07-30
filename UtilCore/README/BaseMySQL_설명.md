@@ -59,10 +59,10 @@
 
 | 함수 | 반환값 | 설명 |
 |---|---|---|
-| `SetCharacterSetName(ptszName)` | `bool` | 지정한 문자셋 이름을 `m_szCharacterSet`에 저장(유니코드 빌드 시 `WideCharToMultiByte`로 변환). 실제 서버 적용은 다음 `Connect()` 시점에 이루어짐. |
-| `GetCharacterSetName(ptszName)` | `bool` | `m_szCharacterSet`이 비어 있으면 `mysql_character_set_name()`으로 채운 뒤 반환. |
+| `SetCharacterSetName(ptszCharacterSetName, nBufferLength)` | `bool` | `nBufferLength`는 입력 버퍼의 할당 크기(capacity)로 취급되며, `_tcsnlen(ptszCharacterSetName, nBufferLength)`로 그 범위 내에서 실제 문자열 길이(`nDataLength`, 널 문자 제외)를 안전하게 구한 뒤 이 길이만큼만 `m_szCharacterSet`에 저장한다. 유니코드 빌드에서는 `WideCharToMultiByte(CP_UTF8, ...)`로 변환하며, 변환 결과 길이가 `_countof(m_szCharacterSet)` 이상이면(버퍼 오버런 방지) 실패 처리한다. ANSI 빌드에서는 `strncpy_s`로 `nDataLength`만큼 복사한다. 실제 서버 적용은 다음 `Connect()` 시점에 이루어짐. |
+| `GetCharacterSetName(ptszCharacterSetName, nBufferLength)` | `bool` | `nBufferLength`는 출력 버퍼의 크기를 의미하며(입력 버퍼 의미인 `SetCharacterSetName`의 `nBufferLength`와는 반대), `m_szCharacterSet`이 비어 있으면 `mysql_character_set_name()`으로 채운 뒤 해당 버퍼 크기 내에서 결과를 기록해 반환한다. 유니코드 빌드에서는 `SetCharacterSetName()`이 저장한 인코딩(`CP_UTF8`)과 동일한 코드페이지로 `MultiByteToWideChar(CP_UTF8, ...)` 변환하여 왕복 인코딩을 일치시킨다. |
 | `GetCharacterSetInfo(charset)` | `bool` | `mysql_get_character_set_info()`로 `MY_CHARSET_INFO` 구조체를 채움. |
-| `GetEscapeString(dest, src, len)` | `bool` | `mysql_real_escape_string()` 래핑. |
+| `GetEscapeString(dest, src, len)` | `bool` | `mysql_real_escape_string()` 래핑. 이 API의 반환값은 성공/실패 플래그가 아니라 이스케이프된 문자열 길이(빈 문자열 입력 시 정상적으로도 0)이므로, 반환값으로 성공 여부를 판단하지 않고 `m_bConnected`/널 포인터 사전 검증 후 항상 `true`를 반환한다. |
 
 #### 트랜잭션
 

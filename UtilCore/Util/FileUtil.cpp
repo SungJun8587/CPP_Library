@@ -123,6 +123,7 @@ EEncoding GetFileEncodingType(const TCHAR* ptszFullPath)
 	return eFileType;
 }
 
+#if defined(USE_MEMBUFFER)
 //***************************************************************************
 //
 bool ReadFile(CMemBuffer<BYTE>& byteDestination, const TCHAR* ptszFullPath)
@@ -576,6 +577,353 @@ bool ReadFileMap(CMemBuffer<TCHAR>& tDestination, const TCHAR* ptszFullPath)
 	return bIsProcess;
 }
 
+//***************************************************************************
+//
+bool SaveAnsiFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
+{
+	bool	bReturn = false;
+	long	lWriteSize = 0;
+	DWORD	dwTotFileSize = 0;
+	DWORD	dwWrittenSize = 0;
+	DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
+	DWORD	dwWriteOffset = 0;
+	DWORD	dwWriteSize = 0;
+	char* pszBuffer = nullptr;
+
+	HANDLE	hFile;
+
+	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
+	if( ptszBuffer == nullptr || _tcslen(ptszBuffer) < 1 ) return false;
+
+#ifdef _UNICODE
+	CMemBuffer<char>	StrBuffer;
+
+	if( UnicodeToAnsi(StrBuffer, ptszBuffer, _tcslen(ptszBuffer) + 1) != 0 ) return false;
+
+	pszBuffer = StrBuffer.GetBuffer();
+#else
+	pszBuffer = (char*)ptszBuffer;
+#endif
+
+	hFile = CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	if( hFile == INVALID_HANDLE_VALUE )
+	{
+		CloseHandle(hFile);
+		return false;
+	}
+
+	dwTotFileSize = (DWORD)strlen(pszBuffer);
+
+	if( dwTotFileSize > dwMaxWriteSize )
+		dwWriteSize = dwMaxWriteSize;
+	else dwWriteSize = dwTotFileSize;
+
+	while( 1 )
+	{
+		bReturn = WriteFile(hFile, pszBuffer + dwWriteOffset, (DWORD)dwWriteSize, (LPDWORD)&dwWrittenSize, NULL);
+		if( !bReturn )
+		{
+			CloseHandle(hFile);
+			return false;
+		}
+
+		if( dwMaxWriteSize > dwWrittenSize ) break;
+
+		dwWriteOffset = dwWriteOffset + dwWriteSize;
+		lWriteSize = dwTotFileSize - dwWriteOffset - dwMaxWriteSize;
+		if( lWriteSize < 0 )
+			dwWriteSize = dwTotFileSize - dwWriteOffset;
+		else dwWriteSize = dwMaxWriteSize;
+	}
+
+	CloseHandle(hFile);
+
+	return true;
+}
+
+//***************************************************************************
+//
+bool SaveUnicodeBEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
+{
+	bool	bReturn = false;
+	DWORD	dwTotFileSize = 0;
+	DWORD	dwWrittenSize = 0;
+	DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
+	DWORD	dwWriteOffset = 0;
+	DWORD	dwWriteSize = 0;
+	char	szChar[3];
+	wchar_t	wcChar = L'\0';
+	wchar_t	wszChar[2];
+	wchar_t* pwszBuffer = nullptr;
+
+	HANDLE	hFile;
+
+	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
+	if( ptszBuffer == nullptr || _tcslen(ptszBuffer) < 1 ) return false;
+
+#ifdef _UNICODE
+	pwszBuffer = (TCHAR*)ptszBuffer;
+#else
+	CMemBuffer<wchar_t>	WStrBuffer;
+
+	if( AnsiToUnicode(WStrBuffer, ptszBuffer, BufferSize) != 0 ) return false;
+
+	pwszBuffer = WStrBuffer.GetBuffer();
+#endif
+
+	hFile = CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	if( hFile == INVALID_HANDLE_VALUE )
+	{
+		CloseHandle(hFile);
+		return false;
+	}
+
+	sprintf_s(szChar, 3, "%c%c", UNICODE_BE_FILE_IDENTIFIER_BYTE1, UNICODE_BE_FILE_IDENTIFIER_BYTE2);
+	bReturn = WriteFile(hFile, szChar, static_cast<DWORD>(strlen(szChar)), &dwWrittenSize, NULL);
+	if( !bReturn )
+	{
+		CloseHandle(hFile);
+		return false;
+	}
+
+	while( *pwszBuffer )
+	{
+		wcChar = *pwszBuffer;
+
+		wcChar = SWAP16(wcChar);
+		if( wcChar == 0xCDCD ) break;
+
+		swprintf_s(wszChar, 2, L"%c", wcChar);
+		bReturn = WriteFile(hFile, wszChar, (DWORD)wcslen(wszChar) + 1, &dwWrittenSize, NULL);
+		if( !bReturn )
+		{
+			CloseHandle(hFile);
+			return false;
+		}
+
+		pwszBuffer++;
+	}
+
+	CloseHandle(hFile);
+
+	return true;
+}
+
+//***************************************************************************
+//
+bool SaveUnicodeLEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
+{
+	bool	bReturn = false;
+	long	lWriteSize = 0;
+	DWORD	dwTotFileSize = 0;
+	DWORD	dwWrittenSize = 0;
+	DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
+	DWORD	dwWriteOffset = 0;
+	DWORD	dwWriteSize = 0;
+	char	szChar[3];
+	wchar_t* pwszBuffer = nullptr;
+
+	HANDLE	hFile;
+
+	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
+	if( ptszBuffer == nullptr || _tcslen(ptszBuffer) < 1 ) return false;
+
+#ifdef _UNICODE
+	pwszBuffer = (TCHAR*)ptszBuffer;
+#else
+	CMemBuffer<wchar_t>	WStrBuffer;
+
+	if( AnsiToUnicode(WStrBuffer, ptszBuffer, BufferSize) != 0 ) return false;
+
+	pwszBuffer = WStrBuffer.GetBuffer();
+#endif
+
+	hFile = CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	if( hFile == INVALID_HANDLE_VALUE )
+	{
+		CloseHandle(hFile);
+		return false;
+	}
+
+	sprintf_s(szChar, 3, "%c%c", UNICODE_LE_FILE_IDENTIFIER_BYTE1, UNICODE_LE_FILE_IDENTIFIER_BYTE2);
+	bReturn = WriteFile(hFile, szChar, static_cast<DWORD>(strlen(szChar)), &dwWrittenSize, NULL);
+	if( !bReturn )
+	{
+		CloseHandle(hFile);
+		return false;
+	}
+
+	dwTotFileSize = ((DWORD)wcslen(pwszBuffer) * 2);
+
+	if( dwTotFileSize > dwMaxWriteSize )
+		dwWriteSize = dwMaxWriteSize;
+	else dwWriteSize = dwTotFileSize;
+
+	while( 1 )
+	{
+		bReturn = WriteFile(hFile, pwszBuffer + (dwWriteOffset / 2), dwWriteSize, &dwWrittenSize, NULL);
+		if( !bReturn )
+		{
+			CloseHandle(hFile);
+			return false;
+		}
+
+		if( dwMaxWriteSize > dwWrittenSize ) break;
+
+		dwWriteOffset = dwWriteOffset + dwWriteSize;
+		lWriteSize = dwTotFileSize - dwWriteOffset - dwMaxWriteSize;
+		if( lWriteSize < 0 )
+			dwWriteSize = dwTotFileSize - dwWriteOffset;
+		else dwWriteSize = dwMaxWriteSize;
+	}
+
+	CloseHandle(hFile);
+
+	return true;
+}
+
+//***************************************************************************
+//
+bool SaveUTF8BOMFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
+{
+	bool	bReturn = false;
+	long	lWriteSize = 0;
+	DWORD	dwTotFileSize = 0;
+	DWORD	dwWrittenSize = 0;
+	DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
+	DWORD	dwWriteOffset = 0;
+	DWORD	dwWriteSize = 0;
+	char	szChar[4];
+	char* pszBuffer = nullptr;
+
+	HANDLE	hFile;
+
+	CMemBuffer<char>	StrBuffer;
+
+	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
+	if( ptszBuffer == nullptr || _tcslen(ptszBuffer) < 1 ) return false;
+
+#ifdef _UNICODE
+	if( UnicodeToUtf8(StrBuffer, ptszBuffer, BufferSize) != 0 ) return false;
+
+	pszBuffer = StrBuffer.GetBuffer();
+#else
+	if( AnsiToUtf8(StrBuffer, ptszBuffer, BufferSize) != 0 ) return false;
+
+	pszBuffer = StrBuffer.GetBuffer();
+#endif
+
+	hFile = CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	if( hFile == INVALID_HANDLE_VALUE )
+	{
+		CloseHandle(hFile);
+		return false;
+	}
+
+	sprintf_s(szChar, 4, "%c%c%c", UTF_FILE_IDENTIFIER_BYTE1, UTF_FILE_IDENTIFIER_BYTE2, UTF_FILE_IDENTIFIER_BYTE3);
+	bReturn = WriteFile(hFile, szChar, static_cast<DWORD>(strlen(szChar)), &dwWrittenSize, NULL);
+	if( !bReturn )
+	{
+		CloseHandle(hFile);
+		return false;
+	}
+
+	dwTotFileSize = (DWORD)strlen(pszBuffer);
+
+	if( dwTotFileSize > dwMaxWriteSize )
+		dwWriteSize = dwMaxWriteSize;
+	else dwWriteSize = dwTotFileSize;
+
+	while( 1 )
+	{
+		bReturn = WriteFile(hFile, pszBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL);
+		if( !bReturn )
+		{
+			CloseHandle(hFile);
+			return false;
+		}
+
+		if( dwMaxWriteSize > dwWrittenSize ) break;
+
+		dwWriteOffset = dwWriteOffset + dwWriteSize;
+		lWriteSize = dwTotFileSize - dwWriteOffset - dwMaxWriteSize;
+		if( lWriteSize < 0 )
+			dwWriteSize = dwTotFileSize - dwWriteOffset;
+		else dwWriteSize = dwMaxWriteSize;
+	}
+
+	CloseHandle(hFile);
+
+	return true;
+}
+
+//***************************************************************************
+//
+bool SaveUTF8NOBOMFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
+{
+	bool	bReturn = false;
+	long	lWriteSize = 0;
+	DWORD	dwTotFileSize = 0;
+	DWORD	dwWrittenSize = 0;
+	DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
+	DWORD	dwWriteOffset = 0;
+	DWORD	dwWriteSize = 0;
+	char* pszBuffer = nullptr;
+
+	HANDLE	hFile;
+
+	CMemBuffer<char>	StrBuffer;
+
+	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
+	if( ptszBuffer == nullptr || _tcslen(ptszBuffer) < 1 ) return false;
+
+#ifdef _UNICODE
+	if( UnicodeToUtf8(StrBuffer, ptszBuffer, BufferSize) != 0 ) return false;
+
+	pszBuffer = StrBuffer.GetBuffer();
+#else
+	if( AnsiToUtf8(StrBuffer, ptszBuffer, BufferSize) != 0 ) return false;
+
+	pszBuffer = StrBuffer.GetBuffer();
+#endif
+
+	hFile = CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	if( hFile == INVALID_HANDLE_VALUE )
+	{
+		CloseHandle(hFile);
+		return false;
+	}
+
+	dwTotFileSize = (DWORD)strlen(pszBuffer);
+
+	if( dwTotFileSize > dwMaxWriteSize )
+		dwWriteSize = dwMaxWriteSize;
+	else dwWriteSize = dwTotFileSize;
+
+	while( 1 )
+	{
+		bReturn = WriteFile(hFile, pszBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL);
+		if( !bReturn )
+		{
+			CloseHandle(hFile);
+			return false;
+		}
+
+		if( dwMaxWriteSize > dwWrittenSize ) break;
+
+		dwWriteOffset = dwWriteOffset + dwWriteSize;
+		lWriteSize = dwTotFileSize - dwWriteOffset - dwMaxWriteSize;
+		if( lWriteSize < 0 )
+			dwWriteSize = dwTotFileSize - dwWriteOffset;
+		else dwWriteSize = dwMaxWriteSize;
+	}
+
+	CloseHandle(hFile);
+
+	return true;
+}
+#endif
+
 #ifdef _STRING_
 //***************************************************************************
 //
@@ -974,351 +1322,7 @@ bool SaveFile(const TCHAR* ptszFullPath, const BYTE* pbBuffer, const DWORD dwLen
 	return true;
 }
 
-//***************************************************************************
-//
-bool SaveAnsiFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
-{
-	bool	bReturn = false;
-	long	lWriteSize = 0;
-	DWORD	dwTotFileSize = 0;
-	DWORD	dwWrittenSize = 0;
-	DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
-	DWORD	dwWriteOffset = 0;
-	DWORD	dwWriteSize = 0;
-	char* pszBuffer = nullptr;
 
-	HANDLE	hFile;
-
-	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
-	if( ptszBuffer == nullptr || _tcslen(ptszBuffer) < 1 ) return false;
-
-#ifdef _UNICODE
-	CMemBuffer<char>	StrBuffer;
-
-	if( UnicodeToAnsi(StrBuffer, ptszBuffer, _tcslen(ptszBuffer) + 1) != 0 ) return false;
-
-	pszBuffer = StrBuffer.GetBuffer();
-#else
-	pszBuffer = (char*)ptszBuffer;
-#endif
-
-	hFile = CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
-	if( hFile == INVALID_HANDLE_VALUE )
-	{
-		CloseHandle(hFile);
-		return false;
-	}
-
-	dwTotFileSize = (DWORD)strlen(pszBuffer);
-
-	if( dwTotFileSize > dwMaxWriteSize )
-		dwWriteSize = dwMaxWriteSize;
-	else dwWriteSize = dwTotFileSize;
-
-	while( 1 )
-	{
-		bReturn = WriteFile(hFile, pszBuffer + dwWriteOffset, (DWORD)dwWriteSize, (LPDWORD)&dwWrittenSize, NULL);
-		if( !bReturn )
-		{
-			CloseHandle(hFile);
-			return false;
-		}
-
-		if( dwMaxWriteSize > dwWrittenSize ) break;
-
-		dwWriteOffset = dwWriteOffset + dwWriteSize;
-		lWriteSize = dwTotFileSize - dwWriteOffset - dwMaxWriteSize;
-		if( lWriteSize < 0 )
-			dwWriteSize = dwTotFileSize - dwWriteOffset;
-		else dwWriteSize = dwMaxWriteSize;
-	}
-
-	CloseHandle(hFile);
-
-	return true;
-}
-
-//***************************************************************************
-//
-bool SaveUnicodeBEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
-{
-	bool	bReturn = false;
-	DWORD	dwTotFileSize = 0;
-	DWORD	dwWrittenSize = 0;
-	DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
-	DWORD	dwWriteOffset = 0;
-	DWORD	dwWriteSize = 0;
-	char	szChar[3];
-	wchar_t	wcChar = L'\0';
-	wchar_t	wszChar[2];
-	wchar_t* pwszBuffer = nullptr;
-
-	HANDLE	hFile;
-
-	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
-	if( ptszBuffer == nullptr || _tcslen(ptszBuffer) < 1 ) return false;
-
-#ifdef _UNICODE
-	pwszBuffer = (TCHAR*)ptszBuffer;
-#else
-	CMemBuffer<wchar_t>	WStrBuffer;
-
-	if( AnsiToUnicode(WStrBuffer, ptszBuffer, BufferSize) != 0 ) return false;
-
-	pwszBuffer = WStrBuffer.GetBuffer();
-#endif
-
-	hFile = CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
-	if( hFile == INVALID_HANDLE_VALUE )
-	{
-		CloseHandle(hFile);
-		return false;
-	}
-
-	sprintf_s(szChar, 3, "%c%c", UNICODE_BE_FILE_IDENTIFIER_BYTE1, UNICODE_BE_FILE_IDENTIFIER_BYTE2);
-	bReturn = WriteFile(hFile, szChar, static_cast<DWORD>(strlen(szChar)), &dwWrittenSize, NULL);
-	if( !bReturn )
-	{
-		CloseHandle(hFile);
-		return false;
-	}
-
-	while( *pwszBuffer )
-	{
-		wcChar = *pwszBuffer;
-
-		wcChar = SWAP16(wcChar);
-		if( wcChar == 0xCDCD ) break;
-
-		swprintf_s(wszChar, 2, L"%c", wcChar);
-		bReturn = WriteFile(hFile, wszChar, (DWORD)wcslen(wszChar) + 1, &dwWrittenSize, NULL);
-		if( !bReturn )
-		{
-			CloseHandle(hFile);
-			return false;
-		}
-
-		pwszBuffer++;
-	}
-
-	CloseHandle(hFile);
-
-	return true;
-}
-
-//***************************************************************************
-//
-bool SaveUnicodeLEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
-{
-	bool	bReturn = false;
-	long	lWriteSize = 0;
-	DWORD	dwTotFileSize = 0;
-	DWORD	dwWrittenSize = 0;
-	DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
-	DWORD	dwWriteOffset = 0;
-	DWORD	dwWriteSize = 0;
-	char	szChar[3];
-	wchar_t* pwszBuffer = nullptr;
-
-	HANDLE	hFile;
-
-	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
-	if( ptszBuffer == nullptr || _tcslen(ptszBuffer) < 1 ) return false;
-
-#ifdef _UNICODE
-	pwszBuffer = (TCHAR*)ptszBuffer;
-#else
-	CMemBuffer<wchar_t>	WStrBuffer;
-
-	if( AnsiToUnicode(WStrBuffer, ptszBuffer, BufferSize) != 0 ) return false;
-
-	pwszBuffer = WStrBuffer.GetBuffer();
-#endif
-
-	hFile = CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
-	if( hFile == INVALID_HANDLE_VALUE )
-	{
-		CloseHandle(hFile);
-		return false;
-	}
-
-	sprintf_s(szChar, 3, "%c%c", UNICODE_LE_FILE_IDENTIFIER_BYTE1, UNICODE_LE_FILE_IDENTIFIER_BYTE2);
-	bReturn = WriteFile(hFile, szChar, static_cast<DWORD>(strlen(szChar)), &dwWrittenSize, NULL);
-	if( !bReturn )
-	{
-		CloseHandle(hFile);
-		return false;
-	}
-
-	dwTotFileSize = ((DWORD)wcslen(pwszBuffer) * 2);
-
-	if( dwTotFileSize > dwMaxWriteSize )
-		dwWriteSize = dwMaxWriteSize;
-	else dwWriteSize = dwTotFileSize;
-
-	while( 1 )
-	{
-		bReturn = WriteFile(hFile, pwszBuffer + (dwWriteOffset / 2), dwWriteSize, &dwWrittenSize, NULL);
-		if( !bReturn )
-		{
-			CloseHandle(hFile);
-			return false;
-		}
-
-		if( dwMaxWriteSize > dwWrittenSize ) break;
-
-		dwWriteOffset = dwWriteOffset + dwWriteSize;
-		lWriteSize = dwTotFileSize - dwWriteOffset - dwMaxWriteSize;
-		if( lWriteSize < 0 )
-			dwWriteSize = dwTotFileSize - dwWriteOffset;
-		else dwWriteSize = dwMaxWriteSize;
-	}
-
-	CloseHandle(hFile);
-
-	return true;
-}
-
-//***************************************************************************
-//
-bool SaveUTF8BOMFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
-{
-	bool	bReturn = false;
-	long	lWriteSize = 0;
-	DWORD	dwTotFileSize = 0;
-	DWORD	dwWrittenSize = 0;
-	DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
-	DWORD	dwWriteOffset = 0;
-	DWORD	dwWriteSize = 0;
-	char	szChar[4];
-	char* pszBuffer = nullptr;
-
-	HANDLE	hFile;
-
-	CMemBuffer<char>	StrBuffer;
-
-	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
-	if( ptszBuffer == nullptr || _tcslen(ptszBuffer) < 1 ) return false;
-
-#ifdef _UNICODE
-	if( UnicodeToUtf8(StrBuffer, ptszBuffer, BufferSize) != 0 ) return false;
-
-	pszBuffer = StrBuffer.GetBuffer();
-#else
-	if( AnsiToUtf8(StrBuffer, ptszBuffer, BufferSize) != 0 ) return false;
-
-	pszBuffer = StrBuffer.GetBuffer();
-#endif
-
-	hFile = CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
-	if( hFile == INVALID_HANDLE_VALUE )
-	{
-		CloseHandle(hFile);
-		return false;
-	}
-
-	sprintf_s(szChar, 4, "%c%c%c", UTF_FILE_IDENTIFIER_BYTE1, UTF_FILE_IDENTIFIER_BYTE2, UTF_FILE_IDENTIFIER_BYTE3);
-	bReturn = WriteFile(hFile, szChar, static_cast<DWORD>(strlen(szChar)), &dwWrittenSize, NULL);
-	if( !bReturn )
-	{
-		CloseHandle(hFile);
-		return false;
-	}
-
-	dwTotFileSize = (DWORD)strlen(pszBuffer);
-
-	if( dwTotFileSize > dwMaxWriteSize )
-		dwWriteSize = dwMaxWriteSize;
-	else dwWriteSize = dwTotFileSize;
-
-	while( 1 )
-	{
-		bReturn = WriteFile(hFile, pszBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL);
-		if( !bReturn )
-		{
-			CloseHandle(hFile);
-			return false;
-		}
-
-		if( dwMaxWriteSize > dwWrittenSize ) break;
-
-		dwWriteOffset = dwWriteOffset + dwWriteSize;
-		lWriteSize = dwTotFileSize - dwWriteOffset - dwMaxWriteSize;
-		if( lWriteSize < 0 )
-			dwWriteSize = dwTotFileSize - dwWriteOffset;
-		else dwWriteSize = dwMaxWriteSize;
-	}
-
-	CloseHandle(hFile);
-
-	return true;
-}
-
-//***************************************************************************
-//
-bool SaveUTF8NOBOMFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
-{
-	bool	bReturn = false;
-	long	lWriteSize = 0;
-	DWORD	dwTotFileSize = 0;
-	DWORD	dwWrittenSize = 0;
-	DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
-	DWORD	dwWriteOffset = 0;
-	DWORD	dwWriteSize = 0;
-	char* pszBuffer = nullptr;
-
-	HANDLE	hFile;
-
-	CMemBuffer<char>	StrBuffer;
-
-	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
-	if( ptszBuffer == nullptr || _tcslen(ptszBuffer) < 1 ) return false;
-
-#ifdef _UNICODE
-	if( UnicodeToUtf8(StrBuffer, ptszBuffer, BufferSize) != 0 ) return false;
-
-	pszBuffer = StrBuffer.GetBuffer();
-#else
-	if( AnsiToUtf8(StrBuffer, ptszBuffer, BufferSize) != 0 ) return false;
-
-	pszBuffer = StrBuffer.GetBuffer();
-#endif
-
-	hFile = CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
-	if( hFile == INVALID_HANDLE_VALUE )
-	{
-		CloseHandle(hFile);
-		return false;
-	}
-
-	dwTotFileSize = (DWORD)strlen(pszBuffer);
-
-	if( dwTotFileSize > dwMaxWriteSize )
-		dwWriteSize = dwMaxWriteSize;
-	else dwWriteSize = dwTotFileSize;
-
-	while( 1 )
-	{
-		bReturn = WriteFile(hFile, pszBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL);
-		if( !bReturn )
-		{
-			CloseHandle(hFile);
-			return false;
-		}
-
-		if( dwMaxWriteSize > dwWrittenSize ) break;
-
-		dwWriteOffset = dwWriteOffset + dwWriteSize;
-		lWriteSize = dwTotFileSize - dwWriteOffset - dwMaxWriteSize;
-		if( lWriteSize < 0 )
-			dwWriteSize = dwTotFileSize - dwWriteOffset;
-		else dwWriteSize = dwMaxWriteSize;
-	}
-
-	CloseHandle(hFile);
-
-	return true;
-}
 
 //***************************************************************************
 //
