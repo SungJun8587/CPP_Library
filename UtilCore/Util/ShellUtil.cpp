@@ -663,10 +663,9 @@ HANDLE GetFileHandleDuplicate(TCHAR* ptszDestFullPath, TCHAR* ptszDestFileNameEx
 	return hFile;
 }
 
-#if defined(USE_MEMBUFFER)
 //***************************************************************************
 //
-bool GetProductKeyExtract(CMemBuffer<TCHAR>& TProductKey, const BYTE* pbDigitalProductID, const DWORD dwLength, const bool bIsExtractBytesRange)
+bool GetProductKeyExtract(_tstring& TProductKey, const BYTE* pbDigitalProductID, const DWORD dwLength, const bool bIsExtractBytesRange)
 {
 	int		nKeyStartIndex = 0;
 	int		nKeyEndIndex = 0;
@@ -674,9 +673,8 @@ bool GetProductKeyExtract(CMemBuffer<TCHAR>& TProductKey, const BYTE* pbDigitalP
 	BYTE	bProductKeyExtract[16];
 	BYTE* pbSrcDigitalProductID = nullptr;
 	TCHAR* ptszDecodedChars = nullptr;
-	TCHAR* ptszDestLoc = nullptr;
 
-	TCHAR ptszKeyChars [] = {
+	TCHAR ptszKeyChars[] = {
 							_T('B'), _T('C'), _T('D'), _T('F'), _T('G'), _T('H'), _T('J'), _T('K'), _T('M'),
 							_T('P'), _T('Q'), _T('R'), _T('T'), _T('V'), _T('W'), _T('X'), _T('Y'),
 							_T('2'), _T('3'), _T('4'), _T('6'), _T('7'), _T('8'), _T('9'), _T('\0')
@@ -705,12 +703,14 @@ bool GetProductKeyExtract(CMemBuffer<TCHAR>& TProductKey, const BYTE* pbDigitalP
 		bProductKeyExtract[i - nKeyStartIndex] = pbSrcDigitalProductID[i];
 	bProductKeyExtract[15] = '\0';
 
+	delete[] pbSrcDigitalProductID;
+
 	ptszDecodedChars = new TCHAR[nDecodeLength + 1];
 	for( int i = nDecodeLength - 1; i >= 0; i-- )
 	{
 		if( (i + 1) % 6 == 0 )
 		{
-			ptszDecodedChars[i] = '-';
+			ptszDecodedChars[i] = _T('-');
 		}
 		else
 		{
@@ -727,17 +727,11 @@ bool GetProductKeyExtract(CMemBuffer<TCHAR>& TProductKey, const BYTE* pbDigitalP
 			}
 		}
 	}
-	ptszDecodedChars[nDecodeLength] = '\0';
+	ptszDecodedChars[nDecodeLength] = _T('\0');
 
 	// Remove first character and put 'N' in the right place
 	if( nIsContainsN != 0 )
 	{
-		CMemBuffer<TCHAR> TDestReplace;
-		CMemBuffer<TCHAR> TDestMid01;
-		CMemBuffer<TCHAR> TDestMid02;
-		CMemBuffer<TCHAR> TDestAppend01;
-		CMemBuffer<TCHAR> TDestAppend02;
-
 		int nFirstLetterIndex = 0;
 
 		for( int k = 0; k < nNumLetters; k++ )
@@ -747,28 +741,39 @@ bool GetProductKeyExtract(CMemBuffer<TCHAR>& TProductKey, const BYTE* pbDigitalP
 			break;
 		}
 
-		StrReplace(TDestReplace, ptszDecodedChars + 1, _T("-"), _T(""));
-		StrMid(TDestMid01, TDestReplace.GetBuffer(), 1, nFirstLetterIndex);
-		StrMid(TDestMid02, TDestReplace.GetBuffer(), nFirstLetterIndex + 1, TDestReplace.GetBufSize() - (nFirstLetterIndex + 1));
-		StrAppend(TDestAppend01, TDestMid01.GetBuffer(), _T("N"));
-		StrAppend(TDestAppend02, TDestAppend01.GetBuffer(), TDestMid02.GetBuffer());
-		StrCatLocationToken(TProductKey, TDestAppend02.GetBuffer(), 5, _T('-'));
+		_tstring strReplace;
+		_tstring strTemp = ptszDecodedChars + 1;
+		for( TCHAR ch : strTemp )
+		{
+			if( ch != _T('-') ) strReplace += ch;
+		}
+
+		_tstring strMid01 = strReplace.substr(1, nFirstLetterIndex);
+		_tstring strMid02 = strReplace.substr(nFirstLetterIndex + 1);
+		_tstring strAppend01 = strMid01 + _T("N");
+		_tstring strAppend02 = strAppend01 + strMid02;
+
+		_tstring strFinal;
+		for( size_t i = 0; i < strAppend02.length(); ++i )
+		{
+			if( i > 0 && i % 5 == 0 )
+			{
+				strFinal += _T('-');
+			}
+			strFinal += strAppend02[i];
+		}
+		TProductKey = strFinal;
 	}
 	else
 	{
-		TProductKey.Init(nDecodeLength + 1);
-
-		ptszDestLoc = TProductKey.GetBuffer();
-
-		_tcsncpy_s(ptszDestLoc, nDecodeLength, ptszDecodedChars, _TRUNCATE);
+		TProductKey = ptszDecodedChars;
 	}
 
 	if( ptszDecodedChars )
 	{
-		delete []ptszDecodedChars;
+		delete[]ptszDecodedChars;
 		ptszDecodedChars = nullptr;
 	}
 
 	return true;
 }
-#endif

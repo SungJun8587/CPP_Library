@@ -102,6 +102,22 @@
 | `GetDBClass()` | `m_DbClass` 반환 |
 | `GetServerName / GetDBMSName / GetDBMSVersion / GetServerCharacterSet` | `SQLGetInfo` 또는 (캐릭터셋의 경우) DBMS별 쿼리 실행으로 서버 정보 조회 |
 
+### 5.2.1 DBMS별 연결 문자열 형식
+
+`Connect()`는 `SQLDriverConnect`를 `SQL_DRIVER_NOPROMPT` 옵션으로 호출하므로, 별도 다이얼로그 없이 바로 접속이 성사되려면 `m_tszDSN`에 담기는 연결 문자열이 DBMS 드라이버가 요구하는 키-값 쌍을 빠짐없이 갖추고 있어야 한다. `m_DbClass`로 구분되는 세 DBMS는 드라이버 이름과 필수 키가 서로 달라 아래와 같이 형식이 갈린다.
+
+| DBMS (`EDBClass`) | 드라이버 키 | 필수 키 | 예시 |
+|---|---|---|---|
+| `MSSQL` | `DRIVER={SQL Server}` 또는 `{ODBC Driver 17/18 for SQL Server}` | `SERVER`, `DATABASE`, `UID`, `PWD` | `DRIVER={ODBC Driver 17 for SQL Server};SERVER=192.168.0.10,1433;DATABASE=GameDB;UID=sa;PWD=****;` |
+| `MYSQL` | `DRIVER={MySQL ODBC 8.0 Unicode Driver}` | `SERVER`, `DATABASE`, `USER`, `PASSWORD`, `PORT` | `DRIVER={MySQL ODBC 8.0 Unicode Driver};SERVER=192.168.0.20;PORT=3306;DATABASE=game;USER=root;PASSWORD=****;OPTION=3;` |
+| `ORACLE` | `DRIVER={Oracle in OraClient19Home1}` (또는 Instant Client 드라이버명) | `DBQ`, `UID`, `PWD` | `DRIVER={Oracle in instantclient_19_18};DBQ=192.168.0.30:1521/ORCLPDB;UID=game_user;PWD=****;` |
+
+- **DSN 방식**도 병행 가능하다. 시스템/사용자 DSN을 미리 등록해 두면 `DSN=MyDSN;UID=...;PWD=...;` 형태로 축약할 수 있으며, 이 경우 서버 주소·포트 등의 나머지 정보는 DSN 설정에 위임된다. `CBaseODBC(EDBClass, const TCHAR* ptszDSN, ...)` 생성자는 이 문자열을 그대로 `m_tszDSN`에 복사해 두었다가 `Connect()`에서 사용한다.
+- **MySQL의 `OPTION` 플래그**는 비트마스크로 동작을 조합하며, `OPTION=3`(`FLAG_FOUND_ROWS`(1) + `FLAG_MULTI_STATEMENTS`(2) 등 드라이버 버전에 따라 의미가 다름)처럼 필요한 값만 조합해 사용한다.
+- **Oracle의 `DBQ`**는 TNS 별칭(`DBQ=ORCLPDB`, `tnsnames.ora`에 등록된 이름) 또는 Easy Connect 문자열(`host:port/service_name`) 두 방식 모두 지원되며, TNS 파일 관리를 피하고 싶을 때는 Easy Connect 방식이 더 간단하다.
+- 세 DBMS 모두 비밀번호에 `;`, `{`, `}` 문자가 포함되면 드라이버가 값 경계를 오인식할 수 있으므로, 필요시 `PWD={...}`처럼 중괄호로 감싸 이스케이프해야 한다.
+- `GetServerCharacterSet()`이 `m_DbClass`에 따라 다른 조회 쿼리를 쓰는 것과 마찬가지로, 연결 문자열 조립 로직 역시 `m_DbClass` 분기가 필요하다는 점에서 두 기능은 같은 축으로 묶여 있다.
+
 ### 5.3 Statement 핸들 관리
 
 | 함수 | 설명 |
@@ -269,7 +285,7 @@ odbc.Commit();
 
 ### 단점 / 유의할 점
 
-- **스레드 안전성 없음**: `m_hStmt` 하나, 카운터(`m_nParamNum`, `m_nColNum`) 하나를 인스턴스가 단독으로 갖고 있어 여러 스레드가 동시에 같은 인스턴스를 사용할 수 없다(그래서 커넥션 풀에서 인스턴스 단위로 대여/반납하는 구조가 필요).
+- **스레드 안전성 없음**: `m_hStmt` 하나, 카운터(`m_nParamNum`, `m_nColNum`) 하나를 인스턴스가 단독으로 갖고 있어 여러 스레드가 동시에 같은 인스턴스를 사용할 수 없다(그래서 커넥션 풀에서 인스턴스 단위로 대여/반납하는 구조가 필요하다).
 - **자동 증가 카운터의 상태 의존성**: `BindParamInput(tValue)`류 함수는 호출 순서에 결과가 좌우된다. 중간에 `ResetParamStmt()`를 호출하지 않고 재사용하면 순번이 꼬일 수 있다.
 - **`SQL_DEFAULT_PARAM`/`SQL_LEN_DATA_AT_EXEC` 등 데이터 지연 전송(Data-At-Execution) 미지원**: 헤더 주석에 언급만 되어 있고 관련 별도 처리 로직은 보이지 않는다.
 - **`CDBError`가 첫 번째 진단 레코드만 조회**: 다중 에러/경고 상황에서 일부 정보가 로그에서 누락될 수 있다.

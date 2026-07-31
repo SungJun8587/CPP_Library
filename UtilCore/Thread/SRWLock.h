@@ -14,6 +14,7 @@
 #pragma once
 
 #include <windows.h>
+#include <cassert>
 
 class CSRWLock
 {

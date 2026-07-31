@@ -15,7 +15,7 @@
 #include <atlbase.h>
 #endif
 
-size_t	GetMultiByteLen(const int nCodePage, const TCHAR* ptszSource);
+int		GetMultiByteLen(const int nCodePage, const TCHAR* ptszSource);
 
 DWORD   AnsiToUnicode(wchar_t* unicode, size_t unicode_size, const char* ansi, const size_t ansi_size);
 DWORD	UnicodeToAnsi(char* ansi, size_t ansi_size, const wchar_t* unicode, const size_t unicode_size);

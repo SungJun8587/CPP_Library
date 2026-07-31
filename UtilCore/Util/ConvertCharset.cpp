@@ -8,57 +8,17 @@
 #include "ConvertCharset.h"
 
 //***************************************************************************
-// CodePage
-//	- CP_ACP : 시스템 기본 Windows ANSI 코드 페이지
-//	- CP_MACCP : Macintosh 코드 페이지
-//	- CP_OEMCP : OEM 코드 페이지
-//	- CP_SYMBOL : 기호 코드 페이지(42)
-//	- CP_THREAD_ACP : 현재 스레드에 대한 Windows ANSI 코드 페이지
-//	- CP_UTF7 : UTF-7
-//	- CP_UTF8 : UTF-8
-// 
-// int MultiByteToWideChar(
-//	[in]            UINT                              CodePage,				// 변환을 수행하는 데 사용할 코드 페이지
-//	[in]            DWORD                             dwFlags,				// 변환 형식을 나타내는 플래그
-//	[in]            _In_NLS_string_(cbMultiByte)LPCCH lpMultiByteStr,		// 변환할 문자열에 대한 포인터
-//	[in]            int                               cbMultiByte,			// 문자열의 크기(바이트)
-//	[out, optional] LPWSTR                            lpWideCharStr,		// 변환된 문자열을 수신하는 버퍼에 대한 포인터
-//	[in]            int                               cchWideChar			// lpWideCharStr표시된 버퍼의 크기(문자). 이 값이 0경우 함수는 종료되는 null 문자를 포함하여 필요한 버퍼 크기를 문자 단위로 반환
-// );
-//	반환값 : 성공하면 lpWideCharStr 표시된 버퍼에 기록된 문자수를 반환
-// 
-// int WideCharToMultiByte(
-//	[in]            UINT                               CodePage,			// 변환을 수행하는 데 사용할 코드 페이지
-//	[in]            DWORD                              dwFlags,				// 변환 유형을 나타내는 플래그
-//	[in]            _In_NLS_string_(cchWideChar)LPCWCH lpWideCharStr,		// 변환할 유니코드 문자열에 대한 포인터
-//	[in]            int                                cchWideChar,			// 문자열의 크기(문자)
-//	[out, optional] LPSTR                              lpMultiByteStr,		// 변환된 문자열을 수신하는 버퍼에 대한 포인터
-//	[in]            int                                cbMultiByte,			// lpMultiByteStr로 표시된 버퍼의 크기(바이트). 이 값이 0이면 함수는 종료되는 null 문자를 포함하여 필요한 버퍼 크기(바이트)를 반환
-//	[in, optional]  LPCCH                              lpDefaultChar,		// 지정된 코드 페이지에서 문자를 나타낼 수 없는 경우 사용할 문자에 대한 포인터
-//	[out, optional] LPBOOL                             lpUsedDefaultChar	// 함수가 변환에서 기본 문자를 사용했는지를 나타내는 플래그에 대한 포인터
-// );
-//	반환값 : 성공하면 lpMultiByteStr가 가리키는 버퍼에 기록된 바이트수를 반환
-// 
-// sizeof, _countof 비교
-//	- sizeof : 할당받는 메모리 크기
-//  - _countof : 배열에 개수
-//	Ex)
-//		wchar_t wszBuffer[100];
-//		sizeof(wszBuffer) : sizeof(wchar_t) * 100 = 200
-//		_countof(wszBuffer) : 100
-//
-// 		char szSource[20] = "안녕123하세요";
-//		wchar_t wszSource[20] = L"안녕123하세요";
-//  
-//		int nLength = MultiByteToWideChar(CP_ACP, 0, (LPSTR)szSource, -1, nullptr, 0);			// 버퍼에 기록된 문자수를 반환 : nLength(9) = 문자수(8) + 1('\0')
-//		nLength = WideCharToMultiByte(CP_ACP, 0, wszSource, -1, nullptr, 0, nullptr, NULL);		// 버퍼에 기록된 바이트수를 반환 : nLength(14) = 바이트수(13) + 1('\0')
-//      nLength = strlen(szSource);     // 멀티바이트 바이트수									// 한글은 2바이트, 아스키 문자는 1바이트 : nLength(13)
-//      nLength = wcslen(wszSource);	// 와이드바이트 문자수									// 버퍼에 기록된 문자수를 반환 : nLength(8) 
-//
-size_t GetMultiByteLen(int nCodePage, const TCHAR* ptszSource)
+// @brief TCHAR 문자열의 변환될 멀티바이트 길이(바이트 수)를 계산합니다.
+// @param nCodePage 변환에 사용할 코드 페이지
+// @param ptszSource 대상 TCHAR 문자열
+// @return 성공 시 변환된 문자열 길이, 실패 시 -1
+//***************************************************************************
+int GetMultiByteLen(int nCodePage, const TCHAR* ptszSource)
 {
+	if( ptszSource == nullptr ) return -1;
+
 	int length = static_cast<int>(_tcslen(ptszSource));
-	if( ptszSource == nullptr || length == 0 ) return -1;
+	if( length == 0 ) return -1;
 
 #ifdef _UNICODE
 	length = WideCharToMultiByte(nCodePage, 0, ptszSource, length + 1, nullptr, 0, nullptr, NULL);
@@ -70,24 +30,25 @@ size_t GetMultiByteLen(int nCodePage, const TCHAR* ptszSource)
 }
 
 //***************************************************************************
-// 멀티바이트 문자열을 와이드바이트 문자열로 변환
-//	[out] wchar_t* unicode : 와이드바이트 문자열
-//	[out] size_t unicode_size : 와이드바이트 문자열 문자수 : 문자수 + 1('\0')
-//	[in] const char* ansi : 멀티바이트 문자열
-//	[in] size_t ansi_size : 멀티바이트 문자열 바이트수 : 바이트수 + 1('\0') 
+// @brief ANSI 문자열을 Unicode(WideChar) 문자열로 변환합니다.
+// @param unicode [out] 변환된 Unicode 문자열을 저장할 버퍼
+// @param unicode_size [in] Unicode 버퍼의 크기 (문자 단위)
+// @param ansi [in] 변환할 ANSI 문자열
+// @param ansi_size [in] ANSI 문자열의 크기 (바이트 단위, 널 문자 포함)
+// @return 성공 시 0 (ERROR_SUCCESS), 실패 시 Win32 오류 코드
+//***************************************************************************
 DWORD AnsiToUnicode(wchar_t* unicode, size_t unicode_size, const char* ansi, const size_t ansi_size)
 {
 	DWORD error = 0;
 
 	do
 	{
-		if( ansi == nullptr || ansi_size == 0 )
+		if( ansi == nullptr || ansi_size == 0 || unicode == nullptr )
 		{
 			error = ERROR_INVALID_PARAMETER;
 			break;
 		}
 
-		// 버퍼에 기록된 문자수를 반환 : 문자수 + 1('\0')
 		int required_cch = ::MultiByteToWideChar(
 			CP_ACP,
 			0,
@@ -103,11 +64,9 @@ DWORD AnsiToUnicode(wchar_t* unicode, size_t unicode_size, const char* ansi, con
 
 		if( unicode_size < (size_t)required_cch )
 		{
-			error = ERROR_INVALID_PARAMETER;
+			error = ERROR_INSUFFICIENT_BUFFER;
 			break;
 		}
-
-		unicode_size = required_cch;
 
 		if( 0 == ::MultiByteToWideChar(
 			CP_ACP,
@@ -126,24 +85,25 @@ DWORD AnsiToUnicode(wchar_t* unicode, size_t unicode_size, const char* ansi, con
 }
 
 //***************************************************************************
-// 와이드바이트 문자열을 멀티바이트 문자열로 변환
-//	[out] char* ansi : 멀티바이트 문자열
-//	[out] size_t ansi_size : 멀티바이트 문자열 바이트수 : 바이트수 + 1('\0')
-//	[in] const wchar_t* unicode : 와이드바이트 문자열
-//	[in] const size_t unicode_size : 와이드바이트 문자열 문자수 : 문자수 + 1('\0')
+// @brief Unicode(WideChar) 문자열을 ANSI 문자열로 변환합니다.
+// @param ansi [out] 변환된 ANSI 문자열을 저장할 버퍼
+// @param ansi_size [in] ANSI 버퍼의 크기 (바이트 단위)
+// @param unicode [in] 변환할 Unicode 문자열
+// @param unicode_size [in] Unicode 문자열의 크기 (문자 단위, 널 문자 포함)
+// @return 성공 시 0 (ERROR_SUCCESS), 실패 시 Win32 오류 코드
+//***************************************************************************
 DWORD UnicodeToAnsi(char* ansi, size_t ansi_size, const wchar_t* unicode, const size_t unicode_size)
 {
 	DWORD error = 0;
 
 	do
 	{
-		if( unicode == nullptr || unicode_size == 0 )
+		if( unicode == nullptr || unicode_size == 0 || ansi == nullptr )
 		{
 			error = ERROR_INVALID_PARAMETER;
 			break;
 		}
 
-		// 버퍼에 기록된 바이트수를 반환 : 바이트수 + 1('\0')
 		int required_cch = ::WideCharToMultiByte(
 			CP_ACP,
 			0,
@@ -160,11 +120,9 @@ DWORD UnicodeToAnsi(char* ansi, size_t ansi_size, const wchar_t* unicode, const 
 
 		if( ansi_size < (size_t)required_cch )
 		{
-			error = ERROR_INVALID_PARAMETER;
+			error = ERROR_INSUFFICIENT_BUFFER;
 			break;
 		}
-
-		ansi_size = required_cch;
 
 		if( 0 == ::WideCharToMultiByte(
 			CP_ACP,
@@ -184,24 +142,25 @@ DWORD UnicodeToAnsi(char* ansi, size_t ansi_size, const wchar_t* unicode, const 
 }
 
 //***************************************************************************
-// 와이드바이트 문자열을 UTF8 문자열로 변환
-//	[out] char* utf8 : UTF8 문자열
-//	[out] size_t utf8_size : UTF8 문자열 바이트수 : 바이트수 + 1('\0') 
-//	[in] const wchar_t* unicode : 와이드바이트 문자열
-//	[in] const size_t unicode_size : 와이드바이트 문자열 문자수 : 문자수 + 1('\0')
+// @brief Unicode(WideChar) 문자열을 UTF-8 문자열로 변환합니다.
+// @param utf8 [out] 변환된 UTF-8 문자열을 저장할 버퍼
+// @param utf8_size [in] UTF-8 버퍼의 크기 (바이트 단위)
+// @param unicode [in] 변환할 Unicode 문자열
+// @param unicode_size [in] Unicode 문자열의 크기 (문자 단위, 널 문자 포함)
+// @return 성공 시 0 (ERROR_SUCCESS), 실패 시 Win32 오류 코드
+//***************************************************************************
 DWORD UnicodeToUtf8(char* utf8, size_t utf8_size, const wchar_t* unicode, const size_t unicode_size)
 {
 	DWORD error = 0;
 
 	do
 	{
-		if( unicode == nullptr || unicode_size == 0 )
+		if( unicode == nullptr || unicode_size == 0 || utf8 == nullptr )
 		{
 			error = ERROR_INVALID_PARAMETER;
 			break;
 		}
 
-		// 버퍼에 기록된 바이트수를 반환 : 바이트수 + 1('\0')
 		int required_cch = ::WideCharToMultiByte(
 			CP_UTF8,
 			WC_ERR_INVALID_CHARS,
@@ -218,11 +177,9 @@ DWORD UnicodeToUtf8(char* utf8, size_t utf8_size, const wchar_t* unicode, const 
 
 		if( utf8_size < (size_t)required_cch )
 		{
-			error = ERROR_INVALID_PARAMETER;
+			error = ERROR_INSUFFICIENT_BUFFER;
 			break;
 		}
-
-		utf8_size = required_cch;
 
 		if( 0 == ::WideCharToMultiByte(
 			CP_UTF8,
@@ -242,24 +199,25 @@ DWORD UnicodeToUtf8(char* utf8, size_t utf8_size, const wchar_t* unicode, const 
 }
 
 //***************************************************************************
-// UTF8 문자열을 와이드바이트 문자열로 변환
-//	[out] wchar_t* unicode : 와이드바이트 문자열
-//	[out] size_t unicode_size : 와이드바이트 문자열 문자수 : 문자수 + 1('\0')
-//	[in] const char* utf8 : UTF8 문자열
-//	[in] const size_t utf8_size : UTF8 문자열 바이트수 : 바이트수 + 1('\0')
+// @brief UTF-8 문자열을 Unicode(WideChar) 문자열로 변환합니다.
+// @param unicode [out] 변환된 Unicode 문자열을 저장할 버퍼
+// @param unicode_size [in] Unicode 버퍼의 크기 (문자 단위)
+// @param utf8 [in] 변환할 UTF-8 문자열
+// @param utf8_size [in] UTF-8 문자열의 크기 (바이트 단위, 널 문자 포함)
+// @return 성공 시 0 (ERROR_SUCCESS), 실패 시 Win32 오류 코드
+//***************************************************************************
 DWORD Utf8ToUnicode(wchar_t* unicode, size_t unicode_size, const char* utf8, const size_t utf8_size)
 {
 	DWORD error = 0;
 
 	do
 	{
-		if( utf8 == nullptr || utf8_size == 0 )
+		if( utf8 == nullptr || utf8_size == 0 || unicode == nullptr )
 		{
 			error = ERROR_INVALID_PARAMETER;
 			break;
 		}
 
-		// 버퍼에 기록된 문자수를 반환 : 문자수 + 1('\0')
 		int required_cch = ::MultiByteToWideChar(
 			CP_UTF8,
 			MB_ERR_INVALID_CHARS,
@@ -275,11 +233,9 @@ DWORD Utf8ToUnicode(wchar_t* unicode, size_t unicode_size, const char* utf8, con
 
 		if( unicode_size < (size_t)required_cch )
 		{
-			error = ERROR_INVALID_PARAMETER;
+			error = ERROR_INSUFFICIENT_BUFFER;
 			break;
 		}
-
-		unicode_size = required_cch;
 
 		if( 0 == ::MultiByteToWideChar(
 			CP_UTF8,
@@ -298,7 +254,13 @@ DWORD Utf8ToUnicode(wchar_t* unicode, size_t unicode_size, const char* utf8, con
 }
 
 //***************************************************************************
-// ansi string을 utf-8 string로 변환하기 위해선 ansi string -> unicode string -> utf-8 string의 변환 과정
+// @brief ANSI 문자열을 UTF-8 문자열로 변환합니다 (Unicode 경유).
+// @param utf8 [out] 변환된 UTF-8 문자열을 저장할 버퍼
+// @param utf8_size [in] UTF-8 버퍼의 크기 (바이트 단위)
+// @param ansi [in] 변환할 ANSI 문자열
+// @param ansi_size [in] ANSI 문자열의 크기 (바이트 단위, 널 문자 포함)
+// @return 성공 시 0 (ERROR_SUCCESS), 실패 시 Win32 오류 코드
+//***************************************************************************
 DWORD AnsiToUtf8(char* utf8, size_t utf8_size, const char* ansi, const size_t ansi_size)
 {
 	DWORD error = 0;
@@ -316,7 +278,13 @@ DWORD AnsiToUtf8(char* utf8, size_t utf8_size, const char* ansi, const size_t an
 }
 
 //***************************************************************************
-// utf-8 string을 ansi string로 변환하기 위해선 utf-8 string -> unicode string -> ansi string의 변환 과정
+// @brief UTF-8 문자열을 ANSI 문자열로 변환합니다 (Unicode 경유).
+// @param ansi [out] 변환된 ANSI 문자열을 저장할 버퍼
+// @param ansi_size [in] ANSI 버퍼의 크기 (바이트 단위)
+// @param utf8 [in] 변환할 UTF-8 문자열
+// @param utf8_size [in] UTF-8 문자열의 크기 (바이트 단위, 널 문자 포함)
+// @return 성공 시 0 (ERROR_SUCCESS), 실패 시 Win32 오류 코드
+//***************************************************************************
 DWORD Utf8ToAnsi(char* ansi, size_t ansi_size, const char* utf8, const size_t utf8_size)
 {
 	DWORD error = 0;
@@ -335,10 +303,12 @@ DWORD Utf8ToAnsi(char* ansi, size_t ansi_size, const char* utf8, const size_t ut
 
 #ifdef __MEMBUFFER_H__
 //***************************************************************************
-// 멀티바이트 문자열을 와이드바이트 문자열로 변환
-//	[out] CMemBuffer<wchar_t>& unicode : 와이드바이트 문자열 버퍼
-//	[in] const char* ansi : 멀티바이트 문자열
-//	[in] size_t ansi_size : 멀티바이트 문자열 바이트수 : 바이트수 + 1('\0') 
+// @brief CMemBuffer를 사용하여 ANSI 문자열을 Unicode(WideChar) 문자열로 변환합니다.
+// @param unicode [out] 변환된 Unicode 문자열을 저장할 CMemBuffer 버퍼 객체
+// @param ansi [in] 변환할 ANSI 문자열
+// @param ansi_size [in] ANSI 문자열의 크기 (바이트 단위, 널 문자 포함)
+// @return 성공 시 0 (ERROR_SUCCESS), 실패 시 Win32 오류 코드
+//***************************************************************************
 DWORD AnsiToUnicode(CMemBuffer<wchar_t>& unicode, const char* ansi, const size_t ansi_size)
 {
 	DWORD error = 0;
@@ -351,7 +321,6 @@ DWORD AnsiToUnicode(CMemBuffer<wchar_t>& unicode, const char* ansi, const size_t
 			break;
 		}
 
-		// 버퍼에 기록된 문자수를 반환 : 문자수 + 1('\0')
 		int required_cch = ::MultiByteToWideChar(
 			CP_ACP,
 			0,
@@ -385,10 +354,12 @@ DWORD AnsiToUnicode(CMemBuffer<wchar_t>& unicode, const char* ansi, const size_t
 }
 
 //***************************************************************************
-// 와이드바이트 문자열을 멀티바이트 문자열로 변환
-//	[out] CMemBuffer<char>& ansi : 멀티바이트 문자열 버퍼
-//	[in] const wchar_t* unicode : 와이드바이트 문자열
-//	[in] const size_t unicode_size : 와이드바이트 문자열 문자수 : 문자수 + 1('\0')
+// @brief CMemBuffer를 사용하여 Unicode(WideChar) 문자열을 ANSI 문자열로 변환합니다.
+// @param ansi [out] 변환된 ANSI 문자열을 저장할 CMemBuffer 버퍼 객체
+// @param unicode [in] 변환할 Unicode 문자열
+// @param unicode_size [in] Unicode 문자열의 크기 (문자 단위, 널 문자 포함)
+// @return 성공 시 0 (ERROR_SUCCESS), 실패 시 Win32 오류 코드
+//***************************************************************************
 DWORD UnicodeToAnsi(CMemBuffer<char>& ansi, const wchar_t* unicode, const size_t unicode_size)
 {
 	DWORD error = 0;
@@ -401,7 +372,6 @@ DWORD UnicodeToAnsi(CMemBuffer<char>& ansi, const wchar_t* unicode, const size_t
 			break;
 		}
 
-		// 버퍼에 기록된 바이트수를 반환 : 바이트수 + 1('\0')
 		int required_cch = ::WideCharToMultiByte(
 			CP_ACP,
 			0,
@@ -436,10 +406,12 @@ DWORD UnicodeToAnsi(CMemBuffer<char>& ansi, const wchar_t* unicode, const size_t
 }
 
 //***************************************************************************
-// 와이드바이트 문자열을 UTF-8 문자열로 변환
-//	[out] CMemBuffer<char>& utf8 : UTF-8 문자열 버퍼
-//	[in] const wchar_t* unicode : 와이드바이트 문자열
-//	[in] const size_t unicode_size : 와이드바이트 문자열 문자수 : 문자수 + 1('\0')
+// @brief CMemBuffer를 사용하여 Unicode(WideChar) 문자열을 UTF-8 문자열로 변환합니다.
+// @param utf8 [out] 변환된 UTF-8 문자열을 저장할 CMemBuffer 버퍼 객체
+// @param unicode [in] 변환할 Unicode 문자열
+// @param unicode_size [in] Unicode 문자열의 크기 (문자 단위, 널 문자 포함)
+// @return 성공 시 0 (ERROR_SUCCESS), 실패 시 Win32 오류 코드
+//***************************************************************************
 DWORD UnicodeToUtf8(CMemBuffer<char>& utf8, const wchar_t* unicode, const size_t unicode_size)
 {
 	DWORD error = 0;
@@ -452,7 +424,6 @@ DWORD UnicodeToUtf8(CMemBuffer<char>& utf8, const wchar_t* unicode, const size_t
 			break;
 		}
 
-		// 버퍼에 기록된 바이트수를 반환 : 바이트수 + 1('\0')
 		int required_cch = ::WideCharToMultiByte(
 			CP_UTF8,
 			WC_ERR_INVALID_CHARS,
@@ -487,10 +458,12 @@ DWORD UnicodeToUtf8(CMemBuffer<char>& utf8, const wchar_t* unicode, const size_t
 }
 
 //***************************************************************************
-// UTF-8 문자열을 와이드바이트 문자열로 변환
-//	[out] CMemBuffer<wchar_t>& unicode : 와이드바이트 문자열 버퍼
-//	[in] const char* utf8 : UTF-8 문자열
-//	[in] const size_t utf8_size : UTF-8 바이트수 : 바이트수 + 1('\0') 
+// @brief CMemBuffer를 사용하여 UTF-8 문자열을 Unicode(WideChar) 문자열로 변환합니다.
+// @param unicode [out] 변환된 Unicode 문자열을 저장할 CMemBuffer 버퍼 객체
+// @param utf8 [in] 변환할 UTF-8 문자열
+// @param utf8_size [in] UTF-8 문자열의 크기 (바이트 단위, 널 문자 포함)
+// @return 성공 시 0 (ERROR_SUCCESS), 실패 시 Win32 오류 코드
+//***************************************************************************
 DWORD Utf8ToUnicode(CMemBuffer<wchar_t>& unicode, const char* utf8, const size_t utf8_size)
 {
 	DWORD error = 0;
@@ -503,7 +476,6 @@ DWORD Utf8ToUnicode(CMemBuffer<wchar_t>& unicode, const char* utf8, const size_t
 			break;
 		}
 
-		// 버퍼에 기록된 문자수를 반환 : 문자수 + 1('\0')
 		int required_cch = ::MultiByteToWideChar(
 			CP_UTF8,
 			MB_ERR_INVALID_CHARS,
@@ -536,10 +508,12 @@ DWORD Utf8ToUnicode(CMemBuffer<wchar_t>& unicode, const char* utf8, const size_t
 }
 
 //***************************************************************************
-// 멀티바이트 문자열을 UTF-8 문자열로 변환
-//	[out] CMemBuffer<char>& utf8 : UTF-8 문자열 버퍼
-//	[in] const char* ansi : 멀티바이트 문자열
-//	[in] const size_t ansi_size : 멀티바이트 문자열 바이트수 : 바이트수 + 1('\0') 
+// @brief CMemBuffer를 사용하여 ANSI 문자열을 UTF-8 문자열로 변환합니다.
+// @param utf8 [out] 변환된 UTF-8 문자열을 저장할 CMemBuffer 버퍼 객체
+// @param ansi [in] 변환할 ANSI 문자열
+// @param ansi_size [in] ANSI 문자열의 크기 (바이트 단위, 널 문자 포함)
+// @return 성공 시 0 (ERROR_SUCCESS), 실패 시 Win32 오류 코드
+//***************************************************************************
 DWORD AnsiToUtf8(CMemBuffer<char>& utf8, const char* ansi, const size_t ansi_size)
 {
 	DWORD error = 0;
@@ -556,10 +530,12 @@ DWORD AnsiToUtf8(CMemBuffer<char>& utf8, const char* ansi, const size_t ansi_siz
 }
 
 //***************************************************************************
-// UTF-8 문자열을 멀티바이트 문자열로 변환
-//	[out] CMemBuffer<char>& ansi : 멀티바이트 문자열 버퍼
-//	[in] const char* utf8 : UTF-8 문자열
-//	[in] const size_t utf8_size : UTF8 문자열 바이트수 : 바이트수 + 1('\0')
+// @brief CMemBuffer를 사용하여 UTF-8 문자열을 ANSI 문자열로 변환합니다.
+// @param ansi [out] 변환된 ANSI 문자열을 저장할 CMemBuffer 버퍼 객체
+// @param utf8 [in] 변환할 UTF-8 문자열
+// @param utf8_size [in] UTF-8 문자열의 크기 (바이트 단위, 널 문자 포함)
+// @return 성공 시 0 (ERROR_SUCCESS), 실패 시 Win32 오류 코드
+//***************************************************************************
 DWORD Utf8ToAnsi(CMemBuffer<char>& ansi, const char* utf8, const size_t utf8_size)
 {
 	DWORD error = 0;
@@ -576,55 +552,58 @@ DWORD Utf8ToAnsi(CMemBuffer<char>& ansi, const char* utf8, const size_t utf8_siz
 }
 
 //***************************************************************************
-//
-bool ByteToTChar(CMemBuffer<TCHAR>& TDestination, const BYTE* pbBuffer)
+// @brief 바이트 버퍼(BYTE*)를 TCHAR 문자열 버퍼로 안전하게 변환합니다.
+// @param TDestination [out] 변환된 TCHAR 문자열을 저장할 CMemBuffer 객체
+// @param pbBuffer [in] 원본 바이트 버퍼
+// @param buffer_size [in] 바이트 버퍼의 크기 (바이트 단위)
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
+bool ByteToTChar(CMemBuffer<TCHAR>& TDestination, const BYTE* pbBuffer, size_t buffer_size)
 {
-	int		nLength = 0;
-	int     nSrcLen = 0;
-	char* pszSource = nullptr;
+	if( pbBuffer == nullptr || buffer_size == 0 ) return false;
 
-	pszSource = (char*)pbBuffer;
-	nSrcLen = (int)strlen(pszSource) + 1;
+	const char* pszSource = (const char*)pbBuffer;
 
 #ifdef _UNICODE
-	if( (nLength = MultiByteToWideChar(CP_ACP, 0, (LPSTR)pszSource, nSrcLen, nullptr, 0)) == 0 ) return false;
+	int nLength = MultiByteToWideChar(CP_ACP, 0, pszSource, static_cast<int>(buffer_size), nullptr, 0);
+	if( nLength == 0 ) return false;
 
-	TDestination.Init(nLength);
+	TDestination.Init(nLength + 1);
 
-	if( MultiByteToWideChar(CP_ACP, 0, (LPSTR)pszSource, nSrcLen, TDestination.GetBuffer(), nLength) == 0 ) return false;
+	if( MultiByteToWideChar(CP_ACP, 0, pszSource, static_cast<int>(buffer_size), TDestination.GetBuffer(), nLength) == 0 ) return false;
+	TDestination.GetBuffer()[nLength] = L'\0';
 #else
-	nLength = nSrcLen;
-
-	TDestination.Init(nLength);
-
-	_tcsncpy_s(TDestination.GetBuffer(), TDestination.GetBufSize(), pszSource, _TRUNCATE);
+	TDestination.Init(buffer_size);
+	_tcsncpy_s(TDestination.GetBuffer(), TDestination.GetBufSize(), pszSource, buffer_size);
 #endif
 
 	return true;
 }
 
 //***************************************************************************
-//
+// @brief TCHAR 문자열 버퍼를 바이트 버퍼(BYTE*)로 변환합니다.
+// @param Destination [out] 변환된 바이트 데이터를 저장할 CMemBuffer 객체
+// @param ptszBuffer [in] 원본 TCHAR 문자열
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool TCharToByte(CMemBuffer<BYTE>& Destination, const TCHAR* ptszBuffer)
 {
-	int		nLength = 0;
-	int     nSrcLen = (int)_tcslen(ptszBuffer) + 1;
-	char* pszDestination = nullptr;
+	if( ptszBuffer == nullptr ) return false;
+
+	int nSrcLen = static_cast<int>(_tcslen(ptszBuffer)) + 1;
 
 #ifdef _UNICODE
-	if( (nLength = WideCharToMultiByte(CP_ACP, 0, ptszBuffer, nSrcLen, (LPSTR)pszDestination, 0, nullptr, NULL)) == 0 ) return false;
+	int nLength = WideCharToMultiByte(CP_ACP, 0, ptszBuffer, nSrcLen, nullptr, 0, nullptr, NULL);
+	if( nLength == 0 ) return false;
 
 	Destination.Init(nLength);
+	char* pszDestination = (char*)Destination.GetBuffer();
 
-	pszDestination = (char*)Destination.GetBuffer();
-
-	if( WideCharToMultiByte(CP_ACP, 0, ptszBuffer, nSrcLen, (LPSTR)pszDestination, (int)nLength, nullptr, NULL) == 0 ) return false;
+	if( WideCharToMultiByte(CP_ACP, 0, ptszBuffer, nSrcLen, pszDestination, nLength, nullptr, NULL) == 0 ) return false;
 #else
-	nLength = nSrcLen;
-
+	int nLength = nSrcLen;
 	Destination.Init(nLength);
-
-	pszDestination = (char*)Destination.GetBuffer();
+	char* pszDestination = (char*)Destination.GetBuffer();
 
 	_tcsncpy_s(pszDestination, nLength, ptszBuffer, _TRUNCATE);
 #endif
@@ -635,10 +614,12 @@ bool TCharToByte(CMemBuffer<BYTE>& Destination, const TCHAR* ptszBuffer)
 
 #ifdef _STRING_
 //***************************************************************************
-// 멀티바이트 문자열을 와이드바이트 문자열로 변환
-//	[out] std::wstring& unicode : 와이드바이트 문자열
-//	[in] const char* ansi : 멀티바이트 문자열
-//	[in] size_t ansi_size : 멀티바이트 문자열 바이트수 : 바이트수 + 1('\0') 
+// @brief ANSI 문자열을 std::wstring으로 변환합니다.
+// @param unicode [out] 변환된 결과를 저장할 std::wstring 참조
+// @param ansi [in] 변환할 ANSI 문자열
+// @param ansi_size [in] ANSI 문자열의 크기 (바이트 단위, 널 문자 포함)
+// @return 성공 시 0 (ERROR_SUCCESS), 실패 시 Win32 오류 코드
+//***************************************************************************
 DWORD AnsiToUnicode_String(std::wstring& unicode, const char* ansi, const size_t ansi_size)
 {
 	DWORD error = 0;
@@ -653,7 +634,6 @@ DWORD AnsiToUnicode_String(std::wstring& unicode, const char* ansi, const size_t
 
 		unicode.clear();
 
-		// 버퍼에 기록된 문자수를 반환 : 문자수 + 1('\0')
 		int required_cch = ::MultiByteToWideChar(
 			CP_ACP,
 			0,
@@ -686,10 +666,12 @@ DWORD AnsiToUnicode_String(std::wstring& unicode, const char* ansi, const size_t
 }
 
 //***************************************************************************
-// 와이드바이트 문자열을 멀티바이트 문자열로 변환
-//	[out] std::string& ansi : 멀티바이트 문자열
-//	[in] const wchar_t* unicode : 와이드바이트 문자열
-//	[in] const size_t unicode_size : 와이드바이트 문자열 문자수 : 문자수 + 1('\0')
+// @brief Unicode 문자열을 std::string(ANSI)으로 변환합니다.
+// @param ansi [out] 변환된 결과를 저장할 std::string 참조
+// @param unicode [in] 변환할 Unicode 문자열
+// @param unicode_size [in] Unicode 문자열의 크기 (문자 단위, 널 문자 포함)
+// @return 성공 시 0 (ERROR_SUCCESS), 실패 시 Win32 오류 코드
+//***************************************************************************
 DWORD UnicodeToAnsi_String(std::string& ansi, const wchar_t* unicode, const size_t unicode_size)
 {
 	DWORD error = 0;
@@ -704,7 +686,6 @@ DWORD UnicodeToAnsi_String(std::string& ansi, const wchar_t* unicode, const size
 
 		ansi.clear();
 
-		// 버퍼에 기록된 바이트수를 반환 : 바이트수 + 1('\0')
 		int required_cch = ::WideCharToMultiByte(
 			CP_ACP,
 			0,
@@ -739,10 +720,12 @@ DWORD UnicodeToAnsi_String(std::string& ansi, const wchar_t* unicode, const size
 }
 
 //***************************************************************************
-// 와이드바이트 문자열을 UTF8 문자열로 변환
-//	[out] std::string& utf8 : UTF8 문자열
-//	[in] const wchar_t* unicode : 와이드바이트 문자열
-//	[in] const size_t unicode_size : 와이드바이트 문자열 문자수 : 문자수 + 1('\0')
+// @brief Unicode 문자열을 std::string(UTF-8)으로 변환합니다.
+// @param utf8 [out] 변환된 결과를 저장할 std::string 참조
+// @param unicode [in] 변환할 Unicode 문자열
+// @param unicode_size [in] Unicode 문자열의 크기 (문자 단위, 널 문자 포함)
+// @return 성공 시 0 (ERROR_SUCCESS), 실패 시 Win32 오류 코드
+//***************************************************************************
 DWORD UnicodeToUtf8_String(std::string& utf8, const wchar_t* unicode, const size_t unicode_size)
 {
 	DWORD error = 0;
@@ -757,7 +740,6 @@ DWORD UnicodeToUtf8_String(std::string& utf8, const wchar_t* unicode, const size
 
 		utf8.clear();
 
-		// 버퍼에 기록된 바이트수를 반환 : 바이트수 + 1('\0')
 		int required_cch = ::WideCharToMultiByte(
 			CP_UTF8,
 			WC_ERR_INVALID_CHARS,
@@ -792,10 +774,12 @@ DWORD UnicodeToUtf8_String(std::string& utf8, const wchar_t* unicode, const size
 }
 
 //***************************************************************************
-// UTF8 문자열을 와이드바이트 문자열로 변환
-//	[out] std::wstring& unicode : 와이드바이트 문자열
-//	[in] const char* utf8 : UTF8 문자열
-//	[in] const size_t utf8_size : UTF8 문자열 바이트수 : 바이트수 + 1('\0') 
+// @brief UTF-8 문자열을 std::wstring으로 변환합니다.
+// @param unicode [out] 변환된 결과를 저장할 std::wstring 참조
+// @param utf8 [in] 변환할 UTF-8 문자열
+// @param utf8_size [in] UTF-8 문자열의 크기 (바이트 단위, 널 문자 포함)
+// @return 성공 시 0 (ERROR_SUCCESS), 실패 시 Win32 오류 코드
+//***************************************************************************
 DWORD Utf8ToUnicode_String(std::wstring& unicode, const char* utf8, const size_t utf8_size)
 {
 	DWORD error = 0;
@@ -810,7 +794,6 @@ DWORD Utf8ToUnicode_String(std::wstring& unicode, const char* utf8, const size_t
 
 		unicode.clear();
 
-		// 버퍼에 기록된 문자수를 반환 : 문자수 + 1('\0')
 		int required_cch = ::MultiByteToWideChar(
 			CP_UTF8,
 			MB_ERR_INVALID_CHARS,
@@ -843,7 +826,12 @@ DWORD Utf8ToUnicode_String(std::wstring& unicode, const char* utf8, const size_t
 }
 
 //***************************************************************************
-//
+// @brief ANSI 문자열을 std::string(UTF-8)으로 변환합니다.
+// @param utf8 [out] 변환된 결과를 저장할 std::string 참조
+// @param ansi [in] 변환할 ANSI 문자열
+// @param ansi_size [in] ANSI 문자열의 크기 (바이트 단위, 널 문자 포함)
+// @return 성공 시 0 (ERROR_SUCCESS), 실패 시 Win32 오류 코드
+//***************************************************************************
 DWORD AnsiToUtf8_String(std::string& utf8, const char* ansi, const size_t ansi_size)
 {
 	DWORD error = 0;
@@ -860,7 +848,12 @@ DWORD AnsiToUtf8_String(std::string& utf8, const char* ansi, const size_t ansi_s
 }
 
 //***************************************************************************
-//
+// @brief UTF-8 문자열을 std::string(ANSI)으로 변환합니다.
+// @param ansi [out] 변환된 결과를 저장할 std::string 참조
+// @param utf8 [in] 변환할 UTF-8 문자열
+// @param utf8_size [in] UTF-8 문자열의 크기 (바이트 단위, 널 문자 포함)
+// @return 성공 시 0 (ERROR_SUCCESS), 실패 시 Win32 오류 코드
+//***************************************************************************
 DWORD Utf8ToAnsi_String(std::string& ansi, const char* utf8, const size_t utf8_size)
 {
 	DWORD error = 0;
@@ -877,7 +870,10 @@ DWORD Utf8ToAnsi_String(std::string& ansi, const char* utf8, const size_t utf8_s
 }
 
 //***************************************************************************
-//
+// @brief std::string(ANSI)을 std::wstring으로 변환합니다.
+// @param ansi 원본 std::string 문자열
+// @return 변환된 std::wstring (실패 시 빈 문자열)
+//***************************************************************************
 wstring StringToWString(const std::string& ansi)
 {
 	std::wstring unicode;
@@ -886,7 +882,10 @@ wstring StringToWString(const std::string& ansi)
 }
 
 //***************************************************************************
-//
+// @brief std::wstring을 std::string(ANSI)으로 변환합니다.
+// @param unicode 원본 std::wstring 문자열
+// @return 변환된 std::string (실패 시 빈 문자열)
+//***************************************************************************
 string WStringToString(const std::wstring& unicode)
 {
 	std::string ansi;
@@ -895,8 +894,11 @@ string WStringToString(const std::wstring& unicode)
 }
 
 //***************************************************************************
-//
-string UnicodeToUtf8(const std::wstring unicode)
+// @brief std::wstring을 UTF-8 std::string으로 변환합니다.
+// @param unicode 원본 std::wstring 문자열
+// @return 변환된 UTF-8 std::string (실패 시 빈 문자열)
+//***************************************************************************
+string UnicodeToUtf8(const std::wstring& unicode)
 {
 	std::string utf8;
 	if( UnicodeToUtf8_String(utf8, unicode.c_str(), unicode.size()) != 0 ) return "";
@@ -904,8 +906,11 @@ string UnicodeToUtf8(const std::wstring unicode)
 }
 
 //***************************************************************************
-//
-wstring Utf8ToUnicode(const std::string utf8)
+// @brief UTF-8 std::string을 std::wstring으로 변환합니다.
+// @param utf8 원본 UTF-8 std::string 문자열
+// @return 변환된 std::wstring (실패 시 빈 문자열)
+//***************************************************************************
+wstring Utf8ToUnicode(const std::string& utf8)
 {
 	std::wstring unicode;
 	if( Utf8ToUnicode_String(unicode, utf8.c_str(), utf8.size()) != 0 ) return L"";
@@ -913,8 +918,11 @@ wstring Utf8ToUnicode(const std::string utf8)
 }
 
 //***************************************************************************
-//
-string AnsiToUtf8(const std::string ansi)
+// @brief std::string(ANSI)을 UTF-8 std::string으로 변환합니다.
+// @param ansi 원본 ANSI std::string 문자열
+// @return 변환된 UTF-8 std::string (실패 시 빈 문자열)
+//***************************************************************************
+string AnsiToUtf8(const std::string& ansi)
 {
 	std::string utf8;
 	if( AnsiToUtf8_String(utf8, ansi.c_str(), ansi.size()) != 0 ) return "";
@@ -922,8 +930,11 @@ string AnsiToUtf8(const std::string ansi)
 }
 
 //***************************************************************************
-//
-string Utf8ToAnsi(const std::string utf8)
+// @brief UTF-8 std::string을 ANSI std::string으로 변환합니다.
+// @param utf8 원본 UTF-8 std::string 문자열
+// @return 변환된 ANSI std::string (실패 시 빈 문자열)
+//***************************************************************************
+string Utf8ToAnsi(const std::string& utf8)
 {
 	std::string ansi;
 	if( Utf8ToAnsi_String(ansi, utf8.c_str(), utf8.size()) != 0 ) return "";
@@ -931,7 +942,10 @@ string Utf8ToAnsi(const std::string utf8)
 }
 
 //***************************************************************************
-//
+// @brief std::string(ANSI)을 빌드 환경에 따른 _tstring으로 변환합니다.
+// @param src 원본 std::string 문자열
+// @return 변환된 _tstring
+//***************************************************************************
 _tstring StringToTString(const std::string& src)
 {
 #ifdef _UNICODE
@@ -942,7 +956,10 @@ _tstring StringToTString(const std::string& src)
 }
 
 //***************************************************************************
-//
+// @brief _tstring을 std::string(ANSI)으로 변환합니다.
+// @param src 원본 _tstring 문자열
+// @return 변환된 std::string
+//***************************************************************************
 std::string TStringToString(const _tstring& src)
 {
 #ifdef _UNICODE
@@ -954,7 +971,10 @@ std::string TStringToString(const _tstring& src)
 #endif
 
 //***************************************************************************
-//
+// @brief std::wstring을 빌드 환경에 따른 _tstring으로 변환합니다.
+// @param src 원본 std::wstring 문자열
+// @return 변환된 _tstring
+//***************************************************************************
 _tstring WStringToTString(const std::wstring& src)
 {
 #ifdef _UNICODE
@@ -965,7 +985,10 @@ _tstring WStringToTString(const std::wstring& src)
 }
 
 //***************************************************************************
-//
+// @brief _tstring을 std::wstring으로 변환합니다.
+// @param src 원본 _tstring 문자열
+// @return 변환된 std::wstring
+//***************************************************************************
 wstring TStringToWString(const _tstring& src)
 {
 #ifdef _UNICODE

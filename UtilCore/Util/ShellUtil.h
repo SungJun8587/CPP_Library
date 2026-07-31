@@ -97,9 +97,7 @@ bool	IsRegKey(const HKEY hKey, const TCHAR* ptszSubKey);
 
 HANDLE	GetFileHandleDuplicate(TCHAR* ptszDestFullPath, TCHAR* ptszDestFileNameExt, const TCHAR* ptszFullPath);
 
-#if defined(USE_MEMBUFFER)
-bool	GetProductKeyExtract(CMemBuffer<TCHAR>& TProductKey, const BYTE* pbDigitalProductID, const DWORD dwLength, const bool bIsExtractBytesRange);
-#endif
+bool GetProductKeyExtract(_tstring& TProductKey, const BYTE* pbDigitalProductID, const DWORD dwLength, const bool bIsExtractBytesRange);
 
 #endif // ndef __SHELLUTIL_H__
 

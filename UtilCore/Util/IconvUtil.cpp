@@ -13,6 +13,10 @@ namespace Iconv
 	// Construction/Destruction 
 	//***************************************************************************
 
+	//***************************************************************************
+	// @brief 지정된 인코딩(from -> to)으로 iconv 변환 핸들을 초기화합니다.
+	// @param fromEncoding 원본 문자셋 인코딩 이름
+	// @param toEncoding 대상 문자셋 인코딩 이름
 	CIconvUtil::CIconvUtil(const std::string& fromEncoding, const std::string& toEncoding)
 		: _fromEncoding(fromEncoding), _toEncoding(toEncoding) 
 	{
@@ -24,7 +28,7 @@ namespace Iconv
 	}
 
 	//***************************************************************************
-	// 소멸자: iconv 핸들 닫기
+	// @brief 소멸자: 생성 시 할당된 iconv 변환 핸들을 닫아 리소스를 해제합니다.
 	CIconvUtil::~CIconvUtil()
 	{
 		if( _cd != (iconv_t)-1 ) 
@@ -34,7 +38,9 @@ namespace Iconv
 	}
 
 	//***************************************************************************
-	// 문자열 변환 함수
+	// @brief std::string 문자열을 다른 인코딩으로 변환합니다.
+	// @param input 변환할 원본 문자열
+	// @return 변환된 결과 문자열
 	std::string CIconvUtil::Convert(const std::string& input) const
 	{
 		size_t inBytesLeft = input.size();
@@ -54,7 +60,9 @@ namespace Iconv
 	}
 
 	//***************************************************************************
-	// 문자열 변환 함수
+	// @brief std::wstring 문자열을 std::string으로 변환합니다.
+	// @param input 변환할 원본 와이드 문자열
+	// @return 변환된 결과 문자열
 	std::string CIconvUtil::Convert(const std::wstring& input) const
 	{
 		size_t inBytesLeft = input.size() * sizeof(wchar_t);
@@ -72,7 +80,9 @@ namespace Iconv
 	}
 
 	//***************************************************************************
-	// 문자열 변환 함수
+	// @brief std::string 문자열을 std::wstring으로 변환합니다.
+	// @param input 변환할 원본 문자열
+	// @return 변환된 결과 와이드 문자열
 	std::wstring CIconvUtil::ConvertW(const std::string& input) const
 	{
 		size_t inBytesLeft = input.size();
@@ -90,9 +100,9 @@ namespace Iconv
 	}
 
 	//***************************************************************************
-	// ANSI(예: CP949, Windows-1252) -> UTF-8 변환
-	//	CIconvUtil iconvUtil("CP949", "UTF-8");
-	//	iconvUtil.AnsiToUtf8(content);
+	// @brief ANSI(예: CP949, Windows-1252) 인코딩 문자열을 UTF-8 인코딩으로 변환합니다.
+	// @param input 변환할 ANSI 문자열
+	// @return 변환된 UTF-8 문자열
 	std::string CIconvUtil::AnsiToUtf8(const std::string& input) const
 	{
 		if( input.size() < 1 ) return "";
@@ -101,9 +111,9 @@ namespace Iconv
 	}
 
 	//***************************************************************************
-	// UTF-8 -> ANSI(예: CP949, Windows-1252) 변환
-	//	CIconvUtil iconvUtil("UTF-8", "CP949");
-	//	iconvUtil.Utf8ToAnsi(content);
+	// @brief UTF-8 인코딩 문자열을 ANSI(예: CP949, Windows-1252) 인코딩으로 변환합니다.
+	// @param input 변환할 UTF-8 문자열
+	// @return 변환된 ANSI 문자열
 	std::string CIconvUtil::Utf8ToAnsi(const std::string& input) const
 	{
 		if( input.size() < 1 ) return "";
@@ -112,9 +122,9 @@ namespace Iconv
 	}
 
 	//***************************************************************************
-	// ANSI(예: CP949, Windows-1252) -> WCHAR_T 변환
-	//	CIconvUtil iconvUtil("CP949", "WCHAR_T");
-	//	iconvUtil.AnsiToWChar(content);
+	// @brief ANSI(예: CP949, Windows-1252) 인코딩 문자열을 WCHAR_T(std::wstring)로 변환합니다.
+	// @param input 변환할 ANSI 문자열
+	// @return 변환된 WCHAR_T 문자열
 	std::wstring CIconvUtil::AnsiToWChar(const std::string& input) const
 	{
 		if( input.size() < 1 ) return L"";
@@ -123,9 +133,9 @@ namespace Iconv
 	}
 
 	//***************************************************************************
-	// WCHAR_T -> ANSI(예: CP949, Windows-1252) 변환
-	//	CIconvUtil iconvUtil("WCHAR_T", "CP949");
-	//	iconvUtil.WCharToAnsi(content);
+	// @brief WCHAR_T(std::wstring) 문자열을 ANSI(예: CP949, Windows-1252) 인코딩으로 변환합니다.
+	// @param input 변환할 WCHAR_T 문자열
+	// @return 변환된 ANSI 문자열
 	std::string CIconvUtil::WCharToAnsi(const std::wstring& input) const
 	{
 		if( input.size() < 1 ) return "";
@@ -134,9 +144,9 @@ namespace Iconv
 	}
 
 	//***************************************************************************
-	// UTF-8 -> WCHAR_T 변환
-	//	CIconvUtil iconvUtil("UTF-8", "WCHAR_T");
-	//	iconvUtil.Utf8ToWChar(content);
+	// @brief UTF-8 인코딩 문자열을 WCHAR_T(std::wstring)로 변환합니다.
+	// @param input 변환할 UTF-8 문자열
+	// @return 변환된 WCHAR_T 문자열
 	std::wstring CIconvUtil::Utf8ToWChar(const std::string& input) const
 	{
 		if( input.size() < 1 ) return L"";
@@ -145,9 +155,9 @@ namespace Iconv
 	}
 
 	//***************************************************************************
-	// WCHAR_T -> UTF-8 변환
-	//	CIconvUtil iconvUtil("WCHAR_T", "UTF-8");
-	//	iconvUtil.WCharToUtf8(content);
+	// @brief WCHAR_T(std::wstring) 문자열을 UTF-8 인코딩으로 변환합니다.
+	// @param input 변환할 WCHAR_T 문자열
+	// @return 변환된 UTF-8 문자열
 	std::string CIconvUtil::WCharToUtf8(const std::wstring& input) const
 	{
 		if( input.size() < 1 ) return "";
