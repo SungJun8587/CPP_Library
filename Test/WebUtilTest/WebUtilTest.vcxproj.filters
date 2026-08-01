@@ -1,0 +1,44 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="UtilCore">
+      <UniqueIdentifier>{aefca1c3-0efb-4603-be2a-e943307a3f69}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UtilCore">
+      <UniqueIdentifier>{041cc5db-335e-4002-af01-ad48ff8a046c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UtilCore\Util">
+      <UniqueIdentifier>{782e6532-01ef-46c1-b705-d663fc9691f3}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="WebUtilTest.cpp" />
+    <ClCompile Include="pch.cpp" />
+    <ClCompile Include="TestFunction.cpp" />
+    <ClCompile Include="..\..\UtilCore\Util\ConvertCharset.cpp">
+      <Filter>UtilCore\Util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\UtilCore\Util\WebUtil.cpp">
+      <Filter>UtilCore\Util</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="TestFunction.h" />
+    <ClInclude Include="..\..\UtilCore\BaseDefine.h">
+      <Filter>UtilCore</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\UtilCore\BaseMacro.h">
+      <Filter>UtilCore</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\UtilCore\BaseRedefineDataType.h">
+      <Filter>UtilCore</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\UtilCore\Util\ConvertCharset.h">
+      <Filter>UtilCore\Util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\UtilCore\Util\WebUtil.h">
+      <Filter>UtilCore\Util</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

@@ -14,13 +14,7 @@
 void MemBufferCreate(MEMORY_BYTE_BUFFER* pMemBuffer, size_t nSize)
 {
 	pMemBuffer->m_nSize = nSize;
-
-#ifdef TCMALLOC_TCMALLOC_H_
-	pMemBuffer->m_pbBuffer = (unsigned char*)tc_malloc(pMemBuffer->m_nSize);
-#else
-	pMemBuffer->m_pbBuffer = (unsigned char*)malloc(pMemBuffer->m_nSize);
-#endif
-
+	pMemBuffer->m_pbBuffer = static_cast<unsigned char*>(BaseAllocator::Alloc(static_cast<int32>(pMemBuffer->m_nSize)));
 	pMemBuffer->m_pbPosition = pMemBuffer->m_pbBuffer;
 }
 
@@ -29,21 +23,20 @@ void MemBufferCreate(MEMORY_BYTE_BUFFER* pMemBuffer, size_t nSize)
 //
 void MemBufferGrow(MEMORY_BYTE_BUFFER* pMemBuffer)
 {
-	BYTE* pbBuffer;
-	size_t	nSize;
+	size_t nSize = (size_t)(pMemBuffer->m_pbPosition - pMemBuffer->m_pbBuffer);
+	size_t nNewSize = pMemBuffer->m_nSize * 2;
 
-	nSize = (size_t)(pMemBuffer->m_pbPosition - pMemBuffer->m_pbBuffer);
-	pMemBuffer->m_nSize = pMemBuffer->m_nSize * 2;
-
-#ifdef TCMALLOC_TCMALLOC_H_
-	pbBuffer = (unsigned char*)tc_realloc(pMemBuffer->m_pbBuffer, pMemBuffer->m_nSize);
-#else
-	pbBuffer = (unsigned char*)realloc(pMemBuffer->m_pbBuffer, pMemBuffer->m_nSize);
-#endif
-
-	if( pbBuffer )
+	// BaseAllocator는 realloc을 직접 지원하지 않으므로 새 크기로 할당 후 복사/해제
+	unsigned char* pbNewBuffer = static_cast<unsigned char*>(BaseAllocator::Alloc(static_cast<int32>(nNewSize)));
+	if( pbNewBuffer != nullptr )
 	{
-		pMemBuffer->m_pbBuffer = pbBuffer;
+		if( pMemBuffer->m_pbBuffer != nullptr )
+		{
+			memcpy_s(pbNewBuffer, nNewSize, pMemBuffer->m_pbBuffer, nSize);
+			BaseAllocator::Release(pMemBuffer->m_pbBuffer);
+		}
+		pMemBuffer->m_nSize = nNewSize;
+		pMemBuffer->m_pbBuffer = pbNewBuffer;
 		pMemBuffer->m_pbPosition = pMemBuffer->m_pbBuffer + nSize;
 	}
 }
@@ -77,13 +70,10 @@ void MemBufferAddBuffer(MEMORY_BYTE_BUFFER* pMemBuffer, const BYTE* pbBuffer, co
 void MemBufferDestroy(MEMORY_BYTE_BUFFER* pMemBuffer)
 {
 	pMemBuffer->m_nSize = 0;
-
-#ifdef TCMALLOC_TCMALLOC_H_
-	if( pMemBuffer->m_pbBuffer ) tc_free(pMemBuffer->m_pbBuffer);
-#else
-	if( pMemBuffer->m_pbBuffer ) free(pMemBuffer->m_pbBuffer);
-#endif
-
+	if( pMemBuffer->m_pbBuffer )
+	{
+		BaseAllocator::Release(pMemBuffer->m_pbBuffer);
+	}
 	pMemBuffer->m_pbBuffer = NULL;
 	pMemBuffer->m_pbPosition = NULL;
 }
@@ -94,13 +84,7 @@ void MemBufferDestroy(MEMORY_BYTE_BUFFER* pMemBuffer)
 void MemBufferCreate(MEMORY_CHAR_BUFFER* pMemBuffer, size_t nSize)
 {
 	pMemBuffer->m_nSize = nSize;
-
-#ifdef TCMALLOC_TCMALLOC_H_
-	pMemBuffer->m_ptszBuffer = (TCHAR*)tc_malloc(pMemBuffer->m_nSize * sizeof(TCHAR));
-#else
-	pMemBuffer->m_ptszBuffer = (TCHAR*)malloc(pMemBuffer->m_nSize * sizeof(TCHAR));
-#endif
-
+	pMemBuffer->m_ptszBuffer = static_cast<TCHAR*>(BaseAllocator::Alloc(static_cast<int32>(pMemBuffer->m_nSize * sizeof(TCHAR))));
 	pMemBuffer->m_ptszPosition = pMemBuffer->m_ptszBuffer;
 }
 
@@ -109,21 +93,19 @@ void MemBufferCreate(MEMORY_CHAR_BUFFER* pMemBuffer, size_t nSize)
 //
 void MemBufferGrow(MEMORY_CHAR_BUFFER* pMemBuffer)
 {
-	TCHAR* ptszBuffer;
-	size_t	nSize;
+	size_t nSize = (size_t)(pMemBuffer->m_ptszPosition - pMemBuffer->m_ptszBuffer);
+	size_t nNewSize = pMemBuffer->m_nSize * 2;
 
-	nSize = (size_t)(pMemBuffer->m_ptszPosition - pMemBuffer->m_ptszBuffer);
-	pMemBuffer->m_nSize = pMemBuffer->m_nSize * 2;
-
-#ifdef TCMALLOC_TCMALLOC_H_
-	ptszBuffer = (TCHAR*)tc_realloc(pMemBuffer->m_ptszBuffer, pMemBuffer->m_nSize * sizeof(TCHAR));
-#else
-	ptszBuffer = (TCHAR*)realloc(pMemBuffer->m_ptszBuffer, pMemBuffer->m_nSize * sizeof(TCHAR));
-#endif
-
-	if( ptszBuffer )
+	TCHAR* ptszNewBuffer = static_cast<TCHAR*>(BaseAllocator::Alloc(static_cast<int32>(nNewSize * sizeof(TCHAR))));
+	if( ptszNewBuffer != nullptr )
 	{
-		pMemBuffer->m_ptszBuffer = ptszBuffer;
+		if( pMemBuffer->m_ptszBuffer != nullptr )
+		{
+			memcpy_s(ptszNewBuffer, nNewSize * sizeof(TCHAR), pMemBuffer->m_ptszBuffer, nSize * sizeof(TCHAR));
+			BaseAllocator::Release(pMemBuffer->m_ptszBuffer);
+		}
+		pMemBuffer->m_nSize = nNewSize;
+		pMemBuffer->m_ptszBuffer = ptszNewBuffer;
 		pMemBuffer->m_ptszPosition = pMemBuffer->m_ptszBuffer + nSize;
 	}
 }
@@ -157,13 +139,10 @@ void MemBufferAddBuffer(MEMORY_CHAR_BUFFER* pMemBuffer, const TCHAR* ptszBuffer,
 void MemBufferDestroy(MEMORY_CHAR_BUFFER* pMemBuffer)
 {
 	pMemBuffer->m_nSize = 0;
-
-#ifdef TCMALLOC_TCMALLOC_H_
-	if( pMemBuffer->m_ptszBuffer ) tc_free(pMemBuffer->m_ptszBuffer);
-#else
-	if( pMemBuffer->m_ptszBuffer ) free(pMemBuffer->m_ptszBuffer);
-#endif
-
+	if( pMemBuffer->m_ptszBuffer )
+	{
+		BaseAllocator::Release(pMemBuffer->m_ptszBuffer);
+	}
 	pMemBuffer->m_ptszBuffer = NULL;
 	pMemBuffer->m_ptszPosition = NULL;
 }

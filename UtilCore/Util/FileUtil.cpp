@@ -1,3 +1,4 @@
+
 //***************************************************************************
 // FileUtil.cpp : implementation of the FileUtil Functions.
 //
@@ -5,13 +6,12 @@
 
 #include "pch.h"
 #include "FileUtil.h"
-#include "ConvertCharset.h" // 문자셋 변환 함수 헤더 포함
 
 //***************************************************************************
-// @brief 바이트 배열이 BOM이 없는 UTF-8 인코딩 형식인지 검증합니다.
-// @param pBuffer 검사할 데이터 버퍼 포인터
+// @brief 바이트 배열이 BOM이 없는 UTF-8 인코딩 조건을 만족하는지 검사합니다.
+// @param pBuffer 검사할 데이터 버퍼
 // @param BuffSize 버퍼 크기
-// @return UTF-8 형식이 맞으면 true, 아니면 false
+// @return UTF-8 조건을 만족하면 true, 아니면 false
 bool IsUTF8WithoutBom(const void* pBuffer, const size_t BuffSize)
 {
 	bool bUTF8 = true;
@@ -25,7 +25,7 @@ bool IsUTF8WithoutBom(const void* pBuffer, const size_t BuffSize)
 		{
 			start++;
 		}
-		else if( *start < (0xC0) )	// 잘못된 연속 바이트 (10xxxxxx)
+		else if( *start < (0xC0) )	// 잘못된 시작 바이트 (10xxxxxx)
 		{
 			bUTF8 = false;
 			break;
@@ -52,7 +52,7 @@ bool IsUTF8WithoutBom(const void* pBuffer, const size_t BuffSize)
 			}
 			start += 3;
 		}
-		else						// 4바이트 이상 혹은 허용되지 않는 바이트
+		else						// 4바이트 이상 혹은 지원하지 않는 바이트
 		{
 			bUTF8 = false;
 			break;
@@ -63,7 +63,7 @@ bool IsUTF8WithoutBom(const void* pBuffer, const size_t BuffSize)
 
 #ifdef _WIN32
 //***************************************************************************
-// @brief 파일 경로를 받아 Win32 API 기반으로 파일의 인코딩 타입(UTF-16, UTF-8, ANSI 등)을 판별합니다.
+// @brief 파일 경로를 받아 Win32 API 방식으로 파일의 인코딩 타입(UTF-16, UTF-8, ANSI 등)을 판별합니다.
 // @param ptszFullPath 파일 전체 경로
 // @return 판별된 인코딩 타입 (EEncoding 열거형)
 EEncoding GetFileEncodingType(const TCHAR* ptszFullPath)
@@ -76,22 +76,22 @@ EEncoding GetFileEncodingType(const TCHAR* ptszFullPath)
 	HANDLE	hFile;
 
 	// 파일 읽기 전용으로 오픈
-	hFile = CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	hFile = ::CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile == INVALID_HANDLE_VALUE )
 		return eFileType;
 
-	// [수정] Win32 API의 ReadFile을 명확히 호출하기 위해 앞에 '::'를 붙여 충돌을 방지합니다.
+	// [주의] Win32 API인 ReadFile을 명확히 호출하기 위해 앞에 '::'를 붙여 충돌을 방지합니다.
 	bReturn = ::ReadFile(hFile, szBuffer, 3, &dwReadSize, NULL);
 	if( !bReturn || dwReadSize < 2 ) // 최소 2바이트(BOM)는 읽어야 함
 	{
-		CloseHandle(hFile);
+		::CloseHandle(hFile);
 		return eFileType;
 	}
 	szBuffer[3] = '\0';
 
-	CloseHandle(hFile);
+	::CloseHandle(hFile);
 
-	// BOM 시그니처에 따른 인코딩 종류 분기
+	// BOM 시그니처로 먼저 인코딩 여부 읽기
 	if( (unsigned char)szBuffer[0] == UNICODE_LE_FILE_IDENTIFIER_BYTE1 && (unsigned char)szBuffer[1] == UNICODE_LE_FILE_IDENTIFIER_BYTE2 )
 	{
 		eFileType = EEncoding::UTF16_LE;		// UNICODE(LITTLE ENDIAN)
@@ -109,10 +109,10 @@ EEncoding GetFileEncodingType(const TCHAR* ptszFullPath)
 		else
 		{
 			// BOM이 없는 경우 파일 전체를 읽어 UTF-8(Without BOM)인지 판별
-			HANDLE hFileWithoutBom = CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
+			HANDLE hFileWithoutBom = ::CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
 			if( hFileWithoutBom != INVALID_HANDLE_VALUE )
 			{
-				DWORD dwFileSize = GetFileSize(hFileWithoutBom, nullptr);
+				DWORD dwFileSize = ::GetFileSize(hFileWithoutBom, nullptr);
 				if( dwFileSize > 0 )
 				{
 					std::vector<char> byteDestination(dwFileSize);
@@ -129,7 +129,7 @@ EEncoding GetFileEncodingType(const TCHAR* ptszFullPath)
 				{
 					eFileType = EEncoding::ANSI;
 				}
-				CloseHandle(hFileWithoutBom);
+				::CloseHandle(hFileWithoutBom);
 			}
 			else
 			{
@@ -142,9 +142,9 @@ EEncoding GetFileEncodingType(const TCHAR* ptszFullPath)
 }
 
 //***************************************************************************
-// @brief Win32 API를 사용하여 파일을 바이너리 벡터로 읽어옵니다.
-// @param byteDestination 파일 내용을 담을 바이트 벡터 참조
-// @param ptszFullPath 읽어올 파일의 전체 경로
+// @brief Win32 API를 사용하여 파일을 바이너리 형태로 읽어들입니다.
+// @param byteDestination 읽어들인 데이터를 저장할 바이트 벡터 참조
+// @param ptszFullPath 읽어들일 파일의 전체 경로
 // @return 성공 시 true, 실패 시 false
 bool ReadFile(std::vector<BYTE>& byteDestination, const TCHAR* ptszFullPath)
 {
@@ -152,43 +152,43 @@ bool ReadFile(std::vector<BYTE>& byteDestination, const TCHAR* ptszFullPath)
 
 	DWORD dwLength = GetFileSize(ptszFullPath);
 
-	// 파일 핸들 생성
-	HANDLE hFile = CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	// 파일 핸들 오픈
+	HANDLE hFile = ::CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile == INVALID_HANDLE_VALUE )
 		return false;
 
-	// 파일 크기만큼 벡터 버퍼 확보
+	// 파일 크기만큼 저장 공간 확보
 	byteDestination.resize(dwLength);
 
 	const DWORD	dwMaxReadSize = MAX_BUFFER_SIZE;
 	DWORD		dwReadOffset = 0;
 	BYTE* pbBuffer = byteDestination.data();
 
-	// 버퍼 크기 단위로 나누어 파일 읽기 수행
+	// 최대 크기 단위로 나누어 분할 읽기 수행
 	while( dwReadOffset < dwLength )
 	{
 		DWORD dwRemain = dwLength - dwReadOffset;
 		DWORD dwReadNumSize = (dwRemain > dwMaxReadSize) ? dwMaxReadSize : dwRemain;
 		DWORD dwReadSize = 0;
 
-		if( !ReadFile(hFile, pbBuffer + dwReadOffset, dwReadNumSize, &dwReadSize, NULL) || dwReadSize == 0 )
+		if( !::ReadFile(hFile, pbBuffer + dwReadOffset, dwReadNumSize, &dwReadSize, NULL) || dwReadSize == 0 )
 		{
-			CloseHandle(hFile);
+			::CloseHandle(hFile);
 			return false;
 		}
 
-		dwReadOffset += dwReadSize;	// 실제로 읽은 만큼만 전진 (부분 읽기 대응)
+		dwReadOffset += dwReadSize;	// 실제로 읽은 만큼만 증가 (부분 읽기 대응)
 	}
 
-	CloseHandle(hFile);
+	::CloseHandle(hFile);
 
 	return true;
 }
 
 //***************************************************************************
-// @brief 메모리 맵(Memory Map) 방식을 이용하여 파일을 고속으로 읽어 벡터에 담습니다.
-// @param byteDestination 파일 내용을 담을 바이트 벡터 참조
-// @param ptszFullPath 읽어올 파일의 전체 경로
+// @brief 메모리 맵(Memory Map) 기법을 이용하여 파일을 전체적으로 읽어 버퍼에 저장합니다.
+// @param byteDestination 읽어들인 데이터를 저장할 바이트 벡터 참조
+// @param ptszFullPath 읽어들일 파일의 전체 경로
 // @return 성공 시 true, 실패 시 false
 bool ReadFileMap(std::vector<BYTE>& byteDestination, const TCHAR* ptszFullPath)
 {
@@ -198,37 +198,37 @@ bool ReadFileMap(std::vector<BYTE>& byteDestination, const TCHAR* ptszFullPath)
 
 	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
 
-	hFile = CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	hFile = ::CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile == INVALID_HANDLE_VALUE )
 		return false;
 
 	dwLength = GetFileSize(ptszFullPath);
 
 	// 파일 매핑 객체 생성
-	hFileMap = CreateFileMapping(hFile, nullptr, PAGE_WRITECOPY, 0, dwLength, nullptr);
+	hFileMap = ::CreateFileMapping(hFile, nullptr, PAGE_WRITECOPY, 0, dwLength, nullptr);
 	if( hFileMap == nullptr )
 	{
-		CloseHandle(hFile);
+		::CloseHandle(hFile);
 		return false;
 	}
 
 	// 뷰 생성하여 메모리 주소 획득
-	lpvFile = MapViewOfFile(hFileMap, FILE_MAP_COPY, 0, 0, 0);
+	lpvFile = ::MapViewOfFile(hFileMap, FILE_MAP_COPY, 0, 0, 0);
 	if( lpvFile == nullptr )
 	{
-		CloseHandle(hFile);
-		CloseHandle(hFileMap);
+		::CloseHandle(hFile);
+		::CloseHandle(hFileMap);
 		return false;
 	}
 
-	// 벡터 크기를 맞추고 메모리 복사 수행
+	// 파일 크기를 맞추고 메모리 복사 수행
 	byteDestination.resize(dwLength);
 	memcpy(byteDestination.data(), lpvFile, dwLength);
 
 	// 리소스 해제
-	UnmapViewOfFile(lpvFile);
-	CloseHandle(hFile);
-	CloseHandle(hFileMap);
+	::UnmapViewOfFile(lpvFile);
+	::CloseHandle(hFile);
+	::CloseHandle(hFileMap);
 
 	return true;
 }
@@ -247,20 +247,20 @@ bool SaveAnsiFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size
 	std::string strAnsi;
 
 #ifdef _UNICODE
-	// [수정] 널 문자를 포함하여 변환했다면, 아래에서 널 문자를 제외하고 파일에 씁니다.
+	// [주의] 널 문자를 포함하여 변환했다면, 아래에서 널 문자를 제거하고 파일에 씁니다.
 	if( UnicodeToAnsi_String(strAnsi, ptszBuffer, BufferSize) != 0 ) return false;
 #else
 	strAnsi.assign(ptszBuffer, BufferSize);
 #endif
 
-	// [수정] 변환된 문자열 끝에 널 문자('\0')가 포함되어 있다면 제외
+	// [주의] 변환된 문자열 끝에 널 문자('\0')가 포함되어 있다면 제거
 	if( !strAnsi.empty() && strAnsi.back() == '\0' )
 	{
 		strAnsi.pop_back();
 	}
 
-	// 파일 쓰기 전용 핸들 오픈
-	HANDLE hFile = CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	// 파일 쓰기 위한 핸들 오픈
+	HANDLE hFile = ::CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile == INVALID_HANDLE_VALUE )
 		return false;
 
@@ -269,7 +269,7 @@ bool SaveAnsiFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size
 	const DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
 	DWORD		dwWriteOffset = 0;
 
-	// 분할하여 파일 쓰기 진행
+	// 나누어서 파일 쓰기 수행
 	while( dwWriteOffset < dwTotFileSize )
 	{
 		DWORD dwRemain = dwTotFileSize - dwWriteOffset;
@@ -278,14 +278,14 @@ bool SaveAnsiFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size
 
 		if( !::WriteFile(hFile, pszBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL) || dwWrittenSize == 0 )
 		{
-			CloseHandle(hFile);
+			::CloseHandle(hFile);
 			return false;
 		}
 
 		dwWriteOffset += dwWrittenSize;
 	}
 
-	CloseHandle(hFile);
+	::CloseHandle(hFile);
 
 	return true;
 }
@@ -299,7 +299,7 @@ bool SaveAnsiFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size
 bool SaveUnicodeBEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
 {
 	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
-	if( ptszBuffer == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
+	if( ptszBuffer == nullptr || _tcslen(ptszBuffer) < 1 ) return false;
 
 	std::wstring strUnicode;
 
@@ -309,26 +309,24 @@ bool SaveUnicodeBEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const
 	if( AnsiToUnicode_String(strUnicode, ptszBuffer, BufferSize) != 0 ) return false;
 #endif
 
-	// Big Endian으로 바이트 스왑 (0xCDCD 디버그 패턴에서 중단하던 기존 동작 유지)
+	// Big Endian으로 바이트 순서 변경
 	std::wstring strBE;
 	strBE.reserve(strUnicode.size());
 	for( wchar_t ch : strUnicode )
 	{
-		wchar_t wcChar = SWAP16(ch);
-		if( wcChar == 0xCDCD ) break;
-		strBE.push_back(wcChar);
+		strBE.push_back(SWAP16(ch));
 	}
 
-	HANDLE hFile = CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	HANDLE hFile = ::CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile == INVALID_HANDLE_VALUE )
 		return false;
 
 	// UTF-16 BE BOM 작성
 	char szBom[2] = { (char)UNICODE_BE_FILE_IDENTIFIER_BYTE1, (char)UNICODE_BE_FILE_IDENTIFIER_BYTE2 };
 	DWORD dwWrittenSize = 0;
-	if( !WriteFile(hFile, szBom, sizeof(szBom), &dwWrittenSize, NULL) )
+	if( !::WriteFile(hFile, szBom, sizeof(szBom), &dwWrittenSize, NULL) )
 	{
-		CloseHandle(hFile);
+		::CloseHandle(hFile);
 		return false;
 	}
 
@@ -342,16 +340,16 @@ bool SaveUnicodeBEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const
 		DWORD dwRemain = dwTotFileSize - dwWriteOffset;
 		DWORD dwWriteSize = (dwRemain > dwMaxWriteSize) ? dwMaxWriteSize : dwRemain;
 
-		if( !WriteFile(hFile, pszBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL) || dwWrittenSize == 0 )
+		if( !::WriteFile(hFile, pszBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL) || dwWrittenSize == 0 )
 		{
-			CloseHandle(hFile);
+			::CloseHandle(hFile);
 			return false;
 		}
 
 		dwWriteOffset += dwWrittenSize;
 	}
 
-	CloseHandle(hFile);
+	::CloseHandle(hFile);
 
 	return true;
 }
@@ -365,7 +363,7 @@ bool SaveUnicodeBEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const
 bool SaveUnicodeLEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
 {
 	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
-	if( ptszBuffer == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
+	if( ptszBuffer == nullptr || _tcslen(ptszBuffer) < 1 ) return false;
 
 	std::wstring strUnicode;
 
@@ -375,16 +373,16 @@ bool SaveUnicodeLEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const
 	if( AnsiToUnicode_String(strUnicode, ptszBuffer, BufferSize) != 0 ) return false;
 #endif
 
-	HANDLE hFile = CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	HANDLE hFile = ::CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile == INVALID_HANDLE_VALUE )
 		return false;
 
 	// UTF-16 LE BOM 작성
 	char szBom[2] = { (char)UNICODE_LE_FILE_IDENTIFIER_BYTE1, (char)UNICODE_LE_FILE_IDENTIFIER_BYTE2 };
 	DWORD dwWrittenSize = 0;
-	if( !WriteFile(hFile, szBom, sizeof(szBom), &dwWrittenSize, NULL) )
+	if( !::WriteFile(hFile, szBom, sizeof(szBom), &dwWrittenSize, NULL) )
 	{
-		CloseHandle(hFile);
+		::CloseHandle(hFile);
 		return false;
 	}
 
@@ -398,16 +396,16 @@ bool SaveUnicodeLEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const
 		DWORD dwRemain = dwTotFileSize - dwWriteOffset;
 		DWORD dwWriteSize = (dwRemain > dwMaxWriteSize) ? dwMaxWriteSize : dwRemain;
 
-		if( !WriteFile(hFile, pszBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL) || dwWrittenSize == 0 )
+		if( !::WriteFile(hFile, pszBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL) || dwWrittenSize == 0 )
 		{
-			CloseHandle(hFile);
+			::CloseHandle(hFile);
 			return false;
 		}
 
 		dwWriteOffset += dwWrittenSize;
 	}
 
-	CloseHandle(hFile);
+	::CloseHandle(hFile);
 
 	return true;
 }
@@ -431,13 +429,13 @@ bool SaveUTF8BOMFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const s
 	if( AnsiToUtf8_String(strUtf8, ptszBuffer, BufferSize) != 0 ) return false;
 #endif
 
-	// [수정] 변환된 문자열 끝에 널 문자('\0')가 포함되어 있다면 제외
+	// [주의] 변환된 문자열 끝에 널 문자('\0')가 포함되어 있다면 제거
 	if( !strUtf8.empty() && strUtf8.back() == '\0' )
 	{
 		strUtf8.pop_back();
 	}
 
-	HANDLE hFile = CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	HANDLE hFile = ::CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile == INVALID_HANDLE_VALUE )
 		return false;
 
@@ -446,7 +444,7 @@ bool SaveUTF8BOMFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const s
 	DWORD dwWrittenSize = 0;
 	if( !::WriteFile(hFile, szBom, sizeof(szBom), &dwWrittenSize, NULL) )
 	{
-		CloseHandle(hFile);
+		::CloseHandle(hFile);
 		return false;
 	}
 
@@ -462,14 +460,14 @@ bool SaveUTF8BOMFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const s
 
 		if( !::WriteFile(hFile, pszBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL) || dwWrittenSize == 0 )
 		{
-			CloseHandle(hFile);
+			::CloseHandle(hFile);
 			return false;
 		}
 
 		dwWriteOffset += dwWrittenSize;
 	}
 
-	CloseHandle(hFile);
+	::CloseHandle(hFile);
 
 	return true;
 }
@@ -493,13 +491,13 @@ bool SaveUTF8NOBOMFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const
 	if( AnsiToUtf8_String(strUtf8, ptszBuffer, BufferSize) != 0 ) return false;
 #endif
 
-	// [수정] 변환된 문자열 끝에 널 문자('\0')가 포함되어 있다면 제외
+	// [주의] 변환된 문자열 끝에 널 문자('\0')가 포함되어 있다면 제거
 	if( !strUtf8.empty() && strUtf8.back() == '\0' )
 	{
 		strUtf8.pop_back();
 	}
 
-	HANDLE hFile = CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	HANDLE hFile = ::CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile == INVALID_HANDLE_VALUE )
 		return false;
 
@@ -516,29 +514,27 @@ bool SaveUTF8NOBOMFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const
 
 		if( !::WriteFile(hFile, pszBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL) || dwWrittenSize == 0 )
 		{
-			CloseHandle(hFile);
+			::CloseHandle(hFile);
 			return false;
 		}
 
 		dwWriteOffset += dwWrittenSize;
 	}
 
-	CloseHandle(hFile);
+	::CloseHandle(hFile);
 
 	return true;
 }
 
 //***************************************************************************
-// @brief 인코딩 유형을 자동 감지하여 파일을 _tstring 변수로 읽어옵니다.
-// @param destString 읽어온 문자열을 저장할 _tstring 참조
-// @param ptszFullPath 읽어올 파일의 전체 경로
+// @brief 인코딩 종류에 관계없이 파일을 자동 감지하여 _tstring 형태로 읽어들입니다.
+// @param destString 읽어들인 문자열을 저장할 _tstring 참조
+// @param ptszFullPath 읽어들일 파일의 전체 경로
 // @return 성공 시 true, 실패 시 false
 bool ReadFile(_tstring& destString, const TCHAR* ptszFullPath)
 {
-	int		i = 0;
 	DWORD	dwLength = 0;
 	DWORD	dwReadOffset = 0;
-	wchar_t	wcChar = L'\0';
 	char* pszBuffer = nullptr;
 	wchar_t* pwszBuffer = nullptr;
 
@@ -553,16 +549,16 @@ bool ReadFile(_tstring& destString, const TCHAR* ptszFullPath)
 	dwLength = GetFileSize(ptszFullPath);
 	eFileType = GetFileEncodingType(ptszFullPath);
 
-	hFile = CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	hFile = ::CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile == INVALID_HANDLE_VALUE )
 		return false;
 
 	const DWORD dwMaxReadSize = MAX_BUFFER_SIZE;
 
-	// 인코딩 타입에 맞추어 파일 포인터를 이동하고 버퍼 크기 조절 후 읽기 수행
+	// 인코딩 타입에 맞추어 시작 포인터를 이동하고 남은 크기 만큼 읽기 수행
 	if( eFileType == EEncoding::UTF16_BE || eFileType == EEncoding::UTF16_LE )
 	{
-		SetFilePointer(hFile, sizeof(WORD), nullptr, FILE_BEGIN);
+		::SetFilePointer(hFile, sizeof(WORD), nullptr, FILE_BEGIN);
 		dwLength = dwLength - sizeof(WORD);
 
 		WStrBuffer.resize(dwLength / sizeof(wchar_t) + 1);
@@ -574,16 +570,16 @@ bool ReadFile(_tstring& destString, const TCHAR* ptszFullPath)
 			DWORD dwReadNumSize = (dwRemain > dwMaxReadSize) ? dwMaxReadSize : dwRemain;
 			DWORD dwReadSize = 0;
 
-			if( !ReadFile(hFile, (char*)pwszBuffer + dwReadOffset, dwReadNumSize, &dwReadSize, NULL) || dwReadSize == 0 )
+			if( !::ReadFile(hFile, (char*)pwszBuffer + dwReadOffset, dwReadNumSize, &dwReadSize, NULL) || dwReadSize == 0 )
 			{
-				CloseHandle(hFile);
+				::CloseHandle(hFile);
 				return false;
 			}
 
 			dwReadOffset += dwReadSize;
 		}
 
-		CloseHandle(hFile);
+		::CloseHandle(hFile);
 	}
 	else if( eFileType == EEncoding::ANSI || eFileType == EEncoding::UTF8_BOM || eFileType == EEncoding::UTF8_NOBOM )
 	{
@@ -591,7 +587,7 @@ bool ReadFile(_tstring& destString, const TCHAR* ptszFullPath)
 
 		if( dwSkip > 0 )
 		{
-			SetFilePointer(hFile, dwSkip, nullptr, FILE_BEGIN);
+			::SetFilePointer(hFile, dwSkip, nullptr, FILE_BEGIN);
 			dwLength = dwLength - dwSkip;
 		}
 
@@ -604,9 +600,9 @@ bool ReadFile(_tstring& destString, const TCHAR* ptszFullPath)
 			DWORD dwReadNumSize = (dwRemain > dwMaxReadSize) ? dwMaxReadSize : dwRemain;
 			DWORD dwReadSize = 0;
 
-			if( !ReadFile(hFile, pszBuffer + dwReadOffset, dwReadNumSize, &dwReadSize, NULL) || dwReadSize == 0 )
+			if( !::ReadFile(hFile, pszBuffer + dwReadOffset, dwReadNumSize, &dwReadSize, NULL) || dwReadSize == 0 )
 			{
-				CloseHandle(hFile);
+				::CloseHandle(hFile);
 				return false;
 			}
 
@@ -615,18 +611,18 @@ bool ReadFile(_tstring& destString, const TCHAR* ptszFullPath)
 
 		pszBuffer[dwLength] = '\0';
 
-		CloseHandle(hFile);
+		::CloseHandle(hFile);
 	}
 	else
 	{
-		CloseHandle(hFile);
+		::CloseHandle(hFile);
 		return false;
 	}
 
 	if( (eFileType == EEncoding::UTF16_LE || eFileType == EEncoding::UTF16_BE) && pwszBuffer == nullptr ) return false;
 	if( (eFileType == EEncoding::UTF8_BOM || eFileType == EEncoding::UTF8_NOBOM || eFileType == EEncoding::ANSI) && pszBuffer == nullptr ) return false;
 
-	// 유니코드 혹은 멀티바이트(ANSI) 빌드 환경에 따른 문자열 변환 분기
+	// 유니코드 혹은 멀티바이트(ANSI) 빌드 환경에 따라 문자열 변환 분기
 #ifdef _UNICODE
 	if( eFileType == EEncoding::UTF16_LE )
 	{
@@ -634,15 +630,12 @@ bool ReadFile(_tstring& destString, const TCHAR* ptszFullPath)
 	}
 	else if( eFileType == EEncoding::UTF16_BE )
 	{
-		for( i = 0; *pwszBuffer; i++ )
+		wchar_t* p = pwszBuffer;
+		while( *p )
 		{
-			wcChar = SWAP16(*pwszBuffer);
-			if( wcChar == 0xCDCD ) break;
-			*pwszBuffer = wcChar;
-			pwszBuffer++;
+			*p = SWAP16(*p);
+			p++;
 		}
-		*pwszBuffer = L'\0';
-		pwszBuffer -= i;
 
 		destString = pwszBuffer;
 	}
@@ -661,15 +654,12 @@ bool ReadFile(_tstring& destString, const TCHAR* ptszFullPath)
 	}
 	else if( eFileType == EEncoding::UTF16_BE )
 	{
-		for( i = 0; *pwszBuffer; i++ )
+		wchar_t* p = pwszBuffer;
+		while( *p )
 		{
-			wcChar = SWAP16(*pwszBuffer);
-			if( wcChar == 0xCDCD ) break;
-			*pwszBuffer = wcChar;
-			pwszBuffer++;
+			*p = SWAP16(*p);
+			p++;
 		}
-		*pwszBuffer = L'\0';
-		pwszBuffer -= i;
 
 		if( UnicodeToAnsi_String(destString, pwszBuffer, wcslen(pwszBuffer) + 1) != 0 ) return false;
 	}
@@ -687,17 +677,16 @@ bool ReadFile(_tstring& destString, const TCHAR* ptszFullPath)
 }
 
 //***************************************************************************
-// @brief 파일 맵핑을 활용해 다양한 인코딩의 파일을 읽어 _tstring으로 변환합니다.
-// @param destString 읽어온 문자열이 저장될 변수 (_tstring)
-// @param ptszFullPath 읽어올 파일의 전체 경로 (TCHAR*)
+// @brief 파일 매핑을 활용해 다양한 인코딩의 파일을 읽어 _tstring으로 변환합니다.
+// @param destString 읽어들인 문자열이 저장될 참조 (_tstring)
+// @param ptszFullPath 읽어들일 파일의 전체 경로 (TCHAR*)
 // @return 성공 시 true, 실패 시 false
-// @note GetFileEncodingType 내부에서 ReadFileMap을 호출하는 상호 호출(무한 루프)을 
-//       방지하기 위해, ReadFileMap 내부에서 직접 파일의 앞부분을 읽어 인코딩을 판별합니다.
+// @note 파일 핸들을 판별 단계와 매핑 단계에서 재사용하여 파일을 두 번 열고 닫는
+//       오버헤드와 그 사이의 TOCTOU 창을 줄였습니다.
 bool ReadFileMap(_tstring& destString, const TCHAR* ptszFullPath)
 {
 	bool		bIsProcess = false;
 	DWORD		dwLength = 0;
-	int			i = 0;
 	EEncoding	eFileType = EEncoding::DEFAULT;
 
 	HANDLE	hFile, hFileMap;
@@ -705,15 +694,13 @@ bool ReadFileMap(_tstring& destString, const TCHAR* ptszFullPath)
 
 	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
 
-	// [수정] 무한 루프(스택 오버플로우)를 방지하기 위해 GetFileEncodingType 대신 
-	// 파일 핸들로 직접 BOM 및 인코딩을 판별합니다.
-	hFile = CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, nullptr);
+	hFile = ::CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, nullptr);
 	if( hFile == INVALID_HANDLE_VALUE )
 		return false;
 
 	char szBuffer[4] = { 0, };
 	DWORD dwReadSize = 0;
-	if( ReadFile(hFile, szBuffer, 3, &dwReadSize, NULL) )
+	if( ::ReadFile(hFile, szBuffer, 3, &dwReadSize, NULL) )
 	{
 		if( (unsigned char)szBuffer[0] == UNICODE_LE_FILE_IDENTIFIER_BYTE1 && (unsigned char)szBuffer[1] == UNICODE_LE_FILE_IDENTIFIER_BYTE2 )
 		{
@@ -730,12 +717,12 @@ bool ReadFileMap(_tstring& destString, const TCHAR* ptszFullPath)
 		else
 		{
 			// BOM이 없는 경우 파일 전체를 읽어 판별
-			dwLength = GetFileSize(hFile, nullptr);
+			dwLength = ::GetFileSize(hFile, nullptr);
 			if( dwLength > 0 )
 			{
 				std::vector<char> tempBuffer(dwLength);
-				SetFilePointer(hFile, 0, nullptr, FILE_BEGIN);
-				if( ReadFile(hFile, tempBuffer.data(), dwLength, &dwReadSize, NULL) )
+				::SetFilePointer(hFile, 0, nullptr, FILE_BEGIN);
+				if( ::ReadFile(hFile, tempBuffer.data(), dwLength, &dwReadSize, NULL) )
 				{
 					if( IsUTF8WithoutBom((const void*)tempBuffer.data(), dwReadSize) )
 						eFileType = EEncoding::UTF8_NOBOM;
@@ -749,27 +736,23 @@ bool ReadFileMap(_tstring& destString, const TCHAR* ptszFullPath)
 			}
 		}
 	}
-	CloseHandle(hFile);
 
-	// 파일 맵핑 오픈 재수행
-	hFile = CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, nullptr);
-	if( hFile == INVALID_HANDLE_VALUE )
-		return false;
+	dwLength = ::GetFileSize(hFile, nullptr);
 
-	dwLength = GetFileSize(hFile, nullptr);
-
-	hFileMap = CreateFileMapping(hFile, nullptr, PAGE_WRITECOPY, 0, dwLength, nullptr);
+	// [최적화] CreateFileMapping은 파일 포인터 위치와 무관하게 동작하므로
+	// 위에서 판별에 사용한 핸들을 재오픈 없이 그대로 매핑에 사용합니다.
+	hFileMap = ::CreateFileMapping(hFile, nullptr, PAGE_WRITECOPY, 0, dwLength, nullptr);
 	if( hFileMap == nullptr )
 	{
-		CloseHandle(hFile);
+		::CloseHandle(hFile);
 		return false;
 	}
 
-	lpvFile = MapViewOfFile(hFileMap, FILE_MAP_COPY, 0, 0, 0);
+	lpvFile = ::MapViewOfFile(hFileMap, FILE_MAP_COPY, 0, 0, 0);
 	if( lpvFile == nullptr )
 	{
-		CloseHandle(hFile);
-		CloseHandle(hFileMap);
+		::CloseHandle(hFile);
+		::CloseHandle(hFileMap);
 		return false;
 	}
 
@@ -783,19 +766,12 @@ bool ReadFileMap(_tstring& destString, const TCHAR* ptszFullPath)
 	else if( eFileType == EEncoding::UTF16_BE )
 	{
 		std::wstring temp((wchar_t*)lpvFile + 1);
-		wchar_t* pwszBuffer = temp.data();
-
-		for( i = 0; *pwszBuffer; i++ )
+		for( wchar_t& ch : temp )
 		{
-			wchar_t wcChar = SWAP16(*pwszBuffer);
-			if( wcChar == 0xCDCD ) break;
-			*pwszBuffer = wcChar;
-			pwszBuffer++;
+			ch = SWAP16(ch);
 		}
-		*pwszBuffer = L'\0';
-		pwszBuffer -= i;
 
-		destString = pwszBuffer;
+		destString = temp;
 	}
 	else if( eFileType == EEncoding::UTF8_BOM )
 	{
@@ -817,19 +793,12 @@ bool ReadFileMap(_tstring& destString, const TCHAR* ptszFullPath)
 	else if( eFileType == EEncoding::UTF16_BE )
 	{
 		std::wstring temp((wchar_t*)lpvFile + 1);
-		wchar_t* pwszBuffer = temp.data();
-
-		for( i = 0; *pwszBuffer; i++ )
+		for( wchar_t& ch : temp )
 		{
-			wchar_t wcChar = SWAP16(*pwszBuffer);
-			if( wcChar == 0xCDCD ) break;
-			*pwszBuffer = wcChar;
-			pwszBuffer++;
+			ch = SWAP16(ch);
 		}
-		*pwszBuffer = L'\0';
-		pwszBuffer -= i;
 
-		if( UnicodeToAnsi_String(destString, pwszBuffer, wcslen(pwszBuffer) + 1) != 0 ) bIsProcess = false;
+		if( UnicodeToAnsi_String(destString, temp.data(), temp.size() + 1) != 0 ) bIsProcess = false;
 	}
 	else if( eFileType == EEncoding::UTF8_BOM )
 	{
@@ -845,22 +814,22 @@ bool ReadFileMap(_tstring& destString, const TCHAR* ptszFullPath)
 	}
 #endif
 
-	UnmapViewOfFile(lpvFile);
-	CloseHandle(hFile);
-	CloseHandle(hFileMap);
+	::UnmapViewOfFile(lpvFile);
+	::CloseHandle(hFile);
+	::CloseHandle(hFileMap);
 
 	return bIsProcess;
 }
 
 //***************************************************************************
-// @brief 바이트 버퍼의 데이터를 지정된 크기만큼 파일로 저장합니다.
+// @brief 바이트 버퍼 데이터를 지정한 크기만큼 파일로 저장합니다.
 // @param ptszFullPath 저장할 파일의 전체 경로
 // @param pbBuffer 저장할 바이트 버퍼 포인터
 // @param dwLength 저장할 데이터 크기 (바이트 단위)
 // @return 성공 시 true, 실패 시 false
 bool SaveFile(const TCHAR* ptszFullPath, const BYTE* pbBuffer, const DWORD dwLength)
 {
-	HANDLE hFile = CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	HANDLE hFile = ::CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile == INVALID_HANDLE_VALUE )
 		return false;
 
@@ -873,25 +842,25 @@ bool SaveFile(const TCHAR* ptszFullPath, const BYTE* pbBuffer, const DWORD dwLen
 		DWORD dwWriteSize = (dwRemain > dwMaxWriteSize) ? dwMaxWriteSize : dwRemain;
 		DWORD dwWrittenSize = 0;
 
-		if( !WriteFile(hFile, pbBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL) || dwWrittenSize == 0 )
+		if( !::WriteFile(hFile, pbBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL) || dwWrittenSize == 0 )
 		{
-			CloseHandle(hFile);
+			::CloseHandle(hFile);
 			return false;
 		}
 
 		dwWriteOffset += dwWrittenSize;
 	}
 
-	CloseHandle(hFile);
+	::CloseHandle(hFile);
 
 	return true;
 }
 
 //***************************************************************************
-// @brief 파일의 생성, 접근, 마지막 수정 시간 중 선택한 정보를 시스템 타임(SYSTEMTIME) 형태로 가져옵니다.
+// @brief 파일의 생성, 접근, 마지막 수정 시각 중 지정한 종류를 시스템 타임(SYSTEMTIME) 형태로 가져옵니다.
 // @param ptszFullPath 조회할 파일의 전체 경로
-// @param nCase 조회할 시간 종류 (생성/접근/수정 시간 식별자)
-// @param stLocal 조회된 로컬 시간을 저장할 SYSTEMTIME 구조체 참조
+// @param nCase 조회할 시각 종류 (생성/접근/수정 시각 식별자)
+// @param stLocal 조회한 로컬 시각을 저장할 SYSTEMTIME 구조체 참조
 // @return 성공 시 true, 실패 시 false
 bool GetFileInfoTime(const TCHAR* ptszFullPath, const int nCase, SYSTEMTIME& stLocal)
 {
@@ -902,34 +871,34 @@ bool GetFileInfoTime(const TCHAR* ptszFullPath, const int nCase, SYSTEMTIME& stL
 
 	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
 
-	hFile = CreateFile(ptszFullPath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	hFile = ::CreateFile(ptszFullPath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if( hFile == INVALID_HANDLE_VALUE ) return false;
 
-	// 파일 시간 정보 획득
-	if( !GetFileTime(hFile, &ftCreate, &ftAccess, &ftWrite) )
+	// 파일 시각 정보 획득
+	if( !::GetFileTime(hFile, &ftCreate, &ftAccess, &ftWrite) )
 	{
-		CloseHandle(hFile);
+		::CloseHandle(hFile);
 		return false;
 	}
 
-	CloseHandle(hFile);
+	::CloseHandle(hFile);
 
-	// 요청된 케이스에 따라 변환할 타임 선택
+	// 요청한 케이스에 따라 반환할 타임 선택
 	if( nCase == FILEINFO_CREATETIME )
-		FileTimeToSystemTime(&ftCreate, &stUTC);
+		::FileTimeToSystemTime(&ftCreate, &stUTC);
 	else if( nCase == FILEINFO_ACCESSTIME )
-		FileTimeToSystemTime(&ftAccess, &stUTC);
+		::FileTimeToSystemTime(&ftAccess, &stUTC);
 	else if( nCase == FILEINFO_LASTWRITETIME )
-		FileTimeToSystemTime(&ftWrite, &stUTC);
+		::FileTimeToSystemTime(&ftWrite, &stUTC);
 	else return false;
 
-	SystemTimeToTzSpecificLocalTime(nullptr, &stUTC, &stLocal);
+	::SystemTimeToTzSpecificLocalTime(nullptr, &stUTC, &stLocal);
 
 	return true;
 }
 
 //***************************************************************************
-// @brief 지정한 경로에 파일이 실제로 존재하는지 확인합니다.
+// @brief 지정한 경로에 파일이 존재하는지 확인합니다.
 // @param ptszFullPath 존재 여부를 확인할 파일의 전체 경로
 // @return 파일이 존재하면 true, 아니면 false
 bool IsExistFile(const TCHAR* ptszFullPath)
@@ -938,18 +907,18 @@ bool IsExistFile(const TCHAR* ptszFullPath)
 
 	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
 
-	hFile = CreateFile(ptszFullPath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	hFile = ::CreateFile(ptszFullPath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
 
 	if( hFile == INVALID_HANDLE_VALUE )
 		return false;
 
-	CloseHandle(hFile);
+	::CloseHandle(hFile);
 
 	return true;
 }
 
 //***************************************************************************
-// @brief 파일의 크기를 32비트 DWORD 값으로 반환합니다.
+// @brief 파일 크기를 32비트 DWORD 값으로 반환합니다.
 // @param ptszFullPath 크기를 조회할 파일의 전체 경로
 // @return 파일 크기 (바이트), 실패 시 0
 DWORD GetFileSize(const TCHAR* ptszFullPath)
@@ -961,22 +930,22 @@ DWORD GetFileSize(const TCHAR* ptszFullPath)
 
 	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return 0;
 
-	hFile = CreateFile(ptszFullPath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	hFile = ::CreateFile(ptszFullPath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
 
 	if( hFile == INVALID_HANDLE_VALUE )
 		return 0;
 
-	dwFileSizeLow = GetFileSize(hFile, &dwFileSizeHigh);
+	dwFileSizeLow = ::GetFileSize(hFile, &dwFileSizeHigh);
 
-	CloseHandle(hFile);
+	::CloseHandle(hFile);
 
 	return dwFileSizeLow;
 }
 
 //***************************************************************************
-// @brief 파일 핸들 정보를 기반으로 상세 파일 정보를 조회합니다.
+// @brief 파일 핸들 정보를 사용하여 상세 파일 정보를 조회합니다.
 // @param ptszFullPath 조회할 파일의 전체 경로
-// @param lpFileInformation 상세 정보를 저장할 BY_HANDLE_FILE_INFORMATION 구조체 포인터
+// @param lpFileInformation 조회 정보를 저장할 BY_HANDLE_FILE_INFORMATION 구조체 포인터
 // @return 성공 시 true, 실패 시 false
 bool GetFileInformation(const TCHAR* ptszFullPath, LPBY_HANDLE_FILE_INFORMATION lpFileInformation)
 {
@@ -986,14 +955,14 @@ bool GetFileInformation(const TCHAR* ptszFullPath, LPBY_HANDLE_FILE_INFORMATION 
 
 	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
 
-	hFile = CreateFile(ptszFullPath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	hFile = ::CreateFile(ptszFullPath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
 
 	if( hFile == INVALID_HANDLE_VALUE )
 		return false;
 
-	bResult = GetFileInformationByHandle(hFile, lpFileInformation);
+	bResult = ::GetFileInformationByHandle(hFile, lpFileInformation);
 
-	CloseHandle(hFile);
+	::CloseHandle(hFile);
 
 	return bResult;
 }
@@ -1018,7 +987,7 @@ EEncoding GetFileEncodingType(const _tstring& filepath)
 	file.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
 	size_t bytesRead = static_cast<size_t>(file.gcount());
 
-	// 파일이 너무 작아 BOM을 확인할 수 없는 경우 (기본값 ANSI 또는 DEFAULT 처리)
+	// 파일이 너무 작아 BOM을 확인할 수 없는 경우 (기본은 ANSI 또는 DEFAULT 처리)
 	if( bytesRead == 0 )
 	{
 		return EEncoding::ANSI; // 또는 EEncoding::DEFAULT
@@ -1050,25 +1019,26 @@ EEncoding GetFileEncodingType(const _tstring& filepath)
 }
 
 //***************************************************************************
-// @brief C++ 표준 스트림을 활용해 다양한 인코딩의 파일을 읽어 _tstring으로 변환합니다.
-// @param filepath 읽어올 파일의 전체 경로 (_tstring)
-// @return 읽어온 문자열 내용 (_tstring)
-// @note 변환 과정에서 널 문자('\0')가 포함되어 반환될 경우 텍스트 에디터에서 
-//       바이너리로 오인하는 문제가 발생할 수 있으므로, 반환 직전 문자열 끝의 널 문자를 제거합니다
+// @brief C++ 표준 스트림을 활용해 다양한 인코딩의 파일을 읽어 _tstring으로 반환합니다.
+// @param filepath 읽어들일 파일의 전체 경로 (_tstring)
+// @return 읽어들인 문자열 내용 (_tstring)
+// @note 변환 과정에서 끝 널 문자('\0')가 포함되어 반환될 경우 텍스트 데이터에서
+//       바이너리와 혼동하는 문제가 발생할 수 있으므로, 반환 전에 문자열 끝의
+//       널 문자를 제거합니다
 _tstring ReadFile(const _tstring& filepath)
 {
-	ifstream file(filepath, std::ios::binary);
-	if( !file )
+	// [최적화] seekg/tellg 대신 std::filesystem::file_size로 크기를 측정하여
+	// GetFileSize(const _tstring&)와 동일한 방식으로 통일한다(코드 중복 제거,
+	// uintmax_t 기반으로 대용량 파일에도 안전).
+	std::error_code ec;
+	std::uintmax_t fileSize = std::filesystem::file_size(filepath, ec);
+	if( ec )
 	{
 		return _T("");
 	}
 
-	// 파일 전체를 한 번에 읽기 위해 파일 크기 측정
-	file.seekg(0, std::ios::end);
-	std::streamoff fileSize = file.tellg();
-	file.seekg(0, std::ios::beg);
-
-	if( fileSize < 0 )
+	ifstream file(filepath, std::ios::binary);
+	if( !file )
 	{
 		return _T("");
 	}
@@ -1076,18 +1046,25 @@ _tstring ReadFile(const _tstring& filepath)
 	std::vector<char> buffer(static_cast<size_t>(fileSize));
 	if( fileSize > 0 )
 	{
-		file.read(buffer.data(), fileSize);
+		file.read(buffer.data(), static_cast<std::streamsize>(fileSize));
+
+		// [주의] file_size() 조회와 read() 사이에 파일 내용이 변경될 수 있으므로
+		// (특히 네트워크 공유 폴더에서) 실제로 읽은 바이트 수(gcount)만큼만 신뢰한다.
+		buffer.resize(static_cast<size_t>(file.gcount()));
 	}
 
-	if( buffer.size() < 2 )
+	// [수정] 파일이 비어 있거나 1바이트 이하인 경우도 정상적인 ANSI/빈 파일
+	// 케이스이므로 예외를 던지지 않고 이후 BOM 판별 로직으로 자연스럽게
+	// 흘려보낸다 (각 분기는 size() >= 2 / >= 3 가드를 갖고 있음).
+	if( buffer.empty() )
 	{
-		throw std::runtime_error("File too small to contain valid UTF-16 data");
+		return _T("");
 	}
 
 #ifdef _UNICODE
 	std::wstring result;
 
-	// BOM 확인 후 변환
+	// BOM 확인 및 변환
 	if( buffer.size() >= 2 && static_cast<unsigned char>(buffer[0]) == UNICODE_LE_FILE_IDENTIFIER_BYTE1
 		&& static_cast<unsigned char>(buffer[1]) == UNICODE_LE_FILE_IDENTIFIER_BYTE2 )
 	{
@@ -1121,7 +1098,7 @@ _tstring ReadFile(const _tstring& filepath)
 	}
 	else
 	{
-		// 이미 읽어둔 buffer로 바로 판별 (파일을 다시 열어 재판독하지 않음)
+		// 이미 읽어들인 buffer로 바로 판별 (파일을 다시 열지 않도록)
 		if( IsUTF8WithoutBom((const void*)buffer.data(), buffer.size()) )
 		{
 			std::wstring wtemp;
@@ -1136,7 +1113,7 @@ _tstring ReadFile(const _tstring& filepath)
 		}
 	}
 
-	// [수정] 결과 문자열 끝에 널 문자가 포함되어 있다면 제거
+	// [주의] 결과 문자열 끝에 널 문자가 포함되어 있다면 제거
 	if( !result.empty() && result.back() == L'\0' )
 	{
 		result.pop_back();
@@ -1145,7 +1122,7 @@ _tstring ReadFile(const _tstring& filepath)
 #else
 	std::string result;
 
-	// BOM 확인 후 변환
+	// BOM 확인 및 변환
 	if( buffer.size() >= 2 && static_cast<unsigned char>(buffer[0]) == UNICODE_LE_FILE_IDENTIFIER_BYTE1
 		&& static_cast<unsigned char>(buffer[1]) == UNICODE_LE_FILE_IDENTIFIER_BYTE2 )
 	{
@@ -1190,7 +1167,7 @@ _tstring ReadFile(const _tstring& filepath)
 	}
 	else
 	{
-		// 이미 읽어둔 buffer로 바로 판별 (파일을 다시 열어 재판독하지 않음)
+		// 이미 읽어들인 buffer로 바로 판별 (파일을 다시 열지 않도록)
 		if( IsUTF8WithoutBom((const void*)buffer.data(), buffer.size()) )
 		{
 			std::string atemp;
@@ -1203,7 +1180,7 @@ _tstring ReadFile(const _tstring& filepath)
 		}
 	}
 
-	// [수정] 결과 문자열 끝에 널 문자가 포함되어 있다면 제거
+	// [주의] 결과 문자열 끝에 널 문자가 포함되어 있다면 제거
 	if( !result.empty() && result.back() == '\0' )
 	{
 		result.pop_back();
@@ -1214,14 +1191,14 @@ _tstring ReadFile(const _tstring& filepath)
 }
 
 //***************************************************************************
-// @brief 지정한 인코딩 타입에 맞춰 _tstring 문자열을 파일에 기록합니다.
+// @brief 지정한 인코딩 타입에 따라 _tstring 문자열을 파일에 기록합니다.
 // @param filepath 저장할 파일의 전체 경로 (_tstring)
 // @param content 파일에 쓸 문자열 내용 (_tstring)
 // @param encoding 저장할 인코딩 타입 (EEncoding 열거형)
 // @return 성공 시 true, 실패 시 false
-// @note 문자열 변환 시 널 문자('\0')가 파일에 함께 기록되면 텍스트 에디터에서 
-//       "지원하지 않는 텍스트 인코딩" 또는 바이너리 파일 경고가 발생할 수 있으므로 
-//       순수 텍스트 크기만큼만 파일에 기록되도록 처리합니다
+// @note 문자열 변환 시 끝 널 문자('\0')가 파일에 함께 기록되면 텍스트 데이터에서
+//       "예상하지 못한 텍스트 인코딩" 또는 바이너리 검사 오류가 발생할 수 있으므로
+//       실제 텍스트 크기만큼만 파일에 기록되도록 처리합니다
 bool WriteFile(const _tstring& filepath, const _tstring& content, EEncoding encoding)
 {
 	ofstream file(filepath, std::ios::binary);
@@ -1261,7 +1238,7 @@ bool WriteFile(const _tstring& filepath, const _tstring& content, EEncoding enco
 		string dest;
 		UnicodeToUtf8_String(dest, content.data(), content.size() + 1);
 
-		// [수정] 널 문자를 제외한 순수 바이트 수만큼만 기록
+		// [주의] 널 문자를 포함해 변환된 경우 실제 바이트 만큼만 기록
 		size_t writeSize = (!dest.empty() && dest.back() == '\0') ? dest.size() - 1 : dest.size();
 		file.write(dest.c_str(), writeSize);
 	}
@@ -1270,7 +1247,7 @@ bool WriteFile(const _tstring& filepath, const _tstring& content, EEncoding enco
 		string dest;
 		UnicodeToUtf8_String(dest, content.data(), content.size() + 1);
 
-		// [수정] 널 문자를 제외한 순수 바이트 수만큼만 기록
+		// [주의] 널 문자를 포함해 변환된 경우 실제 바이트 만큼만 기록
 		size_t writeSize = (!dest.empty() && dest.back() == '\0') ? dest.size() - 1 : dest.size();
 		file.write(dest.c_str(), writeSize);
 	}
@@ -1279,12 +1256,12 @@ bool WriteFile(const _tstring& filepath, const _tstring& content, EEncoding enco
 		string dest;
 		UnicodeToAnsi_String(dest, content.data(), content.size() + 1);
 
-		// [수정] 널 문자를 제외한 순수 바이트 수만큼만 기록
+		// [주의] 널 문자를 포함해 변환된 경우 실제 바이트 만큼만 기록
 		size_t writeSize = (!dest.empty() && dest.back() == '\0') ? dest.size() - 1 : dest.size();
 		file.write(dest.c_str(), writeSize);
 	}
 #else
-	// 멀티바이트 빌드 영역도 동일하게 적용
+	// 멀티바이트 빌드 환경도 동일하게 처리
 	if( encoding == EEncoding::UTF16_BE )
 	{
 		unsigned char bom[] = { UNICODE_BE_FILE_IDENTIFIER_BYTE1, UNICODE_BE_FILE_IDENTIFIER_BYTE2 };
@@ -1323,12 +1300,14 @@ bool WriteFile(const _tstring& filepath, const _tstring& content, EEncoding enco
 	{
 		string dest;
 		AnsiToUtf8_String(dest, content.data(), content.size() + 1);
+
+		// [수정] writeSize 계산 값을 실제 write에도 반영 (기존 dest.size() 오기입 수정)
 		size_t writeSize = (!dest.empty() && dest.back() == '\0') ? dest.size() - 1 : dest.size();
-		file.write(dest.c_str(), dest.size());
+		file.write(dest.c_str(), writeSize);
 	}
 	else
 	{
-		// [수정] ANSI 저장 시에도 content 끝에 널 문자가 포함되어 있다면 제외하고 기록
+		// [주의] ANSI 저장 시에도 content 끝에 널 문자가 포함되어 있다면 제외하고 기록
 		size_t writeSize = (!content.empty() && content.back() == _T('\0')) ? content.size() - 1 : content.size();
 		file.write(content.c_str(), writeSize);
 	}
@@ -1348,7 +1327,7 @@ bool IsExistFile(const _tstring& filepath)
 	std::error_code ec;
 	bool bExists = std::filesystem::exists(filepath, ec);
 
-	// ec가 설정된 경우는 "파일 없음"이 아니라 접근 권한 등 실제 조회 실패 상황
+	// ec가 설정된 경우는 "파일 없음"이 아니라 실제 접근 중 오류가 발생한 상황
 	if( ec )
 	{
 		std::cerr << "파일 존재 여부 확인 중 오류 발생: " << ec.message() << std::endl;

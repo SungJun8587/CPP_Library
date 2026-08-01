@@ -874,7 +874,7 @@ DWORD Utf8ToAnsi_String(std::string& ansi, const char* utf8, const size_t utf8_s
 // @param ansi 원본 std::string 문자열
 // @return 변환된 std::wstring (실패 시 빈 문자열)
 //***************************************************************************
-wstring StringToWString(const std::string& ansi)
+wstring AnsiToUnicode(const std::string& ansi)
 {
 	std::wstring unicode;
 	if( AnsiToUnicode_String(unicode, ansi.c_str(), ansi.size()) != 0 ) return L"";
@@ -886,7 +886,7 @@ wstring StringToWString(const std::string& ansi)
 // @param unicode 원본 std::wstring 문자열
 // @return 변환된 std::string (실패 시 빈 문자열)
 //***************************************************************************
-string WStringToString(const std::wstring& unicode)
+string UnicodeToAnsi(const std::wstring& unicode)
 {
 	std::string ansi;
 	if( UnicodeToAnsi_String(ansi, unicode.c_str(), unicode.size()) != 0 ) return "";
@@ -949,7 +949,7 @@ string Utf8ToAnsi(const std::string& utf8)
 _tstring StringToTString(const std::string& src)
 {
 #ifdef _UNICODE
-	return StringToWString(src);
+	return AnsiToUnicode(src);
 #else
 	return src;
 #endif
@@ -963,7 +963,7 @@ _tstring StringToTString(const std::string& src)
 std::string TStringToString(const _tstring& src)
 {
 #ifdef _UNICODE
-	return WStringToString(src);
+	return UnicodeToAnsi(src);
 #else
 	return src;
 #endif
@@ -980,7 +980,7 @@ _tstring WStringToTString(const std::wstring& src)
 #ifdef _UNICODE
 	return src;
 #else
-	return WStringToString(src);
+	return UnicodeToAnsi(src);
 #endif
 }
 
@@ -994,6 +994,6 @@ wstring TStringToWString(const _tstring& src)
 #ifdef _UNICODE
 	return src;
 #else
-	return StringToWString(src);
+	return AnsiToUnicode(src);
 #endif
 }

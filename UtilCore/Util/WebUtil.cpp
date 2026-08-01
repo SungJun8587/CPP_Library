@@ -1,11 +1,14 @@
-﻿
-//***************************************************************************
+﻿//***************************************************************************
 // WebUtil.cpp: implementation of the WebUtil Function.
 //
 //***************************************************************************
 
 #include "pch.h"
 #include "WebUtil.h"
+#include "ConvertCharset.h" // ConvertCharset 함수 사용을 위한 헤더 포함
+
+#include <array>
+#include <cstring>
 
 //***************************************************************************
 static const char g_pcDigits[16] = {
@@ -45,127 +48,253 @@ static int g_pnDecodeMimeBase64[256] = {
 	-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
 };
 
+//===========================================================================
+// 퍼센트 인코딩/디코딩 계열(UrlEncode/Decode, EncodeURI(Component), UrlPathEncode)의
+// 공통 로직. 문자 판별 테이블과 hex 파싱을 한 곳으로 모아, 문자 판별 오타나
+// malformed 입력에 대한 방어 누락이 함수마다 중복되는 것을 방지한다.
+//===========================================================================
+
+// @brief 영숫자 여부 판별 ('0'-'9','A'-'Z','a'-'z')
+static inline bool IsAlnum(unsigned char c)
+{
+	return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+}
+
+// @brief hex 문자 1개를 nibble 값으로 변환. 유효하지 않으면 -1 반환.
+// (malformed % 시퀀스에서 잘못된 문자를 그대로 계산에 사용하는 것을 방지)
+static inline int HexNibble(TCHAR c)
+{
+	if( c >= '0' && c <= '9' ) return c - '0';
+	if( c >= 'A' && c <= 'F' ) return c - 'A' + 10;
+	if( c >= 'a' && c <= 'f' ) return c - 'a' + 10;
+	return -1;
+}
+
+// @brief 안전 문자(퍼센트 인코딩하지 않을 문자) 판별 테이블 생성.
+// 영숫자는 기본 포함, pszExtraSafe에 나열된 문자를 추가로 안전 문자 취급한다.
+static inline std::array<bool, 256> BuildSafeTable(const char* pszExtraSafe)
+{
+	std::array<bool, 256> table{};
+	for( int i = 0; i < 256; i++ )
+		table[i] = IsAlnum((unsigned char)i);
+
+	if( pszExtraSafe != nullptr )
+	{
+		for( const char* p = pszExtraSafe; *p; p++ )
+			table[(unsigned char)*p] = true;
+	}
+	return table;
+}
+
+// @brief 바이트 시퀀스를 퍼센트 인코딩. 안전 문자는 그대로, 공백은 옵션에 따라
+// '+' 또는 %20으로, 나머지는 %XX로 인코딩한다. 1-pass로 처리하여 사이즈 계산과
+// 채우기 로직이 어긋날 여지를 없앤다.
+static inline std::string PercentEncodeBytes(const std::string& source, const std::array<bool, 256>& safeTable, bool bSpaceAsPlus)
+{
+	std::string dest;
+	dest.reserve(source.size());
+
+	for( unsigned char cChar : source )
+	{
+		if( safeTable[cChar] )
+			dest.push_back((char)cChar);
+		else if( bSpaceAsPlus && cChar == ' ' )
+			dest.push_back('+');
+		else
+		{
+			dest.push_back('%');
+			dest.push_back(g_pcDigits[(cChar >> 4) & 0x0F]);
+			dest.push_back(g_pcDigits[cChar & 0x0F]);
+		}
+	}
+	return dest;
+}
+
+// @brief 퍼센트 인코딩 공통 진입점. source를 iCodePage(ANSI/UTF-8)로 변환한 뒤
+// 이미 만들어진 안전 문자 테이블로 인코딩한다. 테이블은 extras가 고정된 각
+// 호출부(UrlEncode 등)에서 함수-로컬 static으로 한 번만 생성해 넘겨준다 —
+// 이 함수 내부에서 매번 새로 만들지 않는다.
+static inline _tstring PercentEncodeCoreWithTable(const _tstring& source, int iCodePage, const std::array<bool, 256>& safeTable, bool bSpaceAsPlus)
+{
+	if( source.empty() ) return _T("");
+
+	std::string sourceData;
+#ifdef _UNICODE
+	sourceData = (iCodePage == CP_UTF8)
+		? UnicodeToUtf8(TStringToWString(source))
+		: UnicodeToAnsi(TStringToWString(source));
+#else
+	sourceData = (iCodePage == CP_UTF8) ? AnsiToUtf8(source) : source;
+#endif
+
+	std::string destData = PercentEncodeBytes(sourceData, safeTable, bSpaceAsPlus);
+
+#ifdef _UNICODE
+	return WStringToTString(AnsiToUnicode(destData));
+#else
+	return destData;
+#endif
+}
+
+// @brief 퍼센트 디코딩 공통 진입점. 인덱스 기반으로 경계를 확인하며 처리하므로
+// "%"로 끝나거나 hex가 아닌 문자가 뒤따르는 malformed 입력에서도 문자열 경계를
+// 벗어나지 않는다. 그런 경우 '%'는 리터럴 문자로 취급한다.
+static inline _tstring PercentDecodeCore(const _tstring& source, int iCodePage, bool bPlusAsSpace)
+{
+	if( source.empty() ) return _T("");
+
+	const size_t n = source.size();
+	std::string destData;
+	destData.reserve(n);
+
+	size_t i = 0;
+	while( i < n )
+	{
+		TCHAR ch = source[i];
+
+		if( ch == '%' && i + 2 < n )
+		{
+			int hi = HexNibble(source[i + 1]);
+			int lo = HexNibble(source[i + 2]);
+			if( hi >= 0 && lo >= 0 )
+			{
+				destData.push_back((char)((hi << 4) | lo));
+				i += 3;
+				continue;
+			}
+			// 잘못된 %XX 시퀀스 -> '%'는 리터럴로 취급하고 한 글자만 전진
+		}
+		else if( bPlusAsSpace && ch == '+' )
+		{
+			destData.push_back(' ');
+			i++;
+			continue;
+		}
+
+		destData.push_back((char)ch);
+		i++;
+	}
+
+	_tstring dest;
+#ifdef _UNICODE
+	dest = (iCodePage == CP_ACP)
+		? WStringToTString(AnsiToUnicode(destData))
+		: WStringToTString(Utf8ToUnicode(destData));
+#else
+	dest = (iCodePage == CP_ACP) ? destData : Utf8ToAnsi(destData);
+#endif
+	return dest;
+}
+
 //***************************************************************************
 // @brief 문자열을 Base64 형식으로 인코딩합니다.
 // @param source 인코딩할 원본 문자열
 // @return Base64로 인코딩된 결과 문자열
 _tstring Base64Enc(const _tstring& source)
 {
-	size_t	length = 0;
-	size_t	size = 0;
-	int		c1, c2, c3;
-	int		e1, e2, e3, e4;
-	const char*	pszSourceDoc = nullptr;
+	if( source.empty() ) return _T("");
 
-	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
-
+	std::string sourceData;
 #ifdef _UNICODE
-	std::string sourceData = Iconv::CIconvUtil::ConvertEncoding(source, "WCHAR_T", "CP949");
-	pszSourceDoc = sourceData.c_str();
-	length = sourceData.size() + 1;
+	sourceData = UnicodeToUtf8(TStringToWString(source)); // UTF-8로 변환하여 다국어 지원
 #else
-	pszSourceDoc = source.c_str();
-	length = source.size() + 1;
+	// 멀티바이트 환경인 경우 필요에 따라 Utf8 변환 거치기
+	sourceData = AnsiToUtf8(source);
 #endif
 
-	c1 = c2 = c3 = 0;
-	e1 = e2 = e3 = e4 = 0;
-	size = (4 * (length / 3)) + (length % 3 ? 4 : 0);
+	const unsigned char* pSrc = reinterpret_cast<const unsigned char*>(sourceData.data());
+	const size_t length = sourceData.size(); // 종료 널 문자는 인코딩 대상에서 제외
 
-	int destIndex = 0;
-	_tstring dest(size, '\0');
+	std::string dest;
+	dest.reserve(((length + 2) / 3) * 4);
 
-	for( size_t i = 0; i < length; i = i + 3 )
+	size_t i = 0;
+	for( ; i + 3 <= length; i += 3 )
 	{
-		c1 = pszSourceDoc[i];
-		c2 = pszSourceDoc[i + 1];
-		c3 = pszSourceDoc[i + 2];
-
-		e1 = (c1 & 0xFC) >> 2;
-		e2 = ((c1 & 0x03) << 4) | ((c2 & 0xF0) >> 4);
-		e3 = ((c2 & 0x0F) << 2) | ((c3 & 0xC0) >> 6);
-		e4 = c3 & 0x3F;
-
-		dest[destIndex] = g_pcMimeBase64[e1];
-		dest[destIndex + 1] = g_pcMimeBase64[e2];
-		dest[destIndex + 2] = g_pcMimeBase64[e3];
-		dest[destIndex + 3] = g_pcMimeBase64[e4];
-
-		if( (i + 2) > length ) dest[destIndex + 2] = '=';
-		if( (i + 3) > length ) dest[destIndex + 3] = '=';
-		
-		destIndex = destIndex + 4;
+		int c1 = pSrc[i], c2 = pSrc[i + 1], c3 = pSrc[i + 2];
+		dest.push_back(g_pcMimeBase64[(c1 & 0xFC) >> 2]);
+		dest.push_back(g_pcMimeBase64[((c1 & 0x03) << 4) | ((c2 & 0xF0) >> 4)]);
+		dest.push_back(g_pcMimeBase64[((c2 & 0x0F) << 2) | ((c3 & 0xC0) >> 6)]);
+		dest.push_back(g_pcMimeBase64[c3 & 0x3F]);
 	}
-	dest[destIndex] = '\0';
 
+	const size_t remain = length - i;
+	if( remain == 1 )
+	{
+		int c1 = pSrc[i];
+		dest.push_back(g_pcMimeBase64[(c1 & 0xFC) >> 2]);
+		dest.push_back(g_pcMimeBase64[(c1 & 0x03) << 4]);
+		dest.push_back('=');
+		dest.push_back('=');
+	}
+	else if( remain == 2 )
+	{
+		int c1 = pSrc[i], c2 = pSrc[i + 1];
+		dest.push_back(g_pcMimeBase64[(c1 & 0xFC) >> 2]);
+		dest.push_back(g_pcMimeBase64[((c1 & 0x03) << 4) | ((c2 & 0xF0) >> 4)]);
+		dest.push_back(g_pcMimeBase64[(c2 & 0x0F) << 2]);
+		dest.push_back('=');
+	}
+
+#ifdef _UNICODE
+	return WStringToTString(AnsiToUnicode(dest));
+#else
 	return dest;
+#endif
 }
 
 //***************************************************************************
 // @brief Base64로 인코딩된 문자열을 디코딩합니다.
 // @param source 디코딩할 Base64 문자열
-// @return 디코딩된 결과 문자열
-_tstring Base64Dec(const _tstring& source)
+// @param pResult 실패 원인을 받을 out 파라미터. nullptr이면 결과 확인을 생략(기존 호출부 호환용).
+// @return 디코딩된 결과 문자열. 실패 시 빈 문자열을 반환하며 pResult에 원인이 채워진다.
+_tstring Base64Dec(const _tstring& source, Base64DecodeResult* pResult)
 {
-	size_t	length = 0;
-	size_t	size = 0;
-	int		c1, c2, c3, c4;
-	int		e1, e2, e3, e4;
-	const TCHAR*	ptszSourceDoc = nullptr;
-	char*	pszDestination = nullptr;
-	char*	pszDestDoc = nullptr;
+	if( pResult ) *pResult = Base64DecodeResult::Success;
+	if( source.empty() ) return _T("");
 
-	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
-
-	length = source.size();
-	c1 = c2 = c3 = 0;
-	e1 = e2 = e3 = e4 = 0;
-	size = (length / 4) * 3 + 1;
-
-	pszDestination = new char[size];
-
-	ptszSourceDoc = source.c_str();
-	pszDestDoc = pszDestination;
-	for( size_t i = 0; i < length; i = i + 4 )
+	if( source.size() % 4 != 0 )
 	{
-		c1 = ptszSourceDoc[i];
-		c2 = ptszSourceDoc[i + 1];
-		c3 = ptszSourceDoc[i + 2];
-		c4 = ptszSourceDoc[i + 3];
-
-		e1 = g_pnDecodeMimeBase64[c1];
-		e2 = g_pnDecodeMimeBase64[c2];
-
-		if( c3 == '=' )
-			e3 = 0;
-		else e3 = g_pnDecodeMimeBase64[c3];
-
-		if( c4 == '=' )
-			e4 = 0;
-		else e4 = g_pnDecodeMimeBase64[c4];
-
-		*pszDestDoc = (e1 << 2) | ((e2 & 0x30) >> 4);
-		*(pszDestDoc + 1) = ((e2 & 0xf) << 4) | ((e3 & 0x3c) >> 2);
-		*(pszDestDoc + 2) = ((e3 & 0x3) << 6) | e4;
-
-		pszDestDoc = pszDestDoc + 3;
+		if( pResult ) *pResult = Base64DecodeResult::InvalidLength;
+		return _T("");
 	}
-	*pszDestDoc = '\0';
+	const size_t length = source.size();
+
+	std::string destData;
+	destData.reserve((length / 4) * 3);
+
+	for( size_t i = 0; i < length; i += 4 )
+	{
+		TCHAR c1 = source[i], c2 = source[i + 1], c3 = source[i + 2], c4 = source[i + 3];
+
+		int e1 = ((unsigned)c1 < 256) ? g_pnDecodeMimeBase64[(unsigned char)c1] : -1;
+		int e2 = ((unsigned)c2 < 256) ? g_pnDecodeMimeBase64[(unsigned char)c2] : -1;
+		int e3 = (c3 == '=') ? 0 : (((unsigned)c3 < 256) ? g_pnDecodeMimeBase64[(unsigned char)c3] : -1);
+		int e4 = (c4 == '=') ? 0 : (((unsigned)c4 < 256) ? g_pnDecodeMimeBase64[(unsigned char)c4] : -1);
+
+		// 패딩('=')은 블록의 마지막 두 자리에서만 허용
+		if( c3 == '=' && c4 != '=' ) { if( pResult ) *pResult = Base64DecodeResult::InvalidCharacter; return _T(""); }
+
+		if( e1 < 0 || e2 < 0 || e3 < 0 || e4 < 0 )
+		{
+			// 유효하지 않은 문자를 포함한 블록 발견 -> 즉시 실패 처리 (fail-closed)
+			if( pResult ) *pResult = Base64DecodeResult::InvalidCharacter;
+			return _T("");
+		}
+
+		destData.push_back((char)((e1 << 2) | ((e2 & 0x30) >> 4)));
+		if( c3 != '=' )
+			destData.push_back((char)(((e2 & 0xf) << 4) | ((e3 & 0x3c) >> 2)));
+		if( c4 != '=' )
+			destData.push_back((char)(((e3 & 0x3) << 6) | e4));
+	}
 
 	_tstring dest;
-
 #ifdef _UNICODE
-	dest = Iconv::CIconvUtil::ConvertEncodingW(pszDestination, "CP949", "WCHAR_T");
+	dest = WStringToTString(Utf8ToUnicode(destData));	// UTF-8로 디코딩하도록 변경
 #else
-	dest.assign(pszDestination);
+	dest = Utf8ToAnsi(destData); // 멀티바이트 환경인 경우
 #endif
-
-	if( pszDestination )
-	{
-		delete[] pszDestination;
-		pszDestination = nullptr;
-	}
-
 	return dest;
 }
 
@@ -174,95 +303,10 @@ _tstring Base64Dec(const _tstring& source)
 // @param source 변환할 원본 문자열
 // @param iCodePage 사용할 코드 페이지 (CP_ACP 또는 CP_UTF8)
 // @return URL 인코딩된 결과 문자열
-// @note
-//	- asp, c#, php 처리방법 차이남
-//		- asp : 영문자, 숫자를 제외한 문자를 16진수로 변환
-//		- c# : 영문자, 숫자, '!', '\'', '(', ')', '*', '-', '.', '_' 제외한 문자를 16진수로 변환
-//		- php : 빈칸은 +로 변환하고, 영문자, 숫자, '-', '.', '_' 제외한 문자를 16진수로 변환.
-//	- 아스키 코드를 16진수로 교환
-//	- EUC-KR, UTF-7, UTF-8, UTF-16에서 다르게 작동
 _tstring UrlEncode(const _tstring& source, const int iCodePage)
 {
-	unsigned char cChar = '\0';
-
-	size_t	size = 0;
-	const char* pszSourceData = nullptr;
-	const char* pszSourceDoc = nullptr;
-	char		szExcept[] = "";
-	//char		szExcept[] = "!'()*-._";	
-
-	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
-
-	std::string	sourceData;
-
-#ifdef _UNICODE
-	if( iCodePage == CP_ACP )
-	{
-		sourceData = Iconv::CIconvUtil::ConvertEncoding(source, "WCHAR_T", "CP949");
-		pszSourceData = sourceData.c_str();
-	}
-	else if( iCodePage == CP_UTF8 )
-	{
-		sourceData = Iconv::CIconvUtil::ConvertEncoding(source, "WCHAR_T", "UTF-8");
-		pszSourceData = sourceData.c_str();
-	}
-#else
-	if( iCodePage == CP_ACP )
-	{
-		pszSourceData = source.c_str();
-	}
-	else if( iCodePage == CP_UTF8 )
-	{
-		sourceData = Iconv::CIconvUtil::ConvertEncoding(source, "CP949", "UTF-8");
-		pszSourceData = sourceData.c_str();
-	}
-#endif
-
-	pszSourceDoc = pszSourceData;
-	if( nullptr != pszSourceDoc )
-	{
-		while( *pszSourceDoc )
-		{
-			cChar = (unsigned char)*pszSourceDoc;
-			if( !((cChar > 47 && cChar < 57) || (cChar > 64 && cChar < 91) || (cChar > 96 && cChar < 123) || strchr(szExcept, cChar)) )
-				size += 2;
-
-			pszSourceDoc++;
-			size++;
-		}
-	}
-
-	int destIndex = 0;
-	std::string destData(size + 1, '\0');
-
-	pszSourceDoc = pszSourceData;
-	if( nullptr != pszSourceDoc )
-	{
-		while( *pszSourceDoc )
-		{
-			cChar = (unsigned char)*pszSourceDoc;
-			if( (cChar > 47 && cChar < 57) || (cChar > 64 && cChar < 91) || (cChar > 96 && cChar < 123) || strchr(szExcept, cChar) )
-				destData[destIndex++] = cChar;
-			else if( cChar == ' ' )
-				destData[destIndex++] = '+';
-			else
-			{
-				destData[destIndex++] = '%';
-				destData[destIndex++] = g_pcDigits[(cChar >> 4) & 0x0F];
-				destData[destIndex++] = g_pcDigits[cChar & 0x0F];
-			}
-			pszSourceDoc++;
-		}
-		destData[destIndex] = '\0';
-	}
-
-#ifdef _UNICODE
-	_tstring dest = Iconv::CIconvUtil::ConvertEncodingW(destData, "CP949", "WCHAR_T");
-#else
-	_tstring dest = destData;
-#endif
-
-	return dest;
+	static const std::array<bool, 256> table = BuildSafeTable("");
+	return PercentEncodeCoreWithTable(source, iCodePage, table, true);
 }
 
 //***************************************************************************
@@ -272,238 +316,76 @@ _tstring UrlEncode(const _tstring& source, const int iCodePage)
 // @return 디코딩된 결과 문자열
 _tstring UrlDecode(const _tstring& source, const int iCodePage)
 {
-	size_t	size = 0;
-	int		nNum = 0;
-	int		nRetval = 0;
-	const TCHAR* ptszSourceDoc = nullptr;
-	char*	pszDestination = nullptr;
-	char*	pszDestDoc = nullptr;
-
-	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
-
-	ptszSourceDoc = source.c_str();
-	while( *ptszSourceDoc )
-	{
-		if( *ptszSourceDoc == '%' )
-			ptszSourceDoc = ptszSourceDoc + 2;
-
-		ptszSourceDoc++;
-		size++;
-	}
-
-	pszDestination = new char[size + 1];
-
-	ptszSourceDoc = source.c_str();
-	pszDestDoc = pszDestination;
-	while( *ptszSourceDoc )
-	{
-		if( *ptszSourceDoc == '%' )
-		{
-			nNum = 0;
-			nRetval = 0;
-			for( int i = 0; i < 2; i++ )
-			{
-				ptszSourceDoc++;
-				if( *ptszSourceDoc < ':' )
-					nNum = *ptszSourceDoc - 48;
-				else if( *ptszSourceDoc > '@' && *ptszSourceDoc < '[' )
-					nNum = (*ptszSourceDoc - 'A') + 10;
-				else
-					nNum = (*ptszSourceDoc - 'a') + 10;
-
-				if( i == 0 )
-					nNum = nNum * 16;
-
-				nRetval += nNum;
-			}
-
-			*pszDestDoc++ = nRetval;
-		}
-		else if( *ptszSourceDoc == '+' )
-			*pszDestDoc++ = ' ';
-		else
-			*pszDestDoc++ = (char)*ptszSourceDoc;
-
-		ptszSourceDoc++;
-	}
-	*pszDestDoc = '\0';
-
-	_tstring dest;
-
-#ifdef _UNICODE
-	if( iCodePage == CP_ACP )
-	{
-		dest = Iconv::CIconvUtil::ConvertEncodingW(pszDestination, "CP949", "WCHAR_T");
-	}
-	else if( iCodePage == CP_UTF8 )
-	{
-		dest = Iconv::CIconvUtil::ConvertEncodingW(pszDestination, "UTF-8", "WCHAR_T");
-	}
-#else
-	if( iCodePage == CP_ACP )
-	{
-		dest.assign(pszDestination);
-	}
-	else if( iCodePage == CP_UTF8 )
-	{
-		dest = Iconv::CIconvUtil::ConvertEncoding(pszDestination, "UTF-8", "CP949");
-	}
-#endif
-
-	if( pszDestination )
-	{
-		delete[]pszDestination;
-		pszDestination = nullptr;
-	}
-
-	return dest;
+	return PercentDecodeCore(source, iCodePage, true);
 }
 
 //***************************************************************************
 // @brief URL 경로(Path) 영역에 맞춰 문자열을 인코딩합니다.
 // @param source 변환할 원본 문자열
 // @return 인코딩된 결과 문자열
-// @note
-//	- URL의 쿼리스트링('?'문자 뒤)를 제외한 문자열에 대해서 변환
-//	- 공백문자(32)를 뺀 아스키 문자(0 ~ 127)를 제외한 문자를 16진수로 변환
-//	- UTF-8 코드를 16진수로 교환
-//	- EUC-KR, UTF-7, UTF-8, UTF-16에서 동일하게 작동
 _tstring UrlPathEncode(const _tstring& source)
 {
-	unsigned char cChar = '\0';
-	size_t	size = 0;
-	const char* pszSourceDoc = nullptr;
-	char*	pszDestination = nullptr;
-	char*	pszDestDoc = nullptr;
+	if( source.empty() ) return _T("");
 
-	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
+	// 원본 사양: 제어문자(0~31)는 그대로 통과시키고, 공백(32)과 128 이상 바이트만
+	// 퍼센트 인코딩한다. 공백을 '+'로 바꾸지 않는다는 점이 UrlEncode와 다르다.
+	static const std::array<bool, 256> table = [] {
+		std::array<bool, 256> t{};
+		for( int i = 0; i < 256; i++ )
+			t[i] = (i < 32) || (i > 32 && i < 128);
+		return t;
+		}();
 
-	std::string	sourceData;
-
+	std::string sourceData;
 #ifdef _UNICODE
-	sourceData = Iconv::CIconvUtil::ConvertEncoding(source, "WCHAR_T", "UTF-8");
+	sourceData = UnicodeToUtf8(TStringToWString(source));
 #else
-	sourceData = Iconv::CIconvUtil::ConvertEncoding(source, "CP949", "UTF-8");
+	sourceData = AnsiToUtf8(source);
 #endif
 
-	pszSourceDoc = sourceData.c_str();
-	while( *pszSourceDoc )
-	{
-		cChar = (unsigned char)*pszSourceDoc;
-		if( !((cChar > -1 && cChar < 32) || (cChar > 32 && cChar < 128)) )
-			size += 2;
-
-		pszSourceDoc++;
-		size++;
-	}
-
-	pszDestination = new char[size + 1];
-
-	pszSourceDoc = sourceData.c_str();
-	pszDestDoc = pszDestination;
-	while( *pszSourceDoc )
-	{
-		cChar = (unsigned char)*pszSourceDoc;
-		if( (cChar > -1 && cChar < 32) || (cChar > 32 && cChar < 128) )
-			*pszDestDoc++ = cChar;
-		else
-		{
-			*pszDestDoc++ = '%';
-			*pszDestDoc++ = g_pcDigits[(cChar >> 4) & 0x0F];
-			*pszDestDoc++ = g_pcDigits[cChar & 0x0F];
-		}
-		pszSourceDoc++;
-	}
-	*pszDestDoc = '\0';
-
-	_tstring dest;
+	std::string destData = PercentEncodeBytes(sourceData, table, false);
 
 #ifdef _UNICODE
-	dest = Iconv::CIconvUtil::ConvertEncodingW(pszDestination, "CP949", "WCHAR_T");
+	return WStringToTString(AnsiToUnicode(destData));
 #else
-	dest.assign(pszDestination);
+	return destData;
 #endif
-
-	if( pszDestination )
-	{
-		delete[]pszDestination;
-		pszDestination = nullptr;
-	}
-
-	return dest;
 }
 
 //***************************************************************************
 // @brief 특수 문자를 HTML 엔티티 코드로 변환합니다.
 // @param source 변환할 원본 문자열
 // @return HTML 인코딩된 결과 문자열
-// @note
-//	- '<' -> '&lt;', '>' -> '&gt;', '&' -> '&amp;', '"' -> '&quot;'로 교환
-//	- EUC-KR, UTF-7, UTF-8, UTF-16에서 동일하게 작동
 _tstring HtmlEncode(const _tstring& source)
 {
-	size_t	size = 0;
-	const TCHAR* ptszSourceDoc = nullptr;
+	if( source.empty() ) return _T("");
 
-	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
+	static const struct { TCHAR ch; const TCHAR* entity; } s_table[] = {
+		{ '<',  _T("&lt;")   },
+		{ '>',  _T("&gt;")   },
+		{ '&',  _T("&amp;")  },
+		{ '"',  _T("&quot;") },
+		{ '\'', _T("&#39;")  }, // 작은따옴표 속성 컨텍스트 XSS 방어
+	};
 
-	ptszSourceDoc = source.c_str();
-	while( *ptszSourceDoc )
+	_tstring dest;
+	dest.reserve(source.size());
+
+	for( TCHAR ch : source )
 	{
-		if( *ptszSourceDoc == '<' || *ptszSourceDoc == '>' )
-			size = size + 3;
-		else if( *ptszSourceDoc == '&' )
-			size = size + 4;
-		else if( *ptszSourceDoc == '"' )
-			size = size + 5;
-
-		ptszSourceDoc++;
-		size++;
+		bool bMatched = false;
+		for( const auto& entry : s_table )
+		{
+			if( ch == entry.ch )
+			{
+				dest += entry.entity;
+				bMatched = true;
+				break;
+			}
+		}
+		if( !bMatched )
+			dest.push_back(ch);
 	}
-
-	int destIndex = 0;
-	_tstring dest(size + 1, '\0');
-
-	ptszSourceDoc = source.c_str();
-	while( *ptszSourceDoc )
-	{
-		if( *ptszSourceDoc == '<' )
-		{
-			dest[destIndex++] = '&';
-			dest[destIndex++] = 'l';
-			dest[destIndex++] = 't';
-			dest[destIndex++] = ';';
-		}
-		else if( *ptszSourceDoc == '>' )
-		{
-			dest[destIndex++] = '&';
-			dest[destIndex++] = 'g';
-			dest[destIndex++] = 't';
-			dest[destIndex++] = ';';
-		}
-		else if( *ptszSourceDoc == '&' )
-		{
-			dest[destIndex++] = '&';
-			dest[destIndex++] = 'a';
-			dest[destIndex++] = 'm';
-			dest[destIndex++] = 'p';
-			dest[destIndex++] = ';';
-		}
-		else if( *ptszSourceDoc == '"' )
-		{
-			dest[destIndex++] = '&';
-			dest[destIndex++] = 'q';
-			dest[destIndex++] = 'u';
-			dest[destIndex++] = 'o';
-			dest[destIndex++] = 't';
-			dest[destIndex++] = ';';
-		}
-		else dest[destIndex++] = *ptszSourceDoc;
-
-		ptszSourceDoc++;
-	}
-	dest[destIndex] = '\0';
-
 	return dest;
 }
 
@@ -513,59 +395,42 @@ _tstring HtmlEncode(const _tstring& source)
 // @return 디코딩된 결과 문자열
 _tstring HtmlDecode(const _tstring& source)
 {
-	size_t	size = 0;
-	const TCHAR* ptszSourceDoc = nullptr;
+	if( source.empty() ) return _T("");
 
-	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
+	static const struct { const TCHAR* entity; TCHAR ch; } s_table[] = {
+		{ _T("&lt;"),   '<' },
+		{ _T("&gt;"),   '>' },
+		{ _T("&amp;"),  '&' },
+		{ _T("&quot;"), '"' },
+		{ _T("&#39;"),  '\'' },
+		{ _T("&apos;"), '\'' }, // HTML5 명명 엔티티 형태도 함께 디코딩 대상에 포함
+	};
 
-	ptszSourceDoc = source.c_str();
-	while( *ptszSourceDoc )
+	const size_t n = source.size();
+	_tstring dest;
+	dest.reserve(n);
+
+	size_t i = 0;
+	while( i < n )
 	{
-		if( *ptszSourceDoc == '&' && *(ptszSourceDoc + 1) == 'l' && *(ptszSourceDoc + 2) == 't' && *(ptszSourceDoc + 3) == ';' )
-			ptszSourceDoc = ptszSourceDoc + 3;
-		else if( *ptszSourceDoc == '&' && *(ptszSourceDoc + 1) == 'g' && *(ptszSourceDoc + 2) == 't' && *(ptszSourceDoc + 3) == ';' )
-			ptszSourceDoc = ptszSourceDoc + 3;
-		else if( *ptszSourceDoc == '&' && *(ptszSourceDoc + 1) == 'a' && *(ptszSourceDoc + 2) == 'm' && *(ptszSourceDoc + 3) == 'p' && *(ptszSourceDoc + 4) == ';' )
-			ptszSourceDoc = ptszSourceDoc + 4;
-		else if( *ptszSourceDoc == '&' && *(ptszSourceDoc + 1) == 'q' && *(ptszSourceDoc + 2) == 'u' && *(ptszSourceDoc + 3) == 'o' && *(ptszSourceDoc + 4) == 't' && *(ptszSourceDoc + 5) == ';' )
-			ptszSourceDoc = ptszSourceDoc + 5;
-
-		ptszSourceDoc++;
-		size++;
+		bool bMatched = false;
+		for( const auto& entry : s_table )
+		{
+			size_t entLen = _tcslen(entry.entity);
+			if( i + entLen <= n && source.compare(i, entLen, entry.entity) == 0 )
+			{
+				dest.push_back(entry.ch);
+				i += entLen;
+				bMatched = true;
+				break;
+			}
+		}
+		if( !bMatched )
+		{
+			dest.push_back(source[i]);
+			i++;
+		}
 	}
-
-	int destIndex = 0;
-	_tstring dest(size + 1, '\0');
-
-	ptszSourceDoc = source.c_str();
-	while( *ptszSourceDoc )
-	{
-		if( *ptszSourceDoc == '&' && *(ptszSourceDoc + 1) == 'l' && *(ptszSourceDoc + 2) == 't' && *(ptszSourceDoc + 3) == ';' )
-		{
-			dest[destIndex++] = '<';
-			ptszSourceDoc = ptszSourceDoc + 3;
-		}
-		else if( *ptszSourceDoc == '&' && *(ptszSourceDoc + 1) == 'g' && *(ptszSourceDoc + 2) == 't' && *(ptszSourceDoc + 3) == ';' )
-		{
-			dest[destIndex++] = '>';
-			ptszSourceDoc = ptszSourceDoc + 3;
-		}
-		else if( *ptszSourceDoc == '&' && *(ptszSourceDoc + 1) == 'a' && *(ptszSourceDoc + 2) == 'm' && *(ptszSourceDoc + 3) == 'p' && *(ptszSourceDoc + 4) == ';' )
-		{
-			dest[destIndex++] = '&';
-			ptszSourceDoc = ptszSourceDoc + 4;
-		}
-		else if( *ptszSourceDoc == '&' && *(ptszSourceDoc + 1) == 'q' && *(ptszSourceDoc + 2) == 'u' && *(ptszSourceDoc + 3) == 'o' && *(ptszSourceDoc + 4) == 't' && *(ptszSourceDoc + 5) == ';' )
-		{
-			dest[destIndex++] = '"';
-			ptszSourceDoc = ptszSourceDoc + 5;
-		}
-		else dest[destIndex++] = *ptszSourceDoc;
-
-		ptszSourceDoc++;
-	}
-	dest[destIndex] = '\0';
-
 	return dest;
 }
 
@@ -573,79 +438,49 @@ _tstring HtmlDecode(const _tstring& source)
 // @brief 자바스크립트 Escape 형식으로 문자열을 인코딩합니다.
 // @param source 변환할 원본 문자열
 // @return 인코딩된 결과 문자열
-// @note
-//	- 영문자, 숫자, '*', '@', '-', '_', '+', '.', '/' 제외한 문자를 16진수로 변환
-//	- 유니코드를 16진수로 교환
-//	- EUC-KR, UTF-7, UTF-8, UTF-16에서 동일하게 작동
 _tstring Escape(const _tstring& source)
 {
-	size_t		size = 0;
+	if( source.empty() ) return _T("");
+
 	wchar_t		wcChar = '\0';
-	const wchar_t*	pwszSourceData = nullptr;
-	const wchar_t*	pwszSourceDoc = nullptr;
-	wchar_t		wszExcept[] = L"*@-_+./";
+	const wchar_t* pwszSourceData = nullptr;
+	const wchar_t	wszExcept[] = L"*@-_+./";
 
-	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
-
+	std::wstring sourceData;
 #ifdef _UNICODE
 	pwszSourceData = source.c_str();
 #else
-	std::wstring sourceData;
-	sourceData = Iconv::CIconvUtil::ConvertEncodingW(source, "CP949", "WCHAR_T");
-
+	sourceData = AnsiToUnicode(source);
 	pwszSourceData = sourceData.c_str();
 #endif
 
-	pwszSourceDoc = pwszSourceData;
-	while( *pwszSourceDoc )
-	{
-		wcChar = *pwszSourceDoc;
-		if( wcChar > 0x7f )
-			size = size + 6;
-		else if( !((wcChar > 47 && wcChar < 57) || (wcChar > 64 && wcChar < 91) || (wcChar > 96 && wcChar < 123) || wcschr(wszExcept, wcChar)) )
-		{
-			if( wcChar <= 0xf )
-				size++;
+	_tstring dest;
+	dest.reserve(source.size());
 
-			size = size + 3;
-		}
-		else
-			size++;
-
-		pwszSourceDoc++;
-	}
-
-	int destIndex = 0;
-	_tstring dest(size + 1, '\0');
-
-	pwszSourceDoc = pwszSourceData;
+	const wchar_t* pwszSourceDoc = pwszSourceData;
 	while( *pwszSourceDoc )
 	{
 		wcChar = *pwszSourceDoc;
 		if( wcChar > 0x7f )
 		{
-			dest[destIndex++] = '%';
-			dest[destIndex++] = 'u';
-
-			dest[destIndex++] = g_pcDigits[(wcChar >> 12) & 0x0F];
-			dest[destIndex++] = g_pcDigits[(wcChar >> 8) & 0x0F];
-			dest[destIndex++] = g_pcDigits[(wcChar >> 4) & 0x0F];
-			dest[destIndex++] = g_pcDigits[wcChar & 0x0F];
+			dest.push_back('%');
+			dest.push_back('u');
+			dest.push_back(g_pcDigits[(wcChar >> 12) & 0x0F]);
+			dest.push_back(g_pcDigits[(wcChar >> 8) & 0x0F]);
+			dest.push_back(g_pcDigits[(wcChar >> 4) & 0x0F]);
+			dest.push_back(g_pcDigits[wcChar & 0x0F]);
 		}
-		else if( !((wcChar > 47 && wcChar < 57) || (wcChar > 64 && wcChar < 91) || (wcChar > 96 && wcChar < 123) || wcschr(wszExcept, wcChar)) )
+		else if( !(IsAlnum((unsigned char)wcChar) || wcschr(wszExcept, wcChar)) )
 		{
-			dest[destIndex++] = '%';
-
-			dest[destIndex++] = g_pcDigits[(wcChar >> 4) & 0x0F];
-			dest[destIndex++] = g_pcDigits[wcChar & 0x0F];
+			dest.push_back('%');
+			dest.push_back(g_pcDigits[(wcChar >> 4) & 0x0F]);
+			dest.push_back(g_pcDigits[wcChar & 0x0F]);
 		}
 		else
-			dest[destIndex++] = (TCHAR)wcChar;
+			dest.push_back((TCHAR)wcChar);
 
 		pwszSourceDoc++;
 	}
-	dest[destIndex] = '\0';
-
 	return dest;
 }
 
@@ -655,99 +490,54 @@ _tstring Escape(const _tstring& source)
 // @return 디코딩된 결과 문자열
 _tstring UnEscape(const _tstring& source)
 {
-	size_t		size = 0;
-	int			nNum = 0;
-	int			nRetval = 0;
-	const TCHAR* ptszSourceDoc = nullptr;
+	if( source.empty() ) return _T("");
 
-	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
+	const size_t n = source.size();
+	std::wstring destData;
+	destData.reserve(n);
 
-	ptszSourceDoc = source.c_str();
-	while( *ptszSourceDoc )
+	size_t i = 0;
+	while( i < n )
 	{
-		if( *ptszSourceDoc == '%' )
+		TCHAR ch = source[i];
+
+		if( ch == '%' && i + 1 < n && source[i + 1] == 'u' && i + 5 < n )
 		{
-			if( *(ptszSourceDoc + 1) == 'u' )
-				ptszSourceDoc = ptszSourceDoc + 5;
-			else ptszSourceDoc = ptszSourceDoc + 2;
+			int n1 = HexNibble(source[i + 2]);
+			int n2 = HexNibble(source[i + 3]);
+			int n3 = HexNibble(source[i + 4]);
+			int n4 = HexNibble(source[i + 5]);
+			if( n1 >= 0 && n2 >= 0 && n3 >= 0 && n4 >= 0 )
+			{
+				destData.push_back((wchar_t)((n1 << 12) | (n2 << 8) | (n3 << 4) | n4));
+				i += 6;
+				continue;
+			}
+			// 잘못된 %uXXXX 시퀀스 -> '%'는 리터럴로 취급
+		}
+		else if( ch == '%' && i + 2 < n )
+		{
+			int hi = HexNibble(source[i + 1]);
+			int lo = HexNibble(source[i + 2]);
+			if( hi >= 0 && lo >= 0 )
+			{
+				destData.push_back((wchar_t)((hi << 4) | lo));
+				i += 3;
+				continue;
+			}
+			// 잘못된 %XX 시퀀스 -> '%'는 리터럴로 취급
 		}
 
-		ptszSourceDoc++;
-		size++;
+		destData.push_back((wchar_t)ch);
+		i++;
 	}
 
-	int destIndex = 0;
-	std::wstring destData(size + 1, '\0');
-
-	ptszSourceDoc = source.c_str();
-	while( *ptszSourceDoc )
-	{
-		if( *ptszSourceDoc == '%' )
-		{
-			if( *(ptszSourceDoc + 1) == 'u' )
-			{
-				ptszSourceDoc++;
-
-				nNum = 0;
-				nRetval = 0;
-				for( int i = 0; i < 4; i++ )
-				{
-					ptszSourceDoc++;
-					if( *ptszSourceDoc < ':' )
-						nNum = *ptszSourceDoc - 48;
-					else if( *ptszSourceDoc > '@' && *ptszSourceDoc < '[' )
-						nNum = (*ptszSourceDoc - 'A') + 10;
-					else
-						nNum = (*ptszSourceDoc - 'a') + 10;
-
-					if( i == 0 )
-						nNum = nNum * 16 * 16 * 16;
-					else if( i == 1 )
-						nNum = nNum * 16 * 16;
-					else if( i == 2 )
-						nNum = nNum * 16;
-
-					nRetval += nNum;
-				}
-
-				destData[destIndex++] = nRetval;
-			}
-			else
-			{
-				nNum = 0;
-				nRetval = 0;
-				for( int i = 0; i < 2; i++ )
-				{
-					ptszSourceDoc++;
-					if( *ptszSourceDoc < ':' )
-						nNum = *ptszSourceDoc - 48;
-					else if( *ptszSourceDoc > '@' && *ptszSourceDoc < '[' )
-						nNum = (*ptszSourceDoc - 'A') + 10;
-					else
-						nNum = (*ptszSourceDoc - 'a') + 10;
-
-					if( i == 0 )
-						nNum = nNum * 16;
-
-					nRetval += nNum;
-				}
-
-				destData[destIndex++] = nRetval;
-			}
-		}
-		else
-			destData[destIndex++] = *ptszSourceDoc;
-
-		ptszSourceDoc++;
-	}
-	destData[destIndex] = '\0';
-
+	_tstring dest;
 #ifndef _UNICODE
-	_tstring dest = Iconv::CIconvUtil::ConvertEncoding(destData, "WCHAR_T", "CP949");
-#else 
-	_tstring dest = destData;
+	dest = WStringToString(destData);
+#else
+	dest = destData;
 #endif
-
 	return dest;
 }
 
@@ -755,67 +545,11 @@ _tstring UnEscape(const _tstring& source)
 // @brief 자바스크립트 EncodeURI 형식으로 문자열을 인코딩합니다.
 // @param source 변환할 원본 문자열
 // @return 인코딩된 결과 문자열
-// @note
-//	- 영문자, 숫자, ',', '/', '?', ':', '@', '&', '=', '+', '$', '#' 제외한 문자를 16진수로 변환
-//	- UTF-8 코드를 16진수로 교환
-//	- EUC-KR, UTF-7, UTF-8, UTF-16에서 동일하게 작동
-_tstring EncodeURI(const _tstring& source)
+// @param bSpaceAsPlus true면 기존 동작(공백->'+') 유지, false면 JS encodeURI 표준(공백->%20).
+_tstring EncodeURI(const _tstring& source, bool bSpaceAsPlus)
 {
-	unsigned char cChar = '\0';
-
-	size_t	size = 0;
-	const char* pszSourceDoc = nullptr;
-	char	szExcept[] = ",/?:@&=+$#";
-
-	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
-
-	std::string	sourceData;
-
-#ifdef _UNICODE
-	sourceData = Iconv::CIconvUtil::ConvertEncoding(source, "WCHAR_T", "UTF-8");
-#else
-	sourceData = Iconv::CIconvUtil::ConvertEncoding(source, "CP949", "UTF-8");
-#endif
-
-	pszSourceDoc = sourceData.c_str();
-	while( *pszSourceDoc )
-	{
-		cChar = (unsigned char)*pszSourceDoc;
-		if( !((cChar > 47 && cChar < 57) || (cChar > 64 && cChar < 91) || (cChar > 96 && cChar < 123) || strchr(szExcept, cChar)) )
-			size += 2;
-
-		pszSourceDoc++;
-		size++;
-	}
-
-	int destIndex = 0;
-	string destData(size + 1, '\0');
-
-	pszSourceDoc = sourceData.c_str();
-	while( *pszSourceDoc )
-	{
-		cChar = (unsigned char)*pszSourceDoc;
-		if( (cChar > 47 && cChar < 57) || (cChar > 64 && cChar < 91) || (cChar > 96 && cChar < 123) || strchr(szExcept, cChar) )
-			destData[destIndex++] = cChar;
-		else if( cChar == ' ' )
-			destData[destIndex++] = '+';
-		else
-		{
-			destData[destIndex++] = '%';
-			destData[destIndex++] = g_pcDigits[(cChar >> 4) & 0x0F];
-			destData[destIndex++] = g_pcDigits[cChar & 0x0F];
-		}
-		pszSourceDoc++;
-	}
-	destData[destIndex] = '\0';
-
-#ifdef _UNICODE
-	_tstring dest = Iconv::CIconvUtil::ConvertEncodingW(destData, "CP949", "WCHAR_T");
-#else
-	_tstring dest = destData;
-#endif
-
-	return dest;
+	static const std::array<bool, 256> table = BuildSafeTable(",/?:@&=+$#");
+	return PercentEncodeCoreWithTable(source, CP_UTF8, table, bSpaceAsPlus);
 }
 
 //***************************************************************************
@@ -824,141 +558,17 @@ _tstring EncodeURI(const _tstring& source)
 // @return 디코딩된 결과 문자열
 _tstring DecodeURI(const _tstring& source)
 {
-	size_t	size = 0;
-	int		nNum = 0;
-	int		nRetval = 0;
-	const TCHAR* ptszSourceDoc = nullptr;
-	char*	pszDestination = nullptr;
-	char*	pszDestDoc = nullptr;
-
-	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
-
-	ptszSourceDoc = source.c_str();
-	while( *ptszSourceDoc )
-	{
-		if( *ptszSourceDoc == '%' )
-			ptszSourceDoc = ptszSourceDoc + 2;
-
-		ptszSourceDoc++;
-		size++;
-	}
-
-	pszDestination = new char[size + 1];
-
-	ptszSourceDoc = source.c_str();
-	pszDestDoc = pszDestination;
-	while( *ptszSourceDoc )
-	{
-		if( *ptszSourceDoc == '%' )
-		{
-			nNum = 0;
-			nRetval = 0;
-			for( int i = 0; i < 2; i++ )
-			{
-				ptszSourceDoc++;
-				if( *ptszSourceDoc < ':' )
-					nNum = *ptszSourceDoc - 48;
-				else if( *ptszSourceDoc > '@' && *ptszSourceDoc < '[' )
-					nNum = (*ptszSourceDoc - 'A') + 10;
-				else
-					nNum = (*ptszSourceDoc - 'a') + 10;
-
-				if( i == 0 )
-					nNum = nNum * 16;
-
-				nRetval += nNum;
-			}
-
-			*pszDestDoc++ = nRetval;
-		}
-		else if( *ptszSourceDoc == '+' )
-			*pszDestDoc++ = ' ';
-		else
-			*pszDestDoc++ = (char)*ptszSourceDoc;
-
-		ptszSourceDoc++;
-	}
-	*pszDestDoc = '\0';
-
-#ifdef _UNICODE
-	_tstring dest = Iconv::CIconvUtil::ConvertEncodingW(pszDestination, "UTF-8", "WCHAR_T");
-#else
-	_tstring dest = Iconv::CIconvUtil::ConvertEncoding(pszDestination, "UTF-8", "CP949");
-#endif
-
-	if( pszDestination )
-	{
-		delete[]pszDestination;
-		pszDestination = nullptr;
-	}
-
-	return dest;
+	return PercentDecodeCore(source, CP_UTF8, true);
 }
 
 //***************************************************************************
 // @brief 자바스크립트 EncodeURIComponent 형식으로 문자열을 인코딩합니다.
 // @param source 변환할 원본 문자열
 // @return 인코딩된 결과 문자열
-// @note
-//	- 영문자, 숫자를 제외한 문자를 16진수로 변환
-//	- UTF-8 코드를 16진수로 교환
-//	- EUC-KR, UTF-7, UTF-8, UTF-16에서 동일하게 작동
 _tstring EncodeURIComponent(const _tstring& source)
 {
-	unsigned char cChar = '\0';
-
-	size_t	size = 0;
-	const char* pszSourceDoc = nullptr;
-
-	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
-
-	std::string	sourceData;
-
-#ifdef _UNICODE
-	sourceData = Iconv::CIconvUtil::ConvertEncoding(source, "WCHAR_T", "UTF-8");
-#else
-	sourceData = Iconv::CIconvUtil::ConvertEncoding(source, "CP949", "UTF-8");
-#endif
-
-	pszSourceDoc = sourceData.c_str();
-	while( *pszSourceDoc )
-	{
-		cChar = (unsigned char)*pszSourceDoc;
-		if( !((cChar > 47 && cChar < 57) || (cChar > 64 && cChar < 91) || (cChar > 96 && cChar < 123)) )
-			size += 2;
-
-		pszSourceDoc++;
-		size++;
-	}
-
-	int destIndex = 0;
-	string destData(size + 1, '\0');
-
-	pszSourceDoc = sourceData.c_str();
-	while( *pszSourceDoc )
-	{
-		cChar = (unsigned char)*pszSourceDoc;
-		if( (cChar > 47 && cChar < 57) || (cChar > 64 && cChar < 91) || (cChar > 96 && cChar < 123) )
-			destData[destIndex++] = cChar;
-		else if( cChar == ' ' )
-			destData[destIndex++] = '+';
-		else
-		{
-			destData[destIndex++] = '%';
-			destData[destIndex++] = g_pcDigits[(cChar >> 4) & 0x0F];
-			destData[destIndex++] = g_pcDigits[cChar & 0x0F];
-		}
-		pszSourceDoc++;
-	}
-	destData[destIndex] = '\0';
-
-#ifdef _UNICODE
-	_tstring dest = Iconv::CIconvUtil::ConvertEncodingW(destData, "CP949", "WCHAR_T");
-#else
-	_tstring dest = destData;
-#endif
-
-	return dest;
+	static const std::array<bool, 256> table = BuildSafeTable("");
+	return PercentEncodeCoreWithTable(source, CP_UTF8, table, true);
 }
 
 //***************************************************************************
@@ -967,73 +577,5 @@ _tstring EncodeURIComponent(const _tstring& source)
 // @return 디코딩된 결과 문자열
 _tstring DecodeURIComponent(const _tstring& source)
 {
-	size_t	size = 0;
-	int		nNum = 0;
-	int		nRetval = 0;
-	const TCHAR* ptszSourceDoc = nullptr;
-	char*	pszDestination = nullptr;
-	char*	pszDestDoc = nullptr;
-
-	if( source.c_str() == nullptr || source.size() == 0 ) return _T("");
-
-	ptszSourceDoc = source.c_str();
-	while( *ptszSourceDoc )
-	{
-		if( *ptszSourceDoc == '%' )
-			ptszSourceDoc = ptszSourceDoc + 2;
-
-		ptszSourceDoc++;
-		size++;
-	}
-
-	pszDestination = new char[size + 1];
-
-	ptszSourceDoc = source.c_str();
-	pszDestDoc = pszDestination;
-	while( *ptszSourceDoc )
-	{
-		if( *ptszSourceDoc == '%' )
-		{
-			nNum = 0;
-			nRetval = 0;
-			for( int i = 0; i < 2; i++ )
-			{
-				ptszSourceDoc++;
-				if( *ptszSourceDoc < ':' )
-					nNum = *ptszSourceDoc - 48;
-				else if( *ptszSourceDoc > '@' && *ptszSourceDoc < '[' )
-					nNum = (*ptszSourceDoc - 'A') + 10;
-				else
-					nNum = (*ptszSourceDoc - 'a') + 10;
-
-				if( i == 0 )
-					nNum = nNum * 16;
-
-				nRetval += nNum;
-			}
-
-			*pszDestDoc++ = nRetval;
-		}
-		else if( *ptszSourceDoc == '+' )
-			*pszDestDoc++ = ' ';
-		else
-			*pszDestDoc++ = (char)*ptszSourceDoc;
-
-		ptszSourceDoc++;
-	}
-	*pszDestDoc = '\0';
-
-#ifdef _UNICODE
-	_tstring dest = Iconv::CIconvUtil::ConvertEncodingW(pszDestination, "UTF-8", "WCHAR_T");
-#else
-	_tstring dest = Iconv::CIconvUtil::ConvertEncoding(pszDestination, "UTF-8", "CP949");
-#endif
-
-	if( pszDestination )
-	{
-		delete[]pszDestination;
-		pszDestination = nullptr;
-	}
-
-	return dest;
+	return PercentDecodeCore(source, CP_UTF8, true);
 }

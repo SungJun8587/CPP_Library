@@ -68,12 +68,8 @@ public:
 
 		if( m_nBufSize < nBufSize ) Destroy();
 
-#ifdef TCMALLOC_TCMALLOC_H_
-		m_pBuffer = (TYPE*)tc_new(m_nBufSize);
-#else
-		m_pBuffer = new TYPE[m_nBufSize];
-#endif
-
+		// BaseAllocator를 통해 할당 및 0으로 초기화
+		m_pBuffer = static_cast<TYPE*>(BaseAllocator::Alloc(static_cast<int32>(m_nBufSize)));
 		memset(m_pBuffer, 0, m_nBufSize);
 		m_nBufLength = nBufSize;
 	}
@@ -82,11 +78,7 @@ public:
 	{
 		if( m_pBuffer )
 		{
-#ifdef TCMALLOC_TCMALLOC_H_
-			tc_delete(m_pBuffer);
-#else
-			delete[]m_pBuffer;
-#endif
+			BaseAllocator::Release(m_pBuffer);
 			m_pBuffer = NULL;
 			m_nBufSize = 0;
 			m_nBufLength = 0;
