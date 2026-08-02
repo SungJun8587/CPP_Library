@@ -1,0 +1,65 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="UtilCore">
+      <UniqueIdentifier>{969fdfcf-fe73-4516-a45f-2ce4eb878852}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UtilCore">
+      <UniqueIdentifier>{f4fc80b2-3743-49d4-a2fa-2ede750140bd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UtilCore\Util">
+      <UniqueIdentifier>{50dc4441-61c8-4221-b4c8-a1072da7408c}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="ReadMe.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="..\..\UtilCore\Util\ConvertCharset.h">
+      <Filter>UtilCore\Util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\UtilCore\Util\EncodingConvert.h">
+      <Filter>UtilCore\Util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\UtilCore\Util\ShellUtil.h">
+      <Filter>UtilCore\Util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\UtilCore\Util\StringUtil.h">
+      <Filter>UtilCore\Util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\UtilCore\BaseDefine.h">
+      <Filter>UtilCore</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\UtilCore\BaseMacro.h">
+      <Filter>UtilCore</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\UtilCore\BaseRedefineDataType.h">
+      <Filter>UtilCore</Filter>
+    </ClInclude>
+    <ClInclude Include="TestFunction.h" />
+    <ClInclude Include="..\..\UtilCore\Util\FileUtil.h">
+      <Filter>UtilCore\Util</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="pch.cpp" />
+    <ClCompile Include="ShellUtilTest.cpp" />
+    <ClCompile Include="..\..\UtilCore\Util\ConvertCharset.cpp">
+      <Filter>UtilCore\Util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\UtilCore\Util\EncodingConvert.cpp">
+      <Filter>UtilCore\Util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\UtilCore\Util\ShellUtil.cpp">
+      <Filter>UtilCore\Util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\UtilCore\Util\StringUtil.cpp">
+      <Filter>UtilCore\Util</Filter>
+    </ClCompile>
+    <ClCompile Include="TestFunction.cpp" />
+    <ClCompile Include="..\..\UtilCore\Util\FileUtil.cpp">
+      <Filter>UtilCore\Util</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

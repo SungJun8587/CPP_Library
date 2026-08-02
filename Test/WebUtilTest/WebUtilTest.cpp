@@ -10,7 +10,12 @@ int main()
 	_CrtSetDbgFlag(_CrtSetDbgFlag(_CRTDBG_REPORT_FLAG) | _CRTDBG_LEAK_CHECK_DF);
 #endif
 
+	_tcout.imbue(std::locale("korean")); // 유니코드 출력 설정
+	_tcout << _T("================ WebUtilTest 시작 ================\n\n");
+
 	TestWebUtil();
+
+	_tcout << _T("================ 모든 WebUtilTest 완료 ================\n");
 
 	system("pause");
 

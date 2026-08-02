@@ -13,8 +13,8 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{2b83a1e4-2521-4ea0-b336-9f8d7145f1af}</ProjectGuid>
-    <RootNamespace>FileUtilTest</RootNamespace>
+    <ProjectGuid>{9e993448-75da-46ee-a862-c83248917742}</ProjectGuid>
+    <RootNamespace>IconvTest</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -65,9 +65,9 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp20</LanguageStandard>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -94,23 +94,19 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\UtilCore\Util\ConvertCharset.cpp" />
-    <ClCompile Include="..\..\UtilCore\Util\EncodingConvert.cpp" />
-    <ClCompile Include="..\..\UtilCore\Util\FileUtil.cpp" />
+    <ClCompile Include="..\..\UtilCore\Util\IconvUtil.cpp" />
+    <ClCompile Include="IconvTest.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="FileUtilTest.cpp" />
     <ClCompile Include="TestFunction.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\UtilCore\BaseDefine.h" />
     <ClInclude Include="..\..\UtilCore\BaseMacro.h" />
     <ClInclude Include="..\..\UtilCore\BaseRedefineDataType.h" />
-    <ClInclude Include="..\..\UtilCore\Util\ConvertCharset.h" />
-    <ClInclude Include="..\..\UtilCore\Util\EncodingConvert.h" />
-    <ClInclude Include="..\..\UtilCore\Util\FileUtil.h" />
+    <ClInclude Include="..\..\UtilCore\Util\IconvUtil.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="TestFunction.h" />
   </ItemGroup>

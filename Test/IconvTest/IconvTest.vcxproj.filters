@@ -1,26 +1,17 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="FileUtilTest.cpp" />
+    <ClCompile Include="IconvTest.cpp" />
     <ClCompile Include="pch.cpp" />
     <ClCompile Include="TestFunction.cpp" />
-    <ClCompile Include="..\..\UtilCore\Util\FileUtil.cpp">
-      <Filter>UtilCore\Util</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Util\ConvertCharset.cpp">
-      <Filter>UtilCore\Util</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Util\EncodingConvert.cpp">
+    <ClCompile Include="..\..\UtilCore\Util\IconvUtil.cpp">
       <Filter>UtilCore\Util</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
     <ClInclude Include="TestFunction.h" />
-    <ClInclude Include="..\..\UtilCore\Util\FileUtil.h">
-      <Filter>UtilCore\Util</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Util\ConvertCharset.h">
+    <ClInclude Include="..\..\UtilCore\Util\IconvUtil.h">
       <Filter>UtilCore\Util</Filter>
     </ClInclude>
     <ClInclude Include="..\..\UtilCore\BaseDefine.h">
@@ -32,16 +23,13 @@
     <ClInclude Include="..\..\UtilCore\BaseRedefineDataType.h">
       <Filter>UtilCore</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Util\EncodingConvert.h">
-      <Filter>UtilCore\Util</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="UtilCore">
-      <UniqueIdentifier>{2e2ba952-e35d-41d7-8b73-e578ffe75e2d}</UniqueIdentifier>
+      <UniqueIdentifier>{348fc218-b4b9-4fab-a4ba-1f1983d50c7c}</UniqueIdentifier>
     </Filter>
     <Filter Include="UtilCore\Util">
-      <UniqueIdentifier>{a103ab91-c968-48dc-8abe-dbae3fe5686d}</UniqueIdentifier>
+      <UniqueIdentifier>{00318547-87a1-473f-a0db-61d913f80bd0}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

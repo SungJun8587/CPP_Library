@@ -48,7 +48,7 @@
     <OutDir>$(SolutionDir)Bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>Bin\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)64D</TargetName>
-    <IncludePath>K:\GitHub\CPP\Library\UtilCore;$(ProjectDir);$(IncludePath)</IncludePath>
+    <IncludePath>K:\GitHub\CPP\Library\UtilCore;K:\GitHub\CPP\Library\ExternalLib\libiconv-1.18\build\include;$(ProjectDir);$(IncludePath)</IncludePath>
     <LibraryPath>K:\GitHub\CPP\Library\ExternalLib\Bin\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -56,7 +56,7 @@
     <OutDir>$(SolutionDir)Bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>Bin\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)64</TargetName>
-    <IncludePath>K:\GitHub\CPP\Library\UtilCore;$(ProjectDir);$(IncludePath)</IncludePath>
+    <IncludePath>K:\GitHub\CPP\Library\UtilCore;K:\GitHub\CPP\Library\ExternalLib\libiconv-1.18\build\include;$(ProjectDir);$(IncludePath)</IncludePath>
     <LibraryPath>K:\GitHub\CPP\Library\ExternalLib\Bin\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -94,6 +94,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\UtilCore\Util\ConvertCharset.cpp" />
+    <ClCompile Include="..\..\UtilCore\Util\EncodingConvert.cpp" />
+    <ClCompile Include="..\..\UtilCore\Util\IconvUtil.cpp" />
     <ClCompile Include="..\..\UtilCore\Util\WebUtil.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -107,6 +109,8 @@
     <ClInclude Include="..\..\UtilCore\BaseMacro.h" />
     <ClInclude Include="..\..\UtilCore\BaseRedefineDataType.h" />
     <ClInclude Include="..\..\UtilCore\Util\ConvertCharset.h" />
+    <ClInclude Include="..\..\UtilCore\Util\EncodingConvert.h" />
+    <ClInclude Include="..\..\UtilCore\Util\IconvUtil.h" />
     <ClInclude Include="..\..\UtilCore\Util\WebUtil.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="TestFunction.h" />

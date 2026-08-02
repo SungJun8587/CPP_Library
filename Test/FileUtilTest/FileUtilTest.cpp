@@ -25,14 +25,14 @@ int main()
 
 	InitGlobalPath();
 
-	//SaveFileTest();
-	//ReadFileTest();
-	//GetFileEncodingTypeTest();
-
+	//Win_SaveFileTest();
 	//Win_GetFileEncodingTypeTest();
 	//Win_ReadFileTest();
 	//Win_ReadFileMapTest();
-	Win_SaveFileTest();
+
+	//GetFileEncodingTypeTest();
+	//ReadFileTest();
+	//SaveFileTest();
 
 	system("pause");
 }

@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // FileUtil.cpp : implementation of the FileUtil Functions.
 //
@@ -8,29 +8,29 @@
 #include "FileUtil.h"
 
 //***************************************************************************
-// @brief ¹ÙÀÌÆ® ¹è¿­ÀÌ BOMÀÌ ¾ø´Â UTF-8 ÀÎÄÚµù Á¶°ÇÀ» ¸¸Á·ÇÏ´ÂÁö °Ë»çÇÕ´Ï´Ù.
-// @param pBuffer °Ë»çÇÒ µ¥ÀÌÅÍ ¹öÆÛ
-// @param BuffSize ¹öÆÛ Å©±â
-// @return UTF-8 Á¶°ÇÀ» ¸¸Á·ÇÏ¸é true, ¾Æ´Ï¸é false
+// @brief ë°”ì´íŠ¸ ë°°ì—´ì´ BOMì´ ì—†ëŠ” UTF-8 ì¸ì½”ë”© ì¡°ê±´ì„ ë§Œì¡±í•˜ëŠ”ì§€ ê²€ì‚¬í•©ë‹ˆë‹¤.
+// @param pBuffer ê²€ì‚¬í•  ë°ì´í„° ë²„í¼
+// @param BuffSize ë²„í¼ í¬ê¸°
+// @return UTF-8 ì¡°ê±´ì„ ë§Œì¡±í•˜ë©´ true, ì•„ë‹ˆë©´ false
 bool IsUTF8WithoutBom(const void* pBuffer, const size_t BuffSize)
 {
 	bool bUTF8 = true;
 	unsigned char* start = (unsigned char*)pBuffer;
 	unsigned char* end = (unsigned char*)pBuffer + BuffSize;
 
-	// ¹öÆÛ ³¡±îÁö ¼øÈ¸ÇÏ¸ç UTF-8 ¹ÙÀÌÆ® ±ÔÄ¢ °Ë»ç
+	// ë²„í¼ ëê¹Œì§€ ìˆœíšŒí•˜ë©° UTF-8 ë°”ì´íŠ¸ ê·œì¹™ ê²€ì‚¬
 	while( start < end )
 	{
-		if( *start < 0x80 )			// 1¹ÙÀÌÆ® ¹®ÀÚ (0xxxxxxx)
+		if( *start < 0x80 )			// 1ë°”ì´íŠ¸ ë¬¸ì (0xxxxxxx)
 		{
 			start++;
 		}
-		else if( *start < (0xC0) )	// Àß¸øµÈ ½ÃÀÛ ¹ÙÀÌÆ® (10xxxxxx)
+		else if( *start < (0xC0) )	// ì˜ëª»ëœ ì‹œì‘ ë°”ì´íŠ¸ (10xxxxxx)
 		{
 			bUTF8 = false;
 			break;
 		}
-		else if( *start < (0xE0) )	// 2¹ÙÀÌÆ® ¹®ÀÚ (110xxxxx 10xxxxxx)
+		else if( *start < (0xE0) )	// 2ë°”ì´íŠ¸ ë¬¸ì (110xxxxx 10xxxxxx)
 		{
 			if( start >= end - 1 )
 				break;
@@ -41,7 +41,7 @@ bool IsUTF8WithoutBom(const void* pBuffer, const size_t BuffSize)
 			}
 			start += 2;
 		}
-		else if( *start < (0xF0) )	// 3¹ÙÀÌÆ® ¹®ÀÚ (1110xxxx 10xxxxxx 10xxxxxx)
+		else if( *start < (0xF0) )	// 3ë°”ì´íŠ¸ ë¬¸ì (1110xxxx 10xxxxxx 10xxxxxx)
 		{
 			if( start >= end - 2 )
 				break;
@@ -52,7 +52,18 @@ bool IsUTF8WithoutBom(const void* pBuffer, const size_t BuffSize)
 			}
 			start += 3;
 		}
-		else						// 4¹ÙÀÌÆ® ÀÌ»ó È¤Àº Áö¿øÇÏÁö ¾Ê´Â ¹ÙÀÌÆ®
+		else if( *start < (0xF8) )	// 4ë°”ì´íŠ¸ ë¬¸ì (11110xxx 10xxxxxx 10xxxxxx 10xxxxxx)
+		{
+			if( start >= end - 3 )
+				break;
+			if( (start[1] & (0xC0)) != 0x80 || (start[2] & (0xC0)) != 0x80 || (start[3] & (0xC0)) != 0x80 )
+			{
+				bUTF8 = false;
+				break;
+			}
+			start += 4;
+		}
+		else						// 5ë°”ì´íŠ¸ ì´ìƒ í˜¹ì€ ì§€ì›í•˜ì§€ ì•ŠëŠ” ë°”ì´íŠ¸
 		{
 			bUTF8 = false;
 			break;
@@ -62,109 +73,410 @@ bool IsUTF8WithoutBom(const void* pBuffer, const size_t BuffSize)
 }
 
 #ifdef _WIN32
-//***************************************************************************
-// @brief ÆÄÀÏ °æ·Î¸¦ ¹Ş¾Æ Win32 API ¹æ½ÄÀ¸·Î ÆÄÀÏÀÇ ÀÎÄÚµù Å¸ÀÔ(UTF-16, UTF-8, ANSI µî)À» ÆÇº°ÇÕ´Ï´Ù.
-// @param ptszFullPath ÆÄÀÏ ÀüÃ¼ °æ·Î
-// @return ÆÇº°µÈ ÀÎÄÚµù Å¸ÀÔ (EEncoding ¿­°ÅÇü)
-EEncoding GetFileEncodingType(const TCHAR* ptszFullPath)
-{
-	BOOL		bReturn = false;
-	DWORD		dwReadSize = 0;
-	char		szBuffer[4] = { 0, };
-	EEncoding	eFileType = EEncoding::DEFAULT;
-
-	HANDLE	hFile;
-
-	// ÆÄÀÏ ÀĞ±â Àü¿ëÀ¸·Î ¿ÀÇÂ
-	hFile = ::CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
-	if( hFile == INVALID_HANDLE_VALUE )
-		return eFileType;
-
-	// [ÁÖÀÇ] Win32 APIÀÎ ReadFileÀ» ¸íÈ®È÷ È£ÃâÇÏ±â À§ÇØ ¾Õ¿¡ '::'¸¦ ºÙ¿© Ãæµ¹À» ¹æÁöÇÕ´Ï´Ù.
-	bReturn = ::ReadFile(hFile, szBuffer, 3, &dwReadSize, NULL);
-	if( !bReturn || dwReadSize < 2 ) // ÃÖ¼Ò 2¹ÙÀÌÆ®(BOM)´Â ÀĞ¾î¾ß ÇÔ
+// --- ìµëª… ë„¤ì„ìŠ¤í˜ì´ìŠ¤ ì‹œì‘ ---
+// ì´ ì•ˆì— ì„ ì–¸ëœ í•¨ìˆ˜ë“¤ì€ ì˜¤ì§ ì´ FileUtil.cpp íŒŒì¼ ì•ˆì—ì„œë§Œ ì ‘ê·¼í•  ìˆ˜ ìˆìŠµë‹ˆë‹¤.
+namespace {
+	//***************************************************************************
+	// @brief ì´ë¯¸ ì—´ë ¤ ìˆëŠ” íŒŒì¼ í•¸ë“¤ë¡œë¶€í„° ì¸ì½”ë”© íƒ€ì…ì„ íŒë³„í•˜ëŠ” ê³µìš© í—¬í¼ì…ë‹ˆë‹¤.
+	//        GetFileEncodingType(TCHAR*)ì™€ ReadFileMap(_tstring&, TCHAR*)ì´ ì´ í•¨ìˆ˜ë¥¼
+	//        ê³µìœ í•˜ì—¬ BOM/íœ´ë¦¬ìŠ¤í‹± íŒë³„ ë¡œì§ì´ ë‘ ê³³ì—ì„œ ë”°ë¡œ êµ¬í˜„ë˜ì§€ ì•Šë„ë¡ í•©ë‹ˆë‹¤.
+	// @param hFile ì½ê¸° ê¶Œí•œìœ¼ë¡œ ì´ë¯¸ ì—´ë ¤ ìˆëŠ” íŒŒì¼ í•¸ë“¤
+	// @return íŒë³„ëœ ì¸ì½”ë”© íƒ€ì…. íŒë³„ ì‹¤íŒ¨(ì½ê¸° ì‹¤íŒ¨ ë“±) ì‹œ EEncoding::DEFAULT
+	// @note í˜¸ì¶œ í›„ íŒŒì¼ í¬ì¸í„°ëŠ” í•­ìƒ íŒŒì¼ ì‹œì‘(ì˜¤í”„ì…‹ 0)ìœ¼ë¡œ ë˜ëŒë ¤ ë†“ìŠµë‹ˆë‹¤.
+	//       í•¸ë“¤ì˜ ì˜¤í”ˆ/í´ë¡œì¦ˆëŠ” í˜¸ì¶œì ì±…ì„ì…ë‹ˆë‹¤.
+	EEncoding DetectFileEncoding(HANDLE hFile)
 	{
-		::CloseHandle(hFile);
-		return eFileType;
-	}
-	szBuffer[3] = '\0';
+		EEncoding	eFileType = EEncoding::DEFAULT;
+		char		szBuffer[4] = { 0, };
+		DWORD		dwReadSize = 0;
 
-	::CloseHandle(hFile);
+		// [ì£¼ì˜] Win32 APIì¸ ReadFileì„ ëª…í™•íˆ í˜¸ì¶œí•˜ê¸° ìœ„í•´ ì•ì— '::'ë¥¼ ë¶™ì—¬ ì¶©ëŒì„ ë°©ì§€í•©ë‹ˆë‹¤.
+		if( !::ReadFile(hFile, szBuffer, 3, &dwReadSize, NULL) || dwReadSize < 2 ) // ìµœì†Œ 2ë°”ì´íŠ¸(BOM)ëŠ” ì½ì–´ì•¼ í•¨
+		{
+			::SetFilePointer(hFile, 0, nullptr, FILE_BEGIN);
+			return eFileType; // íŒë³„ ì‹¤íŒ¨: DEFAULT ë°˜í™˜ (í˜¸ì¶œìê°€ ì‹¤íŒ¨ë¡œ ì²˜ë¦¬í•´ì•¼ í•¨)
+		}
+		szBuffer[3] = '\0';
 
-	// BOM ½Ã±×´ÏÃ³·Î ¸ÕÀú ÀÎÄÚµù ¿©ºÎ ÀĞ±â
-	if( (unsigned char)szBuffer[0] == UNICODE_LE_FILE_IDENTIFIER_BYTE1 && (unsigned char)szBuffer[1] == UNICODE_LE_FILE_IDENTIFIER_BYTE2 )
-	{
-		eFileType = EEncoding::UTF16_LE;		// UNICODE(LITTLE ENDIAN)
-	}
-	else if( (unsigned char)szBuffer[0] == UNICODE_BE_FILE_IDENTIFIER_BYTE1 && (unsigned char)szBuffer[1] == UNICODE_BE_FILE_IDENTIFIER_BYTE2 )
-	{
-		eFileType = EEncoding::UTF16_BE;		// UNICODE(BIG ENDIAN)
-	}
-	else
-	{
-		if( (unsigned char)szBuffer[0] == UTF_FILE_IDENTIFIER_BYTE1 && (unsigned char)szBuffer[1] == UTF_FILE_IDENTIFIER_BYTE2 && (unsigned char)szBuffer[2] == UTF_FILE_IDENTIFIER_BYTE3 )
+		// BOM ì‹œê·¸ë‹ˆì²˜ë¡œ ë¨¼ì € ì¸ì½”ë”© ì—¬ë¶€ ì½ê¸°
+		if( (unsigned char)szBuffer[0] == UNICODE_LE_FILE_IDENTIFIER_BYTE1 && (unsigned char)szBuffer[1] == UNICODE_LE_FILE_IDENTIFIER_BYTE2 )
+		{
+			eFileType = EEncoding::UTF16_LE;		// UNICODE(LITTLE ENDIAN)
+		}
+		else if( (unsigned char)szBuffer[0] == UNICODE_BE_FILE_IDENTIFIER_BYTE1 && (unsigned char)szBuffer[1] == UNICODE_BE_FILE_IDENTIFIER_BYTE2 )
+		{
+			eFileType = EEncoding::UTF16_BE;		// UNICODE(BIG ENDIAN)
+		}
+		else if( dwReadSize >= 3 && (unsigned char)szBuffer[0] == UTF_FILE_IDENTIFIER_BYTE1 && (unsigned char)szBuffer[1] == UTF_FILE_IDENTIFIER_BYTE2 && (unsigned char)szBuffer[2] == UTF_FILE_IDENTIFIER_BYTE3 )
 		{
 			eFileType = EEncoding::UTF8_BOM;	// UTF8_BOM
 		}
 		else
 		{
-			// BOMÀÌ ¾ø´Â °æ¿ì ÆÄÀÏ ÀüÃ¼¸¦ ÀĞ¾î UTF-8(Without BOM)ÀÎÁö ÆÇº°
-			HANDLE hFileWithoutBom = ::CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
-			if( hFileWithoutBom != INVALID_HANDLE_VALUE )
+			// BOMì´ ì—†ëŠ” ê²½ìš° íŒŒì¼ ì „ì²´ë¥¼ ì½ì–´ UTF-8(Without BOM)ì¸ì§€ íŒë³„
+			DWORD dwFileSize = ::GetFileSize(hFile, nullptr);
+			::SetFilePointer(hFile, 0, nullptr, FILE_BEGIN);
+
+			if( dwFileSize > 0 )
 			{
-				DWORD dwFileSize = ::GetFileSize(hFileWithoutBom, nullptr);
-				if( dwFileSize > 0 )
+				std::vector<char> byteDestination(dwFileSize);
+				DWORD dwBytesRead = 0;
+				if( ::ReadFile(hFile, byteDestination.data(), dwFileSize, &dwBytesRead, NULL) )
 				{
-					std::vector<char> byteDestination(dwFileSize);
-					DWORD dwBytesRead = 0;
-					if( ::ReadFile(hFileWithoutBom, byteDestination.data(), dwFileSize, &dwBytesRead, NULL) )
-					{
-						if( IsUTF8WithoutBom((const void*)byteDestination.data(), dwBytesRead) )
-							eFileType = EEncoding::UTF8_NOBOM;		// UTF8_NOBOM
-						else
-							eFileType = EEncoding::ANSI;			// ANSI
-					}
+					eFileType = IsUTF8WithoutBom((const void*)byteDestination.data(), dwBytesRead)
+						? EEncoding::UTF8_NOBOM	// UTF8_NOBOM
+						: EEncoding::ANSI;			// ANSI
 				}
-				else
-				{
-					eFileType = EEncoding::ANSI;
-				}
-				::CloseHandle(hFileWithoutBom);
 			}
 			else
 			{
 				eFileType = EEncoding::ANSI;
 			}
 		}
+
+		::SetFilePointer(hFile, 0, nullptr, FILE_BEGIN);
+
+		return eFileType;
 	}
+
+	//***************************************************************************
+	// @brief ANSI í˜•ì‹ìœ¼ë¡œ ë¬¸ìì—´ ë°ì´í„°ë¥¼ íŒŒì¼ì— ì €ì¥í•©ë‹ˆë‹¤.
+	// @param ptszFullPath ì €ì¥í•  íŒŒì¼ì˜ ì „ì²´ ê²½ë¡œ
+	// @param ptszBuffer ì €ì¥í•  ë¬¸ìì—´ ë²„í¼ í¬ì¸í„°
+	// @param BufferSize ë²„í¼ í¬ê¸°
+	// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
+	bool SaveAnsiFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
+	{
+		if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
+		if( ptszBuffer == nullptr || BufferSize == 0 ) return false;
+
+		std::string strAnsi;
+
+#ifdef _UNICODE
+		// [ì£¼ì˜] ë„ ë¬¸ìë¥¼ í¬í•¨í•˜ì—¬ ë³€í™˜í–ˆë‹¤ë©´, ì•„ë˜ì—ì„œ ë„ ë¬¸ìë¥¼ ì œê±°í•˜ê³  íŒŒì¼ì— ì”ë‹ˆë‹¤.
+		if( UnicodeToAnsi_String(strAnsi, ptszBuffer, BufferSize) != 0 ) return false;
+#else
+		strAnsi.assign(ptszBuffer, BufferSize);
+#endif
+
+		// [ì£¼ì˜] ë³€í™˜ëœ ë¬¸ìì—´ ëì— ë„ ë¬¸ì('\0')ê°€ í¬í•¨ë˜ì–´ ìˆë‹¤ë©´ ì œê±°
+		if( !strAnsi.empty() && strAnsi.back() == '\0' )
+		{
+			strAnsi.pop_back();
+		}
+
+		// íŒŒì¼ ì“°ê¸° ìœ„í•œ í•¸ë“¤ ì˜¤í”ˆ
+		HANDLE hFile = ::CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
+		if( hFile == INVALID_HANDLE_VALUE )
+			return false;
+
+		const char* pszBuffer = strAnsi.data();
+		const DWORD	dwTotFileSize = static_cast<DWORD>(strAnsi.size());
+		const DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
+		DWORD		dwWriteOffset = 0;
+
+		// ë‚˜ëˆ„ì–´ì„œ íŒŒì¼ ì“°ê¸° ìˆ˜í–‰
+		while( dwWriteOffset < dwTotFileSize )
+		{
+			DWORD dwRemain = dwTotFileSize - dwWriteOffset;
+			DWORD dwWriteSize = (dwRemain > dwMaxWriteSize) ? dwMaxWriteSize : dwRemain;
+			DWORD dwWrittenSize = 0;
+
+			if( !::WriteFile(hFile, pszBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL) || dwWrittenSize == 0 )
+			{
+				::CloseHandle(hFile);
+				return false;
+			}
+
+			dwWriteOffset += dwWrittenSize;
+		}
+
+		::CloseHandle(hFile);
+
+		return true;
+	}
+
+	//***************************************************************************
+	// @brief ìœ ë‹ˆì½”ë“œ Big Endian(UTF-16 BE) í˜•ì‹ìœ¼ë¡œ íŒŒì¼ì— ì €ì¥í•©ë‹ˆë‹¤.
+	// @param ptszFullPath ì €ì¥í•  íŒŒì¼ì˜ ì „ì²´ ê²½ë¡œ
+	// @param ptszBuffer ì €ì¥í•  ë¬¸ìì—´ ë²„í¼ í¬ì¸í„°
+	// @param BufferSize ë²„í¼ í¬ê¸°
+	// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
+	bool SaveUnicodeBEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
+	{
+		if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
+		if( ptszBuffer == nullptr || _tcslen(ptszBuffer) < 1 ) return false;
+
+		std::wstring strUnicode;
+
+#ifdef _UNICODE
+		strUnicode = ptszBuffer;
+#else
+		if( AnsiToUnicode_String(strUnicode, ptszBuffer, BufferSize) != 0 ) return false;
+#endif
+
+		// Big Endianìœ¼ë¡œ ë°”ì´íŠ¸ ìˆœì„œ ë³€ê²½
+		std::wstring strBE;
+		strBE.reserve(strUnicode.size());
+		for( wchar_t ch : strUnicode )
+		{
+			strBE.push_back(SWAP16(ch));
+		}
+
+		HANDLE hFile = ::CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
+		if( hFile == INVALID_HANDLE_VALUE )
+			return false;
+
+		// UTF-16 BE BOM ì‘ì„±
+		char szBom[2] = { (char)UNICODE_BE_FILE_IDENTIFIER_BYTE1, (char)UNICODE_BE_FILE_IDENTIFIER_BYTE2 };
+		DWORD dwWrittenSize = 0;
+		if( !::WriteFile(hFile, szBom, sizeof(szBom), &dwWrittenSize, NULL) )
+		{
+			::CloseHandle(hFile);
+			return false;
+		}
+
+		const char* pszBuffer = reinterpret_cast<const char*>(strBE.data());
+		const DWORD	dwTotFileSize = static_cast<DWORD>(strBE.size() * sizeof(wchar_t));
+		const DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
+		DWORD		dwWriteOffset = 0;
+
+		while( dwWriteOffset < dwTotFileSize )
+		{
+			DWORD dwRemain = dwTotFileSize - dwWriteOffset;
+			DWORD dwWriteSize = (dwRemain > dwMaxWriteSize) ? dwMaxWriteSize : dwRemain;
+
+			if( !::WriteFile(hFile, pszBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL) || dwWrittenSize == 0 )
+			{
+				::CloseHandle(hFile);
+				return false;
+			}
+
+			dwWriteOffset += dwWrittenSize;
+		}
+
+		::CloseHandle(hFile);
+
+		return true;
+	}
+
+	//***************************************************************************
+	// @brief ìœ ë‹ˆì½”ë“œ Little Endian(UTF-16 LE) í˜•ì‹ìœ¼ë¡œ íŒŒì¼ì— ì €ì¥í•©ë‹ˆë‹¤.
+	// @param ptszFullPath ì €ì¥í•  íŒŒì¼ì˜ ì „ì²´ ê²½ë¡œ
+	// @param ptszBuffer ì €ì¥í•  ë¬¸ìì—´ ë²„í¼ í¬ì¸í„°
+	// @param BufferSize ë²„í¼ í¬ê¸°
+	// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
+	bool SaveUnicodeLEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
+	{
+		if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
+		if( ptszBuffer == nullptr || _tcslen(ptszBuffer) < 1 ) return false;
+
+		std::wstring strUnicode;
+
+#ifdef _UNICODE
+		strUnicode = ptszBuffer;
+#else
+		if( AnsiToUnicode_String(strUnicode, ptszBuffer, BufferSize) != 0 ) return false;
+#endif
+
+		HANDLE hFile = ::CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
+		if( hFile == INVALID_HANDLE_VALUE )
+			return false;
+
+		// UTF-16 LE BOM ì‘ì„±
+		char szBom[2] = { (char)UNICODE_LE_FILE_IDENTIFIER_BYTE1, (char)UNICODE_LE_FILE_IDENTIFIER_BYTE2 };
+		DWORD dwWrittenSize = 0;
+		if( !::WriteFile(hFile, szBom, sizeof(szBom), &dwWrittenSize, NULL) )
+		{
+			::CloseHandle(hFile);
+			return false;
+		}
+
+		const char* pszBuffer = reinterpret_cast<const char*>(strUnicode.data());
+		const DWORD	dwTotFileSize = static_cast<DWORD>(strUnicode.size() * sizeof(wchar_t));
+		const DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
+		DWORD		dwWriteOffset = 0;
+
+		while( dwWriteOffset < dwTotFileSize )
+		{
+			DWORD dwRemain = dwTotFileSize - dwWriteOffset;
+			DWORD dwWriteSize = (dwRemain > dwMaxWriteSize) ? dwMaxWriteSize : dwRemain;
+
+			if( !::WriteFile(hFile, pszBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL) || dwWrittenSize == 0 )
+			{
+				::CloseHandle(hFile);
+				return false;
+			}
+
+			dwWriteOffset += dwWrittenSize;
+		}
+
+		::CloseHandle(hFile);
+
+		return true;
+	}
+
+	//***************************************************************************
+	// @brief BOMì´ í¬í•¨ëœ UTF-8 í˜•ì‹ìœ¼ë¡œ íŒŒì¼ì— ì €ì¥í•©ë‹ˆë‹¤.
+	// @param ptszFullPath ì €ì¥í•  íŒŒì¼ì˜ ì „ì²´ ê²½ë¡œ
+	// @param ptszBuffer ì €ì¥í•  ë¬¸ìì—´ ë²„í¼ í¬ì¸í„°
+	// @param BufferSize ë²„í¼ í¬ê¸°
+	// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
+	bool SaveUTF8BOMFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
+	{
+		if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
+		if( ptszBuffer == nullptr || BufferSize == 0 ) return false;
+
+		std::string strUtf8;
+
+#ifdef _UNICODE
+		if( UnicodeToUtf8_String(strUtf8, ptszBuffer, BufferSize) != 0 ) return false;
+#else
+		if( AnsiToUtf8_String(strUtf8, ptszBuffer, BufferSize) != 0 ) return false;
+#endif
+
+		// [ì£¼ì˜] ë³€í™˜ëœ ë¬¸ìì—´ ëì— ë„ ë¬¸ì('\0')ê°€ í¬í•¨ë˜ì–´ ìˆë‹¤ë©´ ì œê±°
+		if( !strUtf8.empty() && strUtf8.back() == '\0' )
+		{
+			strUtf8.pop_back();
+		}
+
+		HANDLE hFile = ::CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
+		if( hFile == INVALID_HANDLE_VALUE )
+			return false;
+
+		// UTF-8 BOM ì‘ì„±
+		char szBom[3] = { (char)UTF_FILE_IDENTIFIER_BYTE1, (char)UTF_FILE_IDENTIFIER_BYTE2, (char)UTF_FILE_IDENTIFIER_BYTE3 };
+		DWORD dwWrittenSize = 0;
+		if( !::WriteFile(hFile, szBom, sizeof(szBom), &dwWrittenSize, NULL) )
+		{
+			::CloseHandle(hFile);
+			return false;
+		}
+
+		const char* pszBuffer = strUtf8.data();
+		const DWORD	dwTotFileSize = static_cast<DWORD>(strUtf8.size());
+		const DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
+		DWORD		dwWriteOffset = 0;
+
+		while( dwWriteOffset < dwTotFileSize )
+		{
+			DWORD dwRemain = dwTotFileSize - dwWriteOffset;
+			DWORD dwWriteSize = (dwRemain > dwMaxWriteSize) ? dwMaxWriteSize : dwRemain;
+
+			if( !::WriteFile(hFile, pszBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL) || dwWrittenSize == 0 )
+			{
+				::CloseHandle(hFile);
+				return false;
+			}
+
+			dwWriteOffset += dwWrittenSize;
+		}
+
+		::CloseHandle(hFile);
+
+		return true;
+	}
+
+	//***************************************************************************
+	// @brief BOMì´ ì—†ëŠ” UTF-8 í˜•ì‹ìœ¼ë¡œ íŒŒì¼ì— ì €ì¥í•©ë‹ˆë‹¤.
+	// @param ptszFullPath ì €ì¥í•  íŒŒì¼ì˜ ì „ì²´ ê²½ë¡œ
+	// @param ptszBuffer ì €ì¥í•  ë¬¸ìì—´ ë²„í¼ í¬ì¸í„°
+	// @param BufferSize ë²„í¼ í¬ê¸°
+	// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
+	bool SaveUTF8NOBOMFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
+	{
+		if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
+		if( ptszBuffer == nullptr || BufferSize == 0 ) return false;
+
+		std::string strUtf8;
+
+#ifdef _UNICODE
+		if( UnicodeToUtf8_String(strUtf8, ptszBuffer, BufferSize) != 0 ) return false;
+#else
+		if( AnsiToUtf8_String(strUtf8, ptszBuffer, BufferSize) != 0 ) return false;
+#endif
+
+		// [ì£¼ì˜] ë³€í™˜ëœ ë¬¸ìì—´ ëì— ë„ ë¬¸ì('\0')ê°€ í¬í•¨ë˜ì–´ ìˆë‹¤ë©´ ì œê±°
+		if( !strUtf8.empty() && strUtf8.back() == '\0' )
+		{
+			strUtf8.pop_back();
+		}
+
+		HANDLE hFile = ::CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
+		if( hFile == INVALID_HANDLE_VALUE )
+			return false;
+
+		const char* pszBuffer = strUtf8.data();
+		const DWORD	dwTotFileSize = static_cast<DWORD>(strUtf8.size());
+		const DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
+		DWORD		dwWriteOffset = 0;
+		DWORD		dwWrittenSize = 0;
+
+		while( dwWriteOffset < dwTotFileSize )
+		{
+			DWORD dwRemain = dwTotFileSize - dwWriteOffset;
+			DWORD dwWriteSize = (dwRemain > dwMaxWriteSize) ? dwMaxWriteSize : dwRemain;
+
+			if( !::WriteFile(hFile, pszBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL) || dwWrittenSize == 0 )
+			{
+				::CloseHandle(hFile);
+				return false;
+			}
+
+			dwWriteOffset += dwWrittenSize;
+		}
+
+		::CloseHandle(hFile);
+
+		return true;
+	}
+}
+
+//***************************************************************************
+// @brief íŒŒì¼ ê²½ë¡œë¥¼ ë°›ì•„ Win32 API ë°©ì‹ìœ¼ë¡œ íŒŒì¼ì˜ ì¸ì½”ë”© íƒ€ì…(UTF-16, UTF-8, ANSI ë“±)ì„ íŒë³„í•©ë‹ˆë‹¤.
+// @param ptszFullPath íŒŒì¼ ì „ì²´ ê²½ë¡œ
+// @return íŒë³„ëœ ì¸ì½”ë”© íƒ€ì… (EEncoding ì—´ê±°í˜•)
+EEncoding GetFileEncodingType(const TCHAR* ptszFullPath)
+{
+	EEncoding eFileType = EEncoding::DEFAULT;
+
+	// íŒŒì¼ ì½ê¸° ì „ìš©ìœ¼ë¡œ ì˜¤í”ˆ
+	HANDLE hFile = ::CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	if( hFile == INVALID_HANDLE_VALUE )
+		return eFileType;
+
+	eFileType = DetectFileEncoding(hFile);
+
+	::CloseHandle(hFile);
 
 	return eFileType;
 }
 
 //***************************************************************************
-// @brief Win32 API¸¦ »ç¿ëÇÏ¿© ÆÄÀÏÀ» ¹ÙÀÌ³Ê¸® ÇüÅÂ·Î ÀĞ¾îµéÀÔ´Ï´Ù.
-// @param byteDestination ÀĞ¾îµéÀÎ µ¥ÀÌÅÍ¸¦ ÀúÀåÇÒ ¹ÙÀÌÆ® º¤ÅÍ ÂüÁ¶
-// @param ptszFullPath ÀĞ¾îµéÀÏ ÆÄÀÏÀÇ ÀüÃ¼ °æ·Î
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief Win32 APIë¥¼ ì‚¬ìš©í•˜ì—¬ íŒŒì¼ì„ ë°”ì´ë„ˆë¦¬ í˜•íƒœë¡œ ì½ì–´ë“¤ì…ë‹ˆë‹¤.
+// @param byteDestination ì½ì–´ë“¤ì¸ ë°ì´í„°ë¥¼ ì €ì¥í•  ë°”ì´íŠ¸ ë²¡í„° ì°¸ì¡°
+// @param ptszFullPath ì½ì–´ë“¤ì¼ íŒŒì¼ì˜ ì „ì²´ ê²½ë¡œ
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 bool ReadFile(std::vector<BYTE>& byteDestination, const TCHAR* ptszFullPath)
 {
 	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
 
 	DWORD dwLength = GetFileSize(ptszFullPath);
 
-	// ÆÄÀÏ ÇÚµé ¿ÀÇÂ
+	// íŒŒì¼ í•¸ë“¤ ì˜¤í”ˆ
 	HANDLE hFile = ::CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile == INVALID_HANDLE_VALUE )
 		return false;
 
-	// ÆÄÀÏ Å©±â¸¸Å­ ÀúÀå °ø°£ È®º¸
+	// íŒŒì¼ í¬ê¸°ë§Œí¼ ì €ì¥ ê³µê°„ í™•ë³´
 	byteDestination.resize(dwLength);
 
 	const DWORD	dwMaxReadSize = MAX_BUFFER_SIZE;
 	DWORD		dwReadOffset = 0;
 	BYTE* pbBuffer = byteDestination.data();
 
-	// ÃÖ´ë Å©±â ´ÜÀ§·Î ³ª´©¾î ºĞÇÒ ÀĞ±â ¼öÇà
+	// ìµœëŒ€ í¬ê¸° ë‹¨ìœ„ë¡œ ë‚˜ëˆ„ì–´ ë¶„í•  ì½ê¸° ìˆ˜í–‰
 	while( dwReadOffset < dwLength )
 	{
 		DWORD dwRemain = dwLength - dwReadOffset;
@@ -177,7 +489,7 @@ bool ReadFile(std::vector<BYTE>& byteDestination, const TCHAR* ptszFullPath)
 			return false;
 		}
 
-		dwReadOffset += dwReadSize;	// ½ÇÁ¦·Î ÀĞÀº ¸¸Å­¸¸ Áõ°¡ (ºÎºĞ ÀĞ±â ´ëÀÀ)
+		dwReadOffset += dwReadSize;	// ì‹¤ì œë¡œ ì½ì€ ë§Œí¼ë§Œ ì¦ê°€ (ë¶€ë¶„ ì½ê¸° ëŒ€ì‘)
 	}
 
 	::CloseHandle(hFile);
@@ -186,10 +498,10 @@ bool ReadFile(std::vector<BYTE>& byteDestination, const TCHAR* ptszFullPath)
 }
 
 //***************************************************************************
-// @brief ¸Ş¸ğ¸® ¸Ê(Memory Map) ±â¹ıÀ» ÀÌ¿ëÇÏ¿© ÆÄÀÏÀ» ÀüÃ¼ÀûÀ¸·Î ÀĞ¾î ¹öÆÛ¿¡ ÀúÀåÇÕ´Ï´Ù.
-// @param byteDestination ÀĞ¾îµéÀÎ µ¥ÀÌÅÍ¸¦ ÀúÀåÇÒ ¹ÙÀÌÆ® º¤ÅÍ ÂüÁ¶
-// @param ptszFullPath ÀĞ¾îµéÀÏ ÆÄÀÏÀÇ ÀüÃ¼ °æ·Î
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief ë©”ëª¨ë¦¬ ë§µ(Memory Map) ê¸°ë²•ì„ ì´ìš©í•˜ì—¬ íŒŒì¼ì„ ì „ì²´ì ìœ¼ë¡œ ì½ì–´ ë²„í¼ì— ì €ì¥í•©ë‹ˆë‹¤.
+// @param byteDestination ì½ì–´ë“¤ì¸ ë°ì´í„°ë¥¼ ì €ì¥í•  ë°”ì´íŠ¸ ë²¡í„° ì°¸ì¡°
+// @param ptszFullPath ì½ì–´ë“¤ì¼ íŒŒì¼ì˜ ì „ì²´ ê²½ë¡œ
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 bool ReadFileMap(std::vector<BYTE>& byteDestination, const TCHAR* ptszFullPath)
 {
 	DWORD	dwLength = 0;
@@ -204,7 +516,7 @@ bool ReadFileMap(std::vector<BYTE>& byteDestination, const TCHAR* ptszFullPath)
 
 	dwLength = GetFileSize(ptszFullPath);
 
-	// ÆÄÀÏ ¸ÅÇÎ °´Ã¼ »ı¼º
+	// íŒŒì¼ ë§¤í•‘ ê°ì²´ ìƒì„±
 	hFileMap = ::CreateFileMapping(hFile, nullptr, PAGE_WRITECOPY, 0, dwLength, nullptr);
 	if( hFileMap == nullptr )
 	{
@@ -212,7 +524,7 @@ bool ReadFileMap(std::vector<BYTE>& byteDestination, const TCHAR* ptszFullPath)
 		return false;
 	}
 
-	// ºä »ı¼ºÇÏ¿© ¸Ş¸ğ¸® ÁÖ¼Ò È¹µæ
+	// ë·° ìƒì„±í•˜ì—¬ ë©”ëª¨ë¦¬ ì£¼ì†Œ íšë“
 	lpvFile = ::MapViewOfFile(hFileMap, FILE_MAP_COPY, 0, 0, 0);
 	if( lpvFile == nullptr )
 	{
@@ -221,11 +533,11 @@ bool ReadFileMap(std::vector<BYTE>& byteDestination, const TCHAR* ptszFullPath)
 		return false;
 	}
 
-	// ÆÄÀÏ Å©±â¸¦ ¸ÂÃß°í ¸Ş¸ğ¸® º¹»ç ¼öÇà
+	// íŒŒì¼ í¬ê¸°ë¥¼ ë§ì¶”ê³  ë©”ëª¨ë¦¬ ë³µì‚¬ ìˆ˜í–‰
 	byteDestination.resize(dwLength);
 	memcpy(byteDestination.data(), lpvFile, dwLength);
 
-	// ¸®¼Ò½º ÇØÁ¦
+	// ë¦¬ì†ŒìŠ¤ í•´ì œ
 	::UnmapViewOfFile(lpvFile);
 	::CloseHandle(hFile);
 	::CloseHandle(hFileMap);
@@ -234,49 +546,27 @@ bool ReadFileMap(std::vector<BYTE>& byteDestination, const TCHAR* ptszFullPath)
 }
 
 //***************************************************************************
-// @brief ANSI Çü½ÄÀ¸·Î ¹®ÀÚ¿­ µ¥ÀÌÅÍ¸¦ ÆÄÀÏ¿¡ ÀúÀåÇÕ´Ï´Ù.
-// @param ptszFullPath ÀúÀåÇÒ ÆÄÀÏÀÇ ÀüÃ¼ °æ·Î
-// @param ptszBuffer ÀúÀåÇÒ ¹®ÀÚ¿­ ¹öÆÛ Æ÷ÀÎÅÍ
-// @param BufferSize ¹öÆÛ Å©±â
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
-bool SaveAnsiFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
+// @brief ë°”ì´íŠ¸ ë²„í¼ ë°ì´í„°ë¥¼ ì§€ì •í•œ í¬ê¸°ë§Œí¼ íŒŒì¼ë¡œ ì €ì¥í•©ë‹ˆë‹¤.
+// @param ptszFullPath ì €ì¥í•  íŒŒì¼ì˜ ì „ì²´ ê²½ë¡œ
+// @param pbBuffer ì €ì¥í•  ë°”ì´íŠ¸ ë²„í¼ í¬ì¸í„°
+// @param dwLength ì €ì¥í•  ë°ì´í„° í¬ê¸° (ë°”ì´íŠ¸ ë‹¨ìœ„)
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
+bool WriteFile(const TCHAR* ptszFullPath, const BYTE* pbBuffer, const DWORD dwLength)
 {
-	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
-	if( ptszBuffer == nullptr || BufferSize == 0 ) return false;
-
-	std::string strAnsi;
-
-#ifdef _UNICODE
-	// [ÁÖÀÇ] ³Î ¹®ÀÚ¸¦ Æ÷ÇÔÇÏ¿© º¯È¯Çß´Ù¸é, ¾Æ·¡¿¡¼­ ³Î ¹®ÀÚ¸¦ Á¦°ÅÇÏ°í ÆÄÀÏ¿¡ ¾¹´Ï´Ù.
-	if( UnicodeToAnsi_String(strAnsi, ptszBuffer, BufferSize) != 0 ) return false;
-#else
-	strAnsi.assign(ptszBuffer, BufferSize);
-#endif
-
-	// [ÁÖÀÇ] º¯È¯µÈ ¹®ÀÚ¿­ ³¡¿¡ ³Î ¹®ÀÚ('\0')°¡ Æ÷ÇÔµÇ¾î ÀÖ´Ù¸é Á¦°Å
-	if( !strAnsi.empty() && strAnsi.back() == '\0' )
-	{
-		strAnsi.pop_back();
-	}
-
-	// ÆÄÀÏ ¾²±â À§ÇÑ ÇÚµé ¿ÀÇÂ
 	HANDLE hFile = ::CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile == INVALID_HANDLE_VALUE )
 		return false;
 
-	const char* pszBuffer = strAnsi.data();
-	const DWORD	dwTotFileSize = static_cast<DWORD>(strAnsi.size());
 	const DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
 	DWORD		dwWriteOffset = 0;
 
-	// ³ª´©¾î¼­ ÆÄÀÏ ¾²±â ¼öÇà
-	while( dwWriteOffset < dwTotFileSize )
+	while( dwWriteOffset < dwLength )
 	{
-		DWORD dwRemain = dwTotFileSize - dwWriteOffset;
+		DWORD dwRemain = dwLength - dwWriteOffset;
 		DWORD dwWriteSize = (dwRemain > dwMaxWriteSize) ? dwMaxWriteSize : dwRemain;
 		DWORD dwWrittenSize = 0;
 
-		if( !::WriteFile(hFile, pszBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL) || dwWrittenSize == 0 )
+		if( !::WriteFile(hFile, pbBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL) || dwWrittenSize == 0 )
 		{
 			::CloseHandle(hFile);
 			return false;
@@ -291,246 +581,10 @@ bool SaveAnsiFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size
 }
 
 //***************************************************************************
-// @brief À¯´ÏÄÚµå Big Endian(UTF-16 BE) Çü½ÄÀ¸·Î ÆÄÀÏ¿¡ ÀúÀåÇÕ´Ï´Ù.
-// @param ptszFullPath ÀúÀåÇÒ ÆÄÀÏÀÇ ÀüÃ¼ °æ·Î
-// @param ptszBuffer ÀúÀåÇÒ ¹®ÀÚ¿­ ¹öÆÛ Æ÷ÀÎÅÍ
-// @param BufferSize ¹öÆÛ Å©±â
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
-bool SaveUnicodeBEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
-{
-	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
-	if( ptszBuffer == nullptr || _tcslen(ptszBuffer) < 1 ) return false;
-
-	std::wstring strUnicode;
-
-#ifdef _UNICODE
-	strUnicode = ptszBuffer;
-#else
-	if( AnsiToUnicode_String(strUnicode, ptszBuffer, BufferSize) != 0 ) return false;
-#endif
-
-	// Big EndianÀ¸·Î ¹ÙÀÌÆ® ¼ø¼­ º¯°æ
-	std::wstring strBE;
-	strBE.reserve(strUnicode.size());
-	for( wchar_t ch : strUnicode )
-	{
-		strBE.push_back(SWAP16(ch));
-	}
-
-	HANDLE hFile = ::CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
-	if( hFile == INVALID_HANDLE_VALUE )
-		return false;
-
-	// UTF-16 BE BOM ÀÛ¼º
-	char szBom[2] = { (char)UNICODE_BE_FILE_IDENTIFIER_BYTE1, (char)UNICODE_BE_FILE_IDENTIFIER_BYTE2 };
-	DWORD dwWrittenSize = 0;
-	if( !::WriteFile(hFile, szBom, sizeof(szBom), &dwWrittenSize, NULL) )
-	{
-		::CloseHandle(hFile);
-		return false;
-	}
-
-	const char* pszBuffer = reinterpret_cast<const char*>(strBE.data());
-	const DWORD	dwTotFileSize = static_cast<DWORD>(strBE.size() * sizeof(wchar_t));
-	const DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
-	DWORD		dwWriteOffset = 0;
-
-	while( dwWriteOffset < dwTotFileSize )
-	{
-		DWORD dwRemain = dwTotFileSize - dwWriteOffset;
-		DWORD dwWriteSize = (dwRemain > dwMaxWriteSize) ? dwMaxWriteSize : dwRemain;
-
-		if( !::WriteFile(hFile, pszBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL) || dwWrittenSize == 0 )
-		{
-			::CloseHandle(hFile);
-			return false;
-		}
-
-		dwWriteOffset += dwWrittenSize;
-	}
-
-	::CloseHandle(hFile);
-
-	return true;
-}
-
-//***************************************************************************
-// @brief À¯´ÏÄÚµå Little Endian(UTF-16 LE) Çü½ÄÀ¸·Î ÆÄÀÏ¿¡ ÀúÀåÇÕ´Ï´Ù.
-// @param ptszFullPath ÀúÀåÇÒ ÆÄÀÏÀÇ ÀüÃ¼ °æ·Î
-// @param ptszBuffer ÀúÀåÇÒ ¹®ÀÚ¿­ ¹öÆÛ Æ÷ÀÎÅÍ
-// @param BufferSize ¹öÆÛ Å©±â
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
-bool SaveUnicodeLEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
-{
-	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
-	if( ptszBuffer == nullptr || _tcslen(ptszBuffer) < 1 ) return false;
-
-	std::wstring strUnicode;
-
-#ifdef _UNICODE
-	strUnicode = ptszBuffer;
-#else
-	if( AnsiToUnicode_String(strUnicode, ptszBuffer, BufferSize) != 0 ) return false;
-#endif
-
-	HANDLE hFile = ::CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
-	if( hFile == INVALID_HANDLE_VALUE )
-		return false;
-
-	// UTF-16 LE BOM ÀÛ¼º
-	char szBom[2] = { (char)UNICODE_LE_FILE_IDENTIFIER_BYTE1, (char)UNICODE_LE_FILE_IDENTIFIER_BYTE2 };
-	DWORD dwWrittenSize = 0;
-	if( !::WriteFile(hFile, szBom, sizeof(szBom), &dwWrittenSize, NULL) )
-	{
-		::CloseHandle(hFile);
-		return false;
-	}
-
-	const char* pszBuffer = reinterpret_cast<const char*>(strUnicode.data());
-	const DWORD	dwTotFileSize = static_cast<DWORD>(strUnicode.size() * sizeof(wchar_t));
-	const DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
-	DWORD		dwWriteOffset = 0;
-
-	while( dwWriteOffset < dwTotFileSize )
-	{
-		DWORD dwRemain = dwTotFileSize - dwWriteOffset;
-		DWORD dwWriteSize = (dwRemain > dwMaxWriteSize) ? dwMaxWriteSize : dwRemain;
-
-		if( !::WriteFile(hFile, pszBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL) || dwWrittenSize == 0 )
-		{
-			::CloseHandle(hFile);
-			return false;
-		}
-
-		dwWriteOffset += dwWrittenSize;
-	}
-
-	::CloseHandle(hFile);
-
-	return true;
-}
-
-//***************************************************************************
-// @brief BOMÀÌ Æ÷ÇÔµÈ UTF-8 Çü½ÄÀ¸·Î ÆÄÀÏ¿¡ ÀúÀåÇÕ´Ï´Ù.
-// @param ptszFullPath ÀúÀåÇÒ ÆÄÀÏÀÇ ÀüÃ¼ °æ·Î
-// @param ptszBuffer ÀúÀåÇÒ ¹®ÀÚ¿­ ¹öÆÛ Æ÷ÀÎÅÍ
-// @param BufferSize ¹öÆÛ Å©±â
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
-bool SaveUTF8BOMFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
-{
-	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
-	if( ptszBuffer == nullptr || BufferSize == 0 ) return false;
-
-	std::string strUtf8;
-
-#ifdef _UNICODE
-	if( UnicodeToUtf8_String(strUtf8, ptszBuffer, BufferSize) != 0 ) return false;
-#else
-	if( AnsiToUtf8_String(strUtf8, ptszBuffer, BufferSize) != 0 ) return false;
-#endif
-
-	// [ÁÖÀÇ] º¯È¯µÈ ¹®ÀÚ¿­ ³¡¿¡ ³Î ¹®ÀÚ('\0')°¡ Æ÷ÇÔµÇ¾î ÀÖ´Ù¸é Á¦°Å
-	if( !strUtf8.empty() && strUtf8.back() == '\0' )
-	{
-		strUtf8.pop_back();
-	}
-
-	HANDLE hFile = ::CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
-	if( hFile == INVALID_HANDLE_VALUE )
-		return false;
-
-	// UTF-8 BOM ÀÛ¼º
-	char szBom[3] = { (char)UTF_FILE_IDENTIFIER_BYTE1, (char)UTF_FILE_IDENTIFIER_BYTE2, (char)UTF_FILE_IDENTIFIER_BYTE3 };
-	DWORD dwWrittenSize = 0;
-	if( !::WriteFile(hFile, szBom, sizeof(szBom), &dwWrittenSize, NULL) )
-	{
-		::CloseHandle(hFile);
-		return false;
-	}
-
-	const char* pszBuffer = strUtf8.data();
-	const DWORD	dwTotFileSize = static_cast<DWORD>(strUtf8.size());
-	const DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
-	DWORD		dwWriteOffset = 0;
-
-	while( dwWriteOffset < dwTotFileSize )
-	{
-		DWORD dwRemain = dwTotFileSize - dwWriteOffset;
-		DWORD dwWriteSize = (dwRemain > dwMaxWriteSize) ? dwMaxWriteSize : dwRemain;
-
-		if( !::WriteFile(hFile, pszBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL) || dwWrittenSize == 0 )
-		{
-			::CloseHandle(hFile);
-			return false;
-		}
-
-		dwWriteOffset += dwWrittenSize;
-	}
-
-	::CloseHandle(hFile);
-
-	return true;
-}
-
-//***************************************************************************
-// @brief BOMÀÌ ¾ø´Â UTF-8 Çü½ÄÀ¸·Î ÆÄÀÏ¿¡ ÀúÀåÇÕ´Ï´Ù.
-// @param ptszFullPath ÀúÀåÇÒ ÆÄÀÏÀÇ ÀüÃ¼ °æ·Î
-// @param ptszBuffer ÀúÀåÇÒ ¹®ÀÚ¿­ ¹öÆÛ Æ÷ÀÎÅÍ
-// @param BufferSize ¹öÆÛ Å©±â
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
-bool SaveUTF8NOBOMFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
-{
-	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
-	if( ptszBuffer == nullptr || BufferSize == 0 ) return false;
-
-	std::string strUtf8;
-
-#ifdef _UNICODE
-	if( UnicodeToUtf8_String(strUtf8, ptszBuffer, BufferSize) != 0 ) return false;
-#else
-	if( AnsiToUtf8_String(strUtf8, ptszBuffer, BufferSize) != 0 ) return false;
-#endif
-
-	// [ÁÖÀÇ] º¯È¯µÈ ¹®ÀÚ¿­ ³¡¿¡ ³Î ¹®ÀÚ('\0')°¡ Æ÷ÇÔµÇ¾î ÀÖ´Ù¸é Á¦°Å
-	if( !strUtf8.empty() && strUtf8.back() == '\0' )
-	{
-		strUtf8.pop_back();
-	}
-
-	HANDLE hFile = ::CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
-	if( hFile == INVALID_HANDLE_VALUE )
-		return false;
-
-	const char* pszBuffer = strUtf8.data();
-	const DWORD	dwTotFileSize = static_cast<DWORD>(strUtf8.size());
-	const DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
-	DWORD		dwWriteOffset = 0;
-	DWORD		dwWrittenSize = 0;
-
-	while( dwWriteOffset < dwTotFileSize )
-	{
-		DWORD dwRemain = dwTotFileSize - dwWriteOffset;
-		DWORD dwWriteSize = (dwRemain > dwMaxWriteSize) ? dwMaxWriteSize : dwRemain;
-
-		if( !::WriteFile(hFile, pszBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL) || dwWrittenSize == 0 )
-		{
-			::CloseHandle(hFile);
-			return false;
-		}
-
-		dwWriteOffset += dwWrittenSize;
-	}
-
-	::CloseHandle(hFile);
-
-	return true;
-}
-
-//***************************************************************************
-// @brief ÀÎÄÚµù Á¾·ù¿¡ °ü°è¾øÀÌ ÆÄÀÏÀ» ÀÚµ¿ °¨ÁöÇÏ¿© _tstring ÇüÅÂ·Î ÀĞ¾îµéÀÔ´Ï´Ù.
-// @param destString ÀĞ¾îµéÀÎ ¹®ÀÚ¿­À» ÀúÀåÇÒ _tstring ÂüÁ¶
-// @param ptszFullPath ÀĞ¾îµéÀÏ ÆÄÀÏÀÇ ÀüÃ¼ °æ·Î
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief ì¸ì½”ë”© ì¢…ë¥˜ì— ê´€ê³„ì—†ì´ íŒŒì¼ì„ ìë™ ê°ì§€í•˜ì—¬ _tstring í˜•íƒœë¡œ ì½ì–´ë“¤ì…ë‹ˆë‹¤.
+// @param destString ì½ì–´ë“¤ì¸ ë¬¸ìì—´ì„ ì €ì¥í•  _tstring ì°¸ì¡°
+// @param ptszFullPath ì½ì–´ë“¤ì¼ íŒŒì¼ì˜ ì „ì²´ ê²½ë¡œ
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 bool ReadFile(_tstring& destString, const TCHAR* ptszFullPath)
 {
 	DWORD	dwLength = 0;
@@ -555,7 +609,7 @@ bool ReadFile(_tstring& destString, const TCHAR* ptszFullPath)
 
 	const DWORD dwMaxReadSize = MAX_BUFFER_SIZE;
 
-	// ÀÎÄÚµù Å¸ÀÔ¿¡ ¸ÂÃß¾î ½ÃÀÛ Æ÷ÀÎÅÍ¸¦ ÀÌµ¿ÇÏ°í ³²Àº Å©±â ¸¸Å­ ÀĞ±â ¼öÇà
+	// ì¸ì½”ë”© íƒ€ì…ì— ë§ì¶”ì–´ ì‹œì‘ í¬ì¸í„°ë¥¼ ì´ë™í•˜ê³  ë‚¨ì€ í¬ê¸° ë§Œí¼ ì½ê¸° ìˆ˜í–‰
 	if( eFileType == EEncoding::UTF16_BE || eFileType == EEncoding::UTF16_LE )
 	{
 		::SetFilePointer(hFile, sizeof(WORD), nullptr, FILE_BEGIN);
@@ -622,7 +676,7 @@ bool ReadFile(_tstring& destString, const TCHAR* ptszFullPath)
 	if( (eFileType == EEncoding::UTF16_LE || eFileType == EEncoding::UTF16_BE) && pwszBuffer == nullptr ) return false;
 	if( (eFileType == EEncoding::UTF8_BOM || eFileType == EEncoding::UTF8_NOBOM || eFileType == EEncoding::ANSI) && pszBuffer == nullptr ) return false;
 
-	// À¯´ÏÄÚµå È¤Àº ¸ÖÆ¼¹ÙÀÌÆ®(ANSI) ºôµå È¯°æ¿¡ µû¶ó ¹®ÀÚ¿­ º¯È¯ ºĞ±â
+	// ìœ ë‹ˆì½”ë“œ í˜¹ì€ ë©€í‹°ë°”ì´íŠ¸(ANSI) ë¹Œë“œ í™˜ê²½ì— ë”°ë¼ ë¬¸ìì—´ ë³€í™˜ ë¶„ê¸°
 #ifdef _UNICODE
 	if( eFileType == EEncoding::UTF16_LE )
 	{
@@ -677,12 +731,14 @@ bool ReadFile(_tstring& destString, const TCHAR* ptszFullPath)
 }
 
 //***************************************************************************
-// @brief ÆÄÀÏ ¸ÅÇÎÀ» È°¿ëÇØ ´Ù¾çÇÑ ÀÎÄÚµùÀÇ ÆÄÀÏÀ» ÀĞ¾î _tstringÀ¸·Î º¯È¯ÇÕ´Ï´Ù.
-// @param destString ÀĞ¾îµéÀÎ ¹®ÀÚ¿­ÀÌ ÀúÀåµÉ ÂüÁ¶ (_tstring)
-// @param ptszFullPath ÀĞ¾îµéÀÏ ÆÄÀÏÀÇ ÀüÃ¼ °æ·Î (TCHAR*)
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
-// @note ÆÄÀÏ ÇÚµéÀ» ÆÇº° ´Ü°è¿Í ¸ÅÇÎ ´Ü°è¿¡¼­ Àç»ç¿ëÇÏ¿© ÆÄÀÏÀ» µÎ ¹ø ¿­°í ´İ´Â
-//       ¿À¹öÇìµå¿Í ±× »çÀÌÀÇ TOCTOU Ã¢À» ÁÙ¿´½À´Ï´Ù.
+// @brief íŒŒì¼ ë§¤í•‘ì„ í™œìš©í•´ ë‹¤ì–‘í•œ ì¸ì½”ë”©ì˜ íŒŒì¼ì„ ì½ì–´ _tstringìœ¼ë¡œ ë³€í™˜í•©ë‹ˆë‹¤.
+// @param destString ì½ì–´ë“¤ì¸ ë¬¸ìì—´ì´ ì €ì¥ë  ì°¸ì¡° (_tstring)
+// @param ptszFullPath ì½ì–´ë“¤ì¼ íŒŒì¼ì˜ ì „ì²´ ê²½ë¡œ (TCHAR*)
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
+// @note íŒë³„ê³¼ ë§¤í•‘ì— ë™ì¼í•œ íŒŒì¼ í•¸ë“¤ì„ ì¬ì‚¬ìš©í•˜ì—¬(íŒŒì¼ì„ ë‘ ë²ˆ ì—´ì§€ ì•ŠìŒ) ê·¸ ì‚¬ì´ì˜
+//       TOCTOU ì°½ì„ ìµœì†Œí™”í–ˆìŠµë‹ˆë‹¤. BOM/íœ´ë¦¬ìŠ¤í‹± íŒë³„ ë¡œì§ì€ GetFileEncodingType(TCHAR*)ì™€
+//       ê³µìœ í•˜ëŠ” DetectFileEncoding() í—¬í¼ë¥¼ ì‚¬ìš©í•˜ë©°, íŒë³„ì— ì‹¤íŒ¨(EEncoding::DEFAULT)í•˜ë©´
+//       ë§¤í•‘ì„ ì‹œë„í•˜ì§€ ì•Šê³  ì¦‰ì‹œ ì‹¤íŒ¨ë¡œ ì²˜ë¦¬í•©ë‹ˆë‹¤.
 bool ReadFileMap(_tstring& destString, const TCHAR* ptszFullPath)
 {
 	bool		bIsProcess = false;
@@ -698,49 +754,18 @@ bool ReadFileMap(_tstring& destString, const TCHAR* ptszFullPath)
 	if( hFile == INVALID_HANDLE_VALUE )
 		return false;
 
-	char szBuffer[4] = { 0, };
-	DWORD dwReadSize = 0;
-	if( ::ReadFile(hFile, szBuffer, 3, &dwReadSize, NULL) )
+	eFileType = DetectFileEncoding(hFile);
+	if( eFileType == EEncoding::DEFAULT )
 	{
-		if( (unsigned char)szBuffer[0] == UNICODE_LE_FILE_IDENTIFIER_BYTE1 && (unsigned char)szBuffer[1] == UNICODE_LE_FILE_IDENTIFIER_BYTE2 )
-		{
-			eFileType = EEncoding::UTF16_LE;
-		}
-		else if( (unsigned char)szBuffer[0] == UNICODE_BE_FILE_IDENTIFIER_BYTE1 && (unsigned char)szBuffer[1] == UNICODE_BE_FILE_IDENTIFIER_BYTE2 )
-		{
-			eFileType = EEncoding::UTF16_BE;
-		}
-		else if( (unsigned char)szBuffer[0] == UTF_FILE_IDENTIFIER_BYTE1 && (unsigned char)szBuffer[1] == UTF_FILE_IDENTIFIER_BYTE2 && (unsigned char)szBuffer[2] == UTF_FILE_IDENTIFIER_BYTE3 )
-		{
-			eFileType = EEncoding::UTF8_BOM;
-		}
-		else
-		{
-			// BOMÀÌ ¾ø´Â °æ¿ì ÆÄÀÏ ÀüÃ¼¸¦ ÀĞ¾î ÆÇº°
-			dwLength = ::GetFileSize(hFile, nullptr);
-			if( dwLength > 0 )
-			{
-				std::vector<char> tempBuffer(dwLength);
-				::SetFilePointer(hFile, 0, nullptr, FILE_BEGIN);
-				if( ::ReadFile(hFile, tempBuffer.data(), dwLength, &dwReadSize, NULL) )
-				{
-					if( IsUTF8WithoutBom((const void*)tempBuffer.data(), dwReadSize) )
-						eFileType = EEncoding::UTF8_NOBOM;
-					else
-						eFileType = EEncoding::ANSI;
-				}
-			}
-			else
-			{
-				eFileType = EEncoding::ANSI;
-			}
-		}
+		// ì¸ì½”ë”© íŒë³„ ì‹¤íŒ¨(ìµœì†Œ BOM í¬ê¸°ë¥¼ ì½ì§€ ëª»í•¨ ë“±) - ë§¤í•‘ì„ ì‹œë„í•˜ì§€ ì•Šê³  ì‹¤íŒ¨ ì²˜ë¦¬
+		::CloseHandle(hFile);
+		return false;
 	}
 
 	dwLength = ::GetFileSize(hFile, nullptr);
 
-	// [ÃÖÀûÈ­] CreateFileMappingÀº ÆÄÀÏ Æ÷ÀÎÅÍ À§Ä¡¿Í ¹«°üÇÏ°Ô µ¿ÀÛÇÏ¹Ç·Î
-	// À§¿¡¼­ ÆÇº°¿¡ »ç¿ëÇÑ ÇÚµéÀ» Àç¿ÀÇÂ ¾øÀÌ ±×´ë·Î ¸ÅÇÎ¿¡ »ç¿ëÇÕ´Ï´Ù.
+	// [ìµœì í™”] CreateFileMappingì€ íŒŒì¼ í¬ì¸í„° ìœ„ì¹˜ì™€ ë¬´ê´€í•˜ê²Œ ë™ì‘í•˜ë¯€ë¡œ
+	// ìœ„ì—ì„œ íŒë³„ì— ì‚¬ìš©í•œ í•¸ë“¤ì„ ì¬ì˜¤í”ˆ ì—†ì´ ê·¸ëŒ€ë¡œ ë§¤í•‘ì— ì‚¬ìš©í•©ë‹ˆë‹¤.
 	hFileMap = ::CreateFileMapping(hFile, nullptr, PAGE_WRITECOPY, 0, dwLength, nullptr);
 	if( hFileMap == nullptr )
 	{
@@ -822,46 +847,57 @@ bool ReadFileMap(_tstring& destString, const TCHAR* ptszFullPath)
 }
 
 //***************************************************************************
-// @brief ¹ÙÀÌÆ® ¹öÆÛ µ¥ÀÌÅÍ¸¦ ÁöÁ¤ÇÑ Å©±â¸¸Å­ ÆÄÀÏ·Î ÀúÀåÇÕ´Ï´Ù.
-// @param ptszFullPath ÀúÀåÇÒ ÆÄÀÏÀÇ ÀüÃ¼ °æ·Î
-// @param pbBuffer ÀúÀåÇÒ ¹ÙÀÌÆ® ¹öÆÛ Æ÷ÀÎÅÍ
-// @param dwLength ÀúÀåÇÒ µ¥ÀÌÅÍ Å©±â (¹ÙÀÌÆ® ´ÜÀ§)
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
-bool SaveFile(const TCHAR* ptszFullPath, const BYTE* pbBuffer, const DWORD dwLength)
+// @brief ì§€ì •í•œ ì¸ì½”ë”© íƒ€ì…(EEncoding)ì— ë”°ë¼ ì•Œë§ì€ ì €ì¥ í•¨ìˆ˜ë¥¼ ë¶„ê¸° í˜¸ì¶œí•©ë‹ˆë‹¤.
+// @param ptszFullPath ì €ì¥í•  íŒŒì¼ì˜ ì „ì²´ ê²½ë¡œ
+// @param ptszBuffer ì €ì¥í•  ë¬¸ìì—´ ë²„í¼ í¬ì¸í„°
+// @param BufferSize ë²„í¼ í¬ê¸°
+// @param fileType ì €ì¥í•  ì¸ì½”ë”© íƒ€ì… (EEncoding ì—´ê±°í˜•)
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
+bool WriteFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize, EEncoding fileType)
 {
-	HANDLE hFile = ::CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
-	if( hFile == INVALID_HANDLE_VALUE )
-		return false;
+	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
+	if( ptszBuffer == nullptr || BufferSize == 0 ) return false;
 
-	const DWORD	dwMaxWriteSize = MAX_BUFFER_SIZE;
-	DWORD		dwWriteOffset = 0;
+	bool bResult = false;
 
-	while( dwWriteOffset < dwLength )
+	switch( fileType )
 	{
-		DWORD dwRemain = dwLength - dwWriteOffset;
-		DWORD dwWriteSize = (dwRemain > dwMaxWriteSize) ? dwMaxWriteSize : dwRemain;
-		DWORD dwWrittenSize = 0;
+	case EEncoding::ANSI:
+		bResult = SaveAnsiFile(ptszFullPath, ptszBuffer, BufferSize);
+		break;
 
-		if( !::WriteFile(hFile, pbBuffer + dwWriteOffset, dwWriteSize, &dwWrittenSize, NULL) || dwWrittenSize == 0 )
-		{
-			::CloseHandle(hFile);
-			return false;
-		}
+	case EEncoding::UTF16_BE:
+		bResult = SaveUnicodeBEFile(ptszFullPath, ptszBuffer, BufferSize);
+		break;
 
-		dwWriteOffset += dwWrittenSize;
+	case EEncoding::UTF16_LE:
+		bResult = SaveUnicodeLEFile(ptszFullPath, ptszBuffer, BufferSize);
+		break;
+
+	case EEncoding::UTF8_BOM:
+		bResult = SaveUTF8BOMFile(ptszFullPath, ptszBuffer, BufferSize);
+		break;
+
+	case EEncoding::UTF8_NOBOM:
+		bResult = SaveUTF8NOBOMFile(ptszFullPath, ptszBuffer, BufferSize);
+		break;
+
+	case EEncoding::DEFAULT:
+	default:
+		// ê¸°ë³¸ê°’ì¼ ê²½ìš° í”„ë¡œì íŠ¸ í™˜ê²½(ANSI ë˜ëŠ” ìœ ë‹ˆì½”ë“œ)ì— ë§ì¶° ANSI í˜¹ì€ ê¸°ë³¸ ì €ì¥ ì •ì±…ìœ¼ë¡œ ì²˜ë¦¬
+		bResult = SaveAnsiFile(ptszFullPath, ptszBuffer, BufferSize);
+		break;
 	}
 
-	::CloseHandle(hFile);
-
-	return true;
+	return bResult;
 }
 
 //***************************************************************************
-// @brief ÆÄÀÏÀÇ »ı¼º, Á¢±Ù, ¸¶Áö¸· ¼öÁ¤ ½Ã°¢ Áß ÁöÁ¤ÇÑ Á¾·ù¸¦ ½Ã½ºÅÛ Å¸ÀÓ(SYSTEMTIME) ÇüÅÂ·Î °¡Á®¿É´Ï´Ù.
-// @param ptszFullPath Á¶È¸ÇÒ ÆÄÀÏÀÇ ÀüÃ¼ °æ·Î
-// @param nCase Á¶È¸ÇÒ ½Ã°¢ Á¾·ù (»ı¼º/Á¢±Ù/¼öÁ¤ ½Ã°¢ ½Äº°ÀÚ)
-// @param stLocal Á¶È¸ÇÑ ·ÎÄÃ ½Ã°¢À» ÀúÀåÇÒ SYSTEMTIME ±¸Á¶Ã¼ ÂüÁ¶
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief íŒŒì¼ì˜ ìƒì„±, ì ‘ê·¼, ë§ˆì§€ë§‰ ìˆ˜ì • ì‹œê° ì¤‘ ì§€ì •í•œ ì¢…ë¥˜ë¥¼ ì‹œìŠ¤í…œ íƒ€ì„(SYSTEMTIME) í˜•íƒœë¡œ ê°€ì ¸ì˜µë‹ˆë‹¤.
+// @param ptszFullPath ì¡°íšŒí•  íŒŒì¼ì˜ ì „ì²´ ê²½ë¡œ
+// @param nCase ì¡°íšŒí•  ì‹œê° ì¢…ë¥˜ (ìƒì„±/ì ‘ê·¼/ìˆ˜ì • ì‹œê° ì‹ë³„ì)
+// @param stLocal ì¡°íšŒí•œ ë¡œì»¬ ì‹œê°ì„ ì €ì¥í•  SYSTEMTIME êµ¬ì¡°ì²´ ì°¸ì¡°
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 bool GetFileInfoTime(const TCHAR* ptszFullPath, const int nCase, SYSTEMTIME& stLocal)
 {
 	FILETIME ftCreate, ftAccess, ftWrite;
@@ -874,7 +910,7 @@ bool GetFileInfoTime(const TCHAR* ptszFullPath, const int nCase, SYSTEMTIME& stL
 	hFile = ::CreateFile(ptszFullPath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if( hFile == INVALID_HANDLE_VALUE ) return false;
 
-	// ÆÄÀÏ ½Ã°¢ Á¤º¸ È¹µæ
+	// íŒŒì¼ ì‹œê° ì •ë³´ íšë“
 	if( !::GetFileTime(hFile, &ftCreate, &ftAccess, &ftWrite) )
 	{
 		::CloseHandle(hFile);
@@ -883,7 +919,7 @@ bool GetFileInfoTime(const TCHAR* ptszFullPath, const int nCase, SYSTEMTIME& stL
 
 	::CloseHandle(hFile);
 
-	// ¿äÃ»ÇÑ ÄÉÀÌ½º¿¡ µû¶ó ¹İÈ¯ÇÒ Å¸ÀÓ ¼±ÅÃ
+	// ìš”ì²­í•œ ì¼€ì´ìŠ¤ì— ë”°ë¼ ë°˜í™˜í•  íƒ€ì„ ì„ íƒ
 	if( nCase == FILEINFO_CREATETIME )
 		::FileTimeToSystemTime(&ftCreate, &stUTC);
 	else if( nCase == FILEINFO_ACCESSTIME )
@@ -898,9 +934,9 @@ bool GetFileInfoTime(const TCHAR* ptszFullPath, const int nCase, SYSTEMTIME& stL
 }
 
 //***************************************************************************
-// @brief ÁöÁ¤ÇÑ °æ·Î¿¡ ÆÄÀÏÀÌ Á¸ÀçÇÏ´ÂÁö È®ÀÎÇÕ´Ï´Ù.
-// @param ptszFullPath Á¸Àç ¿©ºÎ¸¦ È®ÀÎÇÒ ÆÄÀÏÀÇ ÀüÃ¼ °æ·Î
-// @return ÆÄÀÏÀÌ Á¸ÀçÇÏ¸é true, ¾Æ´Ï¸é false
+// @brief ì§€ì •í•œ ê²½ë¡œì— íŒŒì¼ì´ ì¡´ì¬í•˜ëŠ”ì§€ í™•ì¸í•©ë‹ˆë‹¤.
+// @param ptszFullPath ì¡´ì¬ ì—¬ë¶€ë¥¼ í™•ì¸í•  íŒŒì¼ì˜ ì „ì²´ ê²½ë¡œ
+// @return íŒŒì¼ì´ ì¡´ì¬í•˜ë©´ true, ì•„ë‹ˆë©´ false
 bool IsExistFile(const TCHAR* ptszFullPath)
 {
 	HANDLE		hFile;
@@ -918,9 +954,9 @@ bool IsExistFile(const TCHAR* ptszFullPath)
 }
 
 //***************************************************************************
-// @brief ÆÄÀÏ Å©±â¸¦ 32ºñÆ® DWORD °ªÀ¸·Î ¹İÈ¯ÇÕ´Ï´Ù.
-// @param ptszFullPath Å©±â¸¦ Á¶È¸ÇÒ ÆÄÀÏÀÇ ÀüÃ¼ °æ·Î
-// @return ÆÄÀÏ Å©±â (¹ÙÀÌÆ®), ½ÇÆĞ ½Ã 0
+// @brief íŒŒì¼ í¬ê¸°ë¥¼ 32ë¹„íŠ¸ DWORD ê°’ìœ¼ë¡œ ë°˜í™˜í•©ë‹ˆë‹¤.
+// @param ptszFullPath í¬ê¸°ë¥¼ ì¡°íšŒí•  íŒŒì¼ì˜ ì „ì²´ ê²½ë¡œ
+// @return íŒŒì¼ í¬ê¸° (ë°”ì´íŠ¸), ì‹¤íŒ¨ ì‹œ 0
 DWORD GetFileSize(const TCHAR* ptszFullPath)
 {
 	DWORD		dwFileSizeLow = 0;
@@ -943,10 +979,10 @@ DWORD GetFileSize(const TCHAR* ptszFullPath)
 }
 
 //***************************************************************************
-// @brief ÆÄÀÏ ÇÚµé Á¤º¸¸¦ »ç¿ëÇÏ¿© »ó¼¼ ÆÄÀÏ Á¤º¸¸¦ Á¶È¸ÇÕ´Ï´Ù.
-// @param ptszFullPath Á¶È¸ÇÒ ÆÄÀÏÀÇ ÀüÃ¼ °æ·Î
-// @param lpFileInformation Á¶È¸ Á¤º¸¸¦ ÀúÀåÇÒ BY_HANDLE_FILE_INFORMATION ±¸Á¶Ã¼ Æ÷ÀÎÅÍ
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief íŒŒì¼ í•¸ë“¤ ì •ë³´ë¥¼ ì‚¬ìš©í•˜ì—¬ ìƒì„¸ íŒŒì¼ ì •ë³´ë¥¼ ì¡°íšŒí•©ë‹ˆë‹¤.
+// @param ptszFullPath ì¡°íšŒí•  íŒŒì¼ì˜ ì „ì²´ ê²½ë¡œ
+// @param lpFileInformation ì¡°íšŒ ì •ë³´ë¥¼ ì €ì¥í•  BY_HANDLE_FILE_INFORMATION êµ¬ì¡°ì²´ í¬ì¸í„°
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 bool GetFileInformation(const TCHAR* ptszFullPath, LPBY_HANDLE_FILE_INFORMATION lpFileInformation)
 {
 	bool		bResult = false;
@@ -969,9 +1005,9 @@ bool GetFileInformation(const TCHAR* ptszFullPath, LPBY_HANDLE_FILE_INFORMATION 
 #endif // _WIN32
 
 //***************************************************************************
-// @brief C++ Ç¥ÁØ ÆÄÀÏ ½ºÆ®¸²À» »ç¿ëÇÏ¿© ÆÄÀÏÀÇ ÀÎÄÚµù Å¸ÀÔÀ» ÆÇº°ÇÕ´Ï´Ù.
-// @param filepath ÆÇº°ÇÒ ÆÄÀÏÀÇ ÀüÃ¼ °æ·Î (_tstring)
-// @return ÆÇº°µÈ ÀÎÄÚµù Å¸ÀÔ (EEncoding ¿­°ÅÇü)
+// @brief C++ í‘œì¤€ íŒŒì¼ ìŠ¤íŠ¸ë¦¼ì„ ì‚¬ìš©í•˜ì—¬ íŒŒì¼ì˜ ì¸ì½”ë”© íƒ€ì…ì„ íŒë³„í•©ë‹ˆë‹¤.
+// @param filepath íŒë³„í•  íŒŒì¼ì˜ ì „ì²´ ê²½ë¡œ (_tstring)
+// @return íŒë³„ëœ ì¸ì½”ë”© íƒ€ì… (EEncoding ì—´ê±°í˜•)
 EEncoding GetFileEncodingType(const _tstring& filepath)
 {
 	EEncoding	eEncoding = EEncoding::DEFAULT;
@@ -987,13 +1023,13 @@ EEncoding GetFileEncodingType(const _tstring& filepath)
 	file.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
 	size_t bytesRead = static_cast<size_t>(file.gcount());
 
-	// ÆÄÀÏÀÌ ³Ê¹« ÀÛ¾Æ BOMÀ» È®ÀÎÇÒ ¼ö ¾ø´Â °æ¿ì (±âº»Àº ANSI ¶Ç´Â DEFAULT Ã³¸®)
+	// íŒŒì¼ì´ ë„ˆë¬´ ì‘ì•„ BOMì„ í™•ì¸í•  ìˆ˜ ì—†ëŠ” ê²½ìš° (ê¸°ë³¸ì€ ANSI ë˜ëŠ” DEFAULT ì²˜ë¦¬)
 	if( bytesRead == 0 )
 	{
-		return EEncoding::ANSI; // ¶Ç´Â EEncoding::DEFAULT
+		return EEncoding::ANSI; // ë˜ëŠ” EEncoding::DEFAULT
 	}
 
-	// BOM ¹× ³»¿ë ºĞ¼®À» ÅëÇÑ ÀÎÄÚµù ÆÇº° (bytesRead Å©±â °Ë»ç Ãß°¡)
+	// BOM ë° ë‚´ìš© ë¶„ì„ì„ í†µí•œ ì¸ì½”ë”© íŒë³„ (bytesRead í¬ê¸° ê²€ì‚¬ ì¶”ê°€)
 	if( bytesRead >= 2 && buffer[0] == UNICODE_LE_FILE_IDENTIFIER_BYTE1 && buffer[1] == UNICODE_LE_FILE_IDENTIFIER_BYTE2 )
 	{
 		eEncoding = EEncoding::UTF16_LE;		// UNICODE(LITTLE ENDIAN)
@@ -1019,17 +1055,11 @@ EEncoding GetFileEncodingType(const _tstring& filepath)
 }
 
 //***************************************************************************
-// @brief C++ Ç¥ÁØ ½ºÆ®¸²À» È°¿ëÇØ ´Ù¾çÇÑ ÀÎÄÚµùÀÇ ÆÄÀÏÀ» ÀĞ¾î _tstringÀ¸·Î ¹İÈ¯ÇÕ´Ï´Ù.
-// @param filepath ÀĞ¾îµéÀÏ ÆÄÀÏÀÇ ÀüÃ¼ °æ·Î (_tstring)
-// @return ÀĞ¾îµéÀÎ ¹®ÀÚ¿­ ³»¿ë (_tstring)
-// @note º¯È¯ °úÁ¤¿¡¼­ ³¡ ³Î ¹®ÀÚ('\0')°¡ Æ÷ÇÔµÇ¾î ¹İÈ¯µÉ °æ¿ì ÅØ½ºÆ® µ¥ÀÌÅÍ¿¡¼­
-//       ¹ÙÀÌ³Ê¸®¿Í È¥µ¿ÇÏ´Â ¹®Á¦°¡ ¹ß»ıÇÒ ¼ö ÀÖÀ¸¹Ç·Î, ¹İÈ¯ Àü¿¡ ¹®ÀÚ¿­ ³¡ÀÇ
-//       ³Î ¹®ÀÚ¸¦ Á¦°ÅÇÕ´Ï´Ù
+// @brief C++ í‘œì¤€ ìŠ¤íŠ¸ë¦¼ì„ í™œìš©í•´ ë‹¤ì–‘í•œ ì¸ì½”ë”©ì˜ íŒŒì¼ì„ ì½ì–´ _tstringìœ¼ë¡œ ë°˜í™˜í•©ë‹ˆë‹¤.
+// @param filepath ì½ì–´ë“¤ì¼ íŒŒì¼ì˜ ì „ì²´ ê²½ë¡œ (_tstring)
+// @return ì½ì–´ë“¤ì¸ ë¬¸ìì—´ ë‚´ìš© (_tstring)
 _tstring ReadFile(const _tstring& filepath)
 {
-	// [ÃÖÀûÈ­] seekg/tellg ´ë½Å std::filesystem::file_size·Î Å©±â¸¦ ÃøÁ¤ÇÏ¿©
-	// GetFileSize(const _tstring&)¿Í µ¿ÀÏÇÑ ¹æ½ÄÀ¸·Î ÅëÀÏÇÑ´Ù(ÄÚµå Áßº¹ Á¦°Å,
-	// uintmax_t ±â¹İÀ¸·Î ´ë¿ë·® ÆÄÀÏ¿¡µµ ¾ÈÀü).
 	std::error_code ec;
 	std::uintmax_t fileSize = std::filesystem::file_size(filepath, ec);
 	if( ec )
@@ -1037,7 +1067,7 @@ _tstring ReadFile(const _tstring& filepath)
 		return _T("");
 	}
 
-	ifstream file(filepath, std::ios::binary);
+	std::ifstream file(filepath, std::ios::binary);
 	if( !file )
 	{
 		return _T("");
@@ -1047,15 +1077,9 @@ _tstring ReadFile(const _tstring& filepath)
 	if( fileSize > 0 )
 	{
 		file.read(buffer.data(), static_cast<std::streamsize>(fileSize));
-
-		// [ÁÖÀÇ] file_size() Á¶È¸¿Í read() »çÀÌ¿¡ ÆÄÀÏ ³»¿ëÀÌ º¯°æµÉ ¼ö ÀÖÀ¸¹Ç·Î
-		// (Æ¯È÷ ³×Æ®¿öÅ© °øÀ¯ Æú´õ¿¡¼­) ½ÇÁ¦·Î ÀĞÀº ¹ÙÀÌÆ® ¼ö(gcount)¸¸Å­¸¸ ½Å·ÚÇÑ´Ù.
 		buffer.resize(static_cast<size_t>(file.gcount()));
 	}
 
-	// [¼öÁ¤] ÆÄÀÏÀÌ ºñ¾î ÀÖ°Å³ª 1¹ÙÀÌÆ® ÀÌÇÏÀÎ °æ¿ìµµ Á¤»óÀûÀÎ ANSI/ºó ÆÄÀÏ
-	// ÄÉÀÌ½ºÀÌ¹Ç·Î ¿¹¿Ü¸¦ ´øÁöÁö ¾Ê°í ÀÌÈÄ BOM ÆÇº° ·ÎÁ÷À¸·Î ÀÚ¿¬½º·´°Ô
-	// Èê·Áº¸³½´Ù (°¢ ºĞ±â´Â size() >= 2 / >= 3 °¡µå¸¦ °®°í ÀÖÀ½).
 	if( buffer.empty() )
 	{
 		return _T("");
@@ -1064,15 +1088,12 @@ _tstring ReadFile(const _tstring& filepath)
 #ifdef _UNICODE
 	std::wstring result;
 
-	// BOM È®ÀÎ ¹× º¯È¯
 	if( buffer.size() >= 2 && static_cast<unsigned char>(buffer[0]) == UNICODE_LE_FILE_IDENTIFIER_BYTE1
 		&& static_cast<unsigned char>(buffer[1]) == UNICODE_LE_FILE_IDENTIFIER_BYTE2 )
 	{
-		// UTF-16LE BOM
 		result.reserve(buffer.size() / 2);
 		for( size_t i = 2; i < buffer.size(); i += 2 )
 		{
-			// Little Endian: LSB + MSB
 			wchar_t codeUnit = static_cast<unsigned char>(buffer[i]) | (static_cast<unsigned char>(buffer[i + 1]) << 8);
 			result.push_back(codeUnit);
 		}
@@ -1083,7 +1104,6 @@ _tstring ReadFile(const _tstring& filepath)
 		result.reserve(buffer.size() / 2);
 		for( size_t i = 2; i < buffer.size(); i += 2 )
 		{
-			// Big Endian -> Little Endian: MSB + LSB
 			wchar_t codeUnit = (static_cast<unsigned char>(buffer[i]) << 8) | static_cast<unsigned char>(buffer[i + 1]);
 			result.push_back(codeUnit);
 		}
@@ -1092,28 +1112,22 @@ _tstring ReadFile(const _tstring& filepath)
 		&& static_cast<unsigned char>(buffer[1]) == UTF_FILE_IDENTIFIER_BYTE2
 		&& static_cast<unsigned char>(buffer[2]) == UTF_FILE_IDENTIFIER_BYTE3 )
 	{
-		std::wstring wtemp;
-		Utf8ToUnicode_String(wtemp, std::string(buffer.begin() + 3, buffer.end()).c_str(), buffer.size() - 3 + 1);
-		result = wtemp;
+		std::string utf8Str(buffer.begin() + 3, buffer.end());
+		result = Utf8ToUnicode(utf8Str);
 	}
 	else
 	{
-		// ÀÌ¹Ì ÀĞ¾îµéÀÎ buffer·Î ¹Ù·Î ÆÇº° (ÆÄÀÏÀ» ´Ù½Ã ¿­Áö ¾Êµµ·Ï)
+		std::string rawStr(buffer.begin(), buffer.end());
 		if( IsUTF8WithoutBom((const void*)buffer.data(), buffer.size()) )
 		{
-			std::wstring wtemp;
-			Utf8ToUnicode_String(wtemp, std::string(buffer.begin(), buffer.end()).c_str(), buffer.size() + 1);
-			result = wtemp;
+			result = Utf8ToUnicode(rawStr);
 		}
 		else
 		{
-			std::wstring wtemp;
-			AnsiToUnicode_String(wtemp, std::string(buffer.begin(), buffer.end()).c_str(), buffer.size() + 1);
-			result = wtemp;
+			result = AnsiToUnicode(rawStr);
 		}
 	}
 
-	// [ÁÖÀÇ] °á°ú ¹®ÀÚ¿­ ³¡¿¡ ³Î ¹®ÀÚ°¡ Æ÷ÇÔµÇ¾î ÀÖ´Ù¸é Á¦°Å
 	if( !result.empty() && result.back() == L'\0' )
 	{
 		result.pop_back();
@@ -1122,65 +1136,50 @@ _tstring ReadFile(const _tstring& filepath)
 #else
 	std::string result;
 
-	// BOM È®ÀÎ ¹× º¯È¯
 	if( buffer.size() >= 2 && static_cast<unsigned char>(buffer[0]) == UNICODE_LE_FILE_IDENTIFIER_BYTE1
 		&& static_cast<unsigned char>(buffer[1]) == UNICODE_LE_FILE_IDENTIFIER_BYTE2 )
 	{
-		// UTF-16LE BOM
 		std::wstring temp;
 		temp.reserve(buffer.size() / 2);
 		for( size_t i = 2; i < buffer.size(); i += 2 )
 		{
-			// Little Endian: LSB + MSB
 			wchar_t codeUnit = static_cast<unsigned char>(buffer[i]) | (static_cast<unsigned char>(buffer[i + 1]) << 8);
 			temp.push_back(codeUnit);
 		}
-
-		std::string atemp;
-		UnicodeToAnsi_String(atemp, temp.data(), temp.size() + 1);
-		result = atemp;
+		result = UnicodeToAnsi(temp);
 	}
 	else if( buffer.size() >= 2 && static_cast<unsigned char>(buffer[0]) == UNICODE_BE_FILE_IDENTIFIER_BYTE1
 		&& static_cast<unsigned char>(buffer[1]) == UNICODE_BE_FILE_IDENTIFIER_BYTE2 )
 	{
-		// UTF-16BE BOM
 		std::wstring temp;
 		temp.reserve(buffer.size() / 2);
 		for( size_t i = 2; i < buffer.size(); i += 2 )
 		{
-			// Big Endian -> Little Endian: MSB + LSB
 			wchar_t codeUnit = (static_cast<unsigned char>(buffer[i]) << 8) | static_cast<unsigned char>(buffer[i + 1]);
 			temp.push_back(codeUnit);
 		}
-
-		std::string atemp;
-		UnicodeToAnsi_String(atemp, temp.data(), temp.size() + 1);
-		result = atemp;
+		result = UnicodeToAnsi(temp);
 	}
 	else if( buffer.size() >= 3 && static_cast<unsigned char>(buffer[0]) == UTF_FILE_IDENTIFIER_BYTE1
 		&& static_cast<unsigned char>(buffer[1]) == UTF_FILE_IDENTIFIER_BYTE2
 		&& static_cast<unsigned char>(buffer[2]) == UTF_FILE_IDENTIFIER_BYTE3 )
 	{
-		std::string atemp;
-		Utf8ToAnsi_String(atemp, std::string(buffer.begin() + 3, buffer.end()).c_str(), buffer.size() - 3 + 1);
-		result = atemp;
+		std::string utf8Str(buffer.begin() + 3, buffer.end());
+		result = Utf8ToAnsi(utf8Str);
 	}
 	else
 	{
-		// ÀÌ¹Ì ÀĞ¾îµéÀÎ buffer·Î ¹Ù·Î ÆÇº° (ÆÄÀÏÀ» ´Ù½Ã ¿­Áö ¾Êµµ·Ï)
+		std::string rawStr(buffer.begin(), buffer.end());
 		if( IsUTF8WithoutBom((const void*)buffer.data(), buffer.size()) )
 		{
-			std::string atemp;
-			Utf8ToAnsi_String(atemp, std::string(buffer.begin(), buffer.end()).c_str(), buffer.size() + 1);
-			result = atemp;
+			result = Utf8ToAnsi(rawStr);
 		}
 		else
 		{
-			result = std::string(buffer.begin(), buffer.end());
+			result = rawStr;
 		}
 	}
 
-	// [ÁÖÀÇ] °á°ú ¹®ÀÚ¿­ ³¡¿¡ ³Î ¹®ÀÚ°¡ Æ÷ÇÔµÇ¾î ÀÖ´Ù¸é Á¦°Å
 	if( !result.empty() && result.back() == '\0' )
 	{
 		result.pop_back();
@@ -1191,29 +1190,32 @@ _tstring ReadFile(const _tstring& filepath)
 }
 
 //***************************************************************************
-// @brief ÁöÁ¤ÇÑ ÀÎÄÚµù Å¸ÀÔ¿¡ µû¶ó _tstring ¹®ÀÚ¿­À» ÆÄÀÏ¿¡ ±â·ÏÇÕ´Ï´Ù.
-// @param filepath ÀúÀåÇÒ ÆÄÀÏÀÇ ÀüÃ¼ °æ·Î (_tstring)
-// @param content ÆÄÀÏ¿¡ ¾µ ¹®ÀÚ¿­ ³»¿ë (_tstring)
-// @param encoding ÀúÀåÇÒ ÀÎÄÚµù Å¸ÀÔ (EEncoding ¿­°ÅÇü)
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
-// @note ¹®ÀÚ¿­ º¯È¯ ½Ã ³¡ ³Î ¹®ÀÚ('\0')°¡ ÆÄÀÏ¿¡ ÇÔ²² ±â·ÏµÇ¸é ÅØ½ºÆ® µ¥ÀÌÅÍ¿¡¼­
-//       "¿¹»óÇÏÁö ¸øÇÑ ÅØ½ºÆ® ÀÎÄÚµù" ¶Ç´Â ¹ÙÀÌ³Ê¸® °Ë»ç ¿À·ù°¡ ¹ß»ıÇÒ ¼ö ÀÖÀ¸¹Ç·Î
-//       ½ÇÁ¦ ÅØ½ºÆ® Å©±â¸¸Å­¸¸ ÆÄÀÏ¿¡ ±â·ÏµÇµµ·Ï Ã³¸®ÇÕ´Ï´Ù
+// @brief ì§€ì •í•œ ì¸ì½”ë”© íƒ€ì…ì— ë”°ë¼ _tstring ë¬¸ìì—´ì„ íŒŒì¼ì— ê¸°ë¡í•©ë‹ˆë‹¤.
+// @param filepath ì €ì¥í•  íŒŒì¼ì˜ ì „ì²´ ê²½ë¡œ (_tstring)
+// @param content íŒŒì¼ì— ì“¸ ë¬¸ìì—´ ë‚´ìš© (_tstring)
+// @param encoding ì €ì¥í•  ì¸ì½”ë”© íƒ€ì… (EEncoding ì—´ê±°í˜•)
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 bool WriteFile(const _tstring& filepath, const _tstring& content, EEncoding encoding)
 {
-	ofstream file(filepath, std::ios::binary);
+	std::ofstream file(filepath, std::ios::binary);
 	if( !file )
 	{
 		return false;
 	}
 
 #ifdef _UNICODE
+	std::wstring cleanContent = content;
+	if( !cleanContent.empty() && cleanContent.back() == L'\0' )
+	{
+		cleanContent.pop_back();
+	}
+
 	if( encoding == EEncoding::UTF16_BE )
 	{
 		unsigned char bom[] = { UNICODE_BE_FILE_IDENTIFIER_BYTE1, UNICODE_BE_FILE_IDENTIFIER_BYTE2 };
 		file.write(reinterpret_cast<const char*>(bom), 2);
 
-		for( wchar_t ch : content )
+		for( wchar_t ch : cleanContent )
 		{
 			char high = (ch >> 8) & 0xFF;
 			char low = ch & 0xFF;
@@ -1223,53 +1225,43 @@ bool WriteFile(const _tstring& filepath, const _tstring& content, EEncoding enco
 	}
 	else if( encoding == EEncoding::UTF16_LE )
 	{
-		// UTF-16 LE BOM (content.size()´Â ³Î ¹®ÀÚ¸¦ Æ÷ÇÔÇÏÁö ¾ÊÀ¸¹Ç·Î ±×´ë·Î »ç¿ë)
 		unsigned char bom[] = { UNICODE_LE_FILE_IDENTIFIER_BYTE1, UNICODE_LE_FILE_IDENTIFIER_BYTE2 };
 		file.write(reinterpret_cast<const char*>(bom), 2);
 
-		file.write(reinterpret_cast<const char*>(content.data()), content.size() * sizeof(wchar_t));
+		file.write(reinterpret_cast<const char*>(cleanContent.data()), cleanContent.size() * sizeof(wchar_t));
 	}
 	else if( encoding == EEncoding::UTF8_BOM )
 	{
-		// UTF-8 BOM
 		unsigned char bom[] = { UTF_FILE_IDENTIFIER_BYTE1, UTF_FILE_IDENTIFIER_BYTE2, UTF_FILE_IDENTIFIER_BYTE3 };
 		file.write(reinterpret_cast<const char*>(bom), 3);
 
-		string dest;
-		UnicodeToUtf8_String(dest, content.data(), content.size() + 1);
-
-		// [ÁÖÀÇ] ³Î ¹®ÀÚ¸¦ Æ÷ÇÔÇØ º¯È¯µÈ °æ¿ì ½ÇÁ¦ ¹ÙÀÌÆ® ¸¸Å­¸¸ ±â·Ï
-		size_t writeSize = (!dest.empty() && dest.back() == '\0') ? dest.size() - 1 : dest.size();
-		file.write(dest.c_str(), writeSize);
+		std::string dest = UnicodeToUtf8(cleanContent);
+		file.write(dest.c_str(), dest.size());
 	}
 	else if( encoding == EEncoding::UTF8_NOBOM )
 	{
-		string dest;
-		UnicodeToUtf8_String(dest, content.data(), content.size() + 1);
-
-		// [ÁÖÀÇ] ³Î ¹®ÀÚ¸¦ Æ÷ÇÔÇØ º¯È¯µÈ °æ¿ì ½ÇÁ¦ ¹ÙÀÌÆ® ¸¸Å­¸¸ ±â·Ï
-		size_t writeSize = (!dest.empty() && dest.back() == '\0') ? dest.size() - 1 : dest.size();
-		file.write(dest.c_str(), writeSize);
+		std::string dest = UnicodeToUtf8(cleanContent);
+		file.write(dest.c_str(), dest.size());
 	}
 	else
 	{
-		string dest;
-		UnicodeToAnsi_String(dest, content.data(), content.size() + 1);
-
-		// [ÁÖÀÇ] ³Î ¹®ÀÚ¸¦ Æ÷ÇÔÇØ º¯È¯µÈ °æ¿ì ½ÇÁ¦ ¹ÙÀÌÆ® ¸¸Å­¸¸ ±â·Ï
-		size_t writeSize = (!dest.empty() && dest.back() == '\0') ? dest.size() - 1 : dest.size();
-		file.write(dest.c_str(), writeSize);
+		std::string dest = UnicodeToAnsi(cleanContent);
+		file.write(dest.c_str(), dest.size());
 	}
 #else
-	// ¸ÖÆ¼¹ÙÀÌÆ® ºôµå È¯°æµµ µ¿ÀÏÇÏ°Ô Ã³¸®
+	std::string cleanContent = content;
+	if( !cleanContent.empty() && cleanContent.back() == '\0' )
+	{
+		cleanContent.pop_back();
+	}
+
 	if( encoding == EEncoding::UTF16_BE )
 	{
 		unsigned char bom[] = { UNICODE_BE_FILE_IDENTIFIER_BYTE1, UNICODE_BE_FILE_IDENTIFIER_BYTE2 };
 		file.write(reinterpret_cast<const char*>(bom), 2);
 
-		wstring dest;
-		AnsiToUnicode_String(dest, content.data(), content.size() + 1);
-		for( wchar_t ch : dest )
+		std::wstring temp = AnsiToUnicode(cleanContent);
+		for( wchar_t ch : temp )
 		{
 			char high = (ch >> 8) & 0xFF;
 			char low = ch & 0xFF;
@@ -1282,55 +1274,45 @@ bool WriteFile(const _tstring& filepath, const _tstring& content, EEncoding enco
 		unsigned char bom[] = { UNICODE_LE_FILE_IDENTIFIER_BYTE1, UNICODE_LE_FILE_IDENTIFIER_BYTE2 };
 		file.write(reinterpret_cast<const char*>(bom), 2);
 
-		wstring dest;
-		AnsiToUnicode_String(dest, content.data(), content.size() + 1);
-		file.write(reinterpret_cast<const char*>(dest.data()), dest.size() * sizeof(wchar_t));
+		std::wstring temp = AnsiToUnicode(cleanContent);
+		file.write(reinterpret_cast<const char*>(temp.data()), temp.size() * sizeof(wchar_t));
 	}
 	else if( encoding == EEncoding::UTF8_BOM )
 	{
 		unsigned char bom[] = { UTF_FILE_IDENTIFIER_BYTE1, UTF_FILE_IDENTIFIER_BYTE2, UTF_FILE_IDENTIFIER_BYTE3 };
 		file.write(reinterpret_cast<const char*>(bom), 3);
 
-		string dest;
-		AnsiToUtf8_String(dest, content.data(), content.size() + 1);
-		size_t writeSize = (!dest.empty() && dest.back() == '\0') ? dest.size() - 1 : dest.size();
-		file.write(dest.c_str(), writeSize);
+		std::string dest = AnsiToUtf8(cleanContent);
+		file.write(dest.c_str(), dest.size());
 	}
 	else if( encoding == EEncoding::UTF8_NOBOM )
 	{
-		string dest;
-		AnsiToUtf8_String(dest, content.data(), content.size() + 1);
-
-		// [¼öÁ¤] writeSize °è»ê °ªÀ» ½ÇÁ¦ write¿¡µµ ¹İ¿µ (±âÁ¸ dest.size() ¿À±âÀÔ ¼öÁ¤)
-		size_t writeSize = (!dest.empty() && dest.back() == '\0') ? dest.size() - 1 : dest.size();
-		file.write(dest.c_str(), writeSize);
+		std::string dest = AnsiToUtf8(cleanContent);
+		file.write(dest.c_str(), dest.size());
 	}
 	else
 	{
-		// [ÁÖÀÇ] ANSI ÀúÀå ½Ã¿¡µµ content ³¡¿¡ ³Î ¹®ÀÚ°¡ Æ÷ÇÔµÇ¾î ÀÖ´Ù¸é Á¦¿ÜÇÏ°í ±â·Ï
-		size_t writeSize = (!content.empty() && content.back() == _T('\0')) ? content.size() - 1 : content.size();
-		file.write(content.c_str(), writeSize);
+		file.write(cleanContent.c_str(), cleanContent.size());
 	}
 #endif
 
 	file.close();
-
 	return true;
 }
 
 //***************************************************************************
-// @brief std::filesystemÀ» »ç¿ëÇÏ¿© ÆÄÀÏ Á¸Àç ¿©ºÎ¸¦ È®ÀÎÇÕ´Ï´Ù.
-// @param filepath Á¸Àç ¿©ºÎ¸¦ È®ÀÎÇÒ ÆÄÀÏÀÇ ÀüÃ¼ °æ·Î (_tstring)
-// @return ÆÄÀÏÀÌ Á¸ÀçÇÏ¸é true, ¾Æ´Ï¸é false
+// @brief std::filesystemì„ ì‚¬ìš©í•˜ì—¬ íŒŒì¼ ì¡´ì¬ ì—¬ë¶€ë¥¼ í™•ì¸í•©ë‹ˆë‹¤.
+// @param filepath ì¡´ì¬ ì—¬ë¶€ë¥¼ í™•ì¸í•  íŒŒì¼ì˜ ì „ì²´ ê²½ë¡œ (_tstring)
+// @return íŒŒì¼ì´ ì¡´ì¬í•˜ë©´ true, ì•„ë‹ˆë©´ false
 bool IsExistFile(const _tstring& filepath)
 {
 	std::error_code ec;
 	bool bExists = std::filesystem::exists(filepath, ec);
 
-	// ec°¡ ¼³Á¤µÈ °æ¿ì´Â "ÆÄÀÏ ¾øÀ½"ÀÌ ¾Æ´Ï¶ó ½ÇÁ¦ Á¢±Ù Áß ¿À·ù°¡ ¹ß»ıÇÑ »óÈ²
+	// ecê°€ ì„¤ì •ëœ ê²½ìš°ëŠ” "íŒŒì¼ ì—†ìŒ"ì´ ì•„ë‹ˆë¼ ì‹¤ì œ ì ‘ê·¼ ì¤‘ ì˜¤ë¥˜ê°€ ë°œìƒí•œ ìƒí™©
 	if( ec )
 	{
-		std::cerr << "ÆÄÀÏ Á¸Àç ¿©ºÎ È®ÀÎ Áß ¿À·ù ¹ß»ı: " << ec.message() << std::endl;
+		std::cerr << "íŒŒì¼ ì¡´ì¬ ì—¬ë¶€ í™•ì¸ ì¤‘ ì˜¤ë¥˜ ë°œìƒ: " << ec.message() << std::endl;
 		return false;
 	}
 
@@ -1338,9 +1320,9 @@ bool IsExistFile(const _tstring& filepath)
 }
 
 //***************************************************************************
-// @brief std::filesystemÀ» »ç¿ëÇÏ¿© ÆÄÀÏ Å©±â¸¦ ¹ÙÀÌÆ® ´ÜÀ§·Î ¹İÈ¯ÇÕ´Ï´Ù.
-// @param filepath Å©±â¸¦ Á¶È¸ÇÒ ÆÄÀÏÀÇ ÀüÃ¼ °æ·Î (_tstring)
-// @return ÆÄÀÏ Å©±â (¹ÙÀÌÆ® ´ÜÀ§), ½ÇÆĞ ½Ã static_cast<std::uintmax_t>(-1)
+// @brief std::filesystemì„ ì‚¬ìš©í•˜ì—¬ íŒŒì¼ í¬ê¸°ë¥¼ ë°”ì´íŠ¸ ë‹¨ìœ„ë¡œ ë°˜í™˜í•©ë‹ˆë‹¤.
+// @param filepath í¬ê¸°ë¥¼ ì¡°íšŒí•  íŒŒì¼ì˜ ì „ì²´ ê²½ë¡œ (_tstring)
+// @return íŒŒì¼ í¬ê¸° (ë°”ì´íŠ¸ ë‹¨ìœ„), ì‹¤íŒ¨ ì‹œ static_cast<std::uintmax_t>(-1)
 std::uintmax_t GetFileSize(const _tstring& filepath)
 {
 	std::error_code ec;
@@ -1348,7 +1330,7 @@ std::uintmax_t GetFileSize(const _tstring& filepath)
 
 	if( ec )
 	{
-		std::cerr << "ÆÄÀÏ Å©±â È®ÀÎ Áß ¿À·ù ¹ß»ı: " << ec.message() << std::endl;
+		std::cerr << "íŒŒì¼ í¬ê¸° í™•ì¸ ì¤‘ ì˜¤ë¥˜ ë°œìƒ: " << ec.message() << std::endl;
 		return static_cast<std::uintmax_t>(-1);
 	}
 

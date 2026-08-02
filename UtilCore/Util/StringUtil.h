@@ -1,4 +1,4 @@
-
+﻿
 //***************************************************************************
 // StringUtil.h : interface for the StringUtil Functions.
 //

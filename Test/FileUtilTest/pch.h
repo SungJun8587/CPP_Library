@@ -28,6 +28,7 @@ using namespace std;
 #include <BaseMacro.h>
 
 #include <Util/ConvertCharset.h>
+#include <Util/EncodingConvert.h>
 #include <Util/FileUtil.h>
 
 #endif // ndef PCH_H

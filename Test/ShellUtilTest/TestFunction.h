@@ -7,13 +7,11 @@
 #ifndef __TESTFUNCTION_H__
 #define __TESTFUNCTION_H__
 
-int Win_SaveFileTest();
-int Win_GetFileEncodingTypeTest();
-int Win_ReadFileTest();
-int Win_ReadFileMapTest();
-
-int GetFileEncodingTypeTest();
-int ReadFileTest();
-int SaveFileTest();
+void DirectoryAndFileOperations();
+void RegistryOperations();
+void FileHandleDuplicate();
+void ProductKeyExtract();
+void SHDirectory();
+bool GetRegistry();
 
 #endif // ndef __TESTFUNCTION_H__

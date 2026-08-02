@@ -45,13 +45,10 @@ inline void PrintString(const _tstring& message)
 
 void TestWebUtil()
 {
-	_tcout.imbue(std::locale("korean")); // 유니코드 출력 설정
-	_tcout << _T("================ WebUtil 테스트 시작 ================\n\n");
-
 	// 1. Base64 인코딩 / 디코딩 테스트
 	{
 		PrintString(_T("[Test] Base64Enc / Base64Dec\n"));
-		_tstring original = _T("Hello, WebUtil! 한글, 繁體字 (번체자) / 简体字 (간체자) 테스트");
+		_tstring original = _T("Hello, WebUtil! 한글, 繁體字(번체자) / 简体字(간체자) 테스트");
 		_tstring encoded = Base64Enc(original);
 
 		Base64DecodeResult decResult;
@@ -95,7 +92,7 @@ void TestWebUtil()
 	// 4. HTML 인코딩 / 디코딩 테스트
 	{
 		PrintString(_T("[Test] HtmlEncode / HtmlDecode\n"));
-		_tstring original = _T("<script>alert('XSS & \\\"") _T("繁體字/简体字") _T(" attack\\\");</script>");
+		_tstring original = _T("<script>alert('XSS & \\\"") _T("繁體字(번체자) / 简体字(간체자)") _T(" attack\\\");</script>");
 		_tstring encoded = HtmlEncode(original);
 		_tstring decoded = HtmlDecode(encoded);
 
@@ -110,7 +107,7 @@ void TestWebUtil()
 	// 5. JavaScript Escape / UnEscape 테스트
 	{
 		PrintString(_T("[Test] Escape / UnEscape\n"));
-		_tstring original = _T("안녕 Hello 繁體字 简体字@*-_+./");
+		_tstring original = _T("안녕 Hello 繁體字(번체자) 简体字(간체자)@*-_+./");
 		_tstring encoded = Escape(original);
 		_tstring decoded = UnEscape(encoded);
 
@@ -140,7 +137,7 @@ void TestWebUtil()
 	// 7. JavaScript EncodeURIComponent / DecodeURIComponent 테스트
 	{
 		PrintString(_T("[Test] EncodeURIComponent / DecodeURIComponent\n"));
-		_tstring original = _T("param=繁體字/简体字/특수문자?&=");
+		_tstring original = _T("param=繁體字(번체자)/简体字(간체자)/특수문자?&=");
 		_tstring encoded = EncodeURIComponent(original);
 		_tstring decoded = DecodeURIComponent(encoded);
 
@@ -151,6 +148,4 @@ void TestWebUtil()
 		assert(original == decoded);
 		PrintString(_T(" -> EncodeURIComponent/DecodeURIComponent 테스트 성공!\n\n"));
 	}
-
-	_tcout << _T("================ 모든 WebUtil 테스트 완료 ================\n");
 }

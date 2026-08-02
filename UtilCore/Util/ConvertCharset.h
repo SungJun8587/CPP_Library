@@ -49,21 +49,6 @@ DWORD	Utf8ToUnicode_String(std::wstring& unicode, const char* utf8, const size_t
 
 DWORD	AnsiToUtf8_String(std::string& utf8, const char* ansi, const size_t ansi_size);
 DWORD	Utf8ToAnsi_String(std::string& ansi, const char* utf8, const size_t utf8_size);
-
-wstring AnsiToUnicode(const std::string& ansi);
-string	UnicodeToAnsi(const std::wstring& unicode);
-
-string UnicodeToUtf8(const std::wstring& unicode);
-wstring Utf8ToUnicode(const std::string& utf8);
-
-string AnsiToUtf8(const std::string& ansi);
-string Utf8ToAnsi(const std::string& utf8);
-
-_tstring	StringToTString(const std::string& src);
-string		TStringToString(const _tstring& src);
-
-_tstring	WStringToTString(const std::wstring& src);
-wstring		TStringToWString(const _tstring& src);
 #endif
 
 #endif // ndef __CONVERTCHARSET_H__

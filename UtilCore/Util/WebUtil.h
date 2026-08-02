@@ -11,8 +11,8 @@
 #include <BaseRedefineDataType.h>
 #endif
 
-#ifndef __CONVERTCHARSET_H__
-#include <Util/ConvertCharset.h>
+#ifndef __ENCODINGCONVERT_H__
+#include <Util/EncodingConvert.h>
 #endif
 
 //***************************************************************************

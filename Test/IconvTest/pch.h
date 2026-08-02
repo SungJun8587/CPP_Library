@@ -8,21 +8,29 @@
 #define PCH_H
 
 // 여기에 미리 컴파일하려는 헤더 추가
+#define WIN32_LEAN_AND_MEAN		// 자주 사용하지 않는 API의 일부를 제외하여 Win32 헤더 파일의 크기를 줄이기 위해 설정(빌드 시간 단축 목적)
+//#define _HAS_STD_BYTE 0			// c++17 옵션을 활성화 시 std::byte 를 비활성 하는 옵션
+
 #include <windows.h>
-#include <stdio.h>
-#include <tchar.h>
-#include <string.h>
+#include <atlbase.h>
 #include <crtdbg.h>
-#include <strsafe.h>
-#include <cassert>
+#include <locale.h>
+#include <wtypes.h>
+
+#include <string>
+#include <vector>
+
+#include <iostream>
+using namespace std;
 
 #include <BaseDefine.h>
 #include <BaseRedefineDataType.h>
 #include <BaseMacro.h>
 
-#include <Util/ConvertCharset.h>
-#include <Util/IconvUtil.h>
-#include <Util/EncodingConvert.h>
-#include <Util/WebUtil.h>
+#pragma comment(lib, LIB_NAME("libiconv"))
 
-#endif //PCH_H
+#include <iconv.h>
+
+#include <Util/IConvUtil.h>
+
+#endif // ndef PCH_H

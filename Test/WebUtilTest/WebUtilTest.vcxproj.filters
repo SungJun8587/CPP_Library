@@ -21,6 +21,12 @@
     <ClCompile Include="..\..\UtilCore\Util\WebUtil.cpp">
       <Filter>UtilCore\Util</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\UtilCore\Util\EncodingConvert.cpp">
+      <Filter>UtilCore\Util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\UtilCore\Util\IconvUtil.cpp">
+      <Filter>UtilCore\Util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
@@ -38,6 +44,12 @@
       <Filter>UtilCore\Util</Filter>
     </ClInclude>
     <ClInclude Include="..\..\UtilCore\Util\WebUtil.h">
+      <Filter>UtilCore\Util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\UtilCore\Util\EncodingConvert.h">
+      <Filter>UtilCore\Util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\UtilCore\Util\IconvUtil.h">
       <Filter>UtilCore\Util</Filter>
     </ClInclude>
   </ItemGroup>

@@ -1,4 +1,4 @@
-
+﻿
 //***************************************************************************
 // FileUtil.h : interface for the FileUtil Functions.
 //
@@ -60,16 +60,11 @@ EEncoding	GetFileEncodingType(const TCHAR* ptszFullPath);
 
 bool		ReadFile(std::vector<BYTE>& byteDestination, const TCHAR* ptszFullPath);
 bool		ReadFileMap(std::vector<BYTE>& byteDestination, const TCHAR* ptszFullPath);
-
-bool		SaveFile(const TCHAR* ptszFullPath, const BYTE* pbBuffer, const DWORD dwLength);
-bool		SaveAnsiFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize);
-bool		SaveUnicodeBEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize);
-bool		SaveUnicodeLEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize);
-bool		SaveUTF8BOMFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize);
-bool		SaveUTF8NOBOMFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize);
+bool		WriteFile(const TCHAR* ptszFullPath, const BYTE* pbBuffer, const DWORD dwLength);
 
 bool		ReadFile(_tstring& destString, const TCHAR* ptszFullPath);
 bool		ReadFileMap(_tstring& destString, const TCHAR* ptszFullPath);
+bool		WriteFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize, EEncoding fileType);
 
 bool		GetFileInfoTime(const TCHAR* ptszFilePath, const int nCase, SYSTEMTIME& stLocal);
 bool		IsExistFile(const TCHAR* ptszFilePath);
