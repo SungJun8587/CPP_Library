@@ -98,7 +98,7 @@ public:
 	void		Clear();
 
 private:
-	USE_LOCK;
+	RWSPIN_USE_LOCK;
 	CPriorityQueue<TimerItem>	_items;
 	Atomic<bool>				_distributing = false;
 };

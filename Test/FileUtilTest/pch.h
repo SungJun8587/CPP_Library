@@ -27,7 +27,7 @@ using namespace std;
 #include <BaseRedefineDataType.h>
 #include <BaseMacro.h>
 
-#include <Util/ConvertCharset.h>
+#include <Util/WinCharsetConv.h>
 #include <Util/EncodingConvert.h>
 #include <Util/FileUtil.h>
 

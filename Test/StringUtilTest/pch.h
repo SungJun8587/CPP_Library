@@ -10,19 +10,29 @@
 // 여기에 미리 컴파일하려는 헤더 추가
 #include <windows.h>
 #include <stdio.h>
+#include <conio.h>
+#include <stdlib.h>
 #include <tchar.h>
-#include <string.h>
 #include <crtdbg.h>
+#include <time.h>
+#include <malloc.h>
+#include <locale.h> 
 #include <strsafe.h>
-#include <cassert>
+#include <string.h>
+#include <typeinfo>
 
+//***************************************************************************
+// Version Define
+//***************************************************************************
 #include <BaseDefine.h>
 #include <BaseRedefineDataType.h>
 #include <BaseMacro.h>
 
-#include <Util/WinCharsetConv.h>
-#include <Util/IconvUtil.h>
-#include <Util/EncodingConvert.h>
-#include <Util/WebUtil.h>
+#include <Util/StringUtil.h>
+
+#include "StringFunc.h"
+#include "TestFunction.h"
+
+#define  _DEBUGLOG				  // Enable Logging For Monitoring System
 
 #endif //PCH_H

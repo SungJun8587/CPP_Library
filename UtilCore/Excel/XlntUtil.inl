@@ -20,14 +20,12 @@
 		// 데이터 추가
 		if( isCastUtf8 )	// 한글 깨짐 방지 : ANSI(예: CP949, Windows-1252) -> UTF-8 변경하여 액셀 저장 
 		{
-			Iconv::CIconvUtil iconvUtil("CP949", "UTF-8");
-
 			for( uint32 row = 0; row < data.size(); ++row )
 			{
 				auto excel_row = data[row].serialize();
 				for( uint32 col = 0; col < excel_row.size(); ++col )
 				{
-					_worksheet.cell(col + 1, row + 2).value(iconvUtil.AnsiToUtf8(excel_row[col]));
+					_worksheet.cell(col + 1, row + 2).value(AnsiToUtf8(excel_row[col]));
 				}
 			}
 		}

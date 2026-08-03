@@ -1,4 +1,4 @@
-
+﻿
 //***************************************************************************
 // AdoAsyncSrv.cpp : implementation of the CAdoAsyncSrv class.
 //
@@ -6,7 +6,6 @@
 
 #include "pch.h"
 #include "AdoAsyncSrv.h"
-#include <algorithm>
 
 extern CThreadManager* gpThreadManager;
 
@@ -38,12 +37,19 @@ CAdoAsyncSrv::~CAdoAsyncSrv()
 
 void CAdoAsyncSrv::Clear()
 {
-	std::unique_lock<std::mutex> lockGuard(_mutex);
+	// CSwapQueue를 비우기 위해 전체 크기만큼 척크 스왑 수행
+	std::queue<st_DBAsyncRq*> tempQueue;
 
-	while( !_queueDBAsyncRq.empty() )
+	int64_t totalSize = _queueDBAsyncRq.GetSize();
+	if( totalSize > 0 )
 	{
-		st_DBAsyncRq* pAsyncRq = _queueDBAsyncRq.front();
-		_queueDBAsyncRq.pop();
+		_queueDBAsyncRq.SwapChunk(tempQueue, static_cast<size_t>(totalSize));
+	}
+
+	while( !tempQueue.empty() )
+	{
+		st_DBAsyncRq* pAsyncRq = tempQueue.front();
+		tempQueue.pop();
 		if( pAsyncRq != nullptr ) SAFE_DELETE(pAsyncRq);
 	}
 }
@@ -56,15 +62,18 @@ void CAdoAsyncSrv::FlushRemainingTasks()
 	_cva.notify_all();
 	_cvProducer.notify_all();
 
-	CQueue<st_DBAsyncRq*> tempQueue;
+	std::queue<st_DBAsyncRq*> tempQueue;
+	int64_t totalSize = _queueDBAsyncRq.GetSize();
+	if( totalSize > 0 )
 	{
-		std::unique_lock<std::mutex> lockGuard(_mutex);
-		tempQueue = std::move(_queueDBAsyncRq);
+		_queueDBAsyncRq.SwapChunk(tempQueue, static_cast<size_t>(totalSize));
 	}
 
 	int32 remainingCount = static_cast<int32>(tempQueue.size());
 	if( remainingCount > 0 )
 	{
+		LOG_INFO(_T("Processing %d remaining ADO requests in main thread..."), remainingCount);
+
 		while( !tempQueue.empty() )
 		{
 			st_DBAsyncRq* pAsyncRq = tempQueue.front();
@@ -76,13 +85,24 @@ void CAdoAsyncSrv::FlushRemainingTasks()
 			if( it != _mapCommand.end() )
 			{
 				std::shared_ptr<CDBAsyncSrvHandler> command = it->second;
-				command->ProcessAsyncCall(pAsyncRq);
+				EDBReturnType Ret = command->ProcessAsyncCall(pAsyncRq);
+
+				if( Ret != EDBReturnType::OK )
+				{
+					LOG_ERROR(_T("Failed to process ADO task during manual flush... callIdent: [%u]"), pAsyncRq->callIdent);
+				}
+			}
+			else
+			{
+				LOG_ERROR(_T("Error not found command handler for ADO task... callIdent: [%u]"), pAsyncRq->callIdent);
 			}
 
 			SubOutstandingRequest();
 			SAFE_DELETE(pAsyncRq);
 		}
 	}
+
+	LOG_INFO(_T("Manual flush completed for ADO. All tasks processed."));
 }
 
 void CAdoAsyncSrv::ClearAdoPools()
@@ -137,7 +157,6 @@ bool CAdoAsyncSrv::InitAdo(CVector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt
 			return false;
 		}
 
-		// DBNode�� ���ǵ� Ÿ�Ӿƿ�(�⺻ 5�� ��)�� ����
 		if( false == _pAdoConnPools[nIdx]->Init(iter._dbClass, iter._tszDSN, 5, reconnectCfg) )
 		{
 			ClearAdoPools();
@@ -171,9 +190,11 @@ bool CAdoAsyncSrv::RunningThread()
 
 bool CAdoAsyncSrv::Action()
 {
+	std::queue<st_DBAsyncRq*> localQueue;
+
 	while( !_bStopThread.load() )
 	{
-		st_DBAsyncRq* pAsyncRq = Pop();
+		st_DBAsyncRq* pAsyncRq = Pop(localQueue);
 		if( pAsyncRq == nullptr ) continue;
 
 		COMMAND_MAP::iterator it = _mapCommand.find(pAsyncRq->callIdent);
@@ -206,31 +227,55 @@ bool CAdoAsyncSrv::Action()
 
 int CAdoAsyncSrv::Push(st_DBAsyncRq* pAsyncRq)
 {
-	int queueSize = 0;
-	{
-		std::unique_lock<std::mutex> lockGuard(_mutex);
-		if( _bStopThread.load() ) return 0;
+	if( _bStopThread.load() ) return 0;
 
-		_queueDBAsyncRq.push(pAsyncRq);
-		queueSize = static_cast<int>(_queueDBAsyncRq.size());
-	}
+	int queueSize = static_cast<int>(_queueDBAsyncRq.PushAndGetSize(pAsyncRq));
 	_cva.notify_one();
 	return queueSize;
 }
 
-st_DBAsyncRq* CAdoAsyncSrv::Pop()
+st_DBAsyncRq* CAdoAsyncSrv::Pop(std::queue<st_DBAsyncRq*>& localQueue)
 {
-	st_DBAsyncRq* pAsyncRq = nullptr;
+	if( !localQueue.empty() )
+	{
+		st_DBAsyncRq* pAsyncRq = localQueue.front();
+		localQueue.pop();
+		return pAsyncRq;
+	}
+
 	{
 		std::unique_lock<std::mutex> lockGuard(_mutex);
-		_cva.wait(lockGuard, [this]() { return !_queueDBAsyncRq.empty() || _bStopThread.load(); });
 
-		if( _bStopThread.load() && _queueDBAsyncRq.empty() ) return nullptr;
+		_cva.wait(lockGuard, [this, &localQueue]() {
+			return !_queueDBAsyncRq.IsEmpty() || _bStopThread.load();
+			});
 
-		pAsyncRq = _queueDBAsyncRq.front();
-		_queueDBAsyncRq.pop();
+		if( _bStopThread.load() && _queueDBAsyncRq.IsEmpty() && localQueue.empty() )
+			return nullptr;
+
+		// 큐 크기 경고 로그 체크
+		int64 currentSize = _queueDBAsyncRq.GetSize();
+		if( MAX_WARNING_QUERY_QUEUE_SIZE <= currentSize && currentSize <= MAX_WARNING_QUERY_QUEUE_SIZE + 10 )
+			LOG_ERROR(_T("Async ADO Call Queue size... : [%d]"), static_cast<int>(currentSize));
+
+		int currentCount = static_cast<int>(currentSize);
+		if( currentCount > _nLastWarnedQueueSize )
+		{
+			_nLastWarnedQueueSize = currentCount;
+			LOG_WARNING(_T("Async ADO Call Queue size... : [%d]"), _nLastWarnedQueueSize);
+		}
+
+		// 전체를 다 가져오는 대신, 한 번에 처리할 적정량(64개)만 떼어옴 (스케일링 개선)
+		_queueDBAsyncRq.SwapChunk(localQueue, 64);
 	}
+
 	_cvProducer.notify_one();
+
+	if( localQueue.empty() )
+		return nullptr;
+
+	st_DBAsyncRq* pAsyncRq = localQueue.front();
+	localQueue.pop();
 	return pAsyncRq;
 }
 

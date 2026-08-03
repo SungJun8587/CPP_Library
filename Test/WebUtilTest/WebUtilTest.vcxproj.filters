@@ -15,9 +15,6 @@
     <ClCompile Include="WebUtilTest.cpp" />
     <ClCompile Include="pch.cpp" />
     <ClCompile Include="TestFunction.cpp" />
-    <ClCompile Include="..\..\UtilCore\Util\ConvertCharset.cpp">
-      <Filter>UtilCore\Util</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\UtilCore\Util\WebUtil.cpp">
       <Filter>UtilCore\Util</Filter>
     </ClCompile>
@@ -25,6 +22,9 @@
       <Filter>UtilCore\Util</Filter>
     </ClCompile>
     <ClCompile Include="..\..\UtilCore\Util\IconvUtil.cpp">
+      <Filter>UtilCore\Util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\UtilCore\Util\WinCharsetConv.cpp">
       <Filter>UtilCore\Util</Filter>
     </ClCompile>
   </ItemGroup>
@@ -40,9 +40,6 @@
     <ClInclude Include="..\..\UtilCore\BaseRedefineDataType.h">
       <Filter>UtilCore</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Util\ConvertCharset.h">
-      <Filter>UtilCore\Util</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\UtilCore\Util\WebUtil.h">
       <Filter>UtilCore\Util</Filter>
     </ClInclude>
@@ -50,6 +47,9 @@
       <Filter>UtilCore\Util</Filter>
     </ClInclude>
     <ClInclude Include="..\..\UtilCore\Util\IconvUtil.h">
+      <Filter>UtilCore\Util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\UtilCore\Util\WinCharsetConv.h">
       <Filter>UtilCore\Util</Filter>
     </ClInclude>
   </ItemGroup>

@@ -1,4 +1,3 @@
-
 //***************************************************************************
 // AdoAsyncSrv.h : interface for the CAdoAsyncSrv class.
 //
@@ -9,6 +8,10 @@
 
 #ifndef	__ADOCONNPOOL_H__
 #include <DB/ADO/AdoConnPool.h>
+#endif
+
+#ifndef __SWAPQUEUE_H__
+#include <ThreadSafeContainers/SwapQueue.h>
 #endif
 
 class CAdoAsyncSrv
@@ -28,19 +31,19 @@ public:
 
 	std::shared_ptr<CDBAsyncSrvHandler> Regist(const BYTE command, std::shared_ptr<CDBAsyncSrvHandler> const handler);
 
-	int GetQueryQueueSize() {
-		std::lock_guard<std::mutex> lockGuard(_mutex); return static_cast<int>(_queueDBAsyncRq.size());
+	int GetQueryQueueSize() const {
+		return static_cast<int>(_queueDBAsyncRq.GetSize());
 	}
-	bool IsEmpty() {
-		std::lock_guard<std::mutex> lockGuard(_mutex); return _queueDBAsyncRq.empty();
+	bool IsEmpty() const {
+		return _queueDBAsyncRq.IsEmpty();
 	}
 	int Push(st_DBAsyncRq* pAsyncRq);
-	st_DBAsyncRq* Pop();
+	st_DBAsyncRq* Pop(std::queue<st_DBAsyncRq*>& localQueue);
 
 	void WaitPushCapacity(size_t maxCapacity) {
 		std::unique_lock<std::mutex> lock(_mutex);
 		_cvProducer.wait(lock, [this, maxCapacity]() {
-			return _queueDBAsyncRq.size() < maxCapacity || _bStopThread.load();
+			return static_cast<size_t>(_queueDBAsyncRq.GetSize()) < maxCapacity || _bStopThread.load();
 			});
 	}
 
@@ -71,7 +74,7 @@ public:
 	CAdoConnPool* GetAdoConnPool(uint64 m_nID);
 	CAdoConnPool* GetLogAdoConnPool();
 
-	CQueue<st_DBAsyncRq*>				_queueDBAsyncRq;
+	CSwapQueue<st_DBAsyncRq*>			_queueDBAsyncRq;
 	COMMAND_MAP							_mapCommand;
 
 	int32								_nDBCount;
@@ -90,6 +93,7 @@ protected:
 private:
 	std::atomic<bool>			_bStopThread;
 	std::atomic<int32>			_nOutstandingRequests{ 0 };
+	int							_nLastWarnedQueueSize{ 2 };
 
 	std::mutex					_mutex;
 	std::condition_variable		_cva;

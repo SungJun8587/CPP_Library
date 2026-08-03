@@ -1,11 +1,11 @@
 
 //***************************************************************************
-// ConvertCharset.h : interface for the ConvertCharset Functions.
+// WinCharsetConv.h : interface for the WinCharsetConv Functions.
 //
 //***************************************************************************
 
-#ifndef __CONVERTCHARSET_H__
-#define __CONVERTCHARSET_H__
+#ifndef __WINCHARSETCONV_H__
+#define __WINCHARSETCONV_H__
 
 #ifndef	_INC_TCHAR
 #include <tchar.h>
@@ -51,4 +51,4 @@ DWORD	AnsiToUtf8_String(std::string& utf8, const char* ansi, const size_t ansi_s
 DWORD	Utf8ToAnsi_String(std::string& ansi, const char* utf8, const size_t utf8_size);
 #endif
 
-#endif // ndef __CONVERTCHARSET_H__
+#endif // ndef __WINCHARSETCONV_H__

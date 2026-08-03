@@ -7,13 +7,13 @@
 #include "pch.h"
 #include "OdbcConnPool.h"
 
-constexpr int32 WAIT_TIMEOUT_MS = 100;          // 슬롯 교체 시 사용 중 스레드 이탈 대기 상한
-constexpr int64 LOG_ALERT_INTERVAL_MS = 300000; // 격리 큐 정체 경고 로그 최소 주기 (5분)
+constexpr int32 WAIT_TIMEOUT_MS = 100;				// 슬롯 교체 시 기존 사용 중인 스레드의 이탈 대기 상한 시간 (ms)
+constexpr int64 LOG_ALERT_INTERVAL_MS = 300000;		// 격리 큐 정체 경고 로그 최소 출력 주기 (5분)
+constexpr int64 FORCE_CLEANUP_TIMEOUT_MS = 600000;	// 격리 큐 최대 체류 허용 시간 (10분)
 
 //***************************************************************************
-// Construction/Destruction
-//***************************************************************************
-
+// @brief COdbcConnPool 클래스 생성자입니다.
+// @param nMaxPoolSize 관리할 최대 커넥션 슬롯 개수
 COdbcConnPool::COdbcConnPool(int32 nMaxPoolSize)
 	: _dbClass(EDBClass::NONE)
 	, _nMaxPoolSize(nMaxPoolSize)
@@ -28,13 +28,11 @@ COdbcConnPool::COdbcConnPool(int32 nMaxPoolSize)
 	, _nCurrentWorkerCount(0)
 	, _nDesiredWorkerCount(0)
 {
-	// unique_ptr 배열은 생성자에서 딱 1회만 할당 (주소 안정성 보장)
 	_pOdbcConns = std::make_unique<CachePaddedAtomic<CBaseODBC*>[]>(_nMaxPoolSize);
 	_pRefCount = std::make_unique<CachePaddedAtomic<int32>[]>(_nMaxPoolSize);
-	_slotLocks = std::make_unique<SpinLockDefault[]>(_nMaxPoolSize); // 캐시라인 정렬로 false sharing 방지
+	_slotLocks = std::make_unique<SpinLockDefault[]>(_nMaxPoolSize);
 
 	_pReconnecting = std::make_unique<CachePaddedAtomic<bool>[]>(_nMaxPoolSize);
-	_pNextRetryAllowedMs = std::make_unique<CachePaddedAtomic<int64>[]>(_nMaxPoolSize);
 	_pRetryFailCount = std::make_unique<CachePaddedAtomic<int32>[]>(_nMaxPoolSize);
 
 	for( int32 i = 0; i < _nMaxPoolSize; i++ )
@@ -42,50 +40,52 @@ COdbcConnPool::COdbcConnPool(int32 nMaxPoolSize)
 		_pOdbcConns[i].value.store(nullptr, std::memory_order_relaxed);
 		_pRefCount[i].value.store(0, std::memory_order_relaxed);
 		_pReconnecting[i].value.store(false, std::memory_order_relaxed);
-		_pNextRetryAllowedMs[i].value.store(0, std::memory_order_relaxed);
 		_pRetryFailCount[i].value.store(0, std::memory_order_relaxed);
 	}
 	memset(&_tszDSN[0], 0, sizeof(_tszDSN));
 }
 
+//***************************************************************************
+// @brief COdbcConnPool 클래스 소멸자입니다.
 COdbcConnPool::~COdbcConnPool(void)
 {
-	// 백그라운드 스레드를 먼저 종료해 레이스컨디션을 방지한 뒤 자원 정리
 	StopHealthCheckThread();
+	StopDelayedTaskThread();
 	StopReconnectWorkers();
 	Clear();
 }
 
 //***************************************************************************
-// TReconnectConfig 값 유효성 검사 (Init / SetReconnectConfig 공용)
-//***************************************************************************
+// @brief 재연결 설정 값들의 유효성을 검사합니다.
+// @param cfg 검사할 TReconnectConfig 설정 구조체 레퍼런스
+// @return 유효한 설정이면 true, 아니면 false
 bool COdbcConnPool::ValidateReconnectConfig(const TReconnectConfig& cfg)
 {
 	if( cfg.nWorkerCount < 1 ) return false;
-	// base가 너무 짧으면 DB 다운 시 재연결이 사실상 무한루프처럼 돌아 CPU/연결 폭주로 이어짐
 	if( cfg.nBackoffBaseMs < RECONNECT_BACKOFF_MIN_MS ) return false;
 	if( cfg.nBackoffMaxMs < cfg.nBackoffBaseMs ) return false;
-	// shift가 너무 크면 (BaseMs << shift)에서 오버플로 발생 가능
 	if( cfg.nBackoffMaxShift < 0 || cfg.nBackoffMaxShift > 30 ) return false;
 	if( cfg.nBackoffJitterMs < 0 ) return false;
 	return true;
 }
 
 //***************************************************************************
-// 초기화
-//***************************************************************************
+// @brief 커넥션 풀을 초기화하고 지정된 DSN으로 초기 커넥션을 미리 생성 및 연결합니다.
+// @param dbClass 데이터베이스 종류 식별자
+// @param ptszDSN 연결에 사용할 DSN 문자열 포인터
+// @param reconnectConfig 초기 재연결 및 백오프 정책 설정 구조체
+// @return 초기화 및 전체 연결 성공 시 true, 실패 시 false
 bool COdbcConnPool::Init(const EDBClass dbClass, const TCHAR* ptszDSN,
 	const TReconnectConfig& reconnectConfig)
 {
-	// 재초기화 시나리오 대비, 기존 백그라운드 스레드/자원 정리 선행
 	StopHealthCheckThread();
+	StopDelayedTaskThread();
 	StopReconnectWorkers();
 	Clear();
 
 	_dbClass = dbClass;
 	_tcsncpy_s(_tszDSN, _countof(_tszDSN), ptszDSN, _TRUNCATE);
 
-	// 유효하지 않은 설정은 부분 적용하지 않고 통째로 기본값 대체
 	TReconnectConfig cfgToApply = reconnectConfig;
 	if( !ValidateReconnectConfig(reconnectConfig) )
 	{
@@ -98,7 +98,6 @@ bool COdbcConnPool::Init(const EDBClass dbClass, const TCHAR* ptszDSN,
 	_nBackoffMaxShift.store(cfgToApply.nBackoffMaxShift, std::memory_order_relaxed);
 	_nBackoffJitterMs.store(cfgToApply.nBackoffJitterMs, std::memory_order_relaxed);
 
-	// 최대 크기만큼 커넥션을 동기적으로 미리 채움
 	for( int32 i = 0; i < _nMaxPoolSize; i++ )
 	{
 		CBaseODBC* pConn = xnew<CBaseODBC>(dbClass, ptszDSN);
@@ -116,20 +115,21 @@ bool COdbcConnPool::Init(const EDBClass dbClass, const TCHAR* ptszDSN,
 			return false;
 		}
 
-		_pOdbcConns[i].value.store(pConn, std::memory_order_release); // release로 게시
+		_pOdbcConns[i].value.store(pConn, std::memory_order_release);
 	}
 
+	StartDelayedTaskThread();
 	StartHealthCheckThread();
 	StartReconnectWorkers(cfgToApply.nWorkerCount);
 	return true;
 }
 
 //***************************************************************************
-// 새 커넥션 생성 및 연결 시도 (순수 재연결 로직, 블로킹 I/O)
-//***************************************************************************
+// @brief 새로운 데이터베이스 연결 객체를 생성하고 실제 연결을 시도합니다.
+// @param nType 대상 슬롯 인덱스 번호 (로깅 및 추적용)
+// @return 연결에 성공한 CBaseODBC 포인터, 실패 시 nullptr
 CBaseODBC* COdbcConnPool::TryReconnect(int32 nType)
 {
-	// 슬롯 획득/락과 분리된 상태에서 새 커넥션을 별도로 생성해 대기 시간과 경쟁을 최소화
 	CBaseODBC* pNewConn = xnew<CBaseODBC>(_dbClass, _tszDSN);
 	if( pNewConn == nullptr )
 	{
@@ -147,8 +147,9 @@ CBaseODBC* COdbcConnPool::TryReconnect(int32 nType)
 }
 
 //***************************************************************************
-// 슬롯 참조 획득
-//***************************************************************************
+// @brief 지정한 슬롯 번호의 커넥션 참조를 획득합니다.
+// @param nType 가져올 커넥션 슬롯 인덱스 번호
+// @return 유효한 CBaseODBC 포인터, 실패 시 nullptr
 CBaseODBC* COdbcConnPool::GetOdbcConn(int32 nType)
 {
 	if( !IsValidIndex(nType) )
@@ -157,13 +158,9 @@ CBaseODBC* COdbcConnPool::GetOdbcConn(int32 nType)
 		return nullptr;
 	}
 
-	// 1. 참조 카운트를 낙관적으로 먼저 증가시켜, 재연결 워커가 삭제/재할당하지 못하도록 선점
 	_pRefCount[nType].value.fetch_add(1, std::memory_order_relaxed);
-
-	// 2. acquire로 최신 포인터 로드
 	CBaseODBC* pOdbcConn = _pOdbcConns[nType].value.load(std::memory_order_acquire);
 
-	// 3. 무효 상태면 선점 취소 후 nullptr 반환 (헬스체크가 감지해 재연결 위임)
 	if( pOdbcConn == nullptr || !pOdbcConn->IsConnected() )
 	{
 		_pRefCount[nType].value.fetch_sub(1, std::memory_order_release);
@@ -171,12 +168,13 @@ CBaseODBC* COdbcConnPool::GetOdbcConn(int32 nType)
 		return nullptr;
 	}
 
-	return pOdbcConn; // 호출자는 사용 후 반드시 ReleaseOdbcConn 필요
+	return pOdbcConn;
 }
 
 //***************************************************************************
-// PopFreeSlotIndex 이후 refcount 변경 없이 조회 (OdbcConnGuard 전용)
-//***************************************************************************
+// @brief 참조 카운트 변경 없이 슬롯의 커넥션을 조회합니다.
+// @param nType 조회할 슬롯 인덱스 번호
+// @return CBaseODBC 포인터, 유효하지 않은 경우 nullptr
 CBaseODBC* COdbcConnPool::GetPooledConnUnsafe(int32 nType) const
 {
 	if( !IsValidIndex(nType) ) return nullptr;
@@ -184,20 +182,17 @@ CBaseODBC* COdbcConnPool::GetPooledConnUnsafe(int32 nType) const
 }
 
 //***************************************************************************
-// 자원 반환
-//***************************************************************************
+// @brief 사용이 끝난 커넥션 슬롯의 참조 카운트를 감소시킵니다.
+// @param nType 반환할 커넥션 슬롯 인덱스 번호
 void COdbcConnPool::ReleaseOdbcConn(int32 nType)
 {
 	if( !IsValidIndex(nType) ) return;
-	// 카운트가 0이 되면 헬스체크/재연결 워커가 감지해 재활용 가능
 	_pRefCount[nType].value.fetch_sub(1, std::memory_order_release);
 }
 
-
-
 //***************************************************************************
-// 빈 슬롯 검색 및 즉시 선점 (실패 시 -1). 힌트 회전으로 경합 분산.
-//***************************************************************************
+// @brief 빈 슬롯을 탐색하고 즉시 선점합니다.
+// @return 선점 성공한 슬롯 인덱스 번호, 실패 시 -1
 int32 COdbcConnPool::PopFreeSlotIndex(void) {
 	uint32 nStart = _nNextSlotHint.fetch_add(1, std::memory_order_relaxed);
 
@@ -209,25 +204,24 @@ int32 COdbcConnPool::PopFreeSlotIndex(void) {
 			CBaseODBC* pConn = _pOdbcConns[i].value.load(std::memory_order_acquire);
 			if( pConn && pConn->IsConnected() ) return i;
 
-			_pRefCount[i].value.store(0, std::memory_order_release); // 잘못 선점한 슬롯 되돌림
+			_pRefCount[i].value.store(0, std::memory_order_release);
 		}
 	}
 	return -1;
 }
 
 //***************************************************************************
-// 재연결 워커가 새 커넥션 확보 후 호출하는 슬롯 교체 마무리
-//***************************************************************************
+// @brief 재연결 워커가 새로 확보한 커넥션을 슬롯에 교체(Swap) 적용합니다.
+// @param nType 교체 대상 슬롯 인덱스 번호
+// @param pNewConn 새로 연결된 CBaseODBC 객체 포인터
 void COdbcConnPool::ApplyReconnectedConn(int32 nType, CBaseODBC* pNewConn)
 {
-	// 대기 중 슬롯이 다시 사용 중으로 바뀌었다면 새 자원 폐기
 	if( _pRefCount[nType].value.load(std::memory_order_acquire) > 0 )
 	{
 		xdelete(pNewConn);
 		return;
 	}
 
-	// 슬롯 스핀락 하에서 교체(Swap)
 	CBaseODBC* pOldConn = nullptr;
 	{
 		SpinLockGuard<SpinLockPreset::Default> guard(_slotLocks[nType]);
@@ -237,9 +231,9 @@ void COdbcConnPool::ApplyReconnectedConn(int32 nType, CBaseODBC* pNewConn)
 
 	if( pOldConn == nullptr ) return;
 
-	// 교체 직후 낡은 자원을 참조 중이던 스레드가 빠져나갈 때까지 짧게 대기
 	auto startTime = std::chrono::steady_clock::now();
 	bool bTimeout = false;
+	int spinCount = 0;
 
 	while( _pRefCount[nType].value.load(std::memory_order_acquire) > 0 )
 	{
@@ -251,12 +245,20 @@ void COdbcConnPool::ApplyReconnectedConn(int32 nType, CBaseODBC* pNewConn)
 			bTimeout = true;
 			break;
 		}
-		std::this_thread::yield();
+
+		// CPU 공회전 방지를 위해 스핀 횟수가 넘어가면 짧게 슬립 수행
+		if( ++spinCount > 1000 )
+		{
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
+		else
+		{
+			std::this_thread::yield();
+		}
 	}
 
 	if( bTimeout )
 	{
-		// 타임아웃 초과 시 강제 삭제하면 UAF 위험 → 격리 큐로 편입
 		LOG_ERROR(_T("ReconnectWorker: Slot(%d) refcount high during swap. Moving to quarantine."), nType);
 
 		auto now = std::chrono::steady_clock::now();
@@ -265,33 +267,14 @@ void COdbcConnPool::ApplyReconnectedConn(int32 nType, CBaseODBC* pNewConn)
 	}
 	else
 	{
-		xdelete(pOldConn); // 참조 없음 확인 후 즉시 삭제
+		xdelete(pOldConn);
 	}
 }
 
 //***************************************************************************
-// steady_clock 기준 현재 시각 (밀리초, 백오프 비교용)
-//***************************************************************************
-int64 COdbcConnPool::NowMs(void)
-{
-	return std::chrono::duration_cast<std::chrono::milliseconds>(
-		std::chrono::steady_clock::now().time_since_epoch()).count();
-}
-
-//***************************************************************************
-// 슬롯이 지금 재연결 시도 가능한지 검사 (백오프 대기 중이면 false)
-//***************************************************************************
-bool COdbcConnPool::IsRetryAllowed(int32 nType) const
-{
-	int64 nNextAllowed = _pNextRetryAllowedMs[nType].value.load(std::memory_order_acquire);
-	return NowMs() >= nNextAllowed;
-}
-
-//***************************************************************************
-// 재연결 실패 처리: 실패 횟수 증가, 다음 허용 시각을 지수적으로(+지터) 연기
-// (DB 전체 다운 시 모든 슬롯이 동시에 재시도해 connection storm이 되는 것을 방지)
-//***************************************************************************
-void COdbcConnPool::OnReconnectFailed(int32 nType)
+// @brief 재연결 실패 시 지수 백오프 및 지터를 계산하여 재시도를 예약합니다.
+// @param nType 재시도가 실패한 슬롯 인덱스 번호
+void COdbcConnPool::ScheduleRetry(int32 nType)
 {
 	int32 nFailCount = _pRetryFailCount[nType].value.fetch_add(1, std::memory_order_acq_rel) + 1;
 
@@ -301,120 +284,170 @@ void COdbcConnPool::OnReconnectFailed(int32 nType)
 	int64 nBaseMs = _nBackoffBaseMs.load(std::memory_order_relaxed);
 	int64 nMaxMs = _nBackoffMaxMs.load(std::memory_order_relaxed);
 
-	int64 nDelayMs = nBaseMs << nShift; // BASE * 2^nShift
+	int64 nDelayMs = nBaseMs << nShift;
 	nDelayMs = std::min<int64>(nDelayMs, nMaxMs);
 
-	// 슬롯 간 재시도 타이밍이 겹치지 않도록 지터 추가
 	thread_local std::mt19937 rng(std::random_device{}());
 	int32 nJitterMax = _nBackoffJitterMs.load(std::memory_order_relaxed);
 	std::uniform_int_distribution<int32> jitterDist(0, std::max(nJitterMax, 0));
 	nDelayMs += jitterDist(rng);
 
-	_pNextRetryAllowedMs[nType].value.store(NowMs() + nDelayMs, std::memory_order_release);
-
-	LOG_DEBUG(_T("OnReconnectFailed: slot(%d) failCount(%d), next retry in %lldms"),
+	LOG_DEBUG(_T("ScheduleRetry: slot(%d) failCount(%d), retrying in %lldms"),
 		nType, nFailCount, static_cast<long long>(nDelayMs));
+
+	_delayedTaskQueue.Reserve(static_cast<int>(nDelayMs), [this, nType]() {
+		CBaseODBC* pCur = _pOdbcConns[nType].value.load(std::memory_order_acquire);
+		if( _pRefCount[nType].value.load(std::memory_order_acquire) == 0 &&
+			(pCur == nullptr || !pCur->IsConnected()) )
+		{
+			EnqueueReconnect(nType);
+		}
+		else
+		{
+			_pReconnecting[nType].value.store(false, std::memory_order_release);
+		}
+		});
 }
 
 //***************************************************************************
-// 재연결 성공 처리: 백오프 상태 초기화
+// @brief 재연결 실패 후속 처리를 수행합니다.
+// @param nType 실패한 슬롯 인덱스 번호
+void COdbcConnPool::OnReconnectFailed(int32 nType)
+{
+	ScheduleRetry(nType);
+}
+
 //***************************************************************************
+// @brief 재연결 성공 시 백오프 실패 카운트를 초기화합니다.
+// @param nType 성공한 슬롯 인덱스 번호
 void COdbcConnPool::OnReconnectSucceeded(int32 nType)
 {
 	_pRetryFailCount[nType].value.store(0, std::memory_order_relaxed);
-	_pNextRetryAllowedMs[nType].value.store(0, std::memory_order_release);
 }
 
 //***************************************************************************
-// 헬스체크 루프: 격리 큐 청소 + 죽은 슬롯 스캔/디스패치 (실제 재연결 I/O는 워커 풀에 위임, 논블로킹)
-//***************************************************************************
+// @brief 격리 큐 정리 및 끊긴 슬롯을 주기적으로 스캔하여 재연결 워커에 디스패치합니다.
 void COdbcConnPool::HealthCheckLoop(void)
 {
-	// 매 주기 재할당 비용을 없애기 위해 루프 밖에서 한 번만 생성, capacity 재사용
 	CVector<CBaseODBC*> vDeletes;
 
 	while( !_bStopHealthCheck.load(std::memory_order_relaxed) )
 	{
 		vDeletes.clear();
 
-		// PART A: 격리 큐 청소 (락 안에서는 분류만, 삭제는 락 밖에서)
 		{
 			SpinLockGuard<SpinLockPreset::Default> qGuard(_globalQuarantineLock);
-			size_t qSize = _quarantineQueue.size(); // 이번 순회에서 새로 들어온 항목은 제외
+			size_t qSize = _quarantineQueue.size();
 
 			for( size_t k = 0; k < qSize; ++k )
 			{
 				TQuarantineItem item = _quarantineQueue.front();
 				_quarantineQueue.pop();
 
-				if( item.pRefCount->load(std::memory_order_acquire) == 0 )
+				auto now = std::chrono::steady_clock::now();
+				auto elapsedTotal = std::chrono::duration_cast<std::chrono::milliseconds>(
+					now - item.lastLogTime).count(); // 최초 혹은 갱신 시각 기준 경과
+
+				// 참조 카운트가 0이 되었거나, 허용 체류 시간을 초과한 경우 강제 회수
+				if( item.pRefCount->load(std::memory_order_acquire) == 0 || elapsedTotal >= FORCE_CLEANUP_TIMEOUT_MS )
 				{
 					if( item.pConn != nullptr )
 					{
-						vDeletes.push_back(item.pConn); // 락 밖에서 삭제하도록 적재
+						if( elapsedTotal >= FORCE_CLEANUP_TIMEOUT_MS )
+						{
+							LOG_ERROR(_T("Quarantine Force Cleanup: Connection exceeded max quarantine time. Forcibly deleting to prevent memory leak."));
+						}
+						vDeletes.push_back(item.pConn);
 					}
 				}
 				else
 				{
-					// 5분 주기로만 경고 로그 (반복 로그 남발 방지)
-					auto now = std::chrono::steady_clock::now();
 					auto elapsedFromLastLog = std::chrono::duration_cast<std::chrono::milliseconds>(
 						now - item.lastLogTime).count();
 
 					if( elapsedFromLastLog >= LOG_ALERT_INTERVAL_MS )
 					{
 						LOG_ERROR(_T("Quarantine Persistent Warning: Connection is still stuck in quarantine! Potential leak in application logic."));
-						item.lastLogTime = now;
+						item.lastLogTime = now; // 주의: lastLogTime 갱신 시점 조율 필요할 수 있음
 					}
 
-					_quarantineQueue.push(item); // 아직 해제 불가, 재삽입
+					_quarantineQueue.push(item);
 				}
 			}
-		} // qGuard 해제
+		}
 
-		// PART A-1: 락 바깥에서 실제 삭제
 		for( int32 i = 0; i < vDeletes.size(); ++i )
 		{
 			xdelete(vDeletes[i]);
 			LOG_DEBUG(_T("Quarantine: Safely deleted stalled connection outside the lock."));
 		}
 
-		// PART B: 죽은 슬롯 스캔 및 재연결 디스패치 (블로킹 없음)
 		for( int32 i = 0; i < _nMaxPoolSize && !_bStopHealthCheck.load(std::memory_order_relaxed); i++ )
 		{
-			if( _pRefCount[i].value.load(std::memory_order_acquire) > 0 ) continue;      // 사용 중이면 패스
+			if( _pRefCount[i].value.load(std::memory_order_acquire) > 0 ) continue;
 
 			CBaseODBC* pCur = _pOdbcConns[i].value.load(std::memory_order_acquire);
-			if( pCur != nullptr && pCur->IsConnected() ) continue;                 // 정상 연결이면 패스
-
-			if( !IsRetryAllowed(i) ) continue;                                     // 백오프 대기 중이면 패스
+			if( pCur != nullptr && pCur->IsConnected() ) continue;
 
 			bool bExpected = false;
 			if( !_pReconnecting[i].value.compare_exchange_strong(bExpected, true, std::memory_order_acq_rel) )
-				continue;                                                          // 이미 처리 중이면 패스
+				continue;
 
-			EnqueueReconnect(i); // 실제 재연결은 워커 풀에 위임
+			if( _pRetryFailCount[i].value.load(std::memory_order_relaxed) == 0 )
+			{
+				EnqueueReconnect(i);
+			}
+			else
+			{
+				_pReconnecting[i].value.store(false, std::memory_order_release);
+			}
 		}
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(_nHealthCheckIntervalMs));
 	}
 }
 
+//***************************************************************************
+// @brief 헬스체크 스레드를 생성하고 구동을 시작합니다.
 void COdbcConnPool::StartHealthCheckThread(void)
 {
 	_bStopHealthCheck.store(false, std::memory_order_relaxed);
 	_healthCheckThreadMgr.CreateThread([this]() { HealthCheckLoop(); });
 }
 
+//***************************************************************************
+// @brief 헬스체크 스레드를 안전하게 종료하고 대기합니다.
 void COdbcConnPool::StopHealthCheckThread(void)
 {
 	_bStopHealthCheck.store(true, std::memory_order_relaxed);
-	_healthCheckThreadMgr.JoinThreads(); // 완전 종료 확인
+	_healthCheckThreadMgr.JoinThreads();
 }
 
 //***************************************************************************
-// 재연결 대기열에 슬롯을 넣고 워커 하나를 깨움
+// @brief CDelayedTaskQueue의 만료 작업 처리 루프 함수입니다.
+void COdbcConnPool::DelayedTaskLoop(void)
+{
+	_delayedTaskQueue.ProcessExpiredTasks();
+}
+
 //***************************************************************************
+// @brief 지연 타이머 큐 전용 스레드를 생성하고 구동을 시작합니다.
+void COdbcConnPool::StartDelayedTaskThread(void)
+{
+	_delayedTaskThreadMgr.CreateThread([this]() { DelayedTaskLoop(); });
+}
+
+//***************************************************************************
+// @brief 지연 타이머 큐 스레드를 안전하게 중지하고 종료를 대기합니다.
+void COdbcConnPool::StopDelayedTaskThread(void)
+{
+	_delayedTaskQueue.Stop();
+	_delayedTaskThreadMgr.JoinThreads();
+}
+
+//***************************************************************************
+// @brief 재연결이 필요한 슬롯 인덱스를 대기열에 넣고 워커 스레드를 깨웁니다.
+// @param nType 재연결 대상 슬롯 인덱스 번호
 void COdbcConnPool::EnqueueReconnect(int32 nType)
 {
 	{
@@ -425,9 +458,8 @@ void COdbcConnPool::EnqueueReconnect(int32 nType)
 }
 
 //***************************************************************************
-// 이 워커가 초과 인원인지 CAS로 판정, 초과면 카운트 감소 후 true 반환
-// (동시에 여러 워커가 판정해도 목표치 초과분만 정확히 빠짐)
-//***************************************************************************
+// @brief 현재 워커 스레드가 목표치를 초과하는지 검사하고 초과 시 스스로 감축합니다.
+// @return 초과 워커로 판정되어 자가 종료하는 경우 true, 아니면 false
 bool COdbcConnPool::TryExitIfExcess(void)
 {
 	int32 nCur = _nCurrentWorkerCount.load(std::memory_order_acquire);
@@ -438,19 +470,16 @@ bool COdbcConnPool::TryExitIfExcess(void)
 			LOG_DEBUG(_T("ReconnectWorker: self-exiting as excess worker (target reached)"));
 			return true;
 		}
-		// CAS 실패 시 nCur가 최신값으로 갱신되어 재평가됨
 	}
 	return false;
 }
 
 //***************************************************************************
-// 재연결 워커 루프: 대기열에서 슬롯을 꺼내 TryReconnect(I/O) + 스왑을 병렬 수행
-//***************************************************************************
+// @brief 재연결 워커 스레드의 메인 루프 함수입니다.
 void COdbcConnPool::ReconnectWorkerLoop(void)
 {
 	while( true )
 	{
-		// 매 순회 시작 시 스스로 초과 인원인지 확인 (SetWorkerCount 축소 요청 즉시 반영)
 		if( TryExitIfExcess() ) return;
 
 		int32 nType;
@@ -466,24 +495,22 @@ void COdbcConnPool::ReconnectWorkerLoop(void)
 			if( _bStopReconnectWorkers.load(std::memory_order_relaxed) && _reconnectPendingSlots.empty() )
 				return;
 
-			if( _reconnectPendingSlots.empty() ) continue; // TryExitIfExcess 재확인으로 복귀
+			if( _reconnectPendingSlots.empty() ) continue;
 
 			nType = _reconnectPendingSlots.front();
 			_reconnectPendingSlots.pop();
 		}
 
-		// 대기 중 슬롯이 이미 다시 사용 중이면 재연결 불필요
 		if( _pRefCount[nType].value.load(std::memory_order_acquire) > 0 )
 		{
 			_pReconnecting[nType].value.store(false, std::memory_order_release);
 			continue;
 		}
 
-		// 블로킹 I/O 구간 — 다른 워커는 각자 슬롯을 병렬 처리
 		CBaseODBC* pNewConn = TryReconnect(nType);
 		if( pNewConn == nullptr )
 		{
-			OnReconnectFailed(nType); // 실패 시 백오프 적용, 다음 헬스체크 순회에서 재큐잉
+			OnReconnectFailed(nType);
 			_pReconnecting[nType].value.store(false, std::memory_order_release);
 			continue;
 		}
@@ -496,13 +523,12 @@ void COdbcConnPool::ReconnectWorkerLoop(void)
 }
 
 //***************************************************************************
-// nWorkerCount개의 워커 스레드로 재연결 풀 신규 기동 (Init 전용)
-//***************************************************************************
+// @brief 지정한 수만큼의 재연결 워커 스레드들을 생성하고 기동합니다.
+// @param nWorkerCount 생성할 워커 스레드 개수
 void COdbcConnPool::StartReconnectWorkers(int32 nWorkerCount)
 {
 	_bStopReconnectWorkers.store(false, std::memory_order_relaxed);
 
-	// 방어적 최소값 보정 (ValidateReconnectConfig를 거쳤다면 정상적으로는 발생하지 않음)
 	int32 nClamped = std::max(nWorkerCount, 1);
 	if( nClamped != nWorkerCount )
 	{
@@ -521,22 +547,20 @@ void COdbcConnPool::StartReconnectWorkers(int32 nWorkerCount)
 	_nCurrentWorkerCount.store(nClamped, std::memory_order_release);
 }
 
+//***************************************************************************
+// @brief 모든 재연결 워커 스레드를 종료시키고 완료를 대기합니다.
 void COdbcConnPool::StopReconnectWorkers(void)
 {
 	_bStopReconnectWorkers.store(true, std::memory_order_relaxed);
-	_reconnectQueueCv.notify_all(); // 대기 중인 모든 워커를 깨워 종료 조건 확인
+	_reconnectQueueCv.notify_all();
 	_reconnectWorkerMgr.JoinThreads();
 	_nCurrentWorkerCount.store(0, std::memory_order_relaxed);
 	_nDesiredWorkerCount.store(0, std::memory_order_relaxed);
 }
 
 //***************************************************************************
-// 목표 워커 수 갱신 (SetReconnectConfig 전용)
-// 확대: 목표치 즉시 갱신 후 부족분만큼 CAS로 조율하며 스폰 (중복 스폰 방지)
-// 축소: 스레드를 직접 건드리지 않고 목표치만 낮춘 뒤 조건변수로 깨움 →
-//       각 워커가 다음 순회에서 TryExitIfExcess()로 스스로 종료 판단.
-//       반복/역전 호출이 있어도 항상 최종 목표치로 정확히 수렴.
-//***************************************************************************
+// @brief 런타임에 목표 재연결 워커 스레드 개수를 동적으로 조정합니다.
+// @param nNewCount 변경할 목표 워커 스레드 수
 void COdbcConnPool::SetWorkerCount(int32 nNewCount)
 {
 	nNewCount = std::max(nNewCount, 1);
@@ -546,14 +570,12 @@ void COdbcConnPool::SetWorkerCount(int32 nNewCount)
 	if( nExpected < nNewCount )
 	{
 		int32 nBefore = nExpected;
-		// CAS로 목표치까지 원자적으로 끌어올려 실제 스폰할 정확한 개수를 결정
 		while( nExpected < nNewCount &&
 			!_nCurrentWorkerCount.compare_exchange_weak(nExpected, nNewCount, std::memory_order_acq_rel) )
 		{
-			// CAS 실패 시 nExpected 최신값으로 재평가
 		}
 
-		if( nExpected < nNewCount ) // CAS 성공 시에만 그만큼 스폰
+		if( nExpected < nNewCount )
 		{
 			int32 nToAdd = nNewCount - nExpected;
 			for( int32 i = 0; i < nToAdd; ++i )
@@ -565,14 +587,15 @@ void COdbcConnPool::SetWorkerCount(int32 nNewCount)
 	}
 	else
 	{
-		_reconnectQueueCv.notify_all(); // 축소는 워커 스스로 판단하도록 깨우기만 함
+		_reconnectQueueCv.notify_all();
 		LOG_DEBUG(_T("SetWorkerCount: target worker count decreased to %d, workers will self-exit"), nNewCount);
 	}
 }
 
 //***************************************************************************
-// 재연결 백오프 정책과 워커 수를 런타임에 조정
-//***************************************************************************
+// @brief 재연결 백오프 정책 및 워커 스레드 설정을 런타임에 일괄 변경합니다.
+// @param reconnectConfig 적용할 새로운 TReconnectConfig 설정 구조체
+// @return 설정 변경 성공 시 true, 유효성 검사 실패 시 false
 bool COdbcConnPool::SetReconnectConfig(const TReconnectConfig& reconnectConfig)
 {
 	if( !ValidateReconnectConfig(reconnectConfig) )
@@ -581,21 +604,19 @@ bool COdbcConnPool::SetReconnectConfig(const TReconnectConfig& reconnectConfig)
 		return false;
 	}
 
-	// 필드별 독립 원자 변수라 완전 동기 스냅샷은 아니지만, 각 값이 개별 판단에만 쓰여 문제 없음
 	_nBackoffBaseMs.store(reconnectConfig.nBackoffBaseMs, std::memory_order_relaxed);
 	_nBackoffMaxMs.store(reconnectConfig.nBackoffMaxMs, std::memory_order_relaxed);
 	_nBackoffMaxShift.store(reconnectConfig.nBackoffMaxShift, std::memory_order_relaxed);
 	_nBackoffJitterMs.store(reconnectConfig.nBackoffJitterMs, std::memory_order_relaxed);
 
-	// 워커 수는 스레드 기동/종료 조율이 필요해 별도 경로로 처리
 	SetWorkerCount(reconnectConfig.nWorkerCount);
 
 	return true;
 }
 
 //***************************************************************************
-// 현재 재연결 설정 스냅샷 조회
-//***************************************************************************
+// @brief 현재 적용된 재연결 정책 설정을 조회합니다.
+// @return 현재 설정값이 담긴 TReconnectConfig 구조체
 COdbcConnPool::TReconnectConfig COdbcConnPool::GetReconnectConfig(void) const
 {
 	TReconnectConfig cfg;
@@ -608,8 +629,7 @@ COdbcConnPool::TReconnectConfig COdbcConnPool::GetReconnectConfig(void) const
 }
 
 //***************************************************************************
-// 풀 자원 최종 청소 (Shutdown)
-//***************************************************************************
+// @brief 풀이 소멸되거나 재초기화될 때 내부 모든 커넥션 자원과 격리 큐를 안전하게 해제합니다.
 void COdbcConnPool::Clear(void)
 {
 	auto now = std::chrono::steady_clock::now();
@@ -622,8 +642,8 @@ void COdbcConnPool::Clear(void)
 
 		auto startTime = std::chrono::steady_clock::now();
 		bool bTimeout = false;
+		int spinCount = 0;
 
-		// 사용 중인 스레드가 이탈할 때까지 대기
 		while( _pRefCount[i].value.load(std::memory_order_acquire) > 0 )
 		{
 			auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -634,7 +654,15 @@ void COdbcConnPool::Clear(void)
 				bTimeout = true;
 				break;
 			}
-			std::this_thread::yield();
+
+			if( ++spinCount > 1000 )
+			{
+				std::this_thread::sleep_for(std::chrono::milliseconds(1));
+			}
+			else
+			{
+				std::this_thread::yield();
+			}
 		}
 
 		if( bTimeout )
@@ -646,13 +674,12 @@ void COdbcConnPool::Clear(void)
 		}
 		else
 		{
-			xdelete(pConn); // 참조 없음, 즉시 삭제
+			xdelete(pConn);
 		}
 
 		_pOdbcConns[i].value.store(nullptr, std::memory_order_relaxed);
 	}
 
-	// 셧다운 시점 격리 큐 처리 (락-밖 소멸 유지)
 	{
 		SpinLockGuard<SpinLockPreset::Default> qGuard(_globalQuarantineLock);
 		while( !_quarantineQueue.empty() )
@@ -664,12 +691,11 @@ void COdbcConnPool::Clear(void)
 			{
 				if( item.pConn != nullptr )
 				{
-					vShutdownDeletes.push_back(item.pConn); // 락 밖에서 최종 삭제
+					vShutdownDeletes.push_back(item.pConn);
 				}
 			}
 			else
 			{
-				// [Safe Leak] 셧다운 시점 UAF 크래시를 방지하기 위해 삭제를 의도적으로 방기
 				LOG_ERROR(_T("Clear: Abandoning leaked connection to prevent Use-After-Free crash."));
 			}
 		}

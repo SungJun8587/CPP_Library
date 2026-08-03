@@ -6,10 +6,6 @@
 
 #include "pch.h"
 #include "WebUtil.h"
-#include "ConvertCharset.h" // ConvertCharset 함수 사용을 위한 헤더 포함
-
-#include <array>
-#include <cstring>
 
 //***************************************************************************
 static const char g_pcDigits[16] = {

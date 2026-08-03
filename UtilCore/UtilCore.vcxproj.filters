@@ -37,6 +37,9 @@
     <Filter Include="DB\ADO">
       <UniqueIdentifier>{9ce0ceff-384e-4b4b-a2bb-bd3c88850848}</UniqueIdentifier>
     </Filter>
+    <Filter Include="ThreadSafeContainers">
+      <UniqueIdentifier>{7ce0c387-18f4-477b-8495-22b140d1f8a0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Memory\Containers.h">
@@ -77,15 +80,6 @@
       <Filter>Thread</Filter>
     </ClInclude>
     <ClInclude Include="UtilCore.h" />
-    <ClInclude Include="Memory\OrderedMap.h">
-      <Filter>Memory</Filter>
-    </ClInclude>
-    <ClInclude Include="Memory\UnOrderedMap.h">
-      <Filter>Memory</Filter>
-    </ClInclude>
-    <ClInclude Include="Memory\ClusteredMap.h">
-      <Filter>Memory</Filter>
-    </ClInclude>
     <ClInclude Include="BaseDefine.h" />
     <ClInclude Include="BaseGlobal.h" />
     <ClInclude Include="BaseMacro.h" />
@@ -136,7 +130,7 @@
     <ClInclude Include="Util\CommonUtil.h">
       <Filter>Util</Filter>
     </ClInclude>
-    <ClInclude Include="Util\ConvertCharset.h">
+    <ClInclude Include="Util\WinCharsetConv.h">
       <Filter>Util</Filter>
     </ClInclude>
     <ClInclude Include="Util\DateTimeUtil.h">
@@ -208,9 +202,6 @@
     <ClInclude Include="Memory\ObjectPool.h">
       <Filter>Memory</Filter>
     </ClInclude>
-    <ClInclude Include="Job\LockQueue.h">
-      <Filter>Job</Filter>
-    </ClInclude>
     <ClInclude Include="Job\JobQueue.h">
       <Filter>Job</Filter>
     </ClInclude>
@@ -240,6 +231,30 @@
     </ClInclude>
     <ClInclude Include="DB\ADO\AdoDB.h">
       <Filter>DB\ADO</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\EncodingConvert.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="ThreadSafeContainers\ClusterSpinMap.h">
+      <Filter>ThreadSafeContainers</Filter>
+    </ClInclude>
+    <ClInclude Include="ThreadSafeContainers\OrderedMap.h">
+      <Filter>ThreadSafeContainers</Filter>
+    </ClInclude>
+    <ClInclude Include="ThreadSafeContainers\UnOrderedMap.h">
+      <Filter>ThreadSafeContainers</Filter>
+    </ClInclude>
+    <ClInclude Include="ThreadSafeContainers\SpinLockQueue.h">
+      <Filter>ThreadSafeContainers</Filter>
+    </ClInclude>
+    <ClInclude Include="ThreadSafeContainers\BlockingTaskQueue.h">
+      <Filter>ThreadSafeContainers</Filter>
+    </ClInclude>
+    <ClInclude Include="ThreadSafeContainers\DelayedTaskQueue.h">
+      <Filter>ThreadSafeContainers</Filter>
+    </ClInclude>
+    <ClInclude Include="ThreadSafeContainers\SwapQueue.h">
+      <Filter>ThreadSafeContainers</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -271,9 +286,6 @@
     <ClCompile Include="DB\MySQL\MySQLConnPool.cpp">
       <Filter>DB\MySQL</Filter>
     </ClCompile>
-    <ClCompile Include="Memory\ClusteredMap.cpp">
-      <Filter>Memory</Filter>
-    </ClCompile>
     <ClCompile Include="BaseGlobal.cpp" />
     <ClCompile Include="ServerConfig.cpp" />
     <ClCompile Include="ServiceSvr.cpp" />
@@ -287,7 +299,7 @@
     <ClCompile Include="Util\CommonUtil.cpp">
       <Filter>Util</Filter>
     </ClCompile>
-    <ClCompile Include="Util\ConvertCharset.cpp">
+    <ClCompile Include="Util\WinCharsetConv.cpp">
       <Filter>Util</Filter>
     </ClCompile>
     <ClCompile Include="Util\DateTimeUtil.cpp">
@@ -362,9 +374,6 @@
     <ClCompile Include="Job\GlobalQueue.cpp">
       <Filter>Job</Filter>
     </ClCompile>
-    <ClCompile Include="Job\LockQueue.cpp">
-      <Filter>Job</Filter>
-    </ClCompile>
     <ClCompile Include="Memory\Allocator.cpp">
       <Filter>Memory</Filter>
     </ClCompile>
@@ -382,6 +391,12 @@
     </ClCompile>
     <ClCompile Include="DB\ADO\AdoDB.cpp">
       <Filter>DB\ADO</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\EncodingConvert.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="ThreadSafeContainers\ClusterSpinMap.cpp">
+      <Filter>ThreadSafeContainers</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -403,12 +418,6 @@
     <None Include="Memory\Singleton.inl">
       <Filter>Memory</Filter>
     </None>
-    <None Include="Memory\OrderedMap.inl">
-      <Filter>Memory</Filter>
-    </None>
-    <None Include="Memory\UnOrderedMap.inl">
-      <Filter>Memory</Filter>
-    </None>
     <None Include="JSON\RapidJSONUtil.inl">
       <Filter>JSON</Filter>
     </None>
@@ -423,6 +432,12 @@
     </None>
     <None Include="Job\JobQueue.inl">
       <Filter>Job</Filter>
+    </None>
+    <None Include="ThreadSafeContainers\OrderedMap.inl">
+      <Filter>ThreadSafeContainers</Filter>
+    </None>
+    <None Include="ThreadSafeContainers\UnOrderedMap.inl">
+      <Filter>ThreadSafeContainers</Filter>
     </None>
   </ItemGroup>
 </Project>

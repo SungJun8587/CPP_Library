@@ -16,9 +16,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
-    <ClInclude Include="..\..\UtilCore\Util\ConvertCharset.h">
-      <Filter>UtilCore\Util</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\UtilCore\Util\EncodingConvert.h">
       <Filter>UtilCore\Util</Filter>
     </ClInclude>
@@ -41,13 +38,13 @@
     <ClInclude Include="..\..\UtilCore\Util\FileUtil.h">
       <Filter>UtilCore\Util</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\UtilCore\Util\WinCharsetConv.h">
+      <Filter>UtilCore\Util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp" />
     <ClCompile Include="ShellUtilTest.cpp" />
-    <ClCompile Include="..\..\UtilCore\Util\ConvertCharset.cpp">
-      <Filter>UtilCore\Util</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\UtilCore\Util\EncodingConvert.cpp">
       <Filter>UtilCore\Util</Filter>
     </ClCompile>
@@ -59,6 +56,9 @@
     </ClCompile>
     <ClCompile Include="TestFunction.cpp" />
     <ClCompile Include="..\..\UtilCore\Util\FileUtil.cpp">
+      <Filter>UtilCore\Util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\UtilCore\Util\WinCharsetConv.cpp">
       <Filter>UtilCore\Util</Filter>
     </ClCompile>
   </ItemGroup>

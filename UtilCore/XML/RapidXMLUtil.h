@@ -85,7 +85,7 @@ private:
 	string TcharToUtf8(const _tstring& input) const
 	{
 #ifdef UNICODE
-		return _unicodeToUtf8->WCharToUtf8(input);
+		return _unicodeToUtf8->Convert(input);
 #else
 		return input;
 #endif
@@ -96,7 +96,7 @@ private:
 	_tstring Utf8ToTchar(const string& input) const
 	{
 #ifdef UNICODE
-		return _utf8ToUnicode->Utf8ToWChar(input);
+		return _utf8ToUnicode->ConvertW(input);
 #else
 		return input;
 #endif
@@ -309,7 +309,7 @@ private:
 	string TcharToUtf8(const _tstring& input) const
 	{
 #ifdef UNICODE
-		return _unicodeToUtf8->WCharToUtf8(input);
+		return _unicodeToUtf8->Convert(input);
 #else
 		return input;
 #endif
@@ -320,7 +320,7 @@ private:
 	_tstring Utf8ToTchar(const string& input) const
 	{
 #ifdef UNICODE
-		return _utf8ToUnicode->Utf8ToWChar(input);
+		return _utf8ToUnicode->ConvertW(input);
 #else
 		return input;
 #endif	

@@ -14,7 +14,7 @@ void CJobTimer::Reserve(uint64 tickAfterMs, weak_ptr<CJobQueue> owner, CJobRef j
 
 	JobData* jobData = CObjectPool<JobData>::Pop(owner, job);
 
-	WRITE_LOCK;
+	RWSPIN_WRITE_LOCK;
 	_items.push(TimerItem{ executeTick, jobData });
 }
 
@@ -26,7 +26,7 @@ void CJobTimer::Distribute(uint64 now)
 
 	CVector<TimerItem> items;
 	{
-		WRITE_LOCK;
+		RWSPIN_WRITE_LOCK;
 		while( _items.empty() == false )
 		{
 			const TimerItem& timerItem = _items.top();
@@ -52,7 +52,7 @@ void CJobTimer::Distribute(uint64 now)
 
 void CJobTimer::Clear()
 {
-	WRITE_LOCK;
+	RWSPIN_WRITE_LOCK;
 	while( _items.empty() == false )
 	{
 		const TimerItem& timerItem = _items.top();

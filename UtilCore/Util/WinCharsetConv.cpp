@@ -1,11 +1,11 @@
 ﻿
 //***************************************************************************
-// ConvertCharset.cpp: implementation of the ConvertCharset Functions.
+// WinCharsetConv.cpp: implementation of the WinCharsetConv Functions.
 //
 //***************************************************************************
 
 #include "pch.h"
-#include "ConvertCharset.h"
+#include "WinCharsetConv.h"
 
 //***************************************************************************
 // @brief TCHAR 문자열의 변환될 멀티바이트 길이(바이트 수)를 계산합니다.

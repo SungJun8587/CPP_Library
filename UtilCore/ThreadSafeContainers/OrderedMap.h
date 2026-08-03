@@ -1,28 +1,32 @@
 
 //***************************************************************************
-// UnOrderedMap.h : interface for the CUnOrderedMap class.
+// OrderedMap.h : interface for the COrderedMap class.
 //
 //***************************************************************************
 
-#ifndef __UNORDEREDMAP_H__
-#define __UNORDEREDMAP_H__
+#ifndef __ORDEREDMAP_H__
+#define __ORDEREDMAP_H__
+
+#ifndef __BASEREDEFINEDATATYPE_H__
+#include <BaseRedefineDataType.h>
+#endif
 
 #ifndef	__ALLOCATOR_H__
 #include <Memory/Allocator.h>
 #endif
 
-#include <unordered_map>
+#include <map>
 #include <shared_mutex>
 
 template<typename T1, typename T2>
-class CUnOrderedMap : public BaseAllocator
+class COrderedMap : public BaseAllocator
 {
 public:
-	typedef std::unordered_map<T1, T2> ObjectMap;
+	typedef std::map<T1, T2> ObjectMap;
 
 public:
-	CUnOrderedMap(void);
-	virtual	~CUnOrderedMap(void);
+	COrderedMap(void);
+	virtual	~COrderedMap(void);
 
 	bool				InsertObject(const T1& key, const T2& object);
 	bool				InsertAndUpdateObject(const T1& key, const T2& object);
@@ -45,6 +49,6 @@ protected:
 	std::shared_mutex	_mutex;
 };
 
-#include "UnOrderedMap.inl"
+#include "OrderedMap.inl"
 
-#endif // ndef __UNORDEREDMAP_H__
+#endif // ndef __ORDEREDMAP_H__

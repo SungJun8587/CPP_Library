@@ -6,14 +6,13 @@
 
 #include "pch.h"
 #include "BaseMySQL.h"
-#include <vector>
 
 //***************************************************************************
 // Construction/Destruction 
 //***************************************************************************
 
 CBaseMySQL::CBaseMySQL()
-	: m_pConn(nullptr), m_pStmt(nullptr), m_uiPort(0), m_bConnected(false)
+	: m_pConn(nullptr), m_pStmt(nullptr), m_uiPort(0), m_bConnected(false), m_bInTransaction(false)
 {
 	memset(&m_szDBHost[0], 0, DATABASE_NAME_STRLEN);
 	memset(&m_szDBUserId[0], 0, DATABASE_NAME_STRLEN);
@@ -27,7 +26,7 @@ CBaseMySQL::CBaseMySQL()
 //***************************************************************************
 //
 CBaseMySQL::CBaseMySQL(const char* pszDBHost, const char* pszDBUserId, const char* pszDBPasswd, const char* pszDBName, const unsigned int nPort)
-	: m_pConn(nullptr), m_pStmt(nullptr), m_bConnected(false)
+	: m_pConn(nullptr), m_pStmt(nullptr), m_bConnected(false), m_bInTransaction(false)
 {
 	strncpy_s(m_szDBHost, _countof(m_szDBHost), pszDBHost, _TRUNCATE);
 	strncpy_s(m_szDBUserId, _countof(m_szDBUserId), pszDBUserId, _TRUNCATE);
@@ -49,13 +48,13 @@ CBaseMySQL::~CBaseMySQL()
 
 //***************************************************************************
 //
-bool CBaseMySQL::Connect(const uint32 uiConnectTimeOut, const uint32 uiReadTimeOut, const uint32 uiWriteTimeOut, const char *pszPluginDir)
+bool CBaseMySQL::Connect(const uint32 uiConnectTimeOut, const uint32 uiReadTimeOut, const uint32 uiWriteTimeOut, const char* pszPluginDir)
 {
 	if( m_bConnected ) return true;
 
-	if( !m_szDBHost ) return false;
+	if( m_szDBHost[0] == '\0' ) return false;
 
-	try 
+	try
 	{
 		m_pConn = mysql_init(nullptr);
 		if( !m_pConn )
@@ -149,6 +148,7 @@ bool CBaseMySQL::Disconnect()
 		m_pConn = nullptr;
 	}
 	m_bConnected = false;
+	m_bInTransaction = false;	// 연결이 끊기면 서버 측 트랜잭션도 더 이상 유효하지 않음
 
 	LOG_DEBUG(_T("%s"), __TFUNCTION__);
 
@@ -201,9 +201,10 @@ bool CBaseMySQL::GetServerInfo(TCHAR* ptszServerInfo, int32 nBufferLength)
 	if( !pszServerInfo ) return false;
 
 #ifdef _UNICODE
-	int nLength = MultiByteToWideChar(CP_ACP, 0, pszServerInfo, -1, NULL, 0);
-	if( nLength == 0 || nBufferLength < nLength ) return false;
-	if( MultiByteToWideChar(CP_ACP, 0, pszServerInfo, -1, ptszServerInfo, nLength) == 0 ) return false;
+	std::wstring wstrServerInfo = AnsiToUnicode(pszServerInfo);
+	if( nBufferLength < (int32)(wstrServerInfo.size() + 1) ) return false;
+
+	wcsncpy_s(ptszServerInfo, nBufferLength, wstrServerInfo.c_str(), _TRUNCATE);
 #else
 	strncpy_s(ptszServerInfo, nBufferLength, pszServerInfo, _TRUNCATE);
 #endif
@@ -225,9 +226,10 @@ bool CBaseMySQL::GetHostInfo(TCHAR* ptszHostInfo, int32 nBufferLength)
 	if( !pszHostInfo ) return false;
 
 #ifdef _UNICODE
-	int nLength = MultiByteToWideChar(CP_ACP, 0, pszHostInfo, -1, NULL, 0);
-	if( nLength == 0 || nBufferLength < nLength ) return false;
-	if( MultiByteToWideChar(CP_ACP, 0, pszHostInfo, -1, ptszHostInfo, nLength) == 0 ) return false;
+	std::wstring wstrHostInfo = AnsiToUnicode(pszHostInfo);
+	if( nBufferLength < (int32)(wstrHostInfo.size() + 1) ) return false;
+
+	wcsncpy_s(ptszHostInfo, nBufferLength, wstrHostInfo.c_str(), _TRUNCATE);
 #else
 	strncpy_s(ptszHostInfo, nBufferLength, pszHostInfo, _TRUNCATE);
 #endif
@@ -262,9 +264,10 @@ bool CBaseMySQL::GetClientInfo(TCHAR* ptszClientInfo, int32 nBufferLength)
 	if( !pszClientInfo ) return false;
 
 #ifdef _UNICODE
-	int nLength = MultiByteToWideChar(CP_ACP, 0, pszClientInfo, -1, NULL, 0);
-	if( nLength == 0 || nBufferLength < nLength ) return false;
-	if( MultiByteToWideChar(CP_ACP, 0, pszClientInfo, -1, ptszClientInfo, nLength) == 0 ) return false;
+	std::wstring wstrClientInfo = AnsiToUnicode(pszClientInfo);
+	if( nBufferLength < (int32)(wstrClientInfo.size() + 1) ) return false;
+
+	wcsncpy_s(ptszClientInfo, nBufferLength, wstrClientInfo.c_str(), _TRUNCATE);
 #else
 	strncpy_s(ptszClientInfo, nBufferLength, pszClientInfo, _TRUNCATE);
 #endif
@@ -300,14 +303,13 @@ bool CBaseMySQL::SetCharacterSetName(const TCHAR* ptszCharacterSetName, int32 nB
 		return false;
 
 #ifdef _UNICODE	
-	// 유니코드(UTF-16) 문자열을 MySQL에서 사용하는 UTF-8 멀티바이트로 변환
-	// cchWideChar에는 실제 데이터 길이(nDataLength)를 전달합니다.
-	int nLength = WideCharToMultiByte(CP_UTF8, 0, ptszCharacterSetName, nDataLength, NULL, 0, NULL, NULL);
-	if( nLength <= 0 || static_cast<size_t>(nLength) >= _countof(m_szCharacterSet) )
+	// 유니코드(UTF-16) 문자열을 MySQL에서 사용하는 UTF-8 멀티바이트로 변환 (실제 데이터 길이 nDataLength 기준)
+	std::wstring wstrCharacterSetName(ptszCharacterSetName, nDataLength);
+	std::string strUtf8 = UnicodeToUtf8(wstrCharacterSetName);
+	if( strUtf8.empty() || strUtf8.size() >= _countof(m_szCharacterSet) )
 		return false;
 
-	if( WideCharToMultiByte(CP_UTF8, 0, ptszCharacterSetName, nDataLength, m_szCharacterSet, static_cast<int>(_countof(m_szCharacterSet)), NULL, NULL) == 0 )
-		return false;
+	strncpy_s(m_szCharacterSet, _countof(m_szCharacterSet), strUtf8.c_str(), _TRUNCATE);
 #else
 	// 멀티바이트 문자열 안전한 복사 (실제 데이터 길이 기준)
 	if( strncpy_s(m_szCharacterSet, _countof(m_szCharacterSet), ptszCharacterSetName, nDataLength) != 0 )
@@ -340,12 +342,11 @@ bool CBaseMySQL::GetCharacterSetName(TCHAR* ptszCharacterSetName, int32 nBufferL
 	if( strlen(m_szCharacterSet) < 1 ) return false;
 
 #ifdef _UNICODE	
-	// m_szCharacterSet은 SetCharacterSetName()에서 CP_UTF8로 저장되므로 동일한 코드페이지로 복원
-	int nLength = MultiByteToWideChar(CP_UTF8, 0, m_szCharacterSet, -1, NULL, 0);
-	if( nLength == 0 || nBufferLength < nLength ) return false;
+	// m_szCharacterSet은 SetCharacterSetName()에서 UTF-8로 저장되므로 동일한 인코딩으로 복원
+	std::wstring wstrCharacterSetName = Utf8ToUnicode(m_szCharacterSet);
+	if( nBufferLength < (int32)(wstrCharacterSetName.size() + 1) ) return false;
 
-	// 출력 버퍼 크기로 nBufferLength 전달
-	if( MultiByteToWideChar(CP_UTF8, 0, m_szCharacterSet, -1, ptszCharacterSetName, nBufferLength) == 0 ) return false;
+	wcsncpy_s(ptszCharacterSetName, nBufferLength, wstrCharacterSetName.c_str(), _TRUNCATE);
 #else
 	strncpy_s(ptszCharacterSetName, nBufferLength, m_szCharacterSet, _TRUNCATE);
 #endif
@@ -402,6 +403,8 @@ bool CBaseMySQL::StartTransaction()
 		return false;
 	}
 
+	m_bInTransaction = true;
+
 	return true;
 }
 
@@ -409,6 +412,11 @@ bool CBaseMySQL::StartTransaction()
 //
 bool CBaseMySQL::Commit()
 {
+	// mysql_commit() 성공/실패와 무관하게 COMMIT 시도 이후 이 커넥션의 트랜잭션 컨텍스트는 종료된 것으로 간주.
+	// (실패 원인이 연결 끊김이면 Disconnect()에서도 리셋되지만, 연결은 살아있는데 논리적으로 실패한
+	//  경우까지 대비해 여기서 항상 리셋하여 플래그가 true로 고착되는 것을 방지)
+	m_bInTransaction = false;
+
 	if( mysql_commit(m_pConn) != 0 )
 	{
 		return false;
@@ -421,6 +429,9 @@ bool CBaseMySQL::Commit()
 //
 bool CBaseMySQL::Rollback()
 {
+	// Commit()과 동일한 이유로 시도 이후 항상 리셋
+	m_bInTransaction = false;
+
 	if( mysql_rollback(m_pConn) != 0 )
 	{
 		return false;
@@ -463,9 +474,10 @@ bool CBaseMySQL::SelectDB(const wchar_t* pwszSelectDBName)
 		return false;
 	}
 
-	int nLength = WideCharToMultiByte(CP_ACP, 0, pwszSelectDBName, -1, NULL, 0, NULL, NULL);
-	if( nLength == 0 || sizeof(szSelectDBName) < (size_t)nLength ) return false;
-	if( WideCharToMultiByte(CP_ACP, 0, pwszSelectDBName, -1, szSelectDBName, nLength, NULL, NULL) == 0 ) return false;
+	std::string strSelectDBName = UnicodeToAnsi(pwszSelectDBName);
+	if( strSelectDBName.empty() || sizeof(szSelectDBName) <= strSelectDBName.size() ) return false;
+
+	strncpy_s(szSelectDBName, sizeof(szSelectDBName), strSelectDBName.c_str(), _TRUNCATE);
 
 	if( mysql_select_db(m_pConn, szSelectDBName) != 0 )
 	{
@@ -524,13 +536,10 @@ bool CBaseMySQL::Prepare(const char* pszSQL)
 //
 bool CBaseMySQL::Prepare(const wchar_t* pwszSQL)
 {
-	char szSQL[DATABASE_BUFFER_SIZE];
+	std::string strSQL = UnicodeToUtf8(pwszSQL);
+	if( strSQL.empty() ) return false;
 
-	int nLength = WideCharToMultiByte(CP_UTF8, 0, pwszSQL, -1, NULL, 0, NULL, NULL);
-	if( nLength == 0 || sizeof(szSQL) < (size_t)nLength ) return false;
-	if( WideCharToMultiByte(CP_UTF8, 0, pwszSQL, -1, szSQL, nLength, NULL, NULL) == 0 ) return false;
-
-	return Prepare(szSQL);
+	return Prepare(strSQL.c_str());
 }
 
 //***************************************************************************
@@ -651,6 +660,14 @@ bool CBaseMySQL::Query(const char* pszSQL)
 
 	if( !m_bConnected )
 	{
+		// 트랜잭션 도중 연결이 끊긴 상태라면 재연결을 시도해도 트랜잭션은 이미 무효이므로
+		// 불필요한 재연결 부하를 만들지 않고 즉시 에러로 반환
+		if( m_bInTransaction )
+		{
+			ErrorQuery(__FUNCTION__, pszSQL, 0, "Transaction lost due to disconnection");
+			return false;
+		}
+
 		if( Connect() == false )
 		{
 			ErrorQuery(__FUNCTION__, pszSQL);
@@ -664,7 +681,7 @@ bool CBaseMySQL::Query(const char* pszSQL)
 		{
 			++cTryCount;
 			unsigned int nErrorNo = mysql_errno(m_pConn);
-			if( cTryCount == 1 && (nErrorNo == CR_SERVER_GONE_ERROR || nErrorNo == CR_SERVER_LOST) )
+			if( cTryCount == 1 && !m_bInTransaction && (nErrorNo == CR_SERVER_GONE_ERROR || nErrorNo == CR_SERVER_LOST) )
 			{
 				Disconnect();
 				if( Connect() == false )
@@ -675,14 +692,15 @@ bool CBaseMySQL::Query(const char* pszSQL)
 			}
 			else
 			{
-				if( nErrorNo == ER_NO_SUCH_TABLE || nErrorNo == ER_BAD_TABLE_ERROR )
+				ErrorQuery(__FUNCTION__, pszSQL, nErrorNo, mysql_error(m_pConn));
+
+				// 트랜잭션 중에 서버와의 연결이 끊긴 경우, 죽은 핸들을 계속 살아있는 것으로
+				// 두지 않도록 명시적으로 정리 (m_bConnected/m_bInTransaction 모두 false로 정리됨)
+				if( m_bInTransaction && (nErrorNo == CR_SERVER_GONE_ERROR || nErrorNo == CR_SERVER_LOST) )
 				{
-					ErrorQuery(__FUNCTION__, pszSQL, nErrorNo, mysql_error(m_pConn));
+					Disconnect();
 				}
-				else
-				{
-					ErrorQuery(__FUNCTION__, pszSQL, nErrorNo, mysql_error(m_pConn));
-				}
+
 				break;
 			}
 		}
@@ -700,13 +718,10 @@ bool CBaseMySQL::Query(const char* pszSQL)
 //
 bool CBaseMySQL::Query(const wchar_t* pwszSQL)
 {
-	char szSQL[DATABASE_BUFFER_SIZE];
+	std::string strSQL = UnicodeToUtf8(pwszSQL);
+	if( strSQL.empty() ) return false;
 
-	int nLength = WideCharToMultiByte(CP_UTF8, 0, pwszSQL, -1, NULL, 0, NULL, NULL);
-	if( nLength == 0 || sizeof(szSQL) < (size_t)nLength ) return false;
-	if( WideCharToMultiByte(CP_UTF8, 0, pwszSQL, -1, szSQL, nLength, NULL, NULL) == 0 ) return false;
-
-	return Query(szSQL);
+	return Query(strSQL.c_str());
 }
 
 //***************************************************************************
@@ -729,13 +744,10 @@ bool CBaseMySQL::Query(const char* pszSQL, MYSQL_RES*& pRes)
 //
 bool CBaseMySQL::Query(const wchar_t* pwszSQL, MYSQL_RES*& pRes)
 {
-	char szSQL[DATABASE_BUFFER_SIZE];
+	std::string strSQL = UnicodeToUtf8(pwszSQL);
+	if( strSQL.empty() ) return false;
 
-	int nLength = WideCharToMultiByte(CP_UTF8, 0, pwszSQL, -1, NULL, 0, NULL, NULL);
-	if( nLength == 0 || sizeof(szSQL) < (size_t)nLength ) return false;
-	if( WideCharToMultiByte(CP_UTF8, 0, pwszSQL, -1, szSQL, nLength, NULL, NULL) == 0 ) return false;
-
-	return Query(szSQL, pRes);
+	return Query(strSQL.c_str(), pRes);
 }
 
 //***************************************************************************
@@ -767,18 +779,15 @@ bool CBaseMySQL::Query(const char* pszSQL, void* pclsData, bool (*FetchRow)(void
 //
 bool CBaseMySQL::Query(const wchar_t* pwszSQL, void* pclsData, bool (*FetchRow)(void*, MYSQL_ROW& Row))
 {
-	char szSQL[DATABASE_BUFFER_SIZE];
+	std::string strSQL = UnicodeToUtf8(pwszSQL);
+	if( strSQL.empty() ) return false;
 
-	int nLength = WideCharToMultiByte(CP_UTF8, 0, pwszSQL, -1, NULL, 0, NULL, NULL);
-	if( nLength == 0 || sizeof(szSQL) < (size_t)nLength ) return false;
-	if( WideCharToMultiByte(CP_UTF8, 0, pwszSQL, -1, szSQL, nLength, NULL, NULL) == 0 ) return false;
-
-	if( Query(szSQL) == false ) return false;
+	if( Query(strSQL.c_str()) == false ) return false;
 
 	MYSQL_RES* pRes = mysql_use_result(m_pConn);
 	if( pRes == NULL )
 	{
-		ErrorQuery(__FUNCTION__, szSQL);
+		ErrorQuery(__FUNCTION__, strSQL.c_str());
 		return false;
 	}
 
@@ -902,10 +911,10 @@ void CBaseMySQL::GetData(const MYSQL_ROW Rows, const int nColNum, wchar_t* pwszV
 {
 	if( Rows[nColNum] )
 	{
-		int nLength = MultiByteToWideChar(CP_UTF8, 0, (LPSTR)Rows[nColNum], -1, NULL, 0);
-		if( nLength == 0 || nBufSize < nLength ) return;
-		if( MultiByteToWideChar(CP_UTF8, 0, (LPSTR)Rows[nColNum], -1, pwszValue, nLength) == 0 ) return;
-		nBufSize = nLength;
+		std::wstring wstrValue = Utf8ToUnicode(Rows[nColNum]);
+		if( nBufSize < (int)(wstrValue.size() + 1) ) return;
+
+		wcsncpy_s(pwszValue, nBufSize, wstrValue.c_str(), _TRUNCATE);
 	}
 }
 
@@ -975,9 +984,10 @@ bool CBaseMySQL::GetErrorMessage(TCHAR* ptszMessage)
 	char* pszMessage = (char*)mysql_error(m_pConn);
 
 #ifdef _UNICODE	
-	int nLength = MultiByteToWideChar(CP_ACP, 0, (LPSTR)pszMessage, -1, NULL, 0);
-	if( nLength == 0 || MYSQL_MAX_MESSAGE_LENGTH < nLength ) return false;
-	if( MultiByteToWideChar(CP_ACP, 0, (LPSTR)pszMessage, -1, ptszMessage, nLength) == 0 ) return false;
+	std::wstring wstrMessage = AnsiToUnicode(pszMessage);
+	if( wstrMessage.size() >= MYSQL_MAX_MESSAGE_LENGTH ) return false;
+
+	wcsncpy_s(ptszMessage, MYSQL_MAX_MESSAGE_LENGTH, wstrMessage.c_str(), _TRUNCATE);
 #else
 	strncpy_s(ptszMessage, MYSQL_MAX_MESSAGE_LENGTH, pszMessage, _TRUNCATE);
 #endif
@@ -994,9 +1004,10 @@ bool CBaseMySQL::GetStmtErrorMessage(MYSQL_STMT* pStmt, TCHAR* ptszMessage)
 	char* pszMessage = (char*)mysql_stmt_error(pStmt);
 
 #ifdef _UNICODE	
-	int nLength = MultiByteToWideChar(CP_ACP, 0, (LPSTR)pszMessage, -1, NULL, 0);
-	if( nLength == 0 || MYSQL_MAX_MESSAGE_LENGTH < nLength ) return false;
-	if( MultiByteToWideChar(CP_ACP, 0, (LPSTR)pszMessage, -1, ptszMessage, nLength) == 0 ) return false;
+	std::wstring wstrMessage = AnsiToUnicode(pszMessage);
+	if( wstrMessage.size() >= MYSQL_MAX_MESSAGE_LENGTH ) return false;
+
+	wcsncpy_s(ptszMessage, MYSQL_MAX_MESSAGE_LENGTH, wstrMessage.c_str(), _TRUNCATE);
 #else
 	strncpy_s(ptszMessage, MYSQL_MAX_MESSAGE_LENGTH, pszMessage, _TRUNCATE);
 #endif
@@ -1019,17 +1030,17 @@ void CBaseMySQL::ErrorQuery(const char* pszFunc, const char* pszSQL, uint32 uiEr
 	}
 
 #ifdef _UNICODE	
-	int nLength = MultiByteToWideChar(CP_ACP, 0, (LPSTR)pszFunc, -1, NULL, 0);
-	if( nLength == 0 || sizeof(tszFunc) < nLength ) return;
-	if( MultiByteToWideChar(CP_ACP, 0, (LPSTR)pszFunc, -1, tszFunc, nLength) == 0 ) return;
+	std::wstring wstrFunc = AnsiToUnicode(pszFunc);
+	if( _countof(tszFunc) < wstrFunc.size() + 1 ) return;
+	wcsncpy_s(tszFunc, _countof(tszFunc), wstrFunc.c_str(), _TRUNCATE);
 
-	nLength = MultiByteToWideChar(CP_ACP, 0, (LPSTR)pszSQL, -1, NULL, 0);
-	if( nLength == 0 || sizeof(tszSQL) < nLength ) return;
-	if( MultiByteToWideChar(CP_ACP, 0, (LPSTR)pszSQL, -1, tszSQL, nLength) == 0 ) return;
+	std::wstring wstrSQL = AnsiToUnicode(pszSQL);
+	if( _countof(tszSQL) < wstrSQL.size() + 1 ) return;
+	wcsncpy_s(tszSQL, _countof(tszSQL), wstrSQL.c_str(), _TRUNCATE);
 
-	nLength = MultiByteToWideChar(CP_ACP, 0, (LPSTR)pszMessage, -1, NULL, 0);
-	if( nLength == 0 || sizeof(tszMessage) < nLength ) return;
-	if( MultiByteToWideChar(CP_ACP, 0, (LPSTR)pszMessage, -1, tszMessage, nLength) == 0 ) return;
+	std::wstring wstrMessage = AnsiToUnicode(pszMessage);
+	if( _countof(tszMessage) < wstrMessage.size() + 1 ) return;
+	wcsncpy_s(tszMessage, _countof(tszMessage), wstrMessage.c_str(), _TRUNCATE);
 #else
 	strncpy_s(tszFunc, MAX_PATH, pszFunc, _TRUNCATE);
 	strncpy_s(tszSQL, DATABASE_BUFFER_SIZE, pszSQL, _TRUNCATE);
@@ -1054,17 +1065,17 @@ void CBaseMySQL::StmtErrorQuery(MYSQL_STMT* pStmt, const char* pszFunc, const ch
 	}
 
 #ifdef _UNICODE	
-	int nLength = MultiByteToWideChar(CP_ACP, 0, (LPSTR)pszFunc, -1, NULL, 0);
-	if( nLength == 0 || sizeof(tszFunc) < nLength ) return;
-	if( MultiByteToWideChar(CP_ACP, 0, (LPSTR)pszFunc, -1, tszFunc, nLength) == 0 ) return;
+	std::wstring wstrFunc = AnsiToUnicode(pszFunc);
+	if( _countof(tszFunc) < wstrFunc.size() + 1 ) return;
+	wcsncpy_s(tszFunc, _countof(tszFunc), wstrFunc.c_str(), _TRUNCATE);
 
-	nLength = MultiByteToWideChar(CP_ACP, 0, (LPSTR)pszSQL, -1, NULL, 0);
-	if( nLength == 0 || sizeof(tszSQL) < nLength ) return;
-	if( MultiByteToWideChar(CP_ACP, 0, (LPSTR)pszSQL, -1, tszSQL, nLength) == 0 ) return;
+	std::wstring wstrSQL = AnsiToUnicode(pszSQL);
+	if( _countof(tszSQL) < wstrSQL.size() + 1 ) return;
+	wcsncpy_s(tszSQL, _countof(tszSQL), wstrSQL.c_str(), _TRUNCATE);
 
-	nLength = MultiByteToWideChar(CP_ACP, 0, (LPSTR)pszMessage, -1, NULL, 0);
-	if( nLength == 0 || sizeof(tszMessage) < nLength ) return;
-	if( MultiByteToWideChar(CP_ACP, 0, (LPSTR)pszMessage, -1, tszMessage, nLength) == 0 ) return;
+	std::wstring wstrMessage = AnsiToUnicode(pszMessage);
+	if( _countof(tszMessage) < wstrMessage.size() + 1 ) return;
+	wcsncpy_s(tszMessage, _countof(tszMessage), wstrMessage.c_str(), _TRUNCATE);
 #else
 	strncpy_s(tszFunc, MAX_PATH, pszFunc, _TRUNCATE);
 	strncpy_s(tszSQL, DATABASE_BUFFER_SIZE, pszSQL, _TRUNCATE);
@@ -1073,5 +1084,3 @@ void CBaseMySQL::StmtErrorQuery(MYSQL_STMT* pStmt, const char* pszFunc, const ch
 
 	LOG_ERROR(_T("%s, QueryInfo[%s], StmtErrorNo[%u], StmtErrorMsg : %s"), tszFunc, tszSQL, uiErrno, tszMessage);
 }
-
-

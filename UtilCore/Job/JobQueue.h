@@ -21,8 +21,8 @@
 #include <Job/Job.h>
 #endif
 
-#ifndef __LOCKQUEUE_H__
-#include <Job/LockQueue.h>
+#ifndef __SPINLOCKQUEUE_H__
+#include <ThreadSafeContainers/SpinLockQueue.h>
 #endif
 
 #ifndef __JOBTIMER_H__
@@ -70,8 +70,8 @@ public:
 	void Execute();
 
 protected:
-	CLockQueue<CJobRef>	_jobs;
-	Atomic<int32>		_jobCount = 0;
+	CSpinLockQueue<CJobRef>	_jobs;
+	Atomic<int32>			_jobCount = 0;
 };
 
 #include <Job/JobQueue.inl>

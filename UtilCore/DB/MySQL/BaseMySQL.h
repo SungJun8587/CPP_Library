@@ -11,6 +11,10 @@
 #include <Memory/Allocator.h>
 #endif
 
+#ifndef __ENCODINGCONVERT_H__
+#include <EncodingConvert.h>
+#endif
+
 #include <mysql.h>
 #include <mysqld_error.h>
 
@@ -35,7 +39,7 @@ public:
 	void		StmtClose();
 	void		FreeResult(MYSQL_RES* res);
 
-	MYSQL*		GetConnPtr();
+	MYSQL* GetConnPtr();
 	bool		IsConnected();
 
 	bool		GetServerInfo(TCHAR* ptszServerInfo, int32 nBufferLength);
@@ -115,7 +119,7 @@ public:
 		bind.buffer = (void*)pszValue;			// const char*로 받은 문자열
 		bind.buffer_length = size;				// 문자열 길이
 		bind.length = ulBufLength;
-	
+
 		return bind;
 	};
 
@@ -130,12 +134,9 @@ public:
 		MYSQL_BIND bind{};
 		memset(&bind, 0, sizeof(bind));
 
-		// std::wstring을 UTF-8로 변환
-		std::string utf8;
-
-		int required_cch = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, pwszValue, static_cast<int>(ulBufSize), nullptr, 0, nullptr, nullptr);
-		utf8.resize(required_cch);
-		WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, pwszValue, -1, const_cast<char*>(utf8.c_str()), static_cast<int>(utf8.size()), NULL, NULL);
+		// 유니코드 문자열을 UTF-8로 변환
+		std::wstring wstrValue(pwszValue, ulBufSize);
+		std::string utf8 = UnicodeToUtf8(wstrValue);
 
 		unsigned long size = static_cast<unsigned long>(utf8.size());
 
@@ -264,6 +265,7 @@ private:
 
 private:
 	bool		m_bConnected;
+	bool		m_bInTransaction;	// 트랜잭션 진행 중 여부 (재연결 억제 판단용)
 
 	char		m_szDBHost[DATABASE_SERVER_NAME_STRLEN];
 	char		m_szDBUserId[DATABASE_DSN_USER_ID_STRLEN];
@@ -275,8 +277,8 @@ private:
 
 	uint32		m_uiPort;
 
-	MYSQL*		m_pConn;		// MySQL Connection 핸들러
-	MYSQL_STMT*	m_pStmt;		// MySQL 쿼리문 실행 관리
+	MYSQL* m_pConn;		// MySQL Connection 핸들러
+	MYSQL_STMT* m_pStmt;		// MySQL 쿼리문 실행 관리
 };
 
 #endif // ndef __BASEMYSQL_H__

@@ -15,6 +15,10 @@
 #include <BaseRedefineDataType.h>
 #endif
 
+#ifndef	__ENCODINGCONVERT_H__
+#include </Util/EncodingConvert.h>
+#endif
+
 #pragma comment(lib, LIB_NAME("xlnt"))
 
 namespace Xlnt

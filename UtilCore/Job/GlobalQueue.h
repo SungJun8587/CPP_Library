@@ -9,8 +9,8 @@
 
 #pragma once
 
-#ifndef __LOCKQUEUE_H__
-#include <Job/LockQueue.h>
+#ifndef __SPINLOCKQUEUE_H__
+#include <ThreadSafeContainers/SpinLockQueue.h>
 #endif
 
 class CGlobalQueue
@@ -23,7 +23,7 @@ public:
 	CJobQueueRef			Pop();
 
 private:
-	CLockQueue<CJobQueueRef> _jobQueues;
+	CSpinLockQueue<CJobQueueRef> _jobQueues;
 };
 
 #endif // ndef __GLOBALQUEUE_H__

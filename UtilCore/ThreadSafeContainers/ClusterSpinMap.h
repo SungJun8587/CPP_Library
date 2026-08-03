@@ -1,28 +1,29 @@
 ﻿
 //***************************************************************************
-// ClusteredMap.h : interface for the CClusteredMap class.
+// ClusterSpinMap.h : interface for the CClusterSpinMap class.
 //
 //***************************************************************************
 
-#ifndef __CLUSTEREDMAP_H__
-#define __CLUSTEREDMAP_H__
+#ifndef __CLUSTERSPINMAP_H__
+#define __CLUSTERSPINMAP_H__
+
+#ifndef __BASEREDEFINEDATATYPE_H__
+#include <BaseRedefineDataType.h>
+#endif
 
 #ifndef __SPINLOCK_H__
 #include <Thread/SpinLock.h>
 #endif
 
-// 임의의 전방 선언 대응 (CMap 환경에 맞춰 필요 시 활성화)
-// template<typename K, typename V> class CMap; 
-
 template<typename T1, typename T2, __int32 nClusterCnt, bool bInnerLock = true>
-class CClusteredMap
+class CClusterSpinMap
 {
 public:
 	typedef	CMap< T1, T2 >					ObjectMap;
 	typedef	std::pair< const T1, T2 >		ObjectMapPair;
 
-	CClusteredMap(void);
-	virtual	~CClusteredMap(void);
+	CClusterSpinMap(void);
+	virtual	~CClusterSpinMap(void);
 
 public:
 	INT32		getSize();
@@ -31,7 +32,6 @@ public:
 	bool		FindObject(T1 key, T2& object);
 	bool		EraseObject(T1 key);
 
-	// 외부 노출 락 API에도 __FUNCTION__을 받을 수 있도록 디폴트 인자 구성
 	void		ReadLock(T1& key, const char* name = nullptr) {
 		readLock(getClusterIdx(key), name);
 	}
@@ -60,18 +60,17 @@ protected:
 		return static_cast<__int32>(key % nClusterCnt);
 	}
 
-	// 프로파일러 전달용 name 매개변수 추가
 	void		readLock(__int32 nClusterIdx, const char* name = nullptr) {
-		if (bInnerLock) m_ObjectLocks[nClusterIdx].ReadLock(name);
+		if( bInnerLock ) m_ObjectLocks[nClusterIdx].ReadLock(name);
 	}
 	void		readUnlock(__int32 nClusterIdx, const char* name = nullptr) {
-		if (bInnerLock) m_ObjectLocks[nClusterIdx].ReadUnlock(name);
+		if( bInnerLock ) m_ObjectLocks[nClusterIdx].ReadUnlock(name);
 	}
 	void		writeLock(__int32 nClusterIdx, const char* name = nullptr) {
-		if (bInnerLock) m_ObjectLocks[nClusterIdx].WriteLock(name);
+		if( bInnerLock ) m_ObjectLocks[nClusterIdx].WriteLock(name);
 	}
 	void		writeUnlock(__int32 nClusterIdx, const char* name = nullptr) {
-		if (bInnerLock) m_ObjectLocks[nClusterIdx].WriteUnlock(name);
+		if( bInnerLock ) m_ObjectLocks[nClusterIdx].WriteUnlock(name);
 	}
 	void		clearObjectMap(void);
 
@@ -80,4 +79,4 @@ public:
 	RWSpinLockDefault	m_ObjectLocks[nClusterCnt];
 };
 
-#endif // ndef __CLUSTEREDMAP_H__
+#endif // ndef __CLUSTERSPINMAP_H__

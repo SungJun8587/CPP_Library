@@ -9,16 +9,10 @@
 
 extern CThreadManager* gpThreadManager;
 
-// [동시성 보장] Meyers' Singleton: C++11부터 함수 내 static 지역 변수 초기화는
-// 컴파일러에 의해 100% 스레드 안전하게(magic statics) 보장된다.
 std::shared_ptr<CMySQLAsyncSrv> CMySQLAsyncSrv::Instance() {
 	static std::shared_ptr<CMySQLAsyncSrv> instance = std::make_shared<CMySQLAsyncSrv>();
 	return instance;
 }
-
-//***************************************************************************
-// Construction/Destruction 
-//***************************************************************************
 
 CMySQLAsyncSrv::CMySQLAsyncSrv()
 {
@@ -31,9 +25,7 @@ CMySQLAsyncSrv::CMySQLAsyncSrv()
 
 CMySQLAsyncSrv::~CMySQLAsyncSrv()
 {
-	// 프로그램 종료 시점에 잔여 큐 데이터를 먼저 비우고 종료
 	FlushRemainingTasks();
-
 	StopThread();
 	Clear();
 	ClearMySQLConnPools();
@@ -45,12 +37,19 @@ CMySQLAsyncSrv::~CMySQLAsyncSrv()
 
 void CMySQLAsyncSrv::Clear()
 {
-	std::unique_lock<std::mutex> lockGuard(_mutex);
+	// CSwapQueue를 비우기 위해 전체 크기만큼 척크 스왑 수행
+	std::queue<st_DBAsyncRq*> tempQueue;
 
-	while( !_queueDBAsyncRq.empty() )
+	int64_t totalSize = _queueDBAsyncRq.GetSize();
+	if( totalSize > 0 )
 	{
-		st_DBAsyncRq* pAsyncRq = _queueDBAsyncRq.front();
-		_queueDBAsyncRq.pop();
+		_queueDBAsyncRq.SwapChunk(tempQueue, static_cast<size_t>(totalSize));
+	}
+
+	while( !tempQueue.empty() )
+	{
+		st_DBAsyncRq* pAsyncRq = tempQueue.front();
+		tempQueue.pop();
 		if( pAsyncRq != nullptr ) SAFE_DELETE(pAsyncRq);
 	}
 }
@@ -59,16 +58,15 @@ void CMySQLAsyncSrv::FlushRemainingTasks()
 {
 	LOG_INFO(_T("Main program requested to flush remaining async DB tasks..."));
 
-	// 1. 새로운 푸시를 막고 워커 스레드 중지 플래그 설정
 	_bStopThread.store(true);
 	_cva.notify_all();
-	_cvProducer.notify_all(); // 대기 중이던 생산자도 함께 깨워 종료 조건을 확인시킴
+	_cvProducer.notify_all();
 
-	// 2. 큐에 남아있는 작업들을 안전하게 임시 큐로 이동
-	CQueue<st_DBAsyncRq*> tempQueue;
+	std::queue<st_DBAsyncRq*> tempQueue;
+	int64_t totalSize = _queueDBAsyncRq.GetSize();
+	if( totalSize > 0 )
 	{
-		std::unique_lock<std::mutex> lockGuard(_mutex);
-		tempQueue = std::move(_queueDBAsyncRq);
+		_queueDBAsyncRq.SwapChunk(tempQueue, static_cast<size_t>(totalSize));
 	}
 
 	int32 remainingCount = static_cast<int32>(tempQueue.size());
@@ -76,7 +74,6 @@ void CMySQLAsyncSrv::FlushRemainingTasks()
 	{
 		LOG_INFO(_T("Processing %d remaining DB requests in main thread..."), remainingCount);
 
-		// 3. 메인 스레드에서 직접 동기 처리
 		while( !tempQueue.empty() )
 		{
 			st_DBAsyncRq* pAsyncRq = tempQueue.front();
@@ -95,7 +92,6 @@ void CMySQLAsyncSrv::FlushRemainingTasks()
 					LOG_ERROR(_T("Failed to process task during manual flush... callIdent: [%u]"), pAsyncRq->callIdent);
 				}
 
-				// Action()과 동일하게, 요청이 최종적으로 처리(성공/실패 불문)되었으므로 카운터 감소
 				SubOutstandingRequest();
 			}
 			else
@@ -110,12 +106,6 @@ void CMySQLAsyncSrv::FlushRemainingTasks()
 	LOG_INFO(_T("Manual flush completed. All tasks processed."));
 }
 
-//***************************************************************************
-// _pMySQLConnPools 배열의 각 풀을 안전하게 해제한다.
-// InitMySQL이 중간에 실패했을 때(일부만 생성된 상태)와, 소멸자 양쪽에서 공용으로 호출된다.
-// CMySQLConnPool은 BaseAllocator를 상속하므로 operator delete가 이미 RawAllocator
-// 경로로 오버라이드되어 있다 - 즉 평범한 delete(SAFE_DELETE)만으로 충분하다.
-//***************************************************************************
 void CMySQLAsyncSrv::ClearMySQLConnPools()
 {
 	if( _pMySQLConnPools == nullptr ) return;
@@ -138,14 +128,8 @@ bool CMySQLAsyncSrv::StartService(CVector<CDBNode> dbNodeVec, const int32 nMaxTh
 	return InitMySQL(dbNodeVec, nMaxThreadCnt);
 }
 
-//***************************************************************************
-// DB 노드별 CMySQLConnPool을 생성/초기화한다.
-//***************************************************************************
 bool CMySQLAsyncSrv::InitMySQL(CVector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt)
 {
-	// [버그 수정] 재시작 시나리오(StopThread() 이후 InitMySQL을 다시 호출하는 경우)에서
-	// _bStopThread가 true로 남아있으면 워커 스레드들이 Action()/Pop()에서 즉시 종료
-	// 조건으로 판단해 아무 작업도 처리하지 못한다. 기존 코드엔 이 초기화가 아예 없었다.
 	_bStopThread.store(false);
 
 	if( 0 == nMaxThreadCnt )
@@ -157,15 +141,8 @@ bool CMySQLAsyncSrv::InitMySQL(CVector<CDBNode> dbNodeVec, const int32 nMaxThrea
 	if( _nDBCount <= 0 )
 		return true;
 
-	// [버그 수정] 배열을 값 초기화(0)해 두어, 중간에 실패해도 ClearMySQLConnPools()가
-	// 아직 생성되지 않은 슬롯을 쓰레기 포인터로 delete하는 일이 없도록 한다.
-	// (기존 코드는 `new CMySQLConnPool*[_nDBCount]`로 값 초기화가 안 돼 있어서,
-	//  Init 도중 실패 시 소멸자가 미생성 슬롯을 그대로 delete해 크래시로 이어질 수 있었다)
 	_pMySQLConnPools = new CMySQLConnPool * [_nDBCount]();
 
-	// [버그 수정] 재연결 워커 수를 풀 크기(= DB 비동기 워커 스레드 수) 대비 비례해서 산정한다.
-	// 기존 코드는 Init()에 reconnectConfig를 넘기지 않아 풀 크기와 무관하게 항상 기본값(4)이었다.
-	// (풀 크기의 10~25% 권장, 최소 4 — DB 재시작 등 대량 동시 장애 복구 속도를 위함)
 	CMySQLConnPool::TReconnectConfig reconnectCfg;
 	reconnectCfg.nWorkerCount = std::max(4, _nMaxThreadCnt / 4);
 
@@ -174,14 +151,10 @@ bool CMySQLAsyncSrv::InitMySQL(CVector<CDBNode> dbNodeVec, const int32 nMaxThrea
 	{
 		if( nIdx >= _nDBCount ) break;
 
-		// CMySQLConnPool이 BaseAllocator를 상속하므로 operator new가 이미 RawAllocator
-		// 경로로 오버라이드되어 있다 - 평범한 new로도 실패 시 nullptr을 반환한다.
 		_pMySQLConnPools[nIdx] = new CMySQLConnPool(_nMaxThreadCnt);
 		if( nullptr == _pMySQLConnPools[nIdx] )
 		{
 			LOG_ERROR(_T("Failed to alloc CMySQLConnPool"));
-			// [버그 수정] 기존 코드는 여기서 Clear() 호출 없이 바로 return해 이미 만들어진
-			// 앞쪽 풀들이 그대로 누수됐다. 이미 만들어진 풀들까지 함께 정리한다.
 			ClearMySQLConnPools();
 			return false;
 		}
@@ -205,12 +178,6 @@ void CMySQLAsyncSrv::StartIoThreads()
 
 	for( int32 i = 0; i < _nMaxThreadCnt; i++ )
 	{
-		// [성능/스타일] std::bind는 내부적으로 타입 소거된 호출 객체를 만들어 컴파일러 인라인
-		// 최적화가 잘 들어가지 않는 경우가 많다. this만 캡처하는 람다가 더 가볍고,
-		// CMySQLConnPool의 워커 스레드들([this](){ ... })과도 스타일이 일치한다.
-		// (참고: `[=]` 람다든 `std::bind(&T::f, this)`든 캡처/바인딩되는 건 동일한 raw
-		//  this 포인터라서, std::bind가 댕글링 포인터 문제를 더 안전하게 막아주는 것은
-		//  아니다 - 두 방식의 안전성은 동일하다)
 		gpThreadManager->CreateThread([this]() { RunningThread(); });
 	}
 }
@@ -226,13 +193,15 @@ bool CMySQLAsyncSrv::RunningThread()
 
 bool CMySQLAsyncSrv::Action()
 {
-	static uint64 cumulateCallCnt = 0;
+	static std::atomic<uint64> cumulateCallCnt{ 0 };
+	std::queue<st_DBAsyncRq*> localQueue;
+
 	while( !_bStopThread.load() )
 	{
-		st_DBAsyncRq* pAsyncRq = Pop();
+		st_DBAsyncRq* pAsyncRq = Pop(localQueue);
 		if( pAsyncRq == nullptr )
 		{
-			continue; // 종료 신호로 깨어난 경우 루프 탈출 흐름으로 진행
+			continue;
 		}
 
 		COMMAND_MAP::iterator it = _mapCommand.find(pAsyncRq->callIdent);
@@ -256,23 +225,14 @@ bool CMySQLAsyncSrv::Action()
 			{
 				uint64 endTick = _GetTickCount();
 				if( 300 <= endTick - startTick )
-					LOG_WARNING(_T("Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"), endTick - startTick, cumulateCallCnt++, static_cast<int>(Ret), pAsyncRq->callIdent);
+					LOG_WARNING(_T("Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"),
+						endTick - startTick, cumulateCallCnt.fetch_add(1, std::memory_order_relaxed), static_cast<int>(Ret), pAsyncRq->callIdent);
 
-				// [버그 수정] st_DBAsyncRq는 callIdent별로 실제 쿼리 데이터를 담은 파생 구조체의
-				// 베이스 타입이다. 기존 코드의 `new st_DBAsyncRq{ *pAsyncRq }`는 베이스 타입으로
-				// 복사하므로 파생 클래스에 있는 실제 쿼리 파라미터가 전부 잘려나가는 오브젝트
-				// 슬라이싱 버그였다 - 재시도된 쿼리가 원래 파라미터를 잃어버린 채로 다시 실행됐을
-				// 것이다. 복사본을 새로 만들 필요 없이 원본 객체를 그대로 재사용해 재시도 플래그만
-				// 세팅하고 재큐잉한다. 슬라이싱 버그가 사라지는 것은 물론, 타임아웃 재시도 경로
-				// (이미 DB가 지연되고 있는 상황)에서 불필요한 heap 할당/해제 한 쌍도 없어진다.
 				uint16 logIdent = pAsyncRq->callIdent;
 				pAsyncRq->bReTry = true;
 
 				int nSize = Push(pAsyncRq);
 
-				// [버그 수정] 종료 신호가 이미 켜진 상태라 큐에 들어가지 못했다면(Push가 0을
-				// 반환) 직접 해제해야 한다. 기존 코드엔 이 처리가 없어 서버 종료 타이밍과
-				// 겹치면 메모리가 누수됐다.
 				if( nSize == 0 )
 				{
 					SAFE_DELETE(pAsyncRq);
@@ -286,14 +246,16 @@ bool CMySQLAsyncSrv::Action()
 #if defined(_DEBUG)
 		uint64 endTick = _GetTickCount();
 		if( 300 <= endTick - startTick )
-			LOG_WARNING(_T("Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"), endTick - startTick, cumulateCallCnt++, static_cast<int>(Ret), pAsyncRq->callIdent);
+			LOG_WARNING(_T("Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"),
+				endTick - startTick, cumulateCallCnt.fetch_add(1, std::memory_order_relaxed), static_cast<int>(Ret), pAsyncRq->callIdent);
 #else
 		uint64 endTick = _GetTickCount();
 		if( 1000 <= endTick - startTick )
-			LOG_WARNING(_T("Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"), endTick - startTick, cumulateCallCnt++, static_cast<int>(Ret), pAsyncRq->callIdent);
+			LOG_WARNING(_T("Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"),
+				endTick - startTick, cumulateCallCnt.fetch_add(1, std::memory_order_relaxed), static_cast<int>(Ret), pAsyncRq->callIdent);
 #endif
 
-		SubOutstandingRequest(); // Action()은 항상 싱글턴 인스턴스 자신의 메서드로만 호출되므로 Instance()를 다시 거칠 필요가 없다
+		SubOutstandingRequest();
 		SAFE_DELETE(pAsyncRq);
 	}
 
@@ -302,57 +264,54 @@ bool CMySQLAsyncSrv::Action()
 
 int CMySQLAsyncSrv::Push(st_DBAsyncRq* pAsyncRq)
 {
-	int queueSize = 0;
-	{
-		std::unique_lock<std::mutex> lockGuard(_mutex);
+	if( _bStopThread.load() ) return 0;
 
-		if( _bStopThread.load() ) return 0;
-
-		_queueDBAsyncRq.push(pAsyncRq);
-		queueSize = static_cast<int>(_queueDBAsyncRq.size());
-	} // [성능] notify 전에 락을 먼저 해제해, 깨어난 워커가 즉시 락을 잡지 못하고
-	  // 다시 잠드는 불필요한 컨텍스트 스위칭(lock-and-wake-under-lock)을 피한다.
-
-	// [동시성 최적화] 데이터가 하나 들어왔으므로 모든 대기 워커 스레드를 다 깨우지 않고,
-	// 정확히 '작업을 처리할 수 있는 워커 하나'만 깨우도록 notify_one()으로 대체해 컨텍스트 스위칭 최소화
+	int queueSize = static_cast<int>(_queueDBAsyncRq.PushAndGetSize(pAsyncRq));
 	_cva.notify_one();
-
 	return queueSize;
 }
 
-st_DBAsyncRq* CMySQLAsyncSrv::Pop()
+st_DBAsyncRq* CMySQLAsyncSrv::Pop(std::queue<st_DBAsyncRq*>& localQueue)
 {
-	static int queueCount = 2;
-	st_DBAsyncRq* pAsyncRq = nullptr;
+	if( !localQueue.empty() )
+	{
+		st_DBAsyncRq* pAsyncRq = localQueue.front();
+		localQueue.pop();
+		return pAsyncRq;
+	}
+
 	{
 		std::unique_lock<std::mutex> lockGuard(_mutex);
 
-		// 큐에 데이터가 들어오거나 종료 신호가 켜질 때까지 대기하며 Lock 스퓨리어스 웨이크업 방지
-		_cva.wait(lockGuard, [this]() { return !_queueDBAsyncRq.empty() || _bStopThread.load(); });
+		_cva.wait(lockGuard, [this, &localQueue]() {
+			return !_queueDBAsyncRq.IsEmpty() || _bStopThread.load();
+			});
 
-		// 종료 상태이고 큐도 비어있다면 즉시 nullptr 반환
-		if( _bStopThread.load() && _queueDBAsyncRq.empty() ) return nullptr;
+		if( _bStopThread.load() && _queueDBAsyncRq.IsEmpty() && localQueue.empty() )
+			return nullptr;
 
-		pAsyncRq = _queueDBAsyncRq.front();
-		_queueDBAsyncRq.pop();
+		int64 currentSize = _queueDBAsyncRq.GetSize();
+		if( MAX_WARNING_QUERY_QUEUE_SIZE <= currentSize && currentSize <= MAX_WARNING_QUERY_QUEUE_SIZE + 10 )
+			LOG_ERROR(_T("Async DB Call Queue size... : [%d]"), static_cast<int>(currentSize));
 
-		if( MAX_WARNING_QUERY_QUEUE_SIZE <= _queueDBAsyncRq.size() && _queueDBAsyncRq.size() <= MAX_WARNING_QUERY_QUEUE_SIZE + 10 )
-			LOG_ERROR(_T("Async DB Call Queue size... : [%d]"), static_cast<int>(_queueDBAsyncRq.size()));
-
-		if( _queueDBAsyncRq.size() > queueCount )
+		int currentCount = static_cast<int>(currentSize);
+		if( currentCount > _nLastWarnedQueueSize )
 		{
-			queueCount = (int)_queueDBAsyncRq.size();
-			LOG_WARNING(_T("Async DB Call Queue size... : [%d]"), static_cast<int>(_queueDBAsyncRq.size()));
+			_nLastWarnedQueueSize = currentCount;
+			LOG_WARNING(_T("Async DB Call Queue size... : [%d]"), _nLastWarnedQueueSize);
 		}
 
-		// [주의] 소비자가 다른 소비자를 깨우는 것은 불필요하므로 notify_all() 호출하지 않음
-	} // [Back-pressure] 락 해제 후 notify — Push()와 동일한 이유로 lock-and-wake-under-lock을 피한다.
+		// 전체를 다 스왑해 오는 대신, 한 번에 처리할 적정량(64개)만 떼어옴 (스케일링 병목 개선)
+		_queueDBAsyncRq.SwapChunk(localQueue, 64);
+	}
 
-	// [Back-pressure] 항목을 하나 꺼내 공간이 하나 생겼으므로, WaitPushCapacity()에서
-	// 대기 중인 생산자 스레드 하나를 깨운다. 이 알림이 없으면 큐가 줄어들어도 대기 중인
-	// 생산자가 영원히 깨어나지 못한다.
 	_cvProducer.notify_one();
 
+	if( localQueue.empty() )
+		return nullptr;
+
+	st_DBAsyncRq* pAsyncRq = localQueue.front();
+	localQueue.pop();
 	return pAsyncRq;
 }
 

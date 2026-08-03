@@ -11,9 +11,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{899DCD42-C59C-4730-A683-18930AD5BC9C}</ProjectGuid>
+    <ProjectGuid>{7B3D6030-9E94-460D-B037-530CFD553DD4}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>ShellUtilTest</RootNamespace>
+    <RootNamespace>StringUtilTest</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -47,7 +47,7 @@
     <OutDir>$(SolutionDir)Bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>Bin\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)64D</TargetName>
-    <IncludePath>K:\GitHub\CPP\Library\UtilCore;K:\GitHub\CPP\Library\DataStructures;K:\GitHub\CPP\Library\ExternalLib\libiconv-1.18\build\include;$(ProjectDir);$(IncludePath)</IncludePath>
+    <IncludePath>K:\GitHub\CPP\Library\UtilCore;$(ProjectDir);$(IncludePath)</IncludePath>
     <LibraryPath>K:\GitHub\CPP\Library\ExternalLib\Bin\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -55,7 +55,7 @@
     <OutDir>$(SolutionDir)Bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>Bin\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)64</TargetName>
-    <IncludePath>K:\GitHub\CPP\Library\UtilCore;K:\GitHub\CPP\Library\DataStructures;K:\GitHub\CPP\Library\ExternalLib\libiconv-1.18\build\include;$(ProjectDir);$(IncludePath)</IncludePath>
+    <IncludePath>K:\GitHub\CPP\Library\UtilCore;$(ProjectDir);$(IncludePath)</IncludePath>
     <LibraryPath>K:\GitHub\CPP\Library\ExternalLib\Bin\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -65,11 +65,14 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <ForceSymbolReferences>%(ForceSymbolReferences)</ForceSymbolReferences>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -81,6 +84,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -88,6 +92,8 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <ForceSymbolReferences>%(ForceSymbolReferences)</ForceSymbolReferences>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -97,25 +103,19 @@
     <ClInclude Include="..\..\UtilCore\BaseDefine.h" />
     <ClInclude Include="..\..\UtilCore\BaseMacro.h" />
     <ClInclude Include="..\..\UtilCore\BaseRedefineDataType.h" />
-    <ClInclude Include="..\..\UtilCore\Util\EncodingConvert.h" />
-    <ClInclude Include="..\..\UtilCore\Util\FileUtil.h" />
-    <ClInclude Include="..\..\UtilCore\Util\ShellUtil.h" />
     <ClInclude Include="..\..\UtilCore\Util\StringUtil.h" />
-    <ClInclude Include="..\..\UtilCore\Util\WinCharsetConv.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="StringFunc.h" />
     <ClInclude Include="TestFunction.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\UtilCore\Util\EncodingConvert.cpp" />
-    <ClCompile Include="..\..\UtilCore\Util\FileUtil.cpp" />
-    <ClCompile Include="..\..\UtilCore\Util\ShellUtil.cpp" />
     <ClCompile Include="..\..\UtilCore\Util\StringUtil.cpp" />
-    <ClCompile Include="..\..\UtilCore\Util\WinCharsetConv.cpp" />
-    <ClCompile Include="ShellUtilTest.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="StringFunc.cpp" />
+    <ClCompile Include="StringUtilTest.cpp" />
     <ClCompile Include="TestFunction.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

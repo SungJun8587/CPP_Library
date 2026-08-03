@@ -59,9 +59,7 @@ using namespace std;
 #include <Memory/Memory.h>
 #include <Memory/ObjectPool.h>
 #include <Memory/Containers.h>
-#include <Memory/ClusteredMap.h>
-#include <Memory/OrderedMap.h>
-#include <Memory/UnOrderedMap.h>
+
 #include <Memory/Singleton.h>
 #include <Memory/MemBuffer.h>
 #include <Memory/Stream.h>
@@ -73,9 +71,16 @@ using namespace std;
 #include <Thread/SRWLock.h>
 #include <Thread/ThreadManager.h>
 
+#include <ThreadSafeContainers/BlockingTaskQueue.h>
+#include <ThreadSafeContainers/ClusterSpinMap.h>
+#include <ThreadSafeContainers/OrderedMap.h>
+#include <ThreadSafeContainers/UnOrderedMap.h>
+#include <ThreadSafeContainers/SpinLockQueue.h>
+#include <ThreadSafeContainers/DelayedTaskQueue.h>
+#include <ThreadSafeContainers/SwapQueue.h>
+
 #include <Job/Job.h>
 #include <Job/JobTimer.h>
-#include <Job/LockQueue.h>
 #include <Job/JobQueue.h>
 #include <Job/GlobalQueue.h>
 
@@ -88,7 +93,8 @@ using namespace std;
 
 #include <Util/CalculatedElapsedTime.h>
 #include <Util/IconvUtil.h>
-#include <Util/ConvertCharset.h>
+#include <Util/WinCharsetConv.h>
+#include <Util/EncodingConvert.h>
 #include <Util/CommonUtil.h>
 #include <Util/DateTimeUtil.h>
 #include <Util/Regular.h>

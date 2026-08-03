@@ -27,7 +27,8 @@
 #include <BaseDefine.h>
 #include <BaseRedefineDataType.h>
 #include <BaseMacro.h>
-#include <Util/ConvertCharset.h>
+
+#include <Util/WinCharsetConv.h>
 #include <Util/EncodingConvert.h>
 #include <Util/FileUtil.h>
 #include <Util/StringUtil.h>

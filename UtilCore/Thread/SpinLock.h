@@ -126,13 +126,21 @@ template <typename Preset = SpinLockPreset::Default>
 class SpinLockGuard
 {
 public:
-    explicit SpinLockGuard(SpinLock<Preset>& lock) noexcept : _lock(lock) { _lock.Lock(); }
-    ~SpinLockGuard() noexcept { _lock.Unlock(); }
-    SpinLockGuard(const SpinLockGuard&)            = delete;
+    explicit SpinLockGuard(SpinLock<Preset>& lock, const char* name = nullptr) noexcept
+        : _lock(lock), _name(name)
+    {
+        _lock.Lock(_name);
+    }
+    ~SpinLockGuard() noexcept { _lock.Unlock(_name); }
+    SpinLockGuard(const SpinLockGuard&) = delete;
     SpinLockGuard& operator=(const SpinLockGuard&) = delete;
 private:
     SpinLock<Preset>& _lock;
+    const char* _name;
 };
+
+#define SPIN_USE_LOCK    mutable SpinLock<SpinLockPreset::LightWeight> _lock
+#define SPIN_LOCK         SpinLockGuard<SpinLockPreset::LightWeight> __spin_lock_guard__(_lock, __func__)
 
 //***************************************************************************
 //  [2] RWSpinLock
@@ -244,10 +252,10 @@ private:
     const char* _name;
 };
 
-#define USE_LOCK           mutable RWSpinLock<RWSpinLockPreset::Default> _lock
-#define WRITE_LOCK         CustomLockGuard<RWSpinLock<RWSpinLockPreset::Default>> \
+#define RWSPIN_USE_LOCK           mutable RWSpinLock<RWSpinLockPreset::Default> _lock
+#define RWSPIN_WRITE_LOCK         CustomLockGuard<RWSpinLock<RWSpinLockPreset::Default>> \
                              __write_lock_guard__(_lock, LockType::Write, __func__)
-#define READ_LOCK          CustomLockGuard<RWSpinLock<RWSpinLockPreset::Default>> \
+#define RWSPIN_READ_LOCK          CustomLockGuard<RWSpinLock<RWSpinLockPreset::Default>> \
                              __read_lock_guard__(_lock, LockType::Read, __func__)
 
 #include "SpinLock.inl"

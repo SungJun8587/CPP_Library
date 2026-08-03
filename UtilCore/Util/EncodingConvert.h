@@ -7,8 +7,8 @@
 #ifndef __ENCODINGCONVERT_H__
 #define __ENCODINGCONVERT_H__
 
-#ifndef __CONVERTCHARSET_H__
-#include <ConvertCharset.h>
+#ifndef __WINCHARSETCONV_H__
+#include <Util/WinCharsetConv.h>
 #endif
 
 #ifdef _STRING_

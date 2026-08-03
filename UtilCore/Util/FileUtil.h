@@ -19,8 +19,8 @@
 #include <tchar.h>
 #endif
 
-#ifndef	__CONVERTCHARSET_H__
-#include <Util/ConvertCharset.h>
+#ifndef	__WINCHARSETCONV_H__
+#include <Util/WinCharsetConv.h>
 #endif
 
 #include <vector>
