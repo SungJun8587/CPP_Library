@@ -182,37 +182,29 @@ while (!outQueue.empty()) {
     outQueue.pop();
 }
 ```
-
 ---
 
-## ⚖️ 비교 요약
+# ⚖️ 큐 클래스 통합 비교 표 (가로: 클래스, 세로: 특징)
 
-| 클래스 | 패턴 | 목적 | 구현 방식 | 장점 | 사용 예시 |
-|--------|------|------|-----------|------|-----------|
-| **DelayedTaskQueue** | SPMC | 시간 기반 실행 | priority_queue + CV | 정밀한 타이머 | 타임아웃, 쿨다운 |
-| **DoubleBufferQueue** | MPSC | 배치 처리 성능 | 더블 버퍼링 | 제로-할당, 고속 | 로깅, 통계 |
-| **SpinLockQueue** | MPMC | 범용 큐 | 스핀락 + 아토믹 | 직관적, 빠른 조회 | 작업 분배 |
-| **BlockingTaskQueue** | MPMC | 블로킹 대기 | Mutex + CV | 안전한 종료 | 워커 파이프라인 |
-| **ChunkedSwapQueue** | SPMC | 부하 제어 | 청킹 스왑 | 부하 분산 | IOCP, 폭주 트래픽 |
-
----
-
-## ⚖️ 특징별 비교 표
-
-| 특징 | **DelayedTaskQueue** | **DoubleBufferQueue** | **SpinLockQueue** | **BlockingTaskQueue** | **ChunkedSwapQueue** |
-|------|----------------------|-----------------------|-------------------|-----------------------|----------------------|
-| **패턴** | SPMC | MPSC | MPMC | MPMC | SPMC |
-| **중점** | 시간 기반 실행 | 배치 처리 성능 | 범용 큐 | 블로킹 대기 | 부하 제어 |
-| **락 방식** | Mutex + CV | Spinlock + Atomic | Spinlock | Mutex + CV | Spinlock |
-| **종료 처리** | Stop 플래그 | 없음 | Clear | ProducerDone | 없음 |
-| **적합한 환경** | 타이머, 스케줄링 | 로깅, 통계 | 작업 큐 | 워커 파이프라인 | IOCP, 폭주 트래픽 |
+| 특징 | **CDelayedTaskQueue** | **CDoubleBufferQueue** | **CSpinLockQueue** | **CBlockingTaskQueue** | **CChunkedSwapQueue** |
+|------|--------------------------|--------------------------|--------------------------|--------------------------|--------------------------|
+| **패턴** | SPMC (Single Producer, Multiple Consumer) | MPSC (Multiple Producer, Single Consumer) | MPMC (Multi Producer, Multi Consumer) | MPMC (Multi Producer, Multi Consumer) | SPMC (Single Producer, Multiple Consumer) |
+| **목적** | 특정 시점 이후 작업 실행 | 초고속 배치 처리 | 범용 작업 큐 | 블로킹 대기 지원 | 부하 제어 및 청킹 처리 |
+| **구현 방식** | `priority_queue`(최소 힙) + `condition_variable` | 더블 버퍼링, 원자적 스왑, 제로-할당 구조 | 스핀락 기반 Push/Pop, 아토믹 카운터로 크기 조회 | `mutex` + `condition_variable`, ProducerDone 플래그 | 청킹 스왑, 아토믹 크기 추적 |
+| **중점** | 시간 기반 실행 | 배치 처리 성능 | 직관적 범용 큐 | 안전한 블로킹 대기 | 부하 제어 및 분산 |
+| **락 방식** | Mutex + Condition Variable | Spinlock + Atomic | Spinlock | Mutex + Condition Variable | Spinlock |
+| **종료 처리** | Stop 플래그로 즉시 종료 | 없음 | Clear 메서드 | ProducerDone 플래그 | 없음 |
+| **장점** | 정밀한 타이머, 효율적 대기 | 힙 재할당 최소화, 락 경합 감소 | 직관적 인터페이스, 빠른 상태 확인 | 안전한 종료, graceful shutdown | 폭주 트래픽 제어, 실시간 안정성 |
+| **사용 예시** | 네트워크 패킷 재전송, 게임 서버 버프/디버프 만료, 푸시 알림 예약 발송 | 멀티스레드 로깅, 통계 수집, DB 비동기 처리 | 글로벌 JobQueue, 멀티스레드 작업 분배 | 워커 파이프라인, 백그라운드 작업 | IOCP 서버 패킷 전달, 대량 요청 처리 |
+| **적합한 환경** | 타이머, 스케줄링, 네트워크 세션 관리 | 로그/통계 수집, 고속 데이터 파이프라인 | 범용 멀티스레드 큐 | 생산자-소비자 파이프라인, 종료 제어 | 실시간 시스템, 폭주 트래픽 제어 |
 
 ---
 
 ## 🚀 설계 인사이트
 
-- **CDelayedTaskQueue** → 시간 정밀성이 중요한 경우.
-- **CDoubleBufferQueue** → 초고속 배치 처리에 최적.
-- **CSpinLockQueue** → 단순하고 직관적인 범용 큐.
-- **CBlockingTaskQueue** → 블로킹 동작과 종료 제어가 필요한 경우.
-- **CChunkedSwapQueue** → 폭주 트래픽 제어 및 부하 분산에 적합.
+- **CDelayedTaskQueue** → 정밀한 시간 제어가 필요한 타이머/스케줄링에 적합.  
+- **CDoubleBufferQueue** → 초고속 배치 처리와 로그/통계 수집에 최적.  
+- **CSpinLockQueue** → 단순하고 직관적인 범용 작업 큐로 활용 가능.  
+- **CBlockingTaskQueue** → 블로킹 동작과 종료 제어가 필요한 파이프라인에 적합.  
+- **CChunkedSwapQueue** → 폭주 트래픽 제어 및 실시간 부하 분산에 최적.  
+
