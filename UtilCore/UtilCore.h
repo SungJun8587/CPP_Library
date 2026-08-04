@@ -77,7 +77,8 @@ using namespace std;
 #include <ThreadSafeContainers/UnOrderedMap.h>
 #include <ThreadSafeContainers/SpinLockQueue.h>
 #include <ThreadSafeContainers/DelayedTaskQueue.h>
-#include <ThreadSafeContainers/SwapQueue.h>
+#include <ThreadSafeContainers/ChunkedSwapQueue.h>
+#include <ThreadSafeContainers/DoubleBufferQueue.h>
 
 #include <Job/Job.h>
 #include <Job/JobTimer.h>

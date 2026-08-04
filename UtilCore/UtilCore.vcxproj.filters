@@ -253,7 +253,10 @@
     <ClInclude Include="ThreadSafeContainers\DelayedTaskQueue.h">
       <Filter>ThreadSafeContainers</Filter>
     </ClInclude>
-    <ClInclude Include="ThreadSafeContainers\SwapQueue.h">
+    <ClInclude Include="ThreadSafeContainers\ChunkedSwapQueue.h">
+      <Filter>ThreadSafeContainers</Filter>
+    </ClInclude>
+    <ClInclude Include="ThreadSafeContainers\DoubleBufferQueue.h">
       <Filter>ThreadSafeContainers</Filter>
     </ClInclude>
   </ItemGroup>

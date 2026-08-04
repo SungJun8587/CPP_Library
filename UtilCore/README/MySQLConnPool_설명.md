@@ -26,11 +26,12 @@
 | 비동기 자동 재연결 | 헬스체크 스레드가 끊어진 슬롯을 감지하고, 별도 워커 풀이 실제 재연결(I/O)을 병렬 수행 |
 | 지수 백오프 + 지터 | DB 전체 장애 시 모든 슬롯이 동시에 재시도하는 connection storm을 방지 |
 | 백오프 하한 강제 | `RECONNECT_BACKOFF_MIN_MS`(10ms) 미만의 `nBackoffBaseMs`는 재연결 폭주로 이어질 수 있어 `ValidateReconnectConfig`에서 거부 |
+| 이벤트 기반 정밀 재시도 스케줄링 | 백오프 대기는 `CDelayedTaskQueue`(§3의 `_delayedTaskQueue`)가 전담하며, 계산된 지연 시간이 정확히 지난 시점에 콜백이 1회 실행되어 재시도를 트리거한다. 헬스체크 스캔 주기(500ms)와는 독립적으로 동작한다 |
 | 동적 워커 수 조정 | `SetReconnectConfig`로 런타임 중 재연결 워커 수/백오프 정책을 조정 가능 |
 | 격리(Quarantine) 큐 | 교체된 낡은 커넥션에 참조가 남아있으면 즉시 삭제하지 않고 격리 후 안전할 때 삭제 |
 | 격리 큐 요약 경보 | 갇힌 항목이 있어도 개별 로그 대신 5분(`LOG_ALERT_INTERVAL_MS`) 주기로 개수와 최장 체류 시간을 한 줄로 요약 로깅해 로그 폭주 방지 |
 | Safe Leak | 프로세스 종료 시점까지 참조가 남은 커넥션은 삭제를 포기(누수)하여 UAF 크래시를 방지 |
-| False sharing 방지 | 슬롯별 원자 배열(`_pMySQLConns`, `_pRefCount`, `_pReconnecting`, `_pNextRetryAllowedMs`, `_pRetryFailCount`)을 `CachePaddedAtomic<T>[]`로, `_slotLocks`를 캐시라인 정렬된 `SpinLockDefault[]`로 구성해 슬롯 간 캐시라인 공유를 차단 |
+| False sharing 방지 | 슬롯별 원자 배열(`_pMySQLConns`, `_pRefCount`, `_pReconnecting`, `_pRetryFailCount`)을 `CachePaddedAtomic<T>[]`로, `_slotLocks`를 캐시라인 정렬된 `SpinLockDefault[]`로 구성해 슬롯 간 캐시라인 공유를 차단 |
 | char/wchar_t 이중 접속정보 입력 | `Init()`이 `char*`/`wchar_t*` 두 오버로드를 제공하며, wchar_t 버전은 `WideCharToMultiByte` 변환 후 공통 로직(`FinishInit`)에 합류 |
 | 할당자 분리 | `CMySQLConnPool` 자신은 `BaseAllocator` 상속으로 RawAllocator 경로를, 내부 `CBaseMySQL` 커넥션은 `xnew`/`xdelete`(PoolAllocator)로 별도 관리 (§10 참고) |
 
@@ -61,8 +62,7 @@
 | `_pRefCount` | 슬롯별 참조 카운트 (`CachePaddedAtomic<int32>[]`, 가장 핫한 배열) |
 | `_slotLocks` | 슬롯별 교체(swap) 보호용 스핀락 배열 (`SpinLockDefault[]`) |
 | `_pReconnecting` | 슬롯별 "재연결 워커가 처리 중" 플래그 (`CachePaddedAtomic<bool>[]`, 중복 디스패치 방지) |
-| `_pNextRetryAllowedMs` | 슬롯별 다음 재시도 허용 시각 (`CachePaddedAtomic<int64>[]`, 백오프) |
-| `_pRetryFailCount` | 슬롯별 연속 재연결 실패 횟수 (`CachePaddedAtomic<int32>[]`) |
+| `_pRetryFailCount` | 슬롯별 연속 재연결 실패 횟수 (`CachePaddedAtomic<int32>[]`). 지수 백오프 shift 계산에 쓰이는 동시에, 0보다 크면 "이미 `_delayedTaskQueue`에 재시도가 예약된 상태"임을 나타내는 상태 플래그 역할도 겸함(§5.2) |
 
 > `_quarantineQueue`가 `&_pRefCount[i].value` 주소를 그대로 저장하므로, 위 배열들은 런타임 중
 > 재할당(make_unique 재호출 등)이 절대 금지된다. 각 슬롯이 `CachePaddedAtomic<T>`로 캐시라인
@@ -73,6 +73,7 @@
 | 변수 | 설명 |
 |---|---|
 | `_healthCheckThreadMgr` / `_bStopHealthCheck` / `_nHealthCheckIntervalMs` | 헬스체크 스레드 관리, 종료 신호, 주기(기본 500ms) |
+| `_delayedTaskQueue` / `_delayedTaskThreadMgr` | 재연결 실패 시 계산된 백오프 지연을 정확한 시각에 1회 실행하기 위한 `CDelayedTaskQueue`와, 이를 처리하는 전담 스레드(단일 컨슈머) |
 | `_nNextSlotHint` | `PopFreeSlotIndex` 탐색 시작 위치 힌트 (경합 분산용) |
 | `_reconnectWorkerMgr` / `_bStopReconnectWorkers` | 재연결 워커 스레드 관리, 전체 종료 신호 |
 | `_nCurrentWorkerCount` / `_nDesiredWorkerCount` | 현재 워커 수 / 목표 워커 수 |
@@ -104,12 +105,13 @@
 | `FinishInit(reconnectConfig)` | 접속 정보가 이미 채워진 뒤 공통으로 실행되는 마무리 로직 — 정책 검증/적용, 커넥션 사전 생성, 헬스체크/재연결 스레드 기동 |
 | `TryReconnect(nType)` | 새 커넥션을 생성하고 실제 연결까지 시도하는 블로킹 I/O 로직 |
 | `ApplyReconnectedConn(nType, pNewConn)` | 새 커넥션으로 슬롯을 스왑하고, 낡은 커넥션을 안전하게 삭제 또는 격리 |
-| `NowMs()` | `steady_clock` 기준 현재 시각을 밀리초 정수로 변환 (백오프 시각 비교용) |
-| `IsRetryAllowed(nType)` | 백오프 대기 시각이 지났는지 검사 |
-| `OnReconnectFailed(nType)` | 실패 횟수를 늘리고 다음 허용 시각을 지수적으로(+지터) 연기 |
-| `OnReconnectSucceeded(nType)` | 백오프 상태 초기화 |
-| `HealthCheckLoop()` | 격리 큐 청소(PART A) + 끊어진 슬롯을 스캔해 재연결 큐에 등록(PART B) (블로킹 I/O 없음) |
+| `ScheduleRetry(nType)` | 실패 횟수(`_pRetryFailCount`)를 늘리고 지수 백오프+지터로 지연 시간을 계산한 뒤, `_delayedTaskQueue.Reserve()`로 그 시간 뒤 1회 실행될 재시도 콜백을 예약 |
+| `OnReconnectFailed(nType)` | `ScheduleRetry(nType)` 호출로 위임 |
+| `OnReconnectSucceeded(nType)` | `_pRetryFailCount`를 0으로 초기화 (백오프 상태 리셋) |
+| `HealthCheckLoop()` | 격리 큐 청소(PART A) + 끊어진 슬롯 스캔(PART B). `_pReconnecting`을 CAS로 선점한 뒤 `_pRetryFailCount == 0`(아직 예약된 재시도가 없는 슬롯)인 경우에만 즉시 재연결 큐에 등록하고, 실패 이력이 있는 슬롯은 `_delayedTaskQueue`의 예약에 맡기고 그냥 넘어감 (블로킹 I/O 없음) |
 | `StartHealthCheckThread()` / `StopHealthCheckThread()` | 헬스체크 스레드 기동/종료(Join까지 대기) |
+| `DelayedTaskLoop()` | `_delayedTaskQueue.ProcessExpiredTasks()`를 호출해 만료된 재시도 콜백들을 실행하는 루프 |
+| `StartDelayedTaskThread()` / `StopDelayedTaskThread()` | 지연 타이머 전담 스레드 기동 / `_delayedTaskQueue.Stop()` 후 안전 종료(join) |
 | `ReconnectWorkerLoop()` | 대기열에서 슬롯을 꺼내 실제 `TryReconnect` + 스왑을 수행하는 워커 루프 |
 | `StartReconnectWorkers(n)` / `StopReconnectWorkers()` | 재연결 워커 풀 기동/종료 |
 | `SetWorkerCount(n)` | 목표 워커 수 갱신. 확대는 즉시 스폰, 축소는 워커가 스스로 종료하도록 유도 |
@@ -125,12 +127,25 @@
 3. 소멸 시 `ReleaseMySQLConn()`으로 참조 카운트 반납
 
 ### 5.2 자동 재연결
-1. `HealthCheckLoop()`이 500ms마다 순회하며 참조 카운트 0 & 연결 끊김 & 백오프 통과한 슬롯을 찾음
-2. `EnqueueReconnect()`로 대기열에 등록, 워커 하나를 깨움
+1. `HealthCheckLoop()`이 500ms마다 순회하며 참조 카운트 0 & 연결 끊김인 슬롯을 찾고, `_pReconnecting`을
+   CAS로 선점한다.
+2. 선점에 성공한 슬롯 중 `_pRetryFailCount == 0`(아직 예약된 재시도가 없는 슬롯)인 경우만
+   `EnqueueReconnect()`로 즉시 대기열에 등록해 워커를 깨운다. 실패 이력이 있어 이미
+   `_delayedTaskQueue`에 재시도가 예약된 슬롯은 이번 순회에서 `_pReconnecting`만 반납하고 넘어간다.
 3. `ReconnectWorkerLoop()`이 `TryReconnect()`로 블로킹 I/O 수행 (다른 워커들은 각자 슬롯을 병렬 처리)
 4. 성공 시 `ApplyReconnectedConn()`으로 슬롯 스왑, 낡은 커넥션은 참조가 빠질 때까지 최대
-   `WAIT_TIMEOUT_MS`(100ms) 대기 후 삭제(또는 타임아웃 시 격리)
-5. 실패 시 `OnReconnectFailed()`로 백오프 적용 후 다음 헬스체크 주기에 재시도
+   `WAIT_TIMEOUT_MS`(100ms) 대기 후 삭제(또는 타임아웃 시 격리), `OnReconnectSucceeded()`로
+   `_pRetryFailCount`를 0으로 리셋
+5. 실패 시 `OnReconnectFailed()` → `ScheduleRetry()`가 실패 횟수를 늘려 지수 백오프+지터 지연을
+   계산하고, `_delayedTaskQueue.Reserve(지연ms, 콜백)`으로 정확히 그 시간 뒤 1회 실행되는 재시도
+   콜백을 예약한다. 콜백은 만료 시점에 슬롯이 여전히 재연결이 필요한 상태인지 재확인한 뒤
+   `EnqueueReconnect()`하거나, 그 사이 다른 경로로 이미 해소됐다면 `_pReconnecting`만 반납한다.
+
+> 풀 시작 시에는 `FinishInit()`이 `StartDelayedTaskThread()` → `StartHealthCheckThread()` →
+> `StartReconnectWorkers()` 순으로 기동해, 헬스체크나 재연결 워커가 첫 실패로 `ScheduleRetry()`를
+> 호출하기 전에 지연 타이머 스레드가 먼저 요청을 받을 준비를 갖춘다. 종료 시에는 반대로
+> `StopHealthCheckThread()` → `StopDelayedTaskThread()` → `StopReconnectWorkers()` 순으로 정지한다
+> (`~CMySQLConnPool()`/재`Init()` 공통).
 
 ### 5.3 격리 큐 처리
 1. `HealthCheckLoop()` PART A에서 매 사이클 `_globalQuarantineLock` 안에서 큐 전체를 순회하며
@@ -154,9 +169,14 @@
 - 격리 큐가 개별 로그 대신 요약 로그만 남겨, 대량 격리 상황에서도 로그가 폭주하지 않는다.
 - 워커 수/백오프 정책을 서비스 운영 중 무중단으로 조정할 수 있다.
 - char/wchar_t 양쪽 접속 정보를 모두 지원해 호출부 인코딩 제약이 적다.
+- 재시도 대기는 `CDelayedTaskQueue` 기반 이벤트 방식으로 처리되어, 헬스체크 스캔 주기(500ms)와
+  무관하게 계산된 백오프 시간이 지난 즉시 정확히 재시도가 트리거된다.
 
 ### 단점 / 트레이드오프
 - 슬롯 배열이 생성자에서 고정 할당되므로, 풀 크기 자체는 런타임에 늘릴 수 없다.
+- 모든 슬롯의 백오프 재시도 콜백이 `_delayedTaskQueue`라는 단일 전담 스레드를 통해 순차
+  처리된다. 콜백 자체는 가벼운 상태 확인 + 큐 등록뿐이라 실질적 지연은 미미하지만, 구조적으로는
+  단일 컨슈머 직렬화 지점이라는 점을 인지하고 있어야 한다.
 - `GetReconnectConfig()`의 스냅샷은 필드별 개별 로드이므로 완전한 원자적 일관성은 보장하지 않는다
   (모니터링 용도로는 문제 없으나 정합성이 중요한 로직에는 부적합).
 - `ApplyReconnectedConn`/`Clear`의 100ms 대기 후 격리 전환 로직은 반환 지연이 긴 호출자가 있을 경우
@@ -319,7 +339,8 @@ pool.SetReconnectConfig(newCfg);
 
 - `MySQLConnGuard`를 사용하지 않고 `GetMySQLConn`/`ReleaseMySQLConn`을 직접 짝지어 호출할 수도 있으나,
   예외 발생 시 반납 누락 위험이 있으므로 가드 사용을 권장한다.
-- 풀 소멸 시 `~CMySQLConnPool()`이 헬스체크/재연결 스레드를 먼저 종료한 뒤 `Clear()`로 자원을 정리한다.
+- 풀 소멸 시 `~CMySQLConnPool()`이 헬스체크 → 지연 타이머 → 재연결 워커 스레드를 순서대로
+  먼저 종료한 뒤 `Clear()`로 자원을 정리한다(§5.2 참고).
 
 ### 9.1 여러 DB를 다루는 실제 서비스 통합 패턴
 

@@ -36,57 +36,77 @@
 #include <BaseTLS.h>
 #endif
 
+#ifndef	__CONTAINERS_H__
+#include <Memory/Containers.h>
+#endif
+
+//***************************************************************************
+// @brief 워커 스레드의 생성/종료(Join)/TLS 초기화-정리를 전담하는 클래스.
+//
+// @details
+//  - 스레드 소유권과 Join 책임은 항상 이 클래스가 갖는다. 외부 코드는
+//    std::thread 핸들을 직접 들고 다루지 않고, 개수(count) 또는 인덱스/ID
+//    같은 식별 정보만으로 이 클래스에 Join을 위임한다.
+//  - join()처럼 블로킹되는 호출은 항상 락 밖에서 수행한다. 락 안에서는
+//    _threads 컨테이너의 구조 변경(추가/이동/삭제)만 수행하며, 실제 대기는
+//    락이 풀린 뒤 로컬로 옮겨진 스레드 핸들에 대해서만 이루어진다.
+//  - JoinThreads()(전체 종료)가 진행 중이면 새로운 스레드 생성을 거부한다.
+//    반면 JoinLastThreads()(부분 그룹 정리)는 이후에도 다른 스레드 생성이
+//    계속될 수 있는 정상 흐름의 일부이므로 종료 플래그와 무관하게 동작한다.
+//
+// @note 사용 시 주의사항 및 호출 방법:
+//  1. 전체 서비스 종료 시 소멸자 또는 JoinThreads()를 1회 호출하여 모든
+//     워커 스레드의 자연 종료를 보장해야 합니다.
+//  2. JoinThreadByIndex()를 사용할 때 인덱스는 erase 연산으로 인해
+//     뒤쪽 인덱스들이 당겨지므로, 조회 직후 바로 사용하는 **일회성 식별자**
+//     로만 사용해야 합니다. 여러 인덱스를 미리 모아 순차적으로 호출하는
+//     방식은 안전하지 않습니다.
+//  3. CreateThread() 내부에서 콜백 실행 중 예외가 발생하면 LOG_ERROR로
+//     예외 메시지를 기록한 뒤 재던지므로, 사후 디버깅 시 로그를 반드시
+//     확인해야 합니다.
+//
+// @example 간단한 테스트 코드 예시:
+//  ```cpp
+//  CThreadManager mgr;
+//
+//  // 워커 스레드 생성
+//  mgr.CreateThread([]() {
+//      std::this_thread::sleep_for(std::chrono::seconds(1));
+//      printf("Worker finished\n");
+//  });
+//
+//  // 현재 스레드 개수 확인
+//  size_t count = mgr.GetThreadCount();
+//  printf("Thread count: %zu\n", count);
+//
+//  // 특정 인덱스 스레드 종료
+//  mgr.JoinThreadByIndex(0);
+//
+//  // 전체 종료
+//  mgr.JoinThreads();
+//  ```
+//***************************************************************************
 class CThreadManager
 {
 public:
-	CThreadManager();
-	CThreadManager(const CThreadManager& other) = delete;
-	CThreadManager(CThreadManager&& other) = delete;
-	CThreadManager& operator=(const CThreadManager& other) = delete;
-	CThreadManager& operator=(CThreadManager&& other) = delete;
+    CThreadManager();
+    ~CThreadManager();
 
-	// 설명 : 소멸 시 JoinThreads()를 호출해 보유 중인 모든 워커 스레드가
-	//        완전히 종료될 때까지 대기합니다.
-	//
-	//        [중요] 각 워커 스레드가 종료되는 순간 그 스레드의 thread_local
-	//        CMemory::TlsCache 소멸자가 자동 호출되어 gpMemory의 전역 풀을
-	//        참조합니다. 따라서 이 소멸자(및 JoinThreads)가 완료되기 전에
-	//        gpMemory가 먼저 파괴되면 use-after-free가 발생합니다.
-	//        -> BaseGlobal::Destroy()에서 반드시 gpThreadManager를
-	//           gpMemory보다 먼저 delete해야 합니다.
-	~CThreadManager();
-
-	// 설명 : 새 워커 스레드를 생성하고 목록에 등록합니다. 스레드 시작/종료
-	//        시점에 InitTLS()/DestroyTLS()를 자동으로 감싸 호출합니다.
-	// 매개변수 : function - 스레드에서 실행할 콜백
-	void CreateThread(function<void(void)> function);
-
-	// 설명 : 생성된 스레드 목록의 뒤에서부터 지정된 개수만큼 스레드가 
-	//         종료될 때까지 대기(join)한 뒤 목록에서 안전하게 제거합니다.
-	void JoinLastThreads(size_t count);
-
-	// 설명 : 보유 중인 모든 워커 스레드가 종료될 때까지 대기(join)한 뒤
-	//        목록을 비웁니다. 이 함수가 반환된 시점에는 모든 워커 스레드의
-	//        thread_local 자원(TlsCache 포함)이 이미 정리 완료된 상태입니다.
-	void JoinThreads();
-
-	// 설명 : 스레드 시작 시 호출되어 스레드 로컬 ID(LThreadId)를 부여합니다.
-	static void InitTLS();
-
-	// 설명 : 스레드 종료 직전(콜백 실행 완료 후) 호출되어 스레드 로컬
-	//        자원을 명시적으로 정리합니다. 현재는 CMemory의 TLS 캐시를
-	//        명시적으로 flush합니다(자연적인 thread_local 소멸 순서에만
-	//        의존하지 않고, 정리 시점을 코드로 명확히 고정하기 위함).
-	static void DestroyTLS();
-
-	// 스레드 ID 반환 (TLS 활용)
-	static int getThreadID() {
-		return LThreadId;
-	}
+    bool CreateThread(std::function<void(void)> fncCallback);
+    void JoinThreads();
+    void JoinLastThreads(size_t count);
+    void JoinThreadByIndex(size_t index);
+    void JoinThreadById(std::thread::id threadId);
+    size_t GetThreadCount() const;
 
 private:
-	CVector<thread> _threads;
-	mutex _lock;
+    void InitTLS();
+    void DestroyTLS();
+
+private:
+    CVector<std::thread>    _threads;                   // 관리 중인 워커 스레드 핸들 목록
+    mutable std::mutex      _lock;                      // 스레드 목록 동기화를 위한 뮤텍스
+    std::atomic<bool>       _bShuttingDown{ false };    // 전체 종료 절차 진입 여부 플래그
 };
 
 #endif // ndef __THREADMANAGER_H__

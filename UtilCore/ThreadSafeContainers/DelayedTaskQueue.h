@@ -39,6 +39,7 @@ struct DelayedTask
 
     //***************************************************************************
     // @brief 최소 힙(Min-Heap) 구성을 위한 비교 연산자 (실행 시간이 빠른 것이 우선순위가 높음)
+    //***************************************************************************
     bool operator>(const DelayedTask& other) const
     {
         return ExecuteTime > other.ExecuteTime;
@@ -48,6 +49,24 @@ struct DelayedTask
 //***************************************************************************
 // @class CDelayedTaskQueue
 // @brief 특정 시간 이후에 실행되어야 하는 작업을 관리하는 타임머신 형태의 지연 예약 큐.
+//
+// @details
+// 내부적으로 std::priority_queue(최소 힙)와 조건 변수를 사용하여,
+// 예약된 시각에 도달한 작업을 효율적으로 실행합니다.
+// 네트워크 세션 관리, 게임 서버 이벤트, 주기적 헬스 체크 등
+// 지연 실행(Delayed Execution)이 필요한 곳에 적합합니다.
+//
+// 주요 사용처 및 이점:
+//  - 네트워크 패킷 재전송, 타임아웃 처리
+//  - 게임 서버의 버프/디버프 만료, 스킬 쿨다운 종료, 리스폰 타이머
+//  - 예약 발송이 필요한 푸시 스케줄러(FcmPushAgent 등)
+//  - DB 커넥션 풀의 재연결 로직(지수 백오프 재시도)
+//  - 세션/커넥션 idle timeout 감지
+//
+// 패턴 최적화:
+//  - **SPMC(Single Producer, Multiple Consumer)** 또는 단일 소비자 루프에 적합
+//    → 하나의 스레드가 예약 작업을 넣고, 하나 이상의 소비자 스레드가
+//      ProcessExpiredTasks()를 통해 실행 가능
 class CDelayedTaskQueue
 {
 public:
@@ -59,6 +78,7 @@ public:
     // @tparam F 람다식 또는 함수 객체 타입
     // @param milliseconds 현재 시점부터 경과해야 할 시간 (밀리초 단위)
     // @param task 시간이 되었을 때 실행할 작업 함수
+    //***************************************************************************
     template<typename F>
     void Reserve(int milliseconds, F&& task)
     {
@@ -75,6 +95,7 @@ public:
     // @brief 시간에 도달한 작업들을 순차적으로 꺼내어 실행합니다.
     // @note 아직 시간이 되지 않은 작업은 남은 시간만큼 조건 변수로 효율적으로 대기합니다.
     //       Stop()이 호출되면 즉시 반환합니다.
+    //***************************************************************************
     void ProcessExpiredTasks()
     {
         std::unique_lock<std::mutex> lock(_mutex);
@@ -105,7 +126,7 @@ public:
             }
 
             // 시간이 된 작업들을 일괄 수집(Drain)하여 락 점유 시간 최소화
-            std::vector<std::function<void()>> expiredTasks;
+            CVector<std::function<void()>> expiredTasks;
             while( !_queue.empty() && _queue.top().ExecuteTime <= now )
             {
                 expiredTasks.push_back(std::move(const_cast<DelayedTask&>(_queue.top())).Task);
@@ -139,6 +160,7 @@ public:
     // @brief 대기 중인 처리 루프를 정지시킵니다.
     // @note 정지 플래그를 설정한 뒤 대기 중인 스레드를 깨웁니다.
     //       ProcessExpiredTasks()는 큐에 남은 작업이 있어도 이 호출 이후 즉시 반환합니다.
+    //***************************************************************************
     void Stop()
     {
         {
@@ -153,9 +175,9 @@ public:
 
 private:
     std::priority_queue<DelayedTask, std::vector<DelayedTask>, std::greater<DelayedTask>> _queue;   // 최소 힙 우선순위 큐
-    std::mutex              _mutex;             // 큐 보호용 뮤텍스
-    std::condition_variable _cv;                // 타이머 대기용 조건 변수
-    std::atomic<bool>       _stopped{ false };  // ProcessExpiredTasks() 루프 정지 플래그
+    std::mutex              _mutex;                     // 큐 보호용 뮤텍스
+    std::condition_variable _cv;                        // 타이머 대기용 조건 변수
+    std::atomic<bool>       _stopped{ false };          // ProcessExpiredTasks() 루프 정지 플래그
 };
 
 #endif // ndef __DELAYEDTASKQUEUE_H__

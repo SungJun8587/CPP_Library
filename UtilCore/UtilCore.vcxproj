@@ -68,11 +68,12 @@
     <ClInclude Include="ServerConnectInfo.h" />
     <ClInclude Include="ServiceSvr.h" />
     <ClInclude Include="ThreadSafeContainers\BlockingTaskQueue.h" />
+    <ClInclude Include="ThreadSafeContainers\ChunkedSwapQueue.h" />
     <ClInclude Include="ThreadSafeContainers\ClusterSpinMap.h" />
     <ClInclude Include="ThreadSafeContainers\DelayedTaskQueue.h" />
+    <ClInclude Include="ThreadSafeContainers\DoubleBufferQueue.h" />
     <ClInclude Include="ThreadSafeContainers\OrderedMap.h" />
     <ClInclude Include="ThreadSafeContainers\SpinLockQueue.h" />
-    <ClInclude Include="ThreadSafeContainers\SwapQueue.h" />
     <ClInclude Include="ThreadSafeContainers\UnOrderedMap.h" />
     <ClInclude Include="Thread\CacheAlignment.h" />
     <ClInclude Include="Thread\CriticalSection.h" />

@@ -18,105 +18,161 @@
 //***************************************************************************
 // Construction/Destruction
 //***************************************************************************
+
 CThreadManager::CThreadManager()
-	: _threads()
-	, _lock()
+    : _threads()
+    , _lock()
 {
 }
 
-// 설명 : JoinThreads()를 호출해 모든 워커 스레드의 자연 종료를 대기합니다.
-//        각 워커 스레드는 종료 직전 DestroyTLS()에서 자신의 CMemory TLS
-//        캐시를 명시적으로 비우므로, 이 소멸자가 반환되는 시점에는 모든
-//        워커 스레드의 캐시가 이미 전역 풀로 반납된 상태입니다.
 CThreadManager::~CThreadManager()
 {
-	JoinThreads();
+    JoinThreads();
 }
 
 //***************************************************************************
-// 설명 : 새 워커 스레드를 생성합니다. 스레드 진입 시 InitTLS()로 스레드
-//        ID를 부여하고, 콜백 실행이 끝나면 DestroyTLS()로 스레드 로컬
-//        자원을 정리한 뒤 스레드가 종료됩니다.
-void CThreadManager::CreateThread(function<void(void)> fncCallback)
+// @brief 새 워커 스레드를 생성합니다.
+// @param fncCallback 스레드 진입 후 실행할 콜백 함수
+// @return 스레드 생성 성공 시 true, 전체 종료 중이라 거부된 경우 false
+//***************************************************************************
+bool CThreadManager::CreateThread(std::function<void(void)> fncCallback)
 {
-	lock_guard<mutex> lock(_lock);
+    std::lock_guard<std::mutex> lock(_lock);
 
-	// create new thread
-	_threads.push_back(thread([=]()
-		{
-			// set thread id
-			InitTLS();
-			fncCallback();
-			DestroyTLS();
-		}));
+    if( _bShuttingDown.load() ) return false;
+
+    _threads.emplace_back([=]() {
+        InitTLS();
+        try {
+            fncCallback();
+        }
+        catch( ... ) {
+            // 예외 발생 시에도 TLS 정리 보장
+            DestroyTLS();
+            throw;
+        }
+        DestroyTLS();
+        });
+
+    return true;
 }
 
 //***************************************************************************
-// 설명 : 보유한 모든 워커 스레드가 종료될 때까지 대기(join)한 뒤 목록을
-//        비웁니다. join이 반환된다는 것은 해당 스레드의 모든 thread_local
-//        객체(소멸자 포함)가 이미 정리 완료되었음을 의미합니다.
+// @brief 보유한 모든 워커 스레드가 종료될 때까지 대기(join)한 뒤 목록을 비웁니다.
+//***************************************************************************
 void CThreadManager::JoinThreads()
 {
-	lock_guard<mutex> lock(_lock);
+    CVector<std::thread> localThreads;
+    {
+        std::lock_guard<std::mutex> lock(_lock);
 
-	for( thread& thread : _threads )
-	{
-		if( thread.joinable() )
-			thread.join();
-	}
+        _bShuttingDown.store(true);
 
-	_threads.clear();
+        localThreads = std::move(_threads);
+        _threads.clear();
+    }
+
+    for( auto& th : localThreads )
+        if( th.joinable() )
+            th.join();
 }
 
 //***************************************************************************
-// 설명 : 생성된 스레드 목록의 뒤에서부터 지정된 개수만큼 스레드가 
-//         종료될 때까지 대기(join)한 뒤 목록에서 안전하게 제거합니다.
+// @brief 생성된 스레드 목록의 뒤에서부터 지정된 개수만큼 Join한 뒤 목록에서 제거합니다.
+// @param count Join할 스레드 개수
+//***************************************************************************
 void CThreadManager::JoinLastThreads(size_t count)
 {
-	lock_guard<mutex> lock(_lock);
+    CVector<std::thread> localThreads;
+    {
+        std::lock_guard<std::mutex> lock(_lock);
 
-	if( count == 0 || _threads.empty() ) return;
+        if( count == 0 || _threads.empty() ) return;
 
-	// 실제로 조인할 개수 결정 (요청한 개수가 전체 스레드 수보다 많으면 전체로 조정)
-	size_t actualCount = std::min(count, _threads.size());
-	size_t startIndex = _threads.size() - actualCount;
+        size_t actualCount = std::min(count, _threads.size());
+        size_t startIndex = _threads.size() - actualCount;
 
-	// 1. 뒤에서부터 지정된 개수만큼 스레드 Join 수행
-	for( size_t i = startIndex; i < _threads.size(); ++i )
-	{
-		if( _threads[i].joinable() )
-		{
-			_threads[i].join();
-		}
-	}
+        localThreads.reserve(actualCount);
+        for( size_t i = startIndex; i < _threads.size(); ++i )
+            localThreads.push_back(std::move(_threads[i]));
 
-	// 2. 조인된 스레드들을 벡터에서 안전하게 제거 (메모리 정리 및 중복 조인 방지)
-	// _threads 벡터의 뒤쪽(startIndex 위치부터 끝까지)을 통째로 잘라냅니다.
-	_threads.erase(_threads.begin() + startIndex, _threads.end());
+        _threads.erase(_threads.begin() + startIndex, _threads.end());
+    }
+
+    for( auto& th : localThreads )
+        if( th.joinable() )
+            th.join();
 }
 
 //***************************************************************************
-// 설명 : 스레드 로컬 ID(LThreadId)를 발급합니다. SThreadId는 모든 스레드가
-//        공유하는 원자적 카운터로, 스레드마다 겹치지 않는 ID를 순차 부여.
+// @brief 특정 인덱스(_threads 상의 위치)에 해당하는 스레드 하나를 Join합니다.
+// @param index Join 대상 스레드의 현재 인덱스
+//***************************************************************************
+void CThreadManager::JoinThreadByIndex(size_t index)
+{
+    std::thread th;
+    {
+        std::lock_guard<std::mutex> lock(_lock);
+
+        if( index >= _threads.size() ) return;
+        if( !_threads[index].joinable() ) return;
+
+        th = std::move(_threads[index]);
+        _threads.erase(_threads.begin() + index); // 목록에서 제거
+    }
+
+    if( th.joinable() )
+        th.join();
+}
+
+//***************************************************************************
+// @brief 특정 스레드 ID를 가진 스레드를 찾아 Join합니다.
+// @param threadId std::thread::get_id()로 얻은 대상 스레드의 ID
+//***************************************************************************
+void CThreadManager::JoinThreadById(std::thread::id threadId)
+{
+    std::thread th;
+    {
+        std::lock_guard<std::mutex> lock(_lock);
+
+        auto it = std::find_if(_threads.begin(), _threads.end(),
+            [&](std::thread& t) { return t.get_id() == threadId; });
+
+        if( it != _threads.end() && it->joinable() ) {
+            th = std::move(*it);
+            _threads.erase(it); // 목록에서 제거
+        }
+    }
+
+    if( th.joinable() )
+        th.join();
+}
+
+//***************************************************************************
+// @brief 현재 관리 중인(아직 Join되지 않은) 스레드 총 개수를 반환합니다.
+// @return 현재 관리 중인 스레드 개수
+//***************************************************************************
+size_t CThreadManager::GetThreadCount() const
+{
+    std::lock_guard<std::mutex> lock(_lock);
+    return _threads.size();
+}
+
+//***************************************************************************
+// @brief 스레드 진입 시 호출되어 스레드 로컬 ID(LThreadId)를 발급합니다.
+//***************************************************************************
 void CThreadManager::InitTLS()
 {
-	static std::atomic<uint32> SThreadId = 1;
-	LThreadId = SThreadId.fetch_add(1);
+    static std::atomic<uint32_t> SThreadId = 1;
+    LThreadId = SThreadId.fetch_add(1);
 }
 
 //***************************************************************************
-// 설명 : 스레드 종료 직전 호출되어 스레드 로컬 자원을 정리합니다.
-//
-//        CMemory 모듈이 포함된 빌드에서는 이 스레드의 CMemory::TlsCache에
-//        남아있는 블록을 명시적으로 전역 풀에 반납합니다. 이 반납은
-//        thread_local 소멸자(자동 호출)로도 결국 일어나지만, 여기서
-//        명시적으로 한 번 더 호출해 "콜백 종료 -> 이 시점에는 이미
-//        스레드가 쓰던 메모리 캐시가 비어있다"는 것을 코드로 명확히
-//        보장합니다. (여러 thread_local 객체 간 소멸 순서에 대한 암묵적
-//        가정을 줄이는 방어적 설계)
+// @brief 스레드 종료 직전 호출되어 스레드 로컬 자원을 정리합니다.
+//***************************************************************************
 void CThreadManager::DestroyTLS()
 {
 #ifdef __MEMORY_H__
-	CMemory::FlushCurrentThreadCache();
+    CMemory::FlushCurrentThreadCache();
 #endif
 }

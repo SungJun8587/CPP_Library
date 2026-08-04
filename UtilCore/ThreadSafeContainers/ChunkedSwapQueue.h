@@ -1,13 +1,17 @@
 ﻿
 //***************************************************************************
-// SwapQueue.h : interface for the CSwapQueue class.
+// ChunkedSwapQueue.h : interface for the CChunkedSwapQueue class.
 //
 //***************************************************************************
 
-#ifndef __SWAPQUEUE_H__
-#define __SWAPQUEUE_H__
+#ifndef __CHUNKED_SWAPQUEUE_H__
+#define __CHUNKED_SWAPQUEUE_H__
 
-#ifndef __CONTAINERS_H__
+#ifndef __BASEREDEFINEDATATYPE_H__
+#include <BaseRedefineDataType.h>
+#endif
+
+#ifndef	__CONTAINERS_H__
 #include <Memory/Containers.h>
 #endif
 
@@ -15,32 +19,39 @@
 #include <Thread/SpinLock.h>
 #endif
 
-#include <queue>
-#include <vector>
-#include <atomic>
-#include <utility>
+#include <queue>     // std::queue 사용
+#include <vector>    // std::vector 사용
+#include <atomic>    // std::atomic<int64_t> 사용
+#include <utility>   // std::move 사용
 
 //***************************************************************************
-// @class CSwapQueue
-// @brief 락 경쟁(Contention)을 최소화하기 위한 더블 버퍼링 기반의 스레드 세이프 큐.
-// @tparam T 큐에 저장할 데이터 타입
-// @note 멀티스레드 환경에서 여러 스레드가 동시에 데이터를 집어넣고(Producer), 
-//       단일 또는 소수의 스레드가 주기적으로 모아서 처리(Consumer)하는 
-//       로그 수집, 패킷 처리, 이벤트 큐 등의 구조에 사용하면 좋습니다.
-//          - IOCP 서버의 네트워크 I / O 스레드 → 로직 스레드 간 패킷 전달 큐(프레임마다 로직 스레드가 한 번의 Swap으로 대량 패킷을 일괄 수거)
-//          - CAdoAsyncSrv류 비동기 DB 서비스에서 요청 / 응답 결과를 워커 스레드가 일괄 수거해 콜백 디스패치하는 결과 큐
-//          - FcmPushAgent 같은 대량 푸시 스케줄러에서 생산자(스케줄 트리거)와 소비자(배치 전송 워커) 사이의 배치 전달 버퍼
-//          - 로깅 시스템에서 다중 스레드가 남기는 로그 라인을 로거 스레드가 주기적으로 일괄 flush하는 용도
+// @class CChunkedSwapQueue
+// @brief 단일 큐와 청킹(Chunking) 기능을 지원하는 스레드 세이프 스왑 큐.
+// 
+// @details 
+// 데이터 양이 폭발적이거나 일시적으로 몰릴 때, 컨슈머가 한 번에 처리하는 양을 
+// 세밀하게 조절(청킹)하여 프레임 드랍이나 과부하를 방지해야 하는 상황에 적합합니다.
+// 
+// 주요 사용처 및 이점:
+//  - IOCP 서버의 네트워크 I/O 스레드 → 로직 스레드 간 패킷 전달 (SwapChunk로 처리량 제어)
+//  - 대량의 요청이 몰릴 때 컨슈머의 부하 분산 및 스파이크 현상 방지
+//  - 큐 크기(_size)를 아토믹으로 실시간 모니터링해야 하는 경우
+// 
+// 패턴 최적화:
+//  - **SPMC(Single Producer, Multiple Consumer)** 환경에 최적화
+//    → 단일 프로듀서가 데이터를 넣고, 여러 컨슈머가 청킹 단위로 나눠 가져가며 부하를 분산
+//***************************************************************************
 template<typename T>
-class CSwapQueue
+class CChunkedSwapQueue
 {
 public:
-    CSwapQueue() = default;
-    ~CSwapQueue() = default;
+    CChunkedSwapQueue() = default;
+    ~CChunkedSwapQueue() = default;
 
     //***************************************************************************
     // @brief 단일 아이템을 입력 큐에 안전하게 삽입합니다.
     // @param item 삽입할 데이터 항목
+    //***************************************************************************
     void Push(T item)
     {
         SPIN_LOCK;
@@ -53,6 +64,7 @@ public:
     // @brief 락 안에서 푸시와 크기 증가를 원자적으로 처리하여 갱신된 전체 크기를 반환합니다.
     // @param item 삽입할 데이터 항목
     // @return 푸시 후의 전체 큐 크기
+    //***************************************************************************
     int64_t PushAndGetSize(T item)
     {
         SPIN_LOCK;
@@ -64,6 +76,7 @@ public:
     //***************************************************************************
     // @brief 여러 아이템을 벡터 단위로 일괄 삽입합니다.
     // @param items 삽입할 데이터 항목들이 담긴 벡터 (성공 시 내부 비워짐)
+    //***************************************************************************
     void PushBatch(std::vector<T>& items)
     {
         if( items.empty() )
@@ -82,6 +95,7 @@ public:
     //***************************************************************************
     // @brief 입력 큐의 모든 요소를 출력 큐로 통째로 스왑(이동)합니다.
     // @param outQueue 데이터를 전달받을 대상 큐
+    //***************************************************************************
     void Swap(std::queue<T>& outQueue)
     {
         SPIN_LOCK;
@@ -109,6 +123,7 @@ public:
     // @note 멀티 스레드 환경에서 하나의 스레드가 백로그 전체를 독점하는 현상을 방지합니다.
     // @param outQueue 데이터를 전달받을 대상 큐
     // @param maxCount 한 번에 가져올 최대 아이템 개수
+    //***************************************************************************
     void SwapChunk(std::queue<T>& outQueue, size_t maxCount)
     {
         SPIN_LOCK;
@@ -130,6 +145,7 @@ public:
 
     //***************************************************************************
     // @brief 큐가 비어있는지 여부를 반환합니다.
+    //***************************************************************************
     bool IsEmpty() const
     {
         return _size.load(std::memory_order_relaxed) == 0;
@@ -137,20 +153,22 @@ public:
 
     //***************************************************************************
     // @brief 현재 큐에 대기 중인 전체 아이템 개수를 반환합니다.
+    //***************************************************************************
     int64_t GetSize() const
     {
         return _size.load(std::memory_order_relaxed);
     }
 
-    CSwapQueue(const CSwapQueue&) = delete;
-    CSwapQueue& operator=(const CSwapQueue&) = delete;
-    CSwapQueue(CSwapQueue&&) = delete;
-    CSwapQueue& operator=(CSwapQueue&&) = delete;
+    CChunkedSwapQueue(const CChunkedSwapQueue&) = delete;
+    CChunkedSwapQueue& operator=(const CChunkedSwapQueue&) = delete;
+    CChunkedSwapQueue(CChunkedSwapQueue&&) = delete;
+    CChunkedSwapQueue& operator=(CChunkedSwapQueue&&) = delete;
 
 private:
     SPIN_USE_LOCK;
-    std::queue<T>          _inQueue;      // 내부 입력을 받는 큐 버퍼
-    std::atomic<int64_t>   _size{ 0 };    // 락 경합 없는 빠른 크기 조회를 위한 아토믹 카운터
+
+    CQueue<T>               _inQueue;      // 내부 입력을 받는 큐 버퍼
+    std::atomic<int64_t>    _size{ 0 };    // 락 경합 없는 빠른 크기 조회를 위한 아토믹 카운터
 };
 
-#endif // ndef __SWAPQUEUE_H__
+#endif // ndef __CHUNKED_SWAPQUEUE_H__

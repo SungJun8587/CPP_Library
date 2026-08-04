@@ -154,11 +154,11 @@ protected:
 
 	std::mutex					_reconnectQueueMutex;          // 재연결 대기열 큐 보호용 뮤텍스
 	std::condition_variable		_reconnectQueueCv;			   // 재연결 대기열에 작업 추가를 알리는 조건 변수
-	std::queue<int32>			_reconnectPendingSlots;        // 재연결 대상 슬롯 인덱스들을 보관하는 대기열 큐
+	CQueue<int32>				_reconnectPendingSlots;		   // 재연결 대상 슬롯 인덱스들을 보관하는 대기열 큐
 
 	// 자원 격리(Quarantine) 관련 멤버
 	SpinLockDefault				_globalQuarantineLock;         // 격리 큐 보호용 전용 스핀락
-	std::queue<TQuarantineItem>	_quarantineQueue;              // 사용 중인 스레드가 빠져나오기를 기다리는 구형 커넥션 보관 큐
+	CQueue<TQuarantineItem>		_quarantineQueue;              // 사용 중인 스레드가 빠져나오기를 기다리는 구형 커넥션 보관 큐
 };
 
 //***************************************************************************

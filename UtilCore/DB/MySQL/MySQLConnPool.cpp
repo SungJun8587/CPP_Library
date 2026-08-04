@@ -14,9 +14,8 @@ constexpr int64 FORCE_CLEANUP_TIMEOUT_MS = 600000;	// 격리 큐 최대 체류 �
 //***************************************************************************
 // @brief CMySQLConnPool 클래스 생성자입니다.
 // @param nMaxPoolSize 관리할 최대 커넥션 슬롯 개수
-CMySQLConnPool::CMySQLConnPool(
-	int32 nMaxPoolSize // 관리할 최대 커넥션 슬롯 개수
-)
+//***************************************************************************
+CMySQLConnPool::CMySQLConnPool(int32 nMaxPoolSize)
 	: _nMaxPoolSize(nMaxPoolSize)
 	, _nBackoffBaseMs(500)
 	, _nBackoffMaxMs(30000)
@@ -53,6 +52,7 @@ CMySQLConnPool::CMySQLConnPool(
 
 //***************************************************************************
 // @brief CMySQLConnPool 클래스 소멸자입니다.
+//***************************************************************************
 CMySQLConnPool::~CMySQLConnPool(void)
 {
 	StopHealthCheckThread();
@@ -65,9 +65,8 @@ CMySQLConnPool::~CMySQLConnPool(void)
 // @brief 재연결 설정 값들의 유효성을 검사합니다.
 // @param cfg 검사할 TReconnectConfig 설정 구조체 레퍼런스
 // @return 유효한 설정이면 true, 아니면 false
-bool CMySQLConnPool::ValidateReconnectConfig(
-	const TReconnectConfig& cfg // 검사할 재연결 설정 구조체
-)
+//***************************************************************************
+bool CMySQLConnPool::ValidateReconnectConfig(const TReconnectConfig& cfg)
 {
 	if( cfg.nWorkerCount < 1 ) return false;
 	if( cfg.nBackoffBaseMs < RECONNECT_BACKOFF_MIN_MS ) return false;
@@ -79,14 +78,15 @@ bool CMySQLConnPool::ValidateReconnectConfig(
 
 //***************************************************************************
 // @brief 커넥션 풀을 초기화하고 지정된 char 접속 정보로 초기 커넥션을 미리 생성합니다.
-bool CMySQLConnPool::Init(
-	const char* pszDBHost,          // 데이터베이스 서버 호스트 주소 (Multi-byte 문자열)
-	const char* pszDBUserId,        // 데이터베이스 사용자 계정 ID
-	const char* pszDBPasswd,        // 데이터베이스 사용자 계정 비밀번호
-	const char* pszDBName,          // 접속할 데이터베이스 이름
-	const uint32 uiPort,            // 데이터베이스 서버 포트 번호
-	const TReconnectConfig& reconnectConfig // 재연결 정책 설정 구조체
-)
+// @param pszDBHost 데이터베이스 서버 호스트 주소
+// @param pszDBUserId 데이터베이스 사용자 계정 ID
+// @param pszDBPasswd 데이터베이스 사용자 계정 비밀번호
+// @param pszDBName 접속할 데이터베이스 이름
+// @param uiPort 데이터베이스 서버 포트 번호
+// @param reconnectConfig 재연결 정책 설정 구조체
+// @return 초기화 및 연결 성공 시 true, 실패 시 false
+//***************************************************************************
+bool CMySQLConnPool::Init(const char* pszDBHost, const char* pszDBUserId, const char* pszDBPasswd, const char* pszDBName, const uint32 uiPort, const TReconnectConfig& reconnectConfig)
 {
 	StopHealthCheckThread();
 	StopDelayedTaskThread();
@@ -104,14 +104,15 @@ bool CMySQLConnPool::Init(
 
 //***************************************************************************
 // @brief 커넥션 풀을 초기화하고 지정된 wchar_t 접속 정보로 초기 커넥션을 미리 생성합니다.
-bool CMySQLConnPool::Init(
-	const wchar_t* pwszDBHost,     // 데이터베이스 서버 호스트 주소 (Wide character 문자열)
-	const wchar_t* pwszDBUserId,   // 데이터베이스 사용자 계정 ID
-	const wchar_t* pwszDBPasswd,   // 데이터베이스 사용자 계정 비밀번호
-	const wchar_t* pwszDBName,     // 접속할 데이터베이스 이름
-	const uint32 uiPort,           // 데이터베이스 서버 포트 번호
-	const TReconnectConfig& reconnectConfig // 재연결 정책 설정 구조체
-)
+// @param pwszDBHost 데이터베이스 서버 호스트 주소 (Wide character 문자열)
+// @param pwszDBUserId 데이터베이스 사용자 계정 ID
+// @param pwszDBPasswd 데이터베이스 사용자 계정 비밀번호
+// @param pwszDBName 접속할 데이터베이스 이름
+// @param uiPort 데이터베이스 서버 포트 번호
+// @param reconnectConfig 재연결 정책 설정 구조체
+// @return 초기화 및 연결 성공 시 true, 실패 시 false
+//***************************************************************************
+bool CMySQLConnPool::Init(const wchar_t* pwszDBHost, const wchar_t* pwszDBUserId, const wchar_t* pwszDBPasswd, const wchar_t* pwszDBName, const uint32 uiPort, const TReconnectConfig& reconnectConfig)
 {
 	StopHealthCheckThread();
 	StopDelayedTaskThread();
@@ -141,9 +142,10 @@ bool CMySQLConnPool::Init(
 
 //***************************************************************************
 // @brief 공통 초기화 마무리 로직 (커넥션 사전 생성 및 백그라운드 스레드 기동)
-bool CMySQLConnPool::FinishInit(
-	const TReconnectConfig& reconnectConfig // 적용할 재연결 설정 구조체
-)
+// @param reconnectConfig 적용할 재연결 설정 구조체
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
+bool CMySQLConnPool::FinishInit(const TReconnectConfig& reconnectConfig)
 {
 	TReconnectConfig cfgToApply = reconnectConfig;
 	if( !ValidateReconnectConfig(reconnectConfig) )
@@ -187,9 +189,8 @@ bool CMySQLConnPool::FinishInit(
 // @brief 새로운 데이터베이스 연결 객체를 생성하고 실제 연결을 시도합니다.
 // @param nType 대상 슬롯 인덱스 번호 (로깅 및 추적용)
 // @return 연결에 성공한 CBaseMySQL 포인터, 실패 시 nullptr
-CBaseMySQL* CMySQLConnPool::TryReconnect(
-	int32 nType // 대상 슬롯 인덱스 번호 (로깅 및 추적용)
-)
+//***************************************************************************
+CBaseMySQL* CMySQLConnPool::TryReconnect(int32 nType)
 {
 	CBaseMySQL* pNewConn = xnew<CBaseMySQL>(_szDBHost, _szDBUserId, _szDBPasswd, _szDBName, _uiPort);
 	if( pNewConn == nullptr )
@@ -211,9 +212,8 @@ CBaseMySQL* CMySQLConnPool::TryReconnect(
 // @brief 지정한 슬롯 번호의 커넥션 참조를 획득합니다.
 // @param nType 가져올 커넥션 슬롯 인덱스 번호
 // @return 유효한 CBaseMySQL 포인터, 실패 시 nullptr
-CBaseMySQL* CMySQLConnPool::GetMySQLConn(
-	int32 nType // 가져올 커넥션 슬롯 인덱스 번호
-)
+//***************************************************************************
+CBaseMySQL* CMySQLConnPool::GetMySQLConn(int32 nType)
 {
 	if( !IsValidIndex(nType) )
 	{
@@ -238,9 +238,8 @@ CBaseMySQL* CMySQLConnPool::GetMySQLConn(
 // @brief 참조 카운트 변경 없이 슬롯의 커넥션을 조회합니다.
 // @param nType 조회할 슬롯 인덱스 번호
 // @return CBaseMySQL 포인터, 유효하지 않은 경우 nullptr
-CBaseMySQL* CMySQLConnPool::GetPooledConnUnsafe(
-	int32 nType // 조회할 슬롯 인덱스 번호
-) const
+//***************************************************************************
+CBaseMySQL* CMySQLConnPool::GetPooledConnUnsafe(int32 nType) const
 {
 	if( !IsValidIndex(nType) ) return nullptr;
 	return _pMySQLConns[nType].value.load(std::memory_order_acquire);
@@ -249,9 +248,8 @@ CBaseMySQL* CMySQLConnPool::GetPooledConnUnsafe(
 //***************************************************************************
 // @brief 사용이 끝난 커넥션 슬롯의 참조 카운트를 감소시킵니다.
 // @param nType 반환할 커넥션 슬롯 인덱스 번호
-void CMySQLConnPool::ReleaseMySQLConn(
-	int32 nType // 반환할 커넥션 슬롯 인덱스 번호
-)
+//***************************************************************************
+void CMySQLConnPool::ReleaseMySQLConn(int32 nType)
 {
 	if( !IsValidIndex(nType) ) return;
 	_pRefCount[nType].value.fetch_sub(1, std::memory_order_release);
@@ -260,7 +258,9 @@ void CMySQLConnPool::ReleaseMySQLConn(
 //***************************************************************************
 // @brief 빈 슬롯을 탐색하고 즉시 선점합니다.
 // @return 선점 성공한 슬롯 인덱스 번호, 실패 시 -1
-int32 CMySQLConnPool::PopFreeSlotIndex(void) {
+//***************************************************************************
+int32 CMySQLConnPool::PopFreeSlotIndex(void) 
+{
 	uint32 nStart = _nNextSlotHint.fetch_add(1, std::memory_order_relaxed);
 
 	for( int32 k = 0; k < _nMaxPoolSize; ++k ) {
@@ -281,10 +281,8 @@ int32 CMySQLConnPool::PopFreeSlotIndex(void) {
 // @brief 재연결 워커가 새로 확보한 커넥션을 슬롯에 교체(Swap) 적용합니다.
 // @param nType 교체 대상 슬롯 인덱스 번호
 // @param pNewConn 새로 연결된 CBaseMySQL 객체 포인터
-void CMySQLConnPool::ApplyReconnectedConn(
-	int32 nType,         // 교체 대상 슬롯 인덱스 번호
-	CBaseMySQL* pNewConn // 새로 연결된 CBaseMySQL 객체 포인터
-)
+//***************************************************************************
+void CMySQLConnPool::ApplyReconnectedConn(int32 nType, CBaseMySQL* pNewConn)
 {
 	if( _pRefCount[nType].value.load(std::memory_order_acquire) > 0 )
 	{
@@ -343,9 +341,8 @@ void CMySQLConnPool::ApplyReconnectedConn(
 //***************************************************************************
 // @brief 재연결 실패 시 지수 백오프 및 지터를 계산하여 재시도를 예약합니다.
 // @param nType 재시도가 실패한 슬롯 인덱스 번호
-void CMySQLConnPool::ScheduleRetry(
-	int32 nType // 재시도가 실패한 슬롯 인덱스 번호
-)
+//***************************************************************************
+void CMySQLConnPool::ScheduleRetry(int32 nType)
 {
 	int32 nFailCount = _pRetryFailCount[nType].value.fetch_add(1, std::memory_order_acq_rel) + 1;
 
@@ -383,9 +380,8 @@ void CMySQLConnPool::ScheduleRetry(
 //***************************************************************************
 // @brief 재연결 실패 후속 처리를 수행합니다.
 // @param nType 실패한 슬롯 인덱스 번호
-void CMySQLConnPool::OnReconnectFailed(
-	int32 nType // 실패한 슬롯 인덱스 번호
-)
+//***************************************************************************
+void CMySQLConnPool::OnReconnectFailed(int32 nType)
 {
 	ScheduleRetry(nType);
 }
@@ -393,15 +389,15 @@ void CMySQLConnPool::OnReconnectFailed(
 //***************************************************************************
 // @brief 재연결 성공 시 백오프 실패 카운트를 초기화합니다.
 // @param nType 성공한 슬롯 인덱스 번호
-void CMySQLConnPool::OnReconnectSucceeded(
-	int32 nType // 성공한 슬롯 인덱스 번호
-)
+//***************************************************************************
+void CMySQLConnPool::OnReconnectSucceeded(int32 nType)
 {
 	_pRetryFailCount[nType].value.store(0, std::memory_order_relaxed);
 }
 
 //***************************************************************************
 // @brief 격리 큐 정리 및 끊긴 슬롯을 주기적으로 스캔하여 재연결 워커에 디스패치합니다.
+//***************************************************************************
 void CMySQLConnPool::HealthCheckLoop(void)
 {
 	CVector<CBaseMySQL*> vDeletes;
@@ -483,6 +479,7 @@ void CMySQLConnPool::HealthCheckLoop(void)
 
 //***************************************************************************
 // @brief 헬스체크 스레드를 생성하고 구동을 시작합니다.
+//***************************************************************************
 void CMySQLConnPool::StartHealthCheckThread(void)
 {
 	_bStopHealthCheck.store(false, std::memory_order_relaxed);
@@ -491,6 +488,7 @@ void CMySQLConnPool::StartHealthCheckThread(void)
 
 //***************************************************************************
 // @brief 헬스체크 스레드를 안전하게 종료하고 대기합니다.
+//***************************************************************************
 void CMySQLConnPool::StopHealthCheckThread(void)
 {
 	_bStopHealthCheck.store(true, std::memory_order_relaxed);
@@ -499,6 +497,7 @@ void CMySQLConnPool::StopHealthCheckThread(void)
 
 //***************************************************************************
 // @brief CDelayedTaskQueue의 만료 작업 처리 루프 함수입니다.
+//***************************************************************************
 void CMySQLConnPool::DelayedTaskLoop(void)
 {
 	_delayedTaskQueue.ProcessExpiredTasks();
@@ -506,6 +505,7 @@ void CMySQLConnPool::DelayedTaskLoop(void)
 
 //***************************************************************************
 // @brief 지연 타이머 큐 전용 스레드를 생성하고 구동을 시작합니다.
+//***************************************************************************
 void CMySQLConnPool::StartDelayedTaskThread(void)
 {
 	_delayedTaskThreadMgr.CreateThread([this]() { DelayedTaskLoop(); });
@@ -513,6 +513,7 @@ void CMySQLConnPool::StartDelayedTaskThread(void)
 
 //***************************************************************************
 // @brief 지연 타이머 큐 스레드를 안전하게 중지하고 종료를 대기합니다.
+//***************************************************************************
 void CMySQLConnPool::StopDelayedTaskThread(void)
 {
 	_delayedTaskQueue.Stop();
@@ -522,9 +523,8 @@ void CMySQLConnPool::StopDelayedTaskThread(void)
 //***************************************************************************
 // @brief 재연결이 필요한 슬롯 인덱스를 대기열에 넣고 워커 스레드를 깨웁니다.
 // @param nType 재연결 대상 슬롯 인덱스 번호
-void CMySQLConnPool::EnqueueReconnect(
-	int32 nType // 재연결 대상 슬롯 인덱스 번호
-)
+//***************************************************************************
+void CMySQLConnPool::EnqueueReconnect(int32 nType)
 {
 	{
 		std::lock_guard<std::mutex> lock(_reconnectQueueMutex);
@@ -536,6 +536,7 @@ void CMySQLConnPool::EnqueueReconnect(
 //***************************************************************************
 // @brief 현재 워커 스레드가 목표치를 초과하는지 검사하고 초과 시 스스로 감축합니다.
 // @return 초과 워커로 판정되어 자가 종료하는 경우 true, 아니면 false
+//***************************************************************************
 bool CMySQLConnPool::TryExitIfExcess(void)
 {
 	int32 nCur = _nCurrentWorkerCount.load(std::memory_order_acquire);
@@ -552,6 +553,7 @@ bool CMySQLConnPool::TryExitIfExcess(void)
 
 //***************************************************************************
 // @brief 재연결 워커 스레드의 메인 루프 함수입니다.
+//***************************************************************************
 void CMySQLConnPool::ReconnectWorkerLoop(void)
 {
 	while( true )
@@ -601,9 +603,8 @@ void CMySQLConnPool::ReconnectWorkerLoop(void)
 //***************************************************************************
 // @brief 지정한 수만큼의 재연결 워커 스레드들을 생성하고 기동합니다.
 // @param nWorkerCount 생성할 워커 스레드 개수
-void CMySQLConnPool::StartReconnectWorkers(
-	int32 nWorkerCount // 생성할 워커 스레드 개수
-)
+//***************************************************************************
+void CMySQLConnPool::StartReconnectWorkers(int32 nWorkerCount)
 {
 	_bStopReconnectWorkers.store(false, std::memory_order_relaxed);
 
@@ -627,6 +628,7 @@ void CMySQLConnPool::StartReconnectWorkers(
 
 //***************************************************************************
 // @brief 모든 재연결 워커 스레드를 종료시키고 완료를 대기합니다.
+//***************************************************************************
 void CMySQLConnPool::StopReconnectWorkers(void)
 {
 	_bStopReconnectWorkers.store(true, std::memory_order_relaxed);
@@ -639,9 +641,8 @@ void CMySQLConnPool::StopReconnectWorkers(void)
 //***************************************************************************
 // @brief 런타임에 목표 재연결 워커 스레드 개수를 동적으로 조정합니다.
 // @param nNewCount 변경할 목표 워커 스레드 수
-void CMySQLConnPool::SetWorkerCount(
-	int32 nNewCount // 변경할 목표 워커 스레드 수
-)
+//***************************************************************************
+void CMySQLConnPool::SetWorkerCount(int32 nNewCount)
 {
 	nNewCount = std::max(nNewCount, 1);
 	_nDesiredWorkerCount.store(nNewCount, std::memory_order_release);
@@ -676,9 +677,8 @@ void CMySQLConnPool::SetWorkerCount(
 // @brief 재연결 백오프 정책 및 워커 스레드 설정을 런타임에 일괄 변경합니다.
 // @param reconnectConfig 적용할 새로운 TReconnectConfig 설정 구조체
 // @return 설정 변경 성공 시 true, 유효성 검사 실패 시 false
-bool CMySQLConnPool::SetReconnectConfig(
-	const TReconnectConfig& reconnectConfig // 적용할 새로운 TReconnectConfig 설정 구조체
-)
+//***************************************************************************
+bool CMySQLConnPool::SetReconnectConfig(const TReconnectConfig& reconnectConfig)
 {
 	if( !ValidateReconnectConfig(reconnectConfig) )
 	{
@@ -699,6 +699,7 @@ bool CMySQLConnPool::SetReconnectConfig(
 //***************************************************************************
 // @brief 현재 적용된 재연결 정책 설정을 조회합니다.
 // @return 현재 설정값이 담긴 TReconnectConfig 구조체
+//***************************************************************************
 CMySQLConnPool::TReconnectConfig CMySQLConnPool::GetReconnectConfig(void) const
 {
 	TReconnectConfig cfg;
@@ -712,6 +713,7 @@ CMySQLConnPool::TReconnectConfig CMySQLConnPool::GetReconnectConfig(void) const
 
 //***************************************************************************
 // @brief 풀이 소멸되거나 재초기화될 때 내부 모든 커넥션 자원과 격리 큐를 안전하게 해제합니다.
+//***************************************************************************
 void CMySQLConnPool::Clear(void)
 {
 	auto now = std::chrono::steady_clock::now();

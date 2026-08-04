@@ -12,7 +12,7 @@
 #endif
 
 #ifndef __SWAPQUEUE_H__
-#include <ThreadSafeContainers/SwapQueue.h>
+#include <ThreadSafeContainers/ChunkedSwapQueue.h>
 #endif
 
 class CMySQLAsyncSrv
@@ -75,13 +75,13 @@ public:
 	CMySQLConnPool* GetMySQLConnPool(uint64 m_nID);
 	CMySQLConnPool* GetLogConnPool();
 
-	CSwapQueue<st_DBAsyncRq*>			_queueDBAsyncRq;
-	COMMAND_MAP							_mapCommand;
+	CChunkedSwapQueue<st_DBAsyncRq*>	_queueDBAsyncRq;				// 비동기 요청 큐
+	COMMAND_MAP							_mapCommand;					// 명령 핸들러 맵
 
-	int32								_nDBCount;
-	bool								_bOpen;
-	int32								_nMaxThreadCnt;
-	CMySQLConnPool** _pMySQLConnPools;
+	int32								_nDBCount;						// DB 개수
+	bool								_bOpen;							// 서비스 오픈 여부
+	int32								_nMaxThreadCnt;					// 최대 스레드 수
+	CMySQLConnPool**					_pMySQLConnPools;				// MySQL 연결 풀 배열
 
 public:
 	static std::shared_ptr<CMySQLAsyncSrv> Instance();
@@ -92,13 +92,13 @@ protected:
 	void		ClearMySQLConnPools(void);
 
 private:
-	std::atomic<bool>			_bStopThread;
-	std::atomic<int32>          _nOutstandingRequests{ 0 };
-	int							_nLastWarnedQueueSize{ 2 };
+	std::atomic<bool>			_bStopThread;							// 스레드 중단 플래그
+	std::atomic<int32>          _nOutstandingRequests{ 0 };				// 처리 중 요청 수
+	int							_nLastWarnedQueueSize{ 2 };				// 마지막 경고 큐 크기
 
-	std::mutex					_mutex;
-	std::condition_variable		_cva;
-	std::condition_variable		_cvProducer;
+	std::mutex					_mutex;									// 동기화용 뮤텍스
+	std::condition_variable		_cva;									// 소비자 대기 조건 변수
+	std::condition_variable		_cvProducer;							// 생산자 대기 조건 변수
 };
 
 #endif // ndef __MYSQLASYNCSRV__H__

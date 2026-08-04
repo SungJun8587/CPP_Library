@@ -13,7 +13,7 @@ C++17 기반 락프리 스핀락 2종(`SpinLock`, `RWSpinLock`)의 설계 배경
 | 공정성 | 없음 | Reader→Writer 기아 방지 (Writer 간 순서는 비보장) |
 | Guard | `SpinLockGuard` | `ReadLockGuard` / `WriteLockGuard` / `CustomLockGuard` |
 | 메모리 배치 | 1캐시라인 고정 | 1캐시라인 고정 |
-| 프로파일링 훅 | `_DEBUG && __THREADMANAGER_H__`에서 `name` 인자로 데드락 프로파일러 연동 | 동일 |
+| 프로파일링 훅 | `USE_GPDEADLOCKPROFILER && _DEBUG`에서 `name` 인자로 데드락 프로파일러 연동 | 동일 |
 
 두 락 모두 캐시라인 경계 정렬(`alignas`) + 명시적 패딩으로 정확히 한 캐시라인을 점유한다. 이 설계의 목적은 단일하다: **락 객체 자체가 인접 데이터와 캐시라인을 공유하지 않도록 강제해 false sharing의 가능성을 원천 차단**하는 것이다.
 
@@ -273,7 +273,7 @@ const int32_t prev = _state.fetch_add(RWSpinLockBits::READER_ONE, std::memory_or
 if ((prev & (RWSpinLockBits::WRITER_WAITING_MASK | RWSpinLockBits::WRITE_LOCKED)) == 0)
 {
     ...
-#if defined(_DEBUG) && defined(__THREADMANAGER_H__)
+#if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
     if (name) gpDeadLockProfiler->PushLock(name);
 #endif
     return true;
@@ -320,21 +320,32 @@ reader 카운트(15비트, 최대 32767)나 writer 대기 카운트(16비트, �
 
 ## 7. RAII Guard와 매크로 계층
 
+`SpinLock`과 `RWSpinLock`은 각각 독립된 매크로 세트를 갖는다.
+
 ```cpp
-#define USE_LOCK    mutable RWSpinLock<RWSpinLockPreset::Default> _lock
-#define WRITE_LOCK  CustomLockGuard<RWSpinLock<RWSpinLockPreset::Default>> \
-                      __write_lock_guard__(_lock, LockType::Write, __func__)
-#define READ_LOCK   CustomLockGuard<RWSpinLock<RWSpinLockPreset::Default>> \
-                      __read_lock_guard__(_lock, LockType::Read, __func__)
+// SpinLock용
+#define SPIN_USE_LOCK    mutable SpinLock<SpinLockPreset::LightWeight> _lock
+#define SPIN_LOCK         SpinLockGuard<SpinLockPreset::LightWeight> __spin_lock_guard__(_lock, __func__)
+
+// RWSpinLock용
+#define RWSPIN_USE_LOCK   mutable RWSpinLock<RWSpinLockPreset::Default> _lock
+#define RWSPIN_WRITE_LOCK CustomLockGuard<RWSpinLock<RWSpinLockPreset::Default>> \
+                             __write_lock_guard__(_lock, LockType::Write, __func__)
+#define RWSPIN_READ_LOCK  CustomLockGuard<RWSpinLock<RWSpinLockPreset::Default>> \
+                             __read_lock_guard__(_lock, LockType::Read, __func__)
 ```
 
-`USE_LOCK`으로 멤버 락을 선언하고, 함수 진입부에 `WRITE_LOCK;` 또는 `READ_LOCK;` 한 줄만 추가하면 스코프 종료 시(정상 반환이든 예외를 통한 탈출이든) 자동으로 언락된다. `Lock`/`ReadLock`/`WriteLock`/`TryReadLock`/`TryWriteLock`이 모두 `noexcept`로 선언되어 있어, 락 관련 연산 자체가 예외를 던지지 않는다는 전제 위에서 RAII 가드의 소멸자도 안전하게 `noexcept`로 유지된다.
+각각 `SPIN_`/`RWSPIN_` 접두사로 이름공간을 분리한 이유는, 같은 클래스가 상호 배제 전용 락과 읽기/쓰기 락을 동시에 멤버로 가져야 하는 경우(예: 한쪽은 세션 리스트를 보호하는 `RWSpinLock`, 다른 한쪽은 단순 카운터를 보호하는 `SpinLock`)를 지원하기 위해서다. 접두사가 없었다면 `USE_LOCK`/`WRITE_LOCK`/`READ_LOCK` 같은 이름이 한 클래스 안에서 두 번 정의될 수 없어 이런 조합이 애초에 불가능했다.
 
-`__func__`(C++11 표준 예약 식별자, `static const char[]`)가 자동으로 프로파일러 이름 인자로 전달된다는 점도 설계 의도가 있다. MSVC 전용 확장인 `__FUNCTION__` 대신 표준 식별자를 쓴 덕분에 컴파일러 간 이식성이 확보되며, `_DEBUG && __THREADMANAGER_H__`가 정의된 빌드에서는 어느 함수가 어떤 락을 얼마나 오래 쥐고 있는지 데드락 프로파일러(`gpDeadLockProfiler`)로 추적할 수 있다. 릴리스 빌드에서는 이 매크로 조건이 거짓이므로 `PushLock`/`PopLock` 호출 자체가 통째로 컴파일되지 않아 런타임 오버헤드가 전혀 없다.
+`SPIN_USE_LOCK`/`RWSPIN_USE_LOCK`으로 멤버 락을 선언하고, 함수 진입부에 `SPIN_LOCK;` 또는 `RWSPIN_WRITE_LOCK;`/`RWSPIN_READ_LOCK;` 한 줄만 추가하면 스코프 종료 시(정상 반환이든 예외를 통한 탈출이든) 자동으로 언락된다. `Lock`/`Unlock`/`ReadLock`/`WriteLock`/`TryReadLock`/`TryWriteLock`이 모두 `noexcept`로 선언되어 있어, 락 관련 연산 자체가 예외를 던지지 않는다는 전제 위에서 RAII 가드의 소멸자도 안전하게 `noexcept`로 유지된다.
 
-`CustomLockGuard`가 `LockType` 열거값으로 읽기/쓰기를 런타임에 선택하는 구조인 이유는, `WRITE_LOCK`/`READ_LOCK` 매크로가 컴파일 타임에 결정된 리터럴을 넘기더라도 내부적으로는 `if (_type == LockType::Write) ... else ...`라는 단일 코드 경로로 두 가드 타입을 통합해, 별도의 `WriteLockGuard`/`ReadLockGuard` 클래스와 중복 없이 프로파일러 연동 로직을 한 곳에서 관리하기 위함이다. 실제로 `WriteLockGuard`/`ReadLockGuard`는 각각 단일 락 타입 전용 RAII 가드로 별도 존재하며, `CustomLockGuard`는 매크로 계층에서 사용하는 범용 버전이다.
+`__func__`(C++11 표준 예약 식별자, `static const char[]`)가 자동으로 프로파일러 이름 인자로 전달된다는 점도 설계 의도가 있다. MSVC 전용 확장인 `__FUNCTION__` 대신 표준 식별자를 쓴 덕분에 컴파일러 간 이식성이 확보되며, `USE_GPDEADLOCKPROFILER && _DEBUG`가 정의된 빌드에서는 어느 함수가 어떤 락을 얼마나 오래 쥐고 있는지 데드락 프로파일러(`gpDeadLockProfiler`)로 추적할 수 있다. 릴리스 빌드에서는 이 매크로 조건이 거짓이므로 `PushLock`/`PopLock` 호출 자체가 통째로 컴파일되지 않아 런타임 오버헤드가 전혀 없다.
 
-사용 예:
+`SpinLock::Lock()`/`Unlock()`도 `RWSpinLock`과 동일하게 `name` 매개변수(기본값 `nullptr`)를 받는다. `SpinLockGuard`가 생성 시점에 `_name`을 보관해 두었다가 `Lock`/`Unlock` 호출 양쪽에 그대로 전달하므로, `SPIN_LOCK` 매크로를 쓰기만 하면 별도 코드 변경 없이 상호 배제 락도 데드락 프로파일러 추적 대상에 자동으로 포함된다. `TryLock()`은 실패할 수 있는 비블로킹 API라 프로파일러 등록 대상에서 제외되어 있다 — 이는 `TryReadLock`/`TryWriteLock`이 성공 시에만 `PushLock`을 호출하는 것(§5.5)과 같은 원칙으로, 실제 획득 여부가 불확실한 시도까지 프로파일러 스택에 남기면 소유 상태가 어긋난다.
+
+`CustomLockGuard`가 `LockType` 열거값으로 읽기/쓰기를 런타임에 선택하는 구조인 이유는, `RWSPIN_WRITE_LOCK`/`RWSPIN_READ_LOCK` 매크로가 컴파일 타임에 결정된 리터럴을 넘기더라도 내부적으로는 `if (_type == LockType::Write) ... else ...`라는 단일 코드 경로로 두 가드 타입을 통합해, 별도의 `WriteLockGuard`/`ReadLockGuard` 클래스와 중복 없이 프로파일러 연동 로직을 한 곳에서 관리하기 위함이다. 실제로 `WriteLockGuard`/`ReadLockGuard`는 각각 단일 락 타입 전용 RAII 가드로 별도 존재하며, `CustomLockGuard`는 매크로 계층에서 사용하는 범용 버전이다.
+
+사용 예 (`RWSpinLock`):
 
 ```cpp
 class SessionManager
@@ -342,23 +353,43 @@ class SessionManager
 public:
     void AddSession(SessionRef session)
     {
-        WRITE_LOCK;
+        RWSPIN_WRITE_LOCK;
         _sessions.push_back(session);
     }
 
     size_t GetSessionCount() const
     {
-        READ_LOCK;
+        RWSPIN_READ_LOCK;
         return _sessions.size();
     }
 
 private:
-    USE_LOCK;
+    RWSPIN_USE_LOCK;
     std::vector<SessionRef> _sessions;
 };
 ```
 
-`GetSessionCount()`가 `const` 멤버 함수인데도 `READ_LOCK`으로 `_lock`을 갱신할 수 있는 이유는 `USE_LOCK` 매크로가 `_lock`을 `mutable`로 선언하기 때문이다. 논리적 상수성(logical constness)을 유지하면서도 락 상태 자체는 갱신 가능해야 하는 전형적인 상황이다.
+사용 예 (`SpinLock`):
+
+```cpp
+class HitCounter
+{
+public:
+    void Increment()
+    {
+        SPIN_LOCK;
+        ++_hitCount;
+    }
+
+private:
+    SPIN_USE_LOCK;
+    uint64_t _hitCount = 0;
+};
+```
+
+`GetSessionCount()`가 `const` 멤버 함수인데도 `RWSPIN_READ_LOCK`으로 `_lock`을 갱신할 수 있는 이유는 `RWSPIN_USE_LOCK`/`SPIN_USE_LOCK` 매크로가 각각 `_lock`을 `mutable`로 선언하기 때문이다. 논리적 상수성(logical constness)을 유지하면서도 락 상태 자체는 갱신 가능해야 하는 전형적인 상황이다.
+
+`SPIN_USE_LOCK`과 `RWSPIN_USE_LOCK`은 접두사만 다를 뿐 내부적으로 선언하는 멤버 이름은 둘 다 `_lock`으로 동일하다. 따라서 한 클래스가 상호 배제 락과 읽기/쓰기 락을 동시에 멤버로 가져야 한다면, 매크로 두 개를 그대로 나란히 쓸 수는 없고 락 중 하나(또는 둘 다)를 `SpinLock<...> _counterLock;`처럼 직접 선언해 서로 다른 멤버 이름을 주어야 한다. `SPIN_`/`RWSPIN_` 접두사가 막아주는 것은 매크로 이름 자체의 충돌(`WRITE_LOCK` 같은 짧은 이름을 두 락 타입이 나눠 쓰는 문제)이지, 매크로가 내부적으로 고정 선언하는 멤버 변수명의 충돌은 아니다.
 
 ---
 
