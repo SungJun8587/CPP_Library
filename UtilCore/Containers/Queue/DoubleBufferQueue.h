@@ -15,13 +15,13 @@
 #include <Memory/Containers.h>
 #endif
 
-#ifndef __SPINLOCK_H__
-#include <Thread/SpinLock.h>
+#ifndef __PLATFORMLOCK_H__
+#include <Thread/PlatformLock.h>
 #endif
 
-#include <atomic>   // std::atomic 사용
-#include <vector>   // std::vector 사용
-#include <utility>  // std::move, std::forward 사용
+#ifndef	__QUEUECOMMON_H__
+#include <Containers/Queue/QueueCommon.h>
+#endif
 
 //***************************************************************************
 // @class CDoubleBufferQueue
@@ -59,6 +59,8 @@ public:
     // @param item 추가할 데이터 객체
     void Push(const T& item)
     {
+        if( m_stopped.load(std::memory_order_relaxed) )
+            return;
         PushInternal(item);
     }
 
@@ -67,6 +69,8 @@ public:
     // @param item 추가할 데이터 객체 (이동语义)
     void Push(T&& item)
     {
+        if( m_stopped.load(std::memory_order_relaxed) )
+            return;
         PushInternal(std::move(item));
     }
 
@@ -77,15 +81,17 @@ public:
     template <typename... Args>
     void Emplace(Args&&... args)
     {
+        if( m_stopped.load(std::memory_order_relaxed) )
+            return;
         PushInternal(T(std::forward<Args>(args)...));
     }
 
     //***************************************************************************
     // @brief 현재 활성 버퍼를 스왑하고, 이전 버퍼의 모든 데이터를 컨테이너로 반환합니다.
     // @return 이전 버퍼에 쌓여있던 데이터들의 벡터
-    std::vector<T> Swap()
+    CVector<T> Swap()
     {
-        std::vector<T> result;
+        CVector<T> result;
         SwapInto(result);
         return result;
     }
@@ -93,7 +99,7 @@ public:
     //***************************************************************************
     // @brief 활성 버퍼를 스왑하고, 이전 버퍼의 내용을 외부 벡터에 효율적으로 옮겨 담습니다.
     // @param out 이전 버퍼의 데이터가 채워질 대상 벡터 
-    void SwapInto(std::vector<T>& out)
+    void SwapInto(CVector<T>& out)
     {
         // 다중 컨슈머 진입 차단 (릴리즈 빌드에서도 Fatal로 안전하게 감지)
         bool expectedSwap = false;
@@ -127,6 +133,13 @@ public:
     size_t ApproxSize() const
     {
         return m_buffer[0].size() + m_buffer[1].size();
+    }
+
+    //***************************************************************************
+    // @brief 큐를 정지시키고 새로운 데이터의 유입을 차단합니다.
+    void Stop()
+    {
+        m_stopped.store(true, std::memory_order_relaxed);
     }
 
 private:
@@ -203,6 +216,9 @@ private:
         int idx;
         for( ;;)
         {
+            if( m_stopped.load(std::memory_order_relaxed) )
+                return;
+
             idx = m_writeIdx.load(std::memory_order_acquire);
 
             // RAII 가드를 통해 예외 발생 시에도 카운터가 안전하게 복구됨
@@ -222,12 +238,13 @@ private:
     //***************************************************************************
     // @brief 내부 멤버 변수들
     //***************************************************************************
-    SpinLock<Preset>  m_bufferLock[2];          // 두 버퍼 각각의 락
+    PLock             m_bufferLock[2];          // 두 버퍼 각각의 플랫폼 통합 락
     CVector<T>        m_buffer[2];              // 더블 버퍼 (데이터 저장소)
 
     std::atomic<int>  m_writeIdx{ 0 };          // 현재 활성 버퍼 인덱스 (0 또는 1)
     std::atomic<bool> m_isSwapping{ false };    // Consumer 스왑 중 여부 플래그
     std::atomic<int>  m_inFlight[2]{};          // 각 버퍼에 기록 중인 Producer 수
+    std::atomic<bool> m_stopped{ false };       // 종료 플래그 추가
 };
 
 #endif // ndef __DOUBLEBUFFERQUEUE_H__

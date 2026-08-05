@@ -37,8 +37,14 @@
     <Filter Include="DB\ADO">
       <UniqueIdentifier>{9ce0ceff-384e-4b4b-a2bb-bd3c88850848}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ThreadSafeContainers">
+    <Filter Include="Containers">
       <UniqueIdentifier>{7ce0c387-18f4-477b-8495-22b140d1f8a0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Containers\Queue">
+      <UniqueIdentifier>{e163e45a-4168-4094-883a-51bdacbb1357}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Containers\Map">
+      <UniqueIdentifier>{d44b777c-6935-4bb4-a8d3-509b399fb56e}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -235,29 +241,47 @@
     <ClInclude Include="Util\EncodingConvert.h">
       <Filter>Util</Filter>
     </ClInclude>
-    <ClInclude Include="ThreadSafeContainers\ClusterSpinMap.h">
-      <Filter>ThreadSafeContainers</Filter>
+    <ClInclude Include="Containers\Queue\BlockingTaskQueue.h">
+      <Filter>Containers\Queue</Filter>
     </ClInclude>
-    <ClInclude Include="ThreadSafeContainers\OrderedMap.h">
-      <Filter>ThreadSafeContainers</Filter>
+    <ClInclude Include="Containers\Queue\ChunkedSwapQueue.h">
+      <Filter>Containers\Queue</Filter>
     </ClInclude>
-    <ClInclude Include="ThreadSafeContainers\UnOrderedMap.h">
-      <Filter>ThreadSafeContainers</Filter>
+    <ClInclude Include="Containers\Queue\DelayedTaskQueue.h">
+      <Filter>Containers\Queue</Filter>
     </ClInclude>
-    <ClInclude Include="ThreadSafeContainers\SpinLockQueue.h">
-      <Filter>ThreadSafeContainers</Filter>
+    <ClInclude Include="Containers\Queue\DoubleBufferQueue.h">
+      <Filter>Containers\Queue</Filter>
     </ClInclude>
-    <ClInclude Include="ThreadSafeContainers\BlockingTaskQueue.h">
-      <Filter>ThreadSafeContainers</Filter>
+    <ClInclude Include="Containers\Queue\MPMCLockFreeQueue.h">
+      <Filter>Containers\Queue</Filter>
     </ClInclude>
-    <ClInclude Include="ThreadSafeContainers\DelayedTaskQueue.h">
-      <Filter>ThreadSafeContainers</Filter>
+    <ClInclude Include="Containers\Queue\MPSCLockFreeQueue.h">
+      <Filter>Containers\Queue</Filter>
     </ClInclude>
-    <ClInclude Include="ThreadSafeContainers\ChunkedSwapQueue.h">
-      <Filter>ThreadSafeContainers</Filter>
+    <ClInclude Include="Containers\Queue\SpinLockQueue.h">
+      <Filter>Containers\Queue</Filter>
     </ClInclude>
-    <ClInclude Include="ThreadSafeContainers\DoubleBufferQueue.h">
-      <Filter>ThreadSafeContainers</Filter>
+    <ClInclude Include="Containers\Queue\SPMCLockFreeQueue.h">
+      <Filter>Containers\Queue</Filter>
+    </ClInclude>
+    <ClInclude Include="Containers\Queue\SPSCLockFreeQueue.h">
+      <Filter>Containers\Queue</Filter>
+    </ClInclude>
+    <ClInclude Include="Containers\Map\ClusterSpinMap.h">
+      <Filter>Containers\Map</Filter>
+    </ClInclude>
+    <ClInclude Include="Containers\Map\OrderedMap.h">
+      <Filter>Containers\Map</Filter>
+    </ClInclude>
+    <ClInclude Include="Containers\Map\UnOrderedMap.h">
+      <Filter>Containers\Map</Filter>
+    </ClInclude>
+    <ClInclude Include="Thread\PlatformLock.h">
+      <Filter>Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="Containers\Queue\QueueCommon.h">
+      <Filter>Containers\Queue</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -398,8 +422,8 @@
     <ClCompile Include="Util\EncodingConvert.cpp">
       <Filter>Util</Filter>
     </ClCompile>
-    <ClCompile Include="ThreadSafeContainers\ClusterSpinMap.cpp">
-      <Filter>ThreadSafeContainers</Filter>
+    <ClCompile Include="Containers\Map\ClusterSpinMap.cpp">
+      <Filter>Containers\Map</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -436,11 +460,11 @@
     <None Include="Job\JobQueue.inl">
       <Filter>Job</Filter>
     </None>
-    <None Include="ThreadSafeContainers\OrderedMap.inl">
-      <Filter>ThreadSafeContainers</Filter>
+    <None Include="Containers\Map\OrderedMap.inl">
+      <Filter>Containers\Map</Filter>
     </None>
-    <None Include="ThreadSafeContainers\UnOrderedMap.inl">
-      <Filter>ThreadSafeContainers</Filter>
+    <None Include="Containers\Map\UnOrderedMap.inl">
+      <Filter>Containers\Map</Filter>
     </None>
   </ItemGroup>
 </Project>

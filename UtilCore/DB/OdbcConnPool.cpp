@@ -31,7 +31,7 @@ COdbcConnPool::COdbcConnPool(int32 nMaxPoolSize)
 {
 	_pOdbcConns = std::make_unique<CachePaddedAtomic<CBaseODBC*>[]>(_nMaxPoolSize);
 	_pRefCount = std::make_unique<CachePaddedAtomic<int32>[]>(_nMaxPoolSize);
-	_slotLocks = std::make_unique<SpinLockDefault[]>(_nMaxPoolSize);
+	_slotLocks = std::make_unique<PLock[]>(_nMaxPoolSize);
 
 	_pReconnecting = std::make_unique<CachePaddedAtomic<bool>[]>(_nMaxPoolSize);
 	_pRetryFailCount = std::make_unique<CachePaddedAtomic<int32>[]>(_nMaxPoolSize);
@@ -234,7 +234,7 @@ void COdbcConnPool::ApplyReconnectedConn(int32 nType, CBaseODBC* pNewConn)
 
 	CBaseODBC* pOldConn = nullptr;
 	{
-		SpinLockGuard<SpinLockPreset::Default> guard(_slotLocks[nType]);
+		PLockGuard guard(_slotLocks[nType]);
 		pOldConn = _pOdbcConns[nType].value.load(std::memory_order_acquire);
 		_pOdbcConns[nType].value.store(pNewConn, std::memory_order_release);
 	}
@@ -272,7 +272,7 @@ void COdbcConnPool::ApplyReconnectedConn(int32 nType, CBaseODBC* pNewConn)
 		LOG_ERROR(_T("ReconnectWorker: Slot(%d) refcount high during swap. Moving to quarantine."), nType);
 
 		auto now = std::chrono::steady_clock::now();
-		SpinLockGuard<SpinLockPreset::Default> qGuard(_globalQuarantineLock);
+		PLockGuard qGuard(_globalQuarantineLock);
 		_quarantineQueue.push({ pOldConn, &_pRefCount[nType].value, now });
 	}
 	else
@@ -350,7 +350,7 @@ void COdbcConnPool::HealthCheckLoop(void)
 		vDeletes.clear();
 
 		{
-			SpinLockGuard<SpinLockPreset::Default> qGuard(_globalQuarantineLock);
+			PLockGuard qGuard(_globalQuarantineLock);
 			size_t qSize = _quarantineQueue.size();
 
 			for( size_t k = 0; k < qSize; ++k )
@@ -697,7 +697,7 @@ void COdbcConnPool::Clear(void)
 		{
 			LOG_ERROR(_T("Clear: Slot(%d) refcount is zombie (%d). Moving to quarantine."), i, _pRefCount[i].value.load());
 
-			SpinLockGuard<SpinLockPreset::Default> qGuard(_globalQuarantineLock);
+			PLockGuard qGuard(_globalQuarantineLock);
 			_quarantineQueue.push({ pConn, &_pRefCount[i].value, now });
 		}
 		else
@@ -709,7 +709,7 @@ void COdbcConnPool::Clear(void)
 	}
 
 	{
-		SpinLockGuard<SpinLockPreset::Default> qGuard(_globalQuarantineLock);
+		PLockGuard qGuard(_globalQuarantineLock);
 		while( !_quarantineQueue.empty() )
 		{
 			TQuarantineItem item = _quarantineQueue.front();

@@ -11,8 +11,8 @@
 #include <DB/OdbcConnPool.h>
 #endif
 
-#ifndef __SWAPQUEUE_H__
-#include <ThreadSafeContainers/ChunkedSwapQueue.h>
+#ifndef __CHUNKED_SWAPQUEUE_H__
+#include <Containers/Queue/ChunkedSwapQueue.h>
 #endif
 
 class COdbcAsyncSrv
@@ -39,8 +39,8 @@ public:
 	bool IsEmpty() const {
 		return _queueDBAsyncRq.IsEmpty();
 	}
-	int Push(st_DBAsyncRq* pAsyncRq);
-	st_DBAsyncRq* Pop(std::queue<st_DBAsyncRq*>& localQueue);
+	int Push(std::unique_ptr<st_DBAsyncRq> pAsyncRq);
+	std::unique_ptr<st_DBAsyncRq> Pop(CQueue<std::unique_ptr<st_DBAsyncRq>>& localQueue);
 
 	// [Back-pressure] CSwapQueue 크기 기준으로 대기
 	void WaitPushCapacity(size_t maxCapacity) {
@@ -77,8 +77,8 @@ public:
 	COdbcConnPool* GetOdbcConnPool(uint64 m_nID);
 	COdbcConnPool* GetLogOdbcConnPool();
 
-	CChunkedSwapQueue<st_DBAsyncRq*>	_queueDBAsyncRq;			// 비동기 요청 큐	
-	COMMAND_MAP							_mapCommand;				// 명령 핸들러 맵
+	CChunkedSwapQueue<std::unique_ptr<st_DBAsyncRq>>	_queueDBAsyncRq;			// 비동기 요청 큐	
+	COMMAND_MAP											_mapCommand;				// 명령 핸들러 맵
 
 	int32								_nDBCount;					// DB 개수
 	bool								_bOpen;						// 서비스 오픈 여부

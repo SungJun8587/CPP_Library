@@ -52,7 +52,7 @@ CAdoAsyncSrv::~CAdoAsyncSrv()
 void CAdoAsyncSrv::Clear()
 {
 	// CSwapQueue를 비우기 위해 전체 크기만큼 척크 스왑 수행
-	std::queue<st_DBAsyncRq*> tempQueue;
+	CQueue<std::unique_ptr<st_DBAsyncRq>> tempQueue;
 
 	int64_t totalSize = _queueDBAsyncRq.GetSize();
 	if( totalSize > 0 )
@@ -60,11 +60,10 @@ void CAdoAsyncSrv::Clear()
 		_queueDBAsyncRq.SwapChunk(tempQueue, static_cast<size_t>(totalSize));
 	}
 
+	// tempQueue가 비워질 때 unique_ptr이 알아서 메모리를 해제하므로 별도의 SAFE_DELETE가 불필요합니다.
 	while( !tempQueue.empty() )
 	{
-		st_DBAsyncRq* pAsyncRq = tempQueue.front();
 		tempQueue.pop();
-		if( pAsyncRq != nullptr ) SAFE_DELETE(pAsyncRq);
 	}
 }
 
@@ -80,7 +79,7 @@ void CAdoAsyncSrv::FlushRemainingTasks()
 	_cva.notify_all();
 	_cvProducer.notify_all();
 
-	std::queue<st_DBAsyncRq*> tempQueue;
+	CQueue<std::unique_ptr<st_DBAsyncRq>> tempQueue;
 	int64_t totalSize = _queueDBAsyncRq.GetSize();
 	if( totalSize > 0 )
 	{
@@ -94,7 +93,7 @@ void CAdoAsyncSrv::FlushRemainingTasks()
 
 		while( !tempQueue.empty() )
 		{
-			st_DBAsyncRq* pAsyncRq = tempQueue.front();
+			std::unique_ptr<st_DBAsyncRq> pAsyncRq = std::move(tempQueue.front());
 			tempQueue.pop();
 
 			if( pAsyncRq == nullptr ) continue;
@@ -103,7 +102,7 @@ void CAdoAsyncSrv::FlushRemainingTasks()
 			if( it != _mapCommand.end() )
 			{
 				std::shared_ptr<CDBAsyncSrvHandler> command = it->second;
-				EDBReturnType Ret = command->ProcessAsyncCall(pAsyncRq);
+				EDBReturnType Ret = command->ProcessAsyncCall(pAsyncRq.get());
 
 				if( Ret != EDBReturnType::OK )
 				{
@@ -116,7 +115,6 @@ void CAdoAsyncSrv::FlushRemainingTasks()
 			}
 
 			SubOutstandingRequest();
-			SAFE_DELETE(pAsyncRq);
 		}
 	}
 
@@ -243,36 +241,37 @@ bool CAdoAsyncSrv::RunningThread()
 //***************************************************************************
 bool CAdoAsyncSrv::Action()
 {
-	std::queue<st_DBAsyncRq*> localQueue;
+	CQueue<std::unique_ptr<st_DBAsyncRq>> localQueue;
 
 	while( !_bStopThread.load() )
 	{
-		st_DBAsyncRq* pAsyncRq = Pop(localQueue);
+		std::unique_ptr<st_DBAsyncRq> pAsyncRq = Pop(localQueue);
 		if( pAsyncRq == nullptr ) continue;
 
 		COMMAND_MAP::iterator it = _mapCommand.find(pAsyncRq->callIdent);
 		if( _mapCommand.end() == it )
 		{
-			SAFE_DELETE(pAsyncRq);
 			continue;
 		}
 
 		std::shared_ptr<CDBAsyncSrvHandler> command = it->second;
-		EDBReturnType Ret = command->ProcessAsyncCall(pAsyncRq);
+		EDBReturnType Ret = command->ProcessAsyncCall(pAsyncRq.get());
 
 		if( Ret != EDBReturnType::OK )
 		{
 			if( Ret == EDBReturnType::TIMEOUT && pAsyncRq->bReTry == false )
 			{
 				pAsyncRq->bReTry = true;
-				int nSize = Push(pAsyncRq);
-				if( nSize == 0 ) SAFE_DELETE(pAsyncRq);
+				int nSize = Push(std::move(pAsyncRq));
+				if( nSize == 0 )
+				{
+					LOG_ERROR(_T("Failed to retry ADO query because service is stopping..."));
+				}
 				continue;
 			}
 		}
 
 		SubOutstandingRequest();
-		SAFE_DELETE(pAsyncRq);
 	}
 
 	return true;
@@ -283,11 +282,11 @@ bool CAdoAsyncSrv::Action()
 // @param pAsyncRq 비동기 요청 객체
 // @return 큐 크기 (0이면 실패)
 //***************************************************************************
-int CAdoAsyncSrv::Push(st_DBAsyncRq* pAsyncRq)
+int CAdoAsyncSrv::Push(std::unique_ptr<st_DBAsyncRq> pAsyncRq)
 {
 	if( _bStopThread.load() ) return 0;
 
-	int queueSize = static_cast<int>(_queueDBAsyncRq.PushAndGetSize(pAsyncRq));
+	int queueSize = static_cast<int>(_queueDBAsyncRq.PushAndGetSize(std::move(pAsyncRq)));
 	_cva.notify_one();
 	return queueSize;
 }
@@ -297,11 +296,11 @@ int CAdoAsyncSrv::Push(st_DBAsyncRq* pAsyncRq)
 // @param localQueue 로컬 큐
 // @return 요청 객체 (없으면 nullptr)
 //***************************************************************************
-st_DBAsyncRq* CAdoAsyncSrv::Pop(std::queue<st_DBAsyncRq*>& localQueue)
+std::unique_ptr<st_DBAsyncRq> CAdoAsyncSrv::Pop(CQueue<std::unique_ptr<st_DBAsyncRq>>& localQueue)
 {
 	if( !localQueue.empty() )
 	{
-		st_DBAsyncRq* pAsyncRq = localQueue.front();
+		std::unique_ptr<st_DBAsyncRq> pAsyncRq = std::move(localQueue.front());
 		localQueue.pop();
 		return pAsyncRq;
 	}
@@ -337,7 +336,7 @@ st_DBAsyncRq* CAdoAsyncSrv::Pop(std::queue<st_DBAsyncRq*>& localQueue)
 	if( localQueue.empty() )
 		return nullptr;
 
-	st_DBAsyncRq* pAsyncRq = localQueue.front();
+	std::unique_ptr<st_DBAsyncRq> pAsyncRq = std::move(localQueue.front());
 	localQueue.pop();
 	return pAsyncRq;
 }

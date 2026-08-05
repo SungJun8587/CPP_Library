@@ -69,16 +69,24 @@ using namespace std;
 #include <Thread/DeadLockProfiler.h>
 #include <Thread/SpinLock.h>
 #include <Thread/SRWLock.h>
+#include <Thread/PlatformLock.h>
 #include <Thread/ThreadManager.h>
 
-#include <ThreadSafeContainers/BlockingTaskQueue.h>
-#include <ThreadSafeContainers/ClusterSpinMap.h>
-#include <ThreadSafeContainers/OrderedMap.h>
-#include <ThreadSafeContainers/UnOrderedMap.h>
-#include <ThreadSafeContainers/SpinLockQueue.h>
-#include <ThreadSafeContainers/DelayedTaskQueue.h>
-#include <ThreadSafeContainers/ChunkedSwapQueue.h>
-#include <ThreadSafeContainers/DoubleBufferQueue.h>
+#include <Containers/Map/ClusterSpinMap.h>
+#include <Containers/Map/OrderedMap.h>
+#include <Containers/Map/UnOrderedMap.h>
+
+#include <Containers/Queue/QueueCommon.h>
+#include <Containers/Queue/BlockingTaskQueue.h>
+#include <Containers/Queue/SpinLockQueue.h>
+#include <Containers/Queue/DelayedTaskQueue.h>
+#include <Containers/Queue/ChunkedSwapQueue.h>
+#include <Containers/Queue/DoubleBufferQueue.h>
+
+#include <Containers/Queue/SPSCLockFreeQueue.h>
+#include <Containers/Queue/SPMCLockFreeQueue.h>
+#include <Containers/Queue/MPSCLockFreeQueue.h>
+#include <Containers/Queue/MPMCLockFreeQueue.h>
 
 #include <Job/Job.h>
 #include <Job/JobTimer.h>

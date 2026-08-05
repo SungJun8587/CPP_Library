@@ -11,8 +11,8 @@
 #include <DB/ADO/AdoConnPool.h>
 #endif
 
-#ifndef __SWAPQUEUE_H__
-#include <ThreadSafeContainers/ChunkedSwapQueue.h>
+#ifndef __CHUNKED_SWAPQUEUE_H__
+#include <Containers/Queue/ChunkedSwapQueue.h>
 #endif
 
 class CAdoAsyncSrv
@@ -38,8 +38,8 @@ public:
 	bool IsEmpty() const {
 		return _queueDBAsyncRq.IsEmpty();
 	}
-	int Push(st_DBAsyncRq* pAsyncRq);
-	st_DBAsyncRq* Pop(std::queue<st_DBAsyncRq*>& localQueue);
+	int Push(std::unique_ptr<st_DBAsyncRq> pAsyncRq);
+	std::unique_ptr<st_DBAsyncRq> Pop(CQueue<std::unique_ptr<st_DBAsyncRq>>& localQueue);
 
 	void WaitPushCapacity(size_t maxCapacity) {
 		std::unique_lock<std::mutex> lock(_mutex);
@@ -75,7 +75,7 @@ public:
 	CAdoConnPool* GetAdoConnPool(uint64 m_nID);
 	CAdoConnPool* GetLogAdoConnPool();
 
-	CChunkedSwapQueue<st_DBAsyncRq*>	_queueDBAsyncRq;			// 비동기 요청 큐
+	CChunkedSwapQueue<std::unique_ptr<st_DBAsyncRq>>	_queueDBAsyncRq;			// 비동기 요청 큐
 	COMMAND_MAP							_mapCommand;				// 명령 핸들러 맵
 
 	int32								_nDBCount;					// DB 개수

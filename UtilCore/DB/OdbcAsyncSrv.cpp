@@ -36,7 +36,6 @@ COdbcAsyncSrv::COdbcAsyncSrv()
 COdbcAsyncSrv::~COdbcAsyncSrv()
 {
 	FlushRemainingTasks();
-
 	StopThread();
 	Clear();
 	ClearOdbcPools();
@@ -53,7 +52,7 @@ COdbcAsyncSrv::~COdbcAsyncSrv()
 void COdbcAsyncSrv::Clear()
 {
 	// CSwapQueue를 비우기 위해 전체 크기만큼 넉넉하게 척크 스왑하거나 통째로 비움
-	std::queue<st_DBAsyncRq*> tempQueue;
+	CQueue<std::unique_ptr<st_DBAsyncRq>> tempQueue;
 
 	// 안전하게 현재 남은 전체 사이즈만큼 척크 스왑을 수행하여 tempQueue로 이동
 	int64_t totalSize = _queueDBAsyncRq.GetSize();
@@ -62,11 +61,10 @@ void COdbcAsyncSrv::Clear()
 		_queueDBAsyncRq.SwapChunk(tempQueue, static_cast<size_t>(totalSize));
 	}
 
+	// tempQueue가 비워질 때 unique_ptr이 알아서 메모리를 해제하므로 별도의 SAFE_DELETE가 불필요합니다.
 	while( !tempQueue.empty() )
 	{
-		st_DBAsyncRq* pAsyncRq = tempQueue.front();
 		tempQueue.pop();
-		if( pAsyncRq != nullptr ) SAFE_DELETE(pAsyncRq);
 	}
 }
 
@@ -83,7 +81,7 @@ void COdbcAsyncSrv::FlushRemainingTasks()
 	_cvProducer.notify_all();
 
 	// 큐에 남아있는 작업들을 안전하게 모두 가져옴
-	std::queue<st_DBAsyncRq*> tempQueue;
+	CQueue<std::unique_ptr<st_DBAsyncRq>> tempQueue;
 	int64_t totalSize = _queueDBAsyncRq.GetSize();
 	if( totalSize > 0 )
 	{
@@ -97,7 +95,7 @@ void COdbcAsyncSrv::FlushRemainingTasks()
 
 		while( !tempQueue.empty() )
 		{
-			st_DBAsyncRq* pAsyncRq = tempQueue.front();
+			std::unique_ptr<st_DBAsyncRq> pAsyncRq = std::move(tempQueue.front());
 			tempQueue.pop();
 
 			if( pAsyncRq == nullptr ) continue;
@@ -106,7 +104,7 @@ void COdbcAsyncSrv::FlushRemainingTasks()
 			if( it != _mapCommand.end() )
 			{
 				std::shared_ptr<CDBAsyncSrvHandler> command = it->second;
-				EDBReturnType Ret = command->ProcessAsyncCall(pAsyncRq);
+				EDBReturnType Ret = command->ProcessAsyncCall(pAsyncRq.get());
 
 				if( Ret != EDBReturnType::OK )
 				{
@@ -119,7 +117,6 @@ void COdbcAsyncSrv::FlushRemainingTasks()
 			}
 
 			SubOutstandingRequest();
-			SAFE_DELETE(pAsyncRq);
 		}
 	}
 
@@ -249,11 +246,11 @@ bool COdbcAsyncSrv::RunningThread()
 bool COdbcAsyncSrv::Action()
 {
 	static uint64 cumulateCallCnt = 0;
-	std::queue<st_DBAsyncRq*> localQueue; // 소비자별 로컬 처리용 큐 (더블 버퍼링 스왑 대상)
+	CQueue<std::unique_ptr<st_DBAsyncRq>> localQueue; // 소비자별 로컬 처리용 큐 (더블 버퍼링 스왑 대상)
 
 	while( !_bStopThread.load() )
 	{
-		st_DBAsyncRq* pAsyncRq = Pop(localQueue);
+		std::unique_ptr<st_DBAsyncRq> pAsyncRq = Pop(localQueue);
 		if( pAsyncRq == nullptr )
 		{
 			continue;
@@ -263,14 +260,13 @@ bool COdbcAsyncSrv::Action()
 		if( _mapCommand.end() == it )
 		{
 			LOG_ERROR(_T("Error not found Async Call... callIdent: [%u]"), pAsyncRq->callIdent);
-			SAFE_DELETE(pAsyncRq);
 			continue;
 		}
 
 		uint64 startTick = _GetTickCount();
 
 		std::shared_ptr<CDBAsyncSrvHandler> command = it->second;
-		EDBReturnType Ret = command->ProcessAsyncCall(pAsyncRq);
+		EDBReturnType Ret = command->ProcessAsyncCall(pAsyncRq.get());
 
 		if( Ret != EDBReturnType::OK )
 		{
@@ -285,11 +281,11 @@ bool COdbcAsyncSrv::Action()
 				uint16 logIdent = pAsyncRq->callIdent;
 				pAsyncRq->bReTry = true;
 
-				int nSize = Push(pAsyncRq);
-
+				int nSize = Push(std::move(pAsyncRq));
 				if( nSize == 0 )
 				{
-					SAFE_DELETE(pAsyncRq);
+					// 서버 중단 등으로 인해 재시도 큐 삽입에 실패하여 요청이 취소될 때 로그를 남깁니다.
+					LOG_ERROR(_T("Failed to retry query because service is stopping... callIdent: [%u]"), logIdent);
 				}
 
 				LOG_ERROR(_T("Query timeout ReTry... callIdent: [%u], queuesize[%d]"), logIdent, nSize);
@@ -308,7 +304,6 @@ bool COdbcAsyncSrv::Action()
 #endif
 
 		SubOutstandingRequest();
-		SAFE_DELETE(pAsyncRq);
 	}
 
 	return true;
@@ -319,12 +314,12 @@ bool COdbcAsyncSrv::Action()
 // @param pAsyncRq 비동기 요청 객체
 // @return 큐 크기 (0이면 실패)
 //***************************************************************************
-int COdbcAsyncSrv::Push(st_DBAsyncRq* pAsyncRq)
+int COdbcAsyncSrv::Push(std::unique_ptr<st_DBAsyncRq> pAsyncRq)
 {
 	if( _bStopThread.load() ) return 0;
 
 	// [1번 수정] 락 안에서 푸시와 사이즈 조회를 원자적으로 처리하므로 이중 delete 위험 소멸
-	int queueSize = static_cast<int>(_queueDBAsyncRq.PushAndGetSize(pAsyncRq));
+	int queueSize = static_cast<int>(_queueDBAsyncRq.PushAndGetSize(std::move(pAsyncRq)));
 
 	_cva.notify_one();
 
@@ -336,11 +331,11 @@ int COdbcAsyncSrv::Push(st_DBAsyncRq* pAsyncRq)
 // @param localQueue 로컬 큐
 // @return 요청 객체 (없으면 nullptr)
 //***************************************************************************
-st_DBAsyncRq* COdbcAsyncSrv::Pop(std::queue<st_DBAsyncRq*>& localQueue)
+std::unique_ptr<st_DBAsyncRq> COdbcAsyncSrv::Pop(CQueue<std::unique_ptr<st_DBAsyncRq>>& localQueue)
 {
 	if( !localQueue.empty() )
 	{
-		st_DBAsyncRq* pAsyncRq = localQueue.front();
+		std::unique_ptr<st_DBAsyncRq> pAsyncRq = std::move(localQueue.front());
 		localQueue.pop();
 		return pAsyncRq;
 	}
@@ -364,7 +359,7 @@ st_DBAsyncRq* COdbcAsyncSrv::Pop(std::queue<st_DBAsyncRq*>& localQueue)
 	if( localQueue.empty() )
 		return nullptr;
 
-	st_DBAsyncRq* pAsyncRq = localQueue.front();
+	std::unique_ptr<st_DBAsyncRq> pAsyncRq = std::move(localQueue.front());
 	localQueue.pop();
 	return pAsyncRq;
 }

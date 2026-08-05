@@ -15,12 +15,13 @@
 #include <Memory/Containers.h>
 #endif
 
-#ifndef __SPINLOCK_H__
-#include <Thread/SpinLock.h>
+#ifndef __PLATFORMLOCK_H__
+#include <Thread/PlatformLock.h>
 #endif
 
-#include <atomic>   // std::atomic<int64_t> 사용
-#include <utility>  // std::move 사용
+#ifndef	__QUEUECOMMON_H__
+#include <Containers/Queue/QueueCommon.h>
+#endif
 
 //***************************************************************************
 // @class CSpinLockQueue
@@ -51,7 +52,10 @@ public:
     // @param item 삽입할 데이터 항목 (복사 또는 이동 가능)
     void Push(T item)
     {
-        SPIN_LOCK;
+        if( _stopped.load(std::memory_order_relaxed) )
+            return;
+
+        PLockGuard lock(_lock, __FUNCTION__);
 
         // 인자로 받은 item을 rvalue로 전환하여 큐에 효율적으로 삽입
         _items.push(std::move(item));
@@ -63,7 +67,7 @@ public:
     // @return 꺼낸 데이터 항목. 큐가 비어있으면 기본 생성된 T 반환.
     T Pop()
     {
-        SPIN_LOCK;
+        PLockGuard lock(_lock, __FUNCTION__);
 
         if( _items.empty() )
             return T();
@@ -78,7 +82,7 @@ public:
     // @param items 데이터를 담을 외부 컨테이너 (CVector<T>)
     void PopAll(OUT CVector<T>& items)
     {
-        SPIN_LOCK; // 단 한 번만 락을 잡고 내부에서 루프를 돌려 쏟아냅니다.
+        PLockGuard lock(_lock, __FUNCTION__); // 단 한 번만 락을 잡고 내부에서 루프를 돌려 쏟아냅니다.
 
         // 메모리 재할당 비용을 줄이기 위해 컨테이너 크기 미리 확보
         items.reserve(items.size() + _items.size());
@@ -94,7 +98,7 @@ public:
     // @brief 큐를 완전히 비웁니다.
     void Clear()
     {
-        SPIN_LOCK;
+        PLockGuard lock(_lock, __FUNCTION__);
 
         // Containers.h의 CQueue<T>를 사용하여 스왑 처리를 수행합니다.
         CQueue<T> emptyQueue;
@@ -118,11 +122,18 @@ public:
         return static_cast<size_t>(_size.load(std::memory_order_relaxed));
     }
 
+    //***************************************************************************
+    // @brief 큐를 정지시키고 추가 푸시를 차단합니다.
+    void Stop()
+    {
+        _stopped.store(true, std::memory_order_relaxed);
+    }
+
 private:
-    SPIN_USE_LOCK;                      // 내부적으로 _lock 객체가 자동 생성됩니다.(LightWeight 프리셋, 배타 스핀락)
-    
-    CQueue<T> _items;                   // 커스텀 CQueue<T> 기반 내부 큐
-    std::atomic<int64_t> _size{ 0 };    // Empty()/Size()를 락 없이 조회하기 위한 카운터
+    PLock                   _lock;          // 플랫폼 통합 단독 락 객체
+    CQueue<T> _items;                       // 커스텀 CQueue<T> 기반 내부 큐
+    std::atomic<int64_t> _size{ 0 };        // Empty()/Size()를 락 없이 조회하기 위한 카운터
+    std::atomic<bool> _stopped{ false };    // 종료 플래그 추가
 };
 
 #endif // ndef __SPINLOCKQUEUE_H__

@@ -19,8 +19,8 @@
 #include <Thread/CacheAlignment.h>
 #endif
 
-#ifndef __SPINLOCK_H__
-#include <Thread/SpinLock.h>
+#ifndef __PLATFORMLOCK_H__
+#include <Thread/PlatformLock.h>
 #endif
 
 #ifndef __THREADMANAGER_H__
@@ -32,11 +32,8 @@
 #endif
 
 #ifndef __DELAYEDTASKQUEUE_H__
-#include <ThreadSafeContainers/DelayedTaskQueue.h>
+#include <Containers/Queue/DelayedTaskQueue.h>
 #endif
-
-#include <mutex>
-#include <condition_variable>
 
 class CAdoConnPool : public BaseAllocator
 {
@@ -131,7 +128,7 @@ protected:
 	// 동적 메모리 및 캐시라인 정렬 슬롯 배열
 	std::unique_ptr<CachePaddedAtomic<CAdoDB*>[]>		_pAdoConns;     // 커넥션 객체 포인터 배열 (캐시 라인 패딩 적용)
 	std::unique_ptr<CachePaddedAtomic<int32>[] >		_pRefCount;     // 각 슬롯별 현재 대여 중인 참조 카운트 배열
-	std::unique_ptr<SpinLockDefault[]>					_slotLocks;             // 슬롯별 독립 락 배열
+	std::unique_ptr<PLock[]>							_slotLocks;     // 단독 락으로 교체
 
 	std::unique_ptr<CachePaddedAtomic<bool>[]>			_pReconnecting;         // 슬롯별 재연결 진행 여부 플래그 배열
 	std::unique_ptr<CachePaddedAtomic<int32>[]>			_pRetryFailCount;       // 슬롯별 연속 재시도 실패 횟수 배열
@@ -158,7 +155,7 @@ protected:
 	CQueue<int32>				_reconnectPendingSlots;		// 재접속 대기 중인 슬롯 인덱스 큐
 
 	// 자원 격리(Quarantine) 관련 멤버
-	SpinLockDefault				_globalQuarantineLock;      // 격리 큐 접근 동기화 스핀락
+	PLock						_globalQuarantineLock;      // 격리 큐 보호용 단독 락
 	CQueue<TQuarantineItem>		_quarantineQueue;			// 좀비 커넥션 격리 큐
 };
 

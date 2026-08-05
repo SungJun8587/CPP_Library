@@ -333,26 +333,26 @@ bool CBaseODBC::GetServerCharacterSet(TCHAR* ptszCharset, int32 nBufferLength)
 	if( ptszCharset == nullptr || nBufferLength <= 0 )
 		return false;
 
-	TCHAR szQuery[256] = { 0, };
+	TCHAR tszQuery[256] = { 0, };
 
 	// DBMS 종류에 따른 조회 쿼리 설정
 	switch( m_DbClass )
 	{
 		case EDBClass::MSSQL:
 			// SQL Server의 서버 전역 캐릭터셋/정렬 방식(Collation) 조회
-			_stprintf_s(szQuery, _T("SELECT @@SERVERNAME, SERVERPROPERTY('Collation')")); // 혹은 DATABASEPROPERTYEX 등 활용 가능
+			_stprintf_s(tszQuery, _T("SELECT @@SERVERNAME, SERVERPROPERTY('Collation')")); // 혹은 DATABASEPROPERTYEX 등 활용 가능
 			// 혹은 가장 대표적인 서버 Collation 조회 쿼리:
 			// _stprintf_s(szQuery, _T("SELECT CONVERT(varchar(128), DATABASEPROPERTYEX(DB_NAME(), 'Collation'))"));
 			break;
 
 		case EDBClass::MYSQL:
 			// MySQL의 서버 캐릭터셋(character_set_server) 조회
-			_stprintf_s(szQuery, _T("SHOW VARIABLES LIKE 'character_set_server'"));
+			_stprintf_s(tszQuery, _T("SHOW VARIABLES LIKE 'character_set_server'"));
 			break;
 
 		case EDBClass::ORACLE:
 			// Oracle의 데이터베이스 캐릭터셋 정보 조회
-			_stprintf_s(szQuery, _T("SELECT * FROM NLS_DATABASE_PARAMETERS WHERE PARAMETER = 'NLS_CHARACTERSET'"));
+			_stprintf_s(tszQuery, _T("SELECT * FROM NLS_DATABASE_PARAMETERS WHERE PARAMETER = 'NLS_CHARACTERSET'"));
 			break;
 
 		default:
@@ -360,8 +360,11 @@ bool CBaseODBC::GetServerCharacterSet(TCHAR* ptszCharset, int32 nBufferLength)
 	}
 
 	// 쿼리 직접 실행
-	if( !ExecDirect(szQuery) )
+	if( !ExecDirect(tszQuery) )
+	{
+		ClearStmt();
 		return false;
+	}
 
 	// 결과 셋 페치 및 데이터 바인딩 로직 처리
 	// (기존 클래스에 구현된 Fetch와 BindCol 방식을 사용하여 첫 번째 결과 행의 값을 가져옴)
@@ -371,12 +374,13 @@ bool CBaseODBC::GetServerCharacterSet(TCHAR* ptszCharset, int32 nBufferLength)
 		// (사용하시는 구현 형태에 맞추어 BindCol 혹은 GetData 호출부 적용)
 		if( !GetData(2, ptszCharset, nBufferLength) ) // MySQL의 경우 SHOW VARIABLES는 2번째 열에 값이 나옴
 		{
-			FreeStmt(SQL_DROP);
+			ClearStmt();
 			return false;
 		}
 	}
 
-	FreeStmt(SQL_DROP);
+	ClearStmt();
+	
 	return true;
 }
 

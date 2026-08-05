@@ -7,70 +7,107 @@
 #include "pch.h"
 #include "SRWLock.h"
 
+#if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
+#include "DeadLockProfiler.h"
+extern CDeadLockProfiler* gpDeadLockProfiler; // 외부 프로파일러 인스턴스 선언 가정
+#endif
+
 //***************************************************************************
 // Construction/Destruction 
 //***************************************************************************
 
+//***************************************************************************
+// @brief CSRWLock 객체를 생성하고 내부 Windows SRWLock 핸들을 초기화합니다.
 CSRWLock::CSRWLock()
 {
     // SRWLock 초기화 (동적 할당 불필요, 스택/멤버 변수로 사용 가능)
     InitializeSRWLock(&_srwLock);
 }
 
+//***************************************************************************
+// @brief CSRWLock 객체를 소멸합니다.
 CSRWLock::~CSRWLock()
 {
     // SRWLock은 별도 Destroy API가 없음
     // 잠긴 상태로 소멸되면 UB — 디버그 빌드에서만 감지
 #ifdef _DEBUG
-    // TryWriteLock 성공 == 현재 아무도 잠그지 않은 상태
+    // TryExclusiveLock 성공 == 현재 아무도 잠그지 않은 상태
     const bool notLocked = TryExclusiveLock();
     assert(notLocked && "RWLock destroyed while locked");
-    if (notLocked) ExclusiveUnLock();
+    if( notLocked ) ExclusiveUnLock();
 #endif
 }
 
 //***************************************************************************
-// 모든 읽기/쓰기 스레드가 해제될 때까지 블록
-void CSRWLock::ExclusiveLock()
+// @brief 모든 읽기/쓰기 스레드가 해제될 때까지 블로킹 대기하며 쓰기 락을 획득합니다.
+void CSRWLock::ExclusiveLock(const char* name)
 {
+#if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
+    if( name && gpDeadLockProfiler ) gpDeadLockProfiler->PushLock(name);
+#endif
+
     AcquireSRWLockExclusive(&_srwLock);
 }
 
 //***************************************************************************
-// 쓰기 락 비블로킹 시도 — 즉시 획득 가능하면 true, 아니면 false
-// [[nodiscard]] : 반환값 무시 시 컴파일러 경고 발생
-bool CSRWLock::TryExclusiveLock()
+// @brief 쓰기 락 획득을 비블로킹 방식으로 시도합니다.
+// @return true: 즉시 획득 성공, false: 획득 실패
+[[nodiscard]] bool CSRWLock::TryExclusiveLock(const char* name)
 {
-    return TryAcquireSRWLockExclusive(&_srwLock) != FALSE;
+    if( TryAcquireSRWLockExclusive(&_srwLock) == FALSE )
+        return false;
+
+#if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
+    if( name && gpDeadLockProfiler ) gpDeadLockProfiler->PushLock(name);
+#endif
+    return true;
 }
 
 //***************************************************************************
-// 쓰기 락 해제 — ExclusiveLock / TryExclusiveLock 성공 후 반드시 호출
-void CSRWLock::ExclusiveUnLock()
+// @brief 쓰기 락을 해제합니다. (ExclusiveLock / TryExclusiveLock 성공 후 반드시 호출)
+void CSRWLock::ExclusiveUnLock(const char* name)
 {
     ReleaseSRWLockExclusive(&_srwLock);
+
+#if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
+    if( name && gpDeadLockProfiler ) gpDeadLockProfiler->PopLock(name);
+#endif
 }
 
 //***************************************************************************
-// 다른 읽기 스레드와 동시 획득 가능, 쓰기 스레드가 있으면 블록
-void CSRWLock::SharedLock()
+// @brief 다른 읽기 스레드와 동시 획득 가능하며, 쓰기 스레드가 있으면 블로킹 대기합니다.
+void CSRWLock::SharedLock(const char* name)
 {
+#if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
+    if( name && gpDeadLockProfiler ) gpDeadLockProfiler->PushLock(name);
+#endif
+
     AcquireSRWLockShared(&_srwLock);
 }
 
 //***************************************************************************
-// 읽기 락 비블로킹 시도 — 즉시 획득 가능하면 true, 아니면 false
-// [[nodiscard]] : 반환값 무시 시 컴파일러 경고 발생
-bool CSRWLock::TrySharedLock()
+// @brief 읽기 락 획득을 비블로킹 방식으로 시도합니다.
+// @return true: 즉시 획득 성공, false: 획득 실패
+[[nodiscard]] bool CSRWLock::TrySharedLock(const char* name)
 {
-    return TryAcquireSRWLockShared(&_srwLock) != FALSE;
+    if( TryAcquireSRWLockShared(&_srwLock) == FALSE )
+        return false;
+
+#if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
+    if( name && gpDeadLockProfiler ) gpDeadLockProfiler->PushLock(name);
+#endif
+    return true;
 }
 
 //***************************************************************************
-// 읽기 락 해제 — SharedLock / TrySharedLock 성공 후 반드시 호출
-void CSRWLock::SharedUnLock()
+// @brief 읽기 락을 해제합니다. (SharedLock / TrySharedLock 성공 후 반드시 호출)
+void CSRWLock::SharedUnLock(const char* name)
 {
     ::ReleaseSRWLockShared(&_srwLock);
+
+#if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
+    if( name && gpDeadLockProfiler ) gpDeadLockProfiler->PopLock(name);
+#endif
 }
 
 
@@ -82,17 +119,18 @@ void CSRWLock::SharedUnLock()
 //***************************************************************************
 
 //***************************************************************************
-// 생성자에서 쓰기 락 획득 (블로킹)
-ExclusiveLockGuard::ExclusiveLockGuard(CSRWLock& lock) : _lock(lock)
+// @brief 생성자에서 쓰기 락을 블로킹 방식으로 획득합니다.
+ExclusiveLockGuard::ExclusiveLockGuard(CSRWLock& lock, const char* name) noexcept
+    : _lock(lock), _name(name)
 {
-    _lock.ExclusiveLock();
+    _lock.ExclusiveLock(_name);
 }
 
 //***************************************************************************
-// 소멸자에서 쓰기 락 해제
-ExclusiveLockGuard::~ExclusiveLockGuard()
+// @brief 소멸자에서 쓰기 락을 자동으로 해제합니다.
+ExclusiveLockGuard::~ExclusiveLockGuard() noexcept
 {
-    _lock.ExclusiveUnLock();
+    _lock.ExclusiveUnLock(_name);
 }
 
 
@@ -104,17 +142,18 @@ ExclusiveLockGuard::~ExclusiveLockGuard()
 //***************************************************************************
 
 //***************************************************************************
-// 생성자에서 읽기 락 획득 (블로킹)
-SharedLockGuard::SharedLockGuard(CSRWLock& lock) : _lock(lock)
+// @brief 생성자에서 읽기 락을 블로킹 방식으로 획득합니다.
+SharedLockGuard::SharedLockGuard(CSRWLock& lock, const char* name) noexcept
+    : _lock(lock), _name(name)
 {
-    _lock.SharedLock();
+    _lock.SharedLock(_name);
 }
 
 //***************************************************************************
-// 소멸자에서 읽기 락 해제
-SharedLockGuard::~SharedLockGuard()
+// @brief 소멸자에서 읽기 락을 자동으로 해제합니다.
+SharedLockGuard::~SharedLockGuard() noexcept
 {
-    _lock.SharedUnLock();
+    _lock.SharedUnLock(_name);
 }
 
 
@@ -126,18 +165,18 @@ SharedLockGuard::~SharedLockGuard()
 //***************************************************************************
 
 //***************************************************************************
-// 생성자에서 쓰기 락 비블로킹 시도
-TryExclusiveLockGuard::TryExclusiveLockGuard(CSRWLock& lock)
-    : _lock(lock), _acquired(lock.TryExclusiveLock())
+// @brief 생성자에서 쓰기 락 비블로킹 획득을 시도합니다.
+TryExclusiveLockGuard::TryExclusiveLockGuard(CSRWLock& lock, const char* name) noexcept
+    : _lock(lock), _name(name), _acquired(lock.TryExclusiveLock(_name))
 {
 }
 
 //***************************************************************************
-// 소멸자에서 획득 성공한 경우에만 쓰기 락 해제
-TryExclusiveLockGuard::~TryExclusiveLockGuard()
+// @brief 소멸자에서 락 획득에 성공했던 경우에만 쓰기 락을 해제합니다.
+TryExclusiveLockGuard::~TryExclusiveLockGuard() noexcept
 {
-    if (_acquired)
-        _lock.ExclusiveUnLock();
+    if( _acquired )
+        _lock.ExclusiveUnLock(_name);
 }
 
 
@@ -149,16 +188,16 @@ TryExclusiveLockGuard::~TryExclusiveLockGuard()
 //***************************************************************************
 
 //***************************************************************************
-// 생성자에서 읽기 락 비블로킹 시도
-TrySharedLockGuard::TrySharedLockGuard(CSRWLock& lock)
-    : _lock(lock), _acquired(lock.TrySharedLock())
+// @brief 생성자에서 읽기 락 비블로킹 획득을 시도합니다.
+TrySharedLockGuard::TrySharedLockGuard(CSRWLock& lock, const char* name) noexcept
+    : _lock(lock), _name(name), _acquired(lock.TrySharedLock(_name))
 {
 }
 
 //***************************************************************************
-// 소멸자에서 획득 성공한 경우에만 읽기 락 해제
-TrySharedLockGuard::~TrySharedLockGuard()
+// @brief 소멸자에서 락 획득에 성공했던 경우에만 읽기 락을 해제합니다.
+TrySharedLockGuard::~TrySharedLockGuard() noexcept
 {
-    if (_acquired)
-        _lock.SharedUnLock();
+    if( _acquired )
+        _lock.SharedUnLock(_name);
 }

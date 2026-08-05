@@ -15,14 +15,13 @@
 #include <Memory/Containers.h>
 #endif
 
-#ifndef __SPINLOCK_H__
-#include <Thread/SpinLock.h>
+#ifndef __PLATFORMLOCK_H__
+#include <Thread/PlatformLock.h>
 #endif
 
-#include <queue>     // std::queue 사용
-#include <vector>    // std::vector 사용
-#include <atomic>    // std::atomic<int64_t> 사용
-#include <utility>   // std::move 사용
+#ifndef	__QUEUECOMMON_H__
+#include <Containers/Queue/QueueCommon.h>
+#endif
 
 //***************************************************************************
 // @class CChunkedSwapQueue
@@ -54,7 +53,10 @@ public:
     //***************************************************************************
     void Push(T item)
     {
-        SPIN_LOCK;
+        if( _stopped.load(std::memory_order_relaxed) )
+            return;
+
+        PLockGuard lock(_lock, __FUNCTION__);
 
         _inQueue.push(std::move(item));
         _size.fetch_add(1, std::memory_order_relaxed);
@@ -67,7 +69,10 @@ public:
     //***************************************************************************
     int64_t PushAndGetSize(T item)
     {
-        SPIN_LOCK;
+        if( _stopped.load(std::memory_order_relaxed) )
+            return _size.load(std::memory_order_relaxed);
+
+        PLockGuard lock(_lock, __FUNCTION__);
 
         _inQueue.push(std::move(item));
         return _size.fetch_add(1, std::memory_order_relaxed) + 1;
@@ -77,12 +82,12 @@ public:
     // @brief 여러 아이템을 벡터 단위로 일괄 삽입합니다.
     // @param items 삽입할 데이터 항목들이 담긴 벡터 (성공 시 내부 비워짐)
     //***************************************************************************
-    void PushBatch(std::vector<T>& items)
+    void PushBatch(CVector<T>& items)
     {
-        if( items.empty() )
+        if( items.empty() || _stopped.load(std::memory_order_relaxed) )
             return;
 
-        SPIN_LOCK;
+        PLockGuard lock(_lock, __FUNCTION__);
 
         for( auto& item : items )
         {
@@ -96,25 +101,28 @@ public:
     // @brief 입력 큐의 모든 요소를 출력 큐로 통째로 스왑(이동)합니다.
     // @param outQueue 데이터를 전달받을 대상 큐
     //***************************************************************************
-    void Swap(std::queue<T>& outQueue)
+    void Swap(CQueue<T>& outQueue)
     {
-        SPIN_LOCK;
+        PLockGuard lock(_lock, __FUNCTION__);
 
         if( _inQueue.empty() )
             return;
 
+        // outQueue가 비어있다면 컨테이너 자체를 O(1)로 통째로 스왑
         if( outQueue.empty() )
         {
             _inQueue.swap(outQueue);
         }
         else
         {
+            // outQueue에 잔여물이 있는 경우에만 개별 이동
             while( !_inQueue.empty() )
             {
                 outQueue.push(std::move(_inQueue.front()));
                 _inQueue.pop();
             }
         }
+
         _size.store(0, std::memory_order_relaxed);
     }
 
@@ -124,9 +132,9 @@ public:
     // @param outQueue 데이터를 전달받을 대상 큐
     // @param maxCount 한 번에 가져올 최대 아이템 개수
     //***************************************************************************
-    void SwapChunk(std::queue<T>& outQueue, size_t maxCount)
+    void SwapChunk(CQueue<T>& outQueue, size_t maxCount)
     {
-        SPIN_LOCK;
+        PLockGuard lock(_lock, __FUNCTION__);
 
         if( _inQueue.empty() )
             return;
@@ -134,6 +142,7 @@ public:
         size_t movedCount = 0;
         while( !_inQueue.empty() && movedCount < maxCount )
         {
+            // unique_ptr 소유권을 안전하게 outQueue로 이동
             outQueue.push(std::move(_inQueue.front()));
             _inQueue.pop();
             ++movedCount;
@@ -159,16 +168,24 @@ public:
         return _size.load(std::memory_order_relaxed);
     }
 
+    //***************************************************************************
+    // @brief 큐를 정지시키고 추가 푸시를 차단합니다.
+    //***************************************************************************
+    void Stop()
+    {
+        _stopped.store(true, std::memory_order_relaxed);
+    }
+
     CChunkedSwapQueue(const CChunkedSwapQueue&) = delete;
     CChunkedSwapQueue& operator=(const CChunkedSwapQueue&) = delete;
     CChunkedSwapQueue(CChunkedSwapQueue&&) = delete;
     CChunkedSwapQueue& operator=(CChunkedSwapQueue&&) = delete;
 
 private:
-    SPIN_USE_LOCK;
-
-    CQueue<T>               _inQueue;      // 내부 입력을 받는 큐 버퍼
-    std::atomic<int64_t>    _size{ 0 };    // 락 경합 없는 빠른 크기 조회를 위한 아토믹 카운터
+    PLock                   _lock;              // 플랫폼 통합 단독 락 객체
+    CQueue<T>               _inQueue;           // 내부 입력을 받는 큐 버퍼
+    std::atomic<int64_t>    _size{ 0 };         // 락 경합 없는 빠른 크기 조회를 위한 아토믹 카운터
+    std::atomic<bool>       _stopped{ false };  // 종료 플래그 추가
 };
 
 #endif // ndef __CHUNKED_SWAPQUEUE_H__

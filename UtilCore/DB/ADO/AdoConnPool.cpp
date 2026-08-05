@@ -35,7 +35,7 @@ CAdoConnPool::CAdoConnPool(int32 nMaxPoolSize)
 	// 풀 크기에 맞춰 각 관리 배열을 동적 할당
 	_pAdoConns = std::make_unique<CachePaddedAtomic<CAdoDB*>[]>(_nMaxPoolSize);
 	_pRefCount = std::make_unique<CachePaddedAtomic<int32>[]>(_nMaxPoolSize);
-	_slotLocks = std::make_unique<SpinLockDefault[]>(_nMaxPoolSize);
+	_slotLocks = std::make_unique<PLock[]>(_nMaxPoolSize);
 
 	_pReconnecting = std::make_unique<CachePaddedAtomic<bool>[]>(_nMaxPoolSize);
 	_pRetryFailCount = std::make_unique<CachePaddedAtomic<int32>[]>(_nMaxPoolSize);
@@ -261,7 +261,7 @@ void CAdoConnPool::ApplyReconnectedConn(int32 nType, CAdoDB* pNewConn)
 
 	CAdoDB* pOldConn = nullptr;
 	{
-		SpinLockGuard<SpinLockPreset::Default> guard(_slotLocks[nType]);
+		PLockGuard guard(_slotLocks[nType]);
 		pOldConn = _pAdoConns[nType].value.load(std::memory_order_acquire);
 		_pAdoConns[nType].value.store(pNewConn, std::memory_order_release);
 	}
@@ -300,7 +300,7 @@ void CAdoConnPool::ApplyReconnectedConn(int32 nType, CAdoDB* pNewConn)
 		LOG_ERROR(_T("ReconnectWorker (ADO): Slot(%d) refcount high during swap. Moving to quarantine."), nType);
 
 		auto now = std::chrono::steady_clock::now();
-		SpinLockGuard<SpinLockPreset::Default> qGuard(_globalQuarantineLock);
+		PLockGuard qGuard(_globalQuarantineLock);
 		_quarantineQueue.push({ pOldConn, &_pRefCount[nType].value, now });
 	}
 	else
@@ -387,7 +387,7 @@ void CAdoConnPool::HealthCheckLoop(void)
 
 		// 격리 큐에 있는 좀비 커넥션들의 참조가 풀렸거나 만료되었는지 검사
 		{
-			SpinLockGuard<SpinLockPreset::Default> qGuard(_globalQuarantineLock);
+			PLockGuard qGuard(_globalQuarantineLock);
 			size_t qSize = _quarantineQueue.size();
 
 			for( size_t k = 0; k < qSize; ++k )
@@ -735,7 +735,7 @@ void CAdoConnPool::Clear(void)
 		if( bTimeout )
 		{
 			LOG_ERROR(_T("Clear (ADO): Slot(%d) refcount is zombie. Moving to quarantine."), i);
-			SpinLockGuard<SpinLockPreset::Default> qGuard(_globalQuarantineLock);
+			PLockGuard qGuard(_globalQuarantineLock);
 			_quarantineQueue.push({ pConn, &_pRefCount[i].value, now });
 		}
 		else
@@ -748,7 +748,7 @@ void CAdoConnPool::Clear(void)
 
 	// 종료 시점에 격리 큐에 남아있는 자원 정리
 	{
-		SpinLockGuard<SpinLockPreset::Default> qGuard(_globalQuarantineLock);
+		PLockGuard qGuard(_globalQuarantineLock);
 		while( !_quarantineQueue.empty() )
 		{
 			TQuarantineItem item = _quarantineQueue.front();

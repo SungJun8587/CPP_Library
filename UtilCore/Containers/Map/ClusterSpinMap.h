@@ -11,8 +11,8 @@
 #include <BaseRedefineDataType.h>
 #endif
 
-#ifndef __SPINLOCK_H__
-#include <Thread/SpinLock.h>
+#ifndef __PLATFORMLOCK_H__
+#include <Thread/PlatformLock.h>
 #endif
 
 template<typename T1, typename T2, __int32 nClusterCnt, bool bInnerLock = true>
@@ -76,7 +76,7 @@ protected:
 
 public:
 	ObjectMap			m_ObjectMaps[nClusterCnt];
-	RWSpinLockDefault	m_ObjectLocks[nClusterCnt];
+	PRWLock				m_ObjectLocks[nClusterCnt];
 };
 
 #endif // ndef __CLUSTERSPINMAP_H__

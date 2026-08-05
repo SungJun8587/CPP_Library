@@ -15,12 +15,9 @@
 #include <Memory/Allocator.h>
 #endif
 
-#include <queue>
-#include <mutex>
-#include <atomic>
-#include <condition_variable>
-#include <chrono>
-#include <functional>
+#ifndef	__QUEUECOMMON_H__
+#include <Containers/Queue/QueueCommon.h>
+#endif
 
 //***************************************************************************
 // @struct DelayedTask
@@ -82,10 +79,15 @@ public:
     template<typename F>
     void Reserve(int milliseconds, F&& task)
     {
+        if( _stopped.load(std::memory_order_relaxed) )
+            return;
+
         auto executeTime = std::chrono::steady_clock::now() + std::chrono::milliseconds(milliseconds);
 
         {
             std::lock_guard<std::mutex> lock(_mutex);
+            if( _stopped.load(std::memory_order_relaxed) )
+                return;
             _queue.push(DelayedTask{ executeTime, std::forward<F>(task) });
         }
         _cv.notify_one(); // 대기 중인 스레드 깨우기

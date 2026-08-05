@@ -24,6 +24,19 @@
     <ClInclude Include="BaseMacro.h" />
     <ClInclude Include="BaseRedefineDataType.h" />
     <ClInclude Include="BaseTLS.h" />
+    <ClInclude Include="Containers\Map\ClusterSpinMap.h" />
+    <ClInclude Include="Containers\Map\OrderedMap.h" />
+    <ClInclude Include="Containers\Map\UnOrderedMap.h" />
+    <ClInclude Include="Containers\Queue\BlockingTaskQueue.h" />
+    <ClInclude Include="Containers\Queue\ChunkedSwapQueue.h" />
+    <ClInclude Include="Containers\Queue\DelayedTaskQueue.h" />
+    <ClInclude Include="Containers\Queue\DoubleBufferQueue.h" />
+    <ClInclude Include="Containers\Queue\MPMCLockFreeQueue.h" />
+    <ClInclude Include="Containers\Queue\MPSCLockFreeQueue.h" />
+    <ClInclude Include="Containers\Queue\QueueCommon.h" />
+    <ClInclude Include="Containers\Queue\SpinLockQueue.h" />
+    <ClInclude Include="Containers\Queue\SPMCLockFreeQueue.h" />
+    <ClInclude Include="Containers\Queue\SPSCLockFreeQueue.h" />
     <ClInclude Include="Crypto\CryptoUtil.h" />
     <ClInclude Include="DB\ADO\AdoAsyncSrv.h" />
     <ClInclude Include="DB\ADO\AdoConnPool.h" />
@@ -67,17 +80,10 @@
     <ClInclude Include="ServerConfig.h" />
     <ClInclude Include="ServerConnectInfo.h" />
     <ClInclude Include="ServiceSvr.h" />
-    <ClInclude Include="ThreadSafeContainers\BlockingTaskQueue.h" />
-    <ClInclude Include="ThreadSafeContainers\ChunkedSwapQueue.h" />
-    <ClInclude Include="ThreadSafeContainers\ClusterSpinMap.h" />
-    <ClInclude Include="ThreadSafeContainers\DelayedTaskQueue.h" />
-    <ClInclude Include="ThreadSafeContainers\DoubleBufferQueue.h" />
-    <ClInclude Include="ThreadSafeContainers\OrderedMap.h" />
-    <ClInclude Include="ThreadSafeContainers\SpinLockQueue.h" />
-    <ClInclude Include="ThreadSafeContainers\UnOrderedMap.h" />
     <ClInclude Include="Thread\CacheAlignment.h" />
     <ClInclude Include="Thread\CriticalSection.h" />
     <ClInclude Include="Thread\DeadLockProfiler.h" />
+    <ClInclude Include="Thread\PlatformLock.h" />
     <ClInclude Include="Thread\SpinLock.h" />
     <ClInclude Include="Thread\SRWLock.h" />
     <ClInclude Include="Thread\ThreadManager.h" />
@@ -102,6 +108,7 @@
   <ItemGroup>
     <ClCompile Include="BaseGlobal.cpp" />
     <ClCompile Include="BaseTLS.cpp" />
+    <ClCompile Include="Containers\Map\ClusterSpinMap.cpp" />
     <ClCompile Include="Crypto\CryptoUtil.cpp" />
     <ClCompile Include="DB\ADO\AdoAsyncSrv.cpp" />
     <ClCompile Include="DB\ADO\AdoConnPool.cpp" />
@@ -136,7 +143,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="ThreadSafeContainers\ClusterSpinMap.cpp" />
     <ClCompile Include="Thread\DeadLockProfiler.cpp" />
     <ClCompile Include="Thread\SRWLock.cpp" />
     <ClCompile Include="Thread\ThreadManager.cpp" />
@@ -157,6 +163,8 @@
     <ClCompile Include="XML\RapidXMLUtil.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Containers\Map\OrderedMap.inl" />
+    <None Include="Containers\Map\UnOrderedMap.inl" />
     <None Include="DB\BaseODBC.inl" />
     <None Include="DB\DB_ColAttr.inl" />
     <None Include="DB\DB_Error.inl" />
@@ -166,8 +174,6 @@
     <None Include="Job\JobQueue.inl" />
     <None Include="JSON\RapidJSONUtil.inl" />
     <None Include="Memory\Singleton.inl" />
-    <None Include="ThreadSafeContainers\OrderedMap.inl" />
-    <None Include="ThreadSafeContainers\UnOrderedMap.inl" />
     <None Include="Thread\SpinLock.inl" />
     <None Include="XML\RapidXMLUtil.inl" />
   </ItemGroup>

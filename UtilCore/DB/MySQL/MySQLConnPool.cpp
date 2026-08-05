@@ -31,7 +31,7 @@ CMySQLConnPool::CMySQLConnPool(int32 nMaxPoolSize)
 {
 	_pMySQLConns = std::make_unique<CachePaddedAtomic<CBaseMySQL*>[]>(_nMaxPoolSize);
 	_pRefCount = std::make_unique<CachePaddedAtomic<int32>[]>(_nMaxPoolSize);
-	_slotLocks = std::make_unique<SpinLockDefault[]>(_nMaxPoolSize);
+	_slotLocks = std::make_unique<PLock[]>(_nMaxPoolSize);
 
 	_pReconnecting = std::make_unique<CachePaddedAtomic<bool>[]>(_nMaxPoolSize);
 	_pRetryFailCount = std::make_unique<CachePaddedAtomic<int32>[]>(_nMaxPoolSize);
@@ -292,7 +292,7 @@ void CMySQLConnPool::ApplyReconnectedConn(int32 nType, CBaseMySQL* pNewConn)
 
 	CBaseMySQL* pOldConn = nullptr;
 	{
-		SpinLockGuard<SpinLockPreset::Default> guard(_slotLocks[nType]);
+		PLockGuard guard(_slotLocks[nType]);
 		pOldConn = _pMySQLConns[nType].value.load(std::memory_order_acquire);
 		_pMySQLConns[nType].value.store(pNewConn, std::memory_order_release);
 	}
@@ -329,7 +329,7 @@ void CMySQLConnPool::ApplyReconnectedConn(int32 nType, CBaseMySQL* pNewConn)
 		LOG_ERROR(_T("ReconnectWorker: Slot(%d) refcount high during swap. Moving to quarantine."), nType);
 
 		auto now = std::chrono::steady_clock::now();
-		SpinLockGuard<SpinLockPreset::Default> qGuard(_globalQuarantineLock);
+		PLockGuard qGuard(_globalQuarantineLock);
 		_quarantineQueue.push({ pOldConn, &_pRefCount[nType].value, now });
 	}
 	else
@@ -407,7 +407,7 @@ void CMySQLConnPool::HealthCheckLoop(void)
 		vDeletes.clear();
 
 		{
-			SpinLockGuard<SpinLockPreset::Default> qGuard(_globalQuarantineLock);
+			PLockGuard qGuard(_globalQuarantineLock);
 			size_t qSize = _quarantineQueue.size();
 
 			for( size_t k = 0; k < qSize; ++k )
@@ -753,7 +753,7 @@ void CMySQLConnPool::Clear(void)
 		{
 			LOG_ERROR(_T("Clear: Slot(%d) refcount is zombie (%d). Moving to quarantine."), i, _pRefCount[i].value.load());
 
-			SpinLockGuard<SpinLockPreset::Default> qGuard(_globalQuarantineLock);
+			PLockGuard qGuard(_globalQuarantineLock);
 			_quarantineQueue.push({ pConn, &_pRefCount[i].value, now });
 		}
 		else
@@ -765,7 +765,7 @@ void CMySQLConnPool::Clear(void)
 	}
 
 	{
-		SpinLockGuard<SpinLockPreset::Default> qGuard(_globalQuarantineLock);
+		PLockGuard qGuard(_globalQuarantineLock);
 		while( !_quarantineQueue.empty() )
 		{
 			TQuarantineItem item = _quarantineQueue.front();

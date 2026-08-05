@@ -19,8 +19,8 @@
 #include <Thread/CacheAlignment.h>
 #endif
 
-#ifndef __SPINLOCK_H__
-#include <Thread/SpinLock.h>
+#ifndef __PLATFORMLOCK_H__
+#include <Thread/PlatformLock.h>
 #endif
 
 #ifndef __THREADMANAGER_H__
@@ -32,11 +32,8 @@
 #endif
 
 #ifndef __DELAYEDTASKQUEUE_H__
-#include <ThreadSafeContainers/DelayedTaskQueue.h>
+#include <Containers/Queue/DelayedTaskQueue.h>
 #endif
-
-#include <mutex>
-#include <condition_variable>
 
 class CMySQLConnPool : public BaseAllocator
 {
@@ -137,7 +134,7 @@ protected:
 	// 동적 메모리 및 캐시라인 정렬 슬롯 배열
 	std::unique_ptr<CachePaddedAtomic<CBaseMySQL*>[]>	_pMySQLConns;  // 슬롯별 실제 데이터베이스 연결 객체 포인터 배열
 	std::unique_ptr<CachePaddedAtomic<int32>[]>			_pRefCount;    // 슬롯 사용 중 여부를 관리하는 참조 카운터 배열
-	std::unique_ptr<SpinLockDefault[]>					_slotLocks;    // 각 슬롯의 연결 교체 작업을 보호하는 개별 스핀락 배열
+	std::unique_ptr<PLock[]>							_slotLocks;    // 단독 락으로 교체
 
 	std::unique_ptr<CachePaddedAtomic<bool>[]>			_pReconnecting;    // 슬롯별 재연결 워커 처리 진행 여부 플래그
 	std::unique_ptr<CachePaddedAtomic<int32>[]>			_pRetryFailCount;  // 슬롯별 연속 재연결 실패 횟수
@@ -164,7 +161,7 @@ protected:
 	CQueue<int32>				_reconnectPendingSlots;			 // 재연결 대상 슬롯 인덱스들을 보관하는 대기열 큐
 
 	// 자원 격리(Quarantine) 관련 멤버
-	SpinLockDefault				_globalQuarantineLock;           // 격리 큐 보호용 전용 스핀락
+	PLock						_globalQuarantineLock;			 // 격리 큐 보호용 단독 락
 	CQueue<TQuarantineItem>		_quarantineQueue;				 // 사용 중인 스레드가 빠져나오기를 기다리는 구형 커넥션 보관 큐
 };
 

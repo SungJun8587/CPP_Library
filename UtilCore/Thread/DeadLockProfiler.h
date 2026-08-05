@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // DeadLockProfiler.h : interface for the CDeadLockProfiler class.
 //
@@ -60,14 +60,14 @@ private:
 private:
 	CUnorderedMap<const char*, int32>	_nameToId;
 	CUnorderedMap<int32, const char*>	_idToName;
-	CMap<int32, CSet<int32>>			_lockHistory; // ±×·¡ÇÁÀÇ ÀÎÁ¢ ¸®½ºÆ® ±¸Á¶
+	CMap<int32, CSet<int32>>			_lockHistory; // ê·¸ë˜í”„ì˜ ì¸ì ‘ ë¦¬ìŠ¤íŠ¸ êµ¬ì¡°
 
 	std::mutex	_mutex;
 
 private:
-	CVector<int32>	_discoveredOrder;		// ³ëµå°¡ ¹ß°ßµÈ ¼ø¼­¸¦ ±â·ÏÇÏ´Â ¹è¿­
-	int32			_discoveredCount = 0;	// ³ëµå°¡ ¹ß°ßµÈ ¼ø¼­
-	CVector<bool>	_finished;				// Dfs(i)°¡ Á¾·á µÇ¾ú´ÂÁö ¿©ºÎ
+	CVector<int32>	_discoveredOrder;		// ë…¸ë“œê°€ ë°œê²¬ëœ ìˆœì„œë¥¼ ê¸°ë¡í•˜ëŠ” ë°°ì—´
+	int32			_discoveredCount = 0;	// ë…¸ë“œê°€ ë°œê²¬ëœ ìˆœì„œ
+	CVector<bool>	_finished;				// Dfs(i)ê°€ ì¢…ë£Œ ë˜ì—ˆëŠ”ì§€ ì—¬ë¶€
 	CVector<int32>	_parent;
 };
 
