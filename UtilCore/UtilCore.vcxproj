@@ -75,6 +75,11 @@
     <ClInclude Include="Memory\RawAllocator.h" />
     <ClInclude Include="Memory\Singleton.h" />
     <ClInclude Include="Memory\Stream.h" />
+    <ClInclude Include="Network\IocpCore.h" />
+    <ClInclude Include="Network\IocpEvent.h" />
+    <ClInclude Include="Network\RecvBuffer.h" />
+    <ClInclude Include="Network\RingBuffer.h" />
+    <ClInclude Include="Network\SendBuffer.h" />
     <ClInclude Include="Network\SocketUtil.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="ServerConfig.h" />
@@ -89,6 +94,8 @@
     <ClInclude Include="Thread\ThreadManager.h" />
     <ClInclude Include="UtilCore.h" />
     <ClInclude Include="Util\BaseFile.h" />
+    <ClInclude Include="Util\BufferReader.h" />
+    <ClInclude Include="Util\BufferWriter.h" />
     <ClInclude Include="Util\CalculatedElapsedTime.h" />
     <ClInclude Include="Util\CommonUtil.h" />
     <ClInclude Include="Util\EncodingConvert.h" />
@@ -134,6 +141,11 @@
     <ClCompile Include="Memory\Memory.cpp" />
     <ClCompile Include="Memory\MemoryPool.cpp" />
     <ClCompile Include="Memory\Stream.cpp" />
+    <ClCompile Include="Network\IocpCore.cpp" />
+    <ClCompile Include="Network\IocpEvent.cpp" />
+    <ClCompile Include="Network\RecvBuffer.cpp" />
+    <ClCompile Include="Network\RingBuffer.cpp" />
+    <ClCompile Include="Network\SendBuffer.cpp" />
     <ClCompile Include="Network\SocketUtil.cpp" />
     <ClCompile Include="ServerConfig.cpp" />
     <ClCompile Include="ServiceSvr.cpp" />
@@ -147,6 +159,8 @@
     <ClCompile Include="Thread\SRWLock.cpp" />
     <ClCompile Include="Thread\ThreadManager.cpp" />
     <ClCompile Include="Util\BaseFile.cpp" />
+    <ClCompile Include="Util\BufferReader.cpp" />
+    <ClCompile Include="Util\BufferWriter.cpp" />
     <ClCompile Include="Util\CommonUtil.cpp" />
     <ClCompile Include="Util\EncodingConvert.cpp" />
     <ClCompile Include="Util\WinCharsetConv.cpp" />

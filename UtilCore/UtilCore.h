@@ -93,6 +93,13 @@ using namespace std;
 #include <Job/JobQueue.h>
 #include <Job/GlobalQueue.h>
 
+#include <Network/SocketUtil.h>
+#include <Network/SendBuffer.h>
+#include <Network/RecvBuffer.h>
+#include <Network/RingBuffer.h>
+#include <Network/IocpEvent.h>
+#include <Network/IocpCore.h>
+
 #include <BaseGlobal.h>
 #include <BaseTLS.h>
 
@@ -112,6 +119,9 @@ using namespace std;
 #include <Util/ShellUtil.h>
 #include <Util/WebUtil.h>
 #include <Util/Endian.h>
+#include <Util/BufferReader.h>
+#include <Util/BufferWriter.h>
+
 
 #include <Excel/XlntUtil.h>
 

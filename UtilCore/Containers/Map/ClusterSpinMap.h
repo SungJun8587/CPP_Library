@@ -16,7 +16,7 @@
 #endif
 
 template<typename T1, typename T2, __int32 nClusterCnt, bool bInnerLock = true>
-class CClusterSpinMap
+class CClusterSpinMap : public BaseAllocator
 {
 public:
 	typedef	CMap< T1, T2 >					ObjectMap;

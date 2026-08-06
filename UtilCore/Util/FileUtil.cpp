@@ -12,6 +12,7 @@
 // @param pBuffer 검사할 데이터 버퍼
 // @param BuffSize 버퍼 크기
 // @return UTF-8 조건을 만족하면 true, 아니면 false
+//***************************************************************************
 bool IsUTF8WithoutBom(const void* pBuffer, const size_t BuffSize)
 {
 	bool bUTF8 = true;
@@ -84,6 +85,7 @@ namespace {
 	// @return 판별된 인코딩 타입. 판별 실패(읽기 실패 등) 시 EEncoding::DEFAULT
 	// @note 호출 후 파일 포인터는 항상 파일 시작(오프셋 0)으로 되돌려 놓습니다.
 	//       핸들의 오픈/클로즈는 호출자 책임입니다.
+	//***************************************************************************
 	EEncoding DetectFileEncoding(HANDLE hFile)
 	{
 		EEncoding	eFileType = EEncoding::DEFAULT;
@@ -145,6 +147,7 @@ namespace {
 	// @param ptszBuffer 저장할 문자열 버퍼 포인터
 	// @param BufferSize 버퍼 크기
 	// @return 성공 시 true, 실패 시 false
+	//***************************************************************************
 	bool SaveAnsiFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
 	{
 		if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
@@ -202,6 +205,7 @@ namespace {
 	// @param ptszBuffer 저장할 문자열 버퍼 포인터
 	// @param BufferSize 버퍼 크기
 	// @return 성공 시 true, 실패 시 false
+	//***************************************************************************
 	bool SaveUnicodeBEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
 	{
 		if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
@@ -266,6 +270,7 @@ namespace {
 	// @param ptszBuffer 저장할 문자열 버퍼 포인터
 	// @param BufferSize 버퍼 크기
 	// @return 성공 시 true, 실패 시 false
+	//***************************************************************************
 	bool SaveUnicodeLEFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
 	{
 		if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
@@ -322,6 +327,7 @@ namespace {
 	// @param ptszBuffer 저장할 문자열 버퍼 포인터
 	// @param BufferSize 버퍼 크기
 	// @return 성공 시 true, 실패 시 false
+	//***************************************************************************
 	bool SaveUTF8BOMFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
 	{
 		if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
@@ -384,6 +390,7 @@ namespace {
 	// @param ptszBuffer 저장할 문자열 버퍼 포인터
 	// @param BufferSize 버퍼 크기
 	// @return 성공 시 true, 실패 시 false
+	//***************************************************************************
 	bool SaveUTF8NOBOMFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize)
 	{
 		if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
@@ -437,6 +444,7 @@ namespace {
 // @brief 파일 경로를 받아 Win32 API 방식으로 파일의 인코딩 타입(UTF-16, UTF-8, ANSI 등)을 판별합니다.
 // @param ptszFullPath 파일 전체 경로
 // @return 판별된 인코딩 타입 (EEncoding 열거형)
+//***************************************************************************
 EEncoding GetFileEncodingType(const TCHAR* ptszFullPath)
 {
 	EEncoding eFileType = EEncoding::DEFAULT;
@@ -458,6 +466,7 @@ EEncoding GetFileEncodingType(const TCHAR* ptszFullPath)
 // @param byteDestination 읽어들인 데이터를 저장할 바이트 벡터 참조
 // @param ptszFullPath 읽어들일 파일의 전체 경로
 // @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool ReadFile(std::vector<BYTE>& byteDestination, const TCHAR* ptszFullPath)
 {
 	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
@@ -502,6 +511,7 @@ bool ReadFile(std::vector<BYTE>& byteDestination, const TCHAR* ptszFullPath)
 // @param byteDestination 읽어들인 데이터를 저장할 바이트 벡터 참조
 // @param ptszFullPath 읽어들일 파일의 전체 경로
 // @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool ReadFileMap(std::vector<BYTE>& byteDestination, const TCHAR* ptszFullPath)
 {
 	DWORD	dwLength = 0;
@@ -551,6 +561,7 @@ bool ReadFileMap(std::vector<BYTE>& byteDestination, const TCHAR* ptszFullPath)
 // @param pbBuffer 저장할 바이트 버퍼 포인터
 // @param dwLength 저장할 데이터 크기 (바이트 단위)
 // @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool WriteFile(const TCHAR* ptszFullPath, const BYTE* pbBuffer, const DWORD dwLength)
 {
 	HANDLE hFile = ::CreateFile(ptszFullPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_ARCHIVE, NULL);
@@ -585,6 +596,7 @@ bool WriteFile(const TCHAR* ptszFullPath, const BYTE* pbBuffer, const DWORD dwLe
 // @param destString 읽어들인 문자열을 저장할 _tstring 참조
 // @param ptszFullPath 읽어들일 파일의 전체 경로
 // @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool ReadFile(_tstring& destString, const TCHAR* ptszFullPath)
 {
 	DWORD	dwLength = 0;
@@ -739,6 +751,7 @@ bool ReadFile(_tstring& destString, const TCHAR* ptszFullPath)
 //       TOCTOU 창을 최소화했습니다. BOM/휴리스틱 판별 로직은 GetFileEncodingType(TCHAR*)와
 //       공유하는 DetectFileEncoding() 헬퍼를 사용하며, 판별에 실패(EEncoding::DEFAULT)하면
 //       매핑을 시도하지 않고 즉시 실패로 처리합니다.
+//***************************************************************************
 bool ReadFileMap(_tstring& destString, const TCHAR* ptszFullPath)
 {
 	bool		bIsProcess = false;
@@ -853,6 +866,7 @@ bool ReadFileMap(_tstring& destString, const TCHAR* ptszFullPath)
 // @param BufferSize 버퍼 크기
 // @param fileType 저장할 인코딩 타입 (EEncoding 열거형)
 // @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool WriteFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t BufferSize, EEncoding fileType)
 {
 	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
@@ -898,6 +912,7 @@ bool WriteFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t 
 // @param nCase 조회할 시각 종류 (생성/접근/수정 시각 식별자)
 // @param stLocal 조회한 로컬 시각을 저장할 SYSTEMTIME 구조체 참조
 // @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool GetFileInfoTime(const TCHAR* ptszFullPath, const int nCase, SYSTEMTIME& stLocal)
 {
 	FILETIME ftCreate, ftAccess, ftWrite;
@@ -937,6 +952,7 @@ bool GetFileInfoTime(const TCHAR* ptszFullPath, const int nCase, SYSTEMTIME& stL
 // @brief 지정한 경로에 파일이 존재하는지 확인합니다.
 // @param ptszFullPath 존재 여부를 확인할 파일의 전체 경로
 // @return 파일이 존재하면 true, 아니면 false
+//***************************************************************************
 bool IsExistFile(const TCHAR* ptszFullPath)
 {
 	HANDLE		hFile;
@@ -957,6 +973,7 @@ bool IsExistFile(const TCHAR* ptszFullPath)
 // @brief 파일 크기를 32비트 DWORD 값으로 반환합니다.
 // @param ptszFullPath 크기를 조회할 파일의 전체 경로
 // @return 파일 크기 (바이트), 실패 시 0
+//***************************************************************************
 DWORD GetFileSize(const TCHAR* ptszFullPath)
 {
 	DWORD		dwFileSizeLow = 0;
@@ -983,6 +1000,7 @@ DWORD GetFileSize(const TCHAR* ptszFullPath)
 // @param ptszFullPath 조회할 파일의 전체 경로
 // @param lpFileInformation 조회 정보를 저장할 BY_HANDLE_FILE_INFORMATION 구조체 포인터
 // @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool GetFileInformation(const TCHAR* ptszFullPath, LPBY_HANDLE_FILE_INFORMATION lpFileInformation)
 {
 	bool		bResult = false;
@@ -1008,6 +1026,7 @@ bool GetFileInformation(const TCHAR* ptszFullPath, LPBY_HANDLE_FILE_INFORMATION 
 // @brief C++ 표준 파일 스트림을 사용하여 파일의 인코딩 타입을 판별합니다.
 // @param filepath 판별할 파일의 전체 경로 (_tstring)
 // @return 판별된 인코딩 타입 (EEncoding 열거형)
+//***************************************************************************
 EEncoding GetFileEncodingType(const _tstring& filepath)
 {
 	EEncoding	eEncoding = EEncoding::DEFAULT;
@@ -1058,6 +1077,7 @@ EEncoding GetFileEncodingType(const _tstring& filepath)
 // @brief C++ 표준 스트림을 활용해 다양한 인코딩의 파일을 읽어 _tstring으로 반환합니다.
 // @param filepath 읽어들일 파일의 전체 경로 (_tstring)
 // @return 읽어들인 문자열 내용 (_tstring)
+//***************************************************************************
 _tstring ReadFile(const _tstring& filepath)
 {
 	std::error_code ec;
@@ -1195,6 +1215,7 @@ _tstring ReadFile(const _tstring& filepath)
 // @param content 파일에 쓸 문자열 내용 (_tstring)
 // @param encoding 저장할 인코딩 타입 (EEncoding 열거형)
 // @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool WriteFile(const _tstring& filepath, const _tstring& content, EEncoding encoding)
 {
 	std::ofstream file(filepath, std::ios::binary);
@@ -1304,6 +1325,7 @@ bool WriteFile(const _tstring& filepath, const _tstring& content, EEncoding enco
 // @brief std::filesystem을 사용하여 파일 존재 여부를 확인합니다.
 // @param filepath 존재 여부를 확인할 파일의 전체 경로 (_tstring)
 // @return 파일이 존재하면 true, 아니면 false
+//***************************************************************************
 bool IsExistFile(const _tstring& filepath)
 {
 	std::error_code ec;
@@ -1323,6 +1345,7 @@ bool IsExistFile(const _tstring& filepath)
 // @brief std::filesystem을 사용하여 파일 크기를 바이트 단위로 반환합니다.
 // @param filepath 크기를 조회할 파일의 전체 경로 (_tstring)
 // @return 파일 크기 (바이트 단위), 실패 시 static_cast<std::uintmax_t>(-1)
+//***************************************************************************
 std::uintmax_t GetFileSize(const _tstring& filepath)
 {
 	std::error_code ec;

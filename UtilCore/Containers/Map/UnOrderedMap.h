@@ -11,18 +11,17 @@
 #include <BaseRedefineDataType.h>
 #endif
 
-#ifndef	__ALLOCATOR_H__
-#include <Memory/Allocator.h>
+#ifndef	__CONTAINERS_H__
+#include <Memory/Containers.h>
 #endif
 
-#include <unordered_map>
 #include <shared_mutex>
 
 template<typename T1, typename T2>
 class CUnOrderedMap : public BaseAllocator
 {
 public:
-	typedef std::unordered_map<T1, T2> ObjectMap;
+	typedef CUnorderedMap<T1, T2> ObjectMap;
 
 public:
 	CUnOrderedMap(void);

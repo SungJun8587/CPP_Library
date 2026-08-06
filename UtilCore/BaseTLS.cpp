@@ -11,9 +11,13 @@ thread_local uint32				LThreadId = 0;
 thread_local uint64				LEndTickCount = 0;
 
 #ifdef __DEADLOCKPROFILER_H__
-	thread_local CStack<int32>		LLockStack;
+	thread_local CStack<int32>			LLockStack;
+#endif
+
+#ifdef __SENDBUFFER_H__
+	thread_local CSendBufferChunkRef	LSendBufferChunk;
 #endif
 
 #ifdef __JOBQUEUE_H__
-	thread_local CJobQueue*			LCurrentJobQueue = nullptr;
+	thread_local CJobQueue*				LCurrentJobQueue = nullptr;
 #endif

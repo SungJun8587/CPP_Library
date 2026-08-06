@@ -14,6 +14,7 @@ using namespace std;
 
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <winerror.h>
 
 #pragma comment(lib, "ws2_32.lib")
 

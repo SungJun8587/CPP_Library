@@ -283,6 +283,27 @@
     <ClInclude Include="Containers\Queue\QueueCommon.h">
       <Filter>Containers\Queue</Filter>
     </ClInclude>
+    <ClInclude Include="Network\IocpCore.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\IocpEvent.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\SendBuffer.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\RecvBuffer.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\BufferWriter.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\BufferReader.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\RingBuffer.h">
+      <Filter>Network</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">
@@ -424,6 +445,27 @@
     </ClCompile>
     <ClCompile Include="Containers\Map\ClusterSpinMap.cpp">
       <Filter>Containers\Map</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\IocpCore.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\IocpEvent.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\SendBuffer.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\RecvBuffer.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\BufferWriter.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\BufferReader.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\RingBuffer.cpp">
+      <Filter>Network</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

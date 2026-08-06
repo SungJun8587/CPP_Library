@@ -16,6 +16,10 @@ extern thread_local uint64				LEndTickCount;
 	extern thread_local CStack<int32>	LLockStack;
 #endif
 
+#ifdef __SENDBUFFER_H__
+	extern thread_local CSendBufferChunkRef	LSendBufferChunk;
+#endif
+
 #ifdef __JOBQUEUE_H__
 	extern thread_local CJobQueue*		LCurrentJobQueue;
 #endif

@@ -1,16 +1,25 @@
+﻿
+//***************************************************************************
+// IocpEvent.cpp: implementation of the CIocpEvent class.
+//
+//***************************************************************************
+
 #include "pch.h"
 #include "IocpEvent.h"
 
-/*--------------
-	IocpEvent
----------------*/
-
-IocpEvent::IocpEvent(EventType type) : eventType(type)
+//***************************************************************************
+// @brief IocpEvent 생성자
+// @param type 이벤트 타입
+//***************************************************************************
+CIocpEvent::CIocpEvent(EventType type) : eventType(type)
 {
 	Init();
 }
 
-void IocpEvent::Init()
+//***************************************************************************
+// @brief OVERLAPPED 구조체 내부 필드 초기화
+//***************************************************************************
+void CIocpEvent::Init()
 {
 	OVERLAPPED::hEvent = 0;
 	OVERLAPPED::Internal = 0;

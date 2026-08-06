@@ -1,5 +1,4 @@
-﻿
-//***************************************************************************
+﻿//***************************************************************************
 // BaseODBC.cpp: implementation of the CBaseODBC class.
 //
 //***************************************************************************
@@ -37,7 +36,10 @@ CBaseODBC::~CBaseODBC()
 }
 
 //***************************************************************************
-//
+// @brief 명령(Statement) 핸들을 초기화하고 속성을 설정함
+// @param lQueryTimeOut - 쿼리 타임아웃 시간
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::InitStmtHandle(const int64 lQueryTimeOut)
 {
 	if( SQL_SUCCESS != SQLAllocHandle(SQL_HANDLE_STMT, m_hConn, (SQLHSTMT*)&m_hStmt) )
@@ -56,7 +58,9 @@ bool CBaseODBC::InitStmtHandle(const int64 lQueryTimeOut)
 }
 
 //***************************************************************************
-//
+// @brief 명령(Statement) 핸들과 관련된 리소스를 해제하거나 상태를 재설정함
+// @param Option - 수행할 작업의 종류 (SQL_CLOSE, SQL_UNBIND, SQL_RESET_PARAMS, SQL_DROP 등)
+//***************************************************************************
 void CBaseODBC::FreeStmt(SQLUSMALLINT Option)
 {
 	if( m_hStmt != SQL_NULL_HSTMT )
@@ -73,7 +77,8 @@ void CBaseODBC::FreeStmt(SQLUSMALLINT Option)
 }
 
 //***************************************************************************
-//
+// @brief 명령(Statement) 관련 바인딩 및 쿼리 정보를 초기화함
+//***************************************************************************
 void CBaseODBC::ClearStmt(void)
 {
 	FreeStmt(SQL_RESET_PARAMS);
@@ -86,7 +91,8 @@ void CBaseODBC::ClearStmt(void)
 }
 
 //***************************************************************************
-//
+// @brief 매개변수 바인딩을 재설정함
+//***************************************************************************
 void CBaseODBC::ResetParamStmt(void)
 {
 	// 매개변수 바인딩을 재설정(SQLBindParameter 함수 초기화)
@@ -95,7 +101,8 @@ void CBaseODBC::ResetParamStmt(void)
 }
 
 //***************************************************************************
-//
+// @brief 컬럼 바인딩을 해제함
+//***************************************************************************
 void CBaseODBC::UnBindColStmt(void)
 {
 	// 열 바인딩을 해제(SQLBindCol 함수 초기화)
@@ -109,6 +116,11 @@ void CBaseODBC::UnBindColStmt(void)
 // 3. SQLDriverConnect() : 데이터베이스와의 연결
 // 4. SQLSetConnectAttr(SQL_ATTR_AUTOCOMMIT) : 자동 커밋 모드 설정
 // 5. SQLAllocHandle(SQL_HANDLE_STMT) : SQL 명령을 실행하거나 결과를 처리하기 위해 명령 핸들을 생성
+// @brief 데이터베이스 서버에 연결을 수행함
+// @param lLoginTimeOut - 로그인 타임아웃 시간
+// @param lConnectionTimeOut - 연결 타임아웃 시간
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::Connect(const int64 lLoginTimeOut, const int64 lConnectionTimeOut)
 {
 	TCHAR tszOutConnStr[DATABASE_BUFFER_SIZE];
@@ -195,7 +207,9 @@ bool CBaseODBC::Connect(const int64 lLoginTimeOut, const int64 lConnectionTimeOu
 }
 
 //***************************************************************************
-//	
+// @brief 데이터베이스 연결을 해제하고 관련 핸들을 정리함
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::Disconnect()
 {
 	SQLRETURN nRet;
@@ -239,7 +253,9 @@ bool CBaseODBC::Disconnect()
 }
 
 //***************************************************************************
-//	
+// @brief 현재 데이터베이스에 연결되어 있는지 확인함
+// @return 연결되어 있으면 true, 아니면 false
+//***************************************************************************
 bool CBaseODBC::IsConnected()
 {
 	if( m_hConn == SQL_NULL_HDBC ) return false;
@@ -257,11 +273,11 @@ bool CBaseODBC::IsConnected()
 }
 
 //***************************************************************************
-//
-/// @brief ODBC 연결에서 서버 이름 정보를 가져옴
-/// @param ptszServerName - 서버 이름을 저장할 버퍼 (출력)
-/// @param nBufferLength - 버퍼 크기 (TCHAR 단위)
-/// @return 성공 시 true, 실패 시 false
+// @brief ODBC 연결에서 서버 이름 정보를 가져옴
+// @param ptszServerName - 서버 이름을 저장할 버퍼 (출력)
+// @param nBufferLength - 버퍼 크기 (TCHAR 단위)
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::GetServerName(TCHAR* ptszServerName, int32 nBufferLength)
 {
 	if( ptszServerName == nullptr || nBufferLength <= 0 ) return false;
@@ -279,11 +295,11 @@ bool CBaseODBC::GetServerName(TCHAR* ptszServerName, int32 nBufferLength)
 }
 
 //***************************************************************************
-//
-/// @brief ODBC 연결에서 DBMS 이름 정보를 가져옴
-/// @param ptszDBMSName - DBMS 이름을 저장할 버퍼 (출력)
-/// @param nBufferLength - 버퍼 크기 (TCHAR 단위)
-/// @return 성공 시 true, 실패 시 false
+// @brief ODBC 연결에서 DBMS 이름 정보를 가져옴
+// @param ptszDBMSName - DBMS 이름을 저장할 버퍼 (출력)
+// @param nBufferLength - 버퍼 크기 (TCHAR 단위)
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::GetDBMSName(TCHAR* ptszDBMSName, int32 nBufferLength)
 {
 	if( ptszDBMSName == nullptr || nBufferLength <= 0 ) return false;
@@ -301,11 +317,11 @@ bool CBaseODBC::GetDBMSName(TCHAR* ptszDBMSName, int32 nBufferLength)
 }
 
 //***************************************************************************
-//
-/// @brief ODBC 연결에서 DBMS 버전 정보를 가져옴
-/// @param ptszDBMSVersion - DBMS 버전 정보를 저장할 버퍼 (출력)
-/// @param nBufferLength - 버퍼 크기 (TCHAR 단위)
-/// @return 성공 시 true, 실패 시 false
+// @brief ODBC 연결에서 DBMS 버전 정보를 가져옴
+// @param ptszDBMSVersion - DBMS 버전 정보를 저장할 버퍼 (출력)
+// @param nBufferLength - 버퍼 크기 (TCHAR 단위)
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::GetDBMSVersion(TCHAR* ptszDBMSVersion, int32 nBufferLength)
 {
 	if( ptszDBMSVersion == nullptr || nBufferLength <= 0 ) return false;
@@ -323,11 +339,11 @@ bool CBaseODBC::GetDBMSVersion(TCHAR* ptszDBMSVersion, int32 nBufferLength)
 }
 
 //***************************************************************************
-//
-/// @brief 각 DBMS별 서버 캐릭터셋(인코딩) 정보를 조회
-/// @param ptszCharset - 캐릭터셋 이름을 저장할 버퍼 (출력)
-/// @param nBufferLength - 버퍼 크기 (TCHAR 단위)
-/// @return 성공 시 true, 실패 시 false
+// @brief 각 DBMS별 서버 캐릭터셋(인코딩) 정보를 조회
+// @param ptszCharset - 캐릭터셋 이름을 저장할 버퍼 (출력)
+// @param nBufferLength - 버퍼 크기 (TCHAR 단위)
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::GetServerCharacterSet(TCHAR* ptszCharset, int32 nBufferLength)
 {
 	if( ptszCharset == nullptr || nBufferLength <= 0 )
@@ -338,25 +354,23 @@ bool CBaseODBC::GetServerCharacterSet(TCHAR* ptszCharset, int32 nBufferLength)
 	// DBMS 종류에 따른 조회 쿼리 설정
 	switch( m_DbClass )
 	{
-		case EDBClass::MSSQL:
-			// SQL Server의 서버 전역 캐릭터셋/정렬 방식(Collation) 조회
-			_stprintf_s(tszQuery, _T("SELECT @@SERVERNAME, SERVERPROPERTY('Collation')")); // 혹은 DATABASEPROPERTYEX 등 활용 가능
-			// 혹은 가장 대표적인 서버 Collation 조회 쿼리:
-			// _stprintf_s(szQuery, _T("SELECT CONVERT(varchar(128), DATABASEPROPERTYEX(DB_NAME(), 'Collation'))"));
-			break;
+	case EDBClass::MSSQL:
+		// SQL Server의 서버 전역 캐릭터셋/정렬 방식(Collation) 조회
+		_stprintf_s(tszQuery, _T("SELECT @@SERVERNAME, SERVERPROPERTY('Collation')"));
+		break;
 
-		case EDBClass::MYSQL:
-			// MySQL의 서버 캐릭터셋(character_set_server) 조회
-			_stprintf_s(tszQuery, _T("SHOW VARIABLES LIKE 'character_set_server'"));
-			break;
+	case EDBClass::MYSQL:
+		// MySQL의 서버 캐릭터셋(character_set_server) 조회
+		_stprintf_s(tszQuery, _T("SHOW VARIABLES LIKE 'character_set_server'"));
+		break;
 
-		case EDBClass::ORACLE:
-			// Oracle의 데이터베이스 캐릭터셋 정보 조회
-			_stprintf_s(tszQuery, _T("SELECT * FROM NLS_DATABASE_PARAMETERS WHERE PARAMETER = 'NLS_CHARACTERSET'"));
-			break;
+	case EDBClass::ORACLE:
+		// Oracle의 데이터베이스 캐릭터셋 정보 조회
+		_stprintf_s(tszQuery, _T("SELECT * FROM NLS_DATABASE_PARAMETERS WHERE PARAMETER = 'NLS_CHARACTERSET'"));
+		break;
 
-		default:
-			return false;
+	default:
+		return false;
 	}
 
 	// 쿼리 직접 실행
@@ -367,11 +381,8 @@ bool CBaseODBC::GetServerCharacterSet(TCHAR* ptszCharset, int32 nBufferLength)
 	}
 
 	// 결과 셋 페치 및 데이터 바인딩 로직 처리
-	// (기존 클래스에 구현된 Fetch와 BindCol 방식을 사용하여 첫 번째 결과 행의 값을 가져옴)
 	if( Fetch() )
 	{
-		// 예시: 첫 번째 컬럼 혹은 지정된 컬럼 결과값을 ptszCharset 버퍼로 바인딩 및 가져오기
-		// (사용하시는 구현 형태에 맞추어 BindCol 혹은 GetData 호출부 적용)
 		if( !GetData(2, ptszCharset, nBufferLength) ) // MySQL의 경우 SHOW VARIABLES는 2번째 열에 값이 나옴
 		{
 			ClearStmt();
@@ -380,12 +391,15 @@ bool CBaseODBC::GetServerCharacterSet(TCHAR* ptszCharset, int32 nBufferLength)
 	}
 
 	ClearStmt();
-	
+
 	return true;
 }
 
 //***************************************************************************
-//	
+// @brief SQL 쿼리를 준비(Prepare)함
+// @param ptszQueryInfo - 준비할 SQL 쿼리 문자열
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::PrepareQuery(const TCHAR* ptszQueryInfo)
 {
 	SQLRETURN nRet;
@@ -421,7 +435,9 @@ bool CBaseODBC::PrepareQuery(const TCHAR* ptszQueryInfo)
 }
 
 //***************************************************************************
-//	
+// @brief 준비된 SQL 쿼리를 실행함
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::Execute()
 {
 	SQLRETURN nRet;
@@ -449,7 +465,10 @@ bool CBaseODBC::Execute()
 }
 
 //***************************************************************************
-//	
+// @brief SQL 쿼리를 즉시 실행함 (직접 실행)
+// @param ptszQueryInfo - 실행할 SQL 쿼리 문자열
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::ExecDirect(const TCHAR* ptszQueryInfo)
 {
 	SQLRETURN nRet;
@@ -472,7 +491,8 @@ bool CBaseODBC::ExecDirect(const TCHAR* ptszQueryInfo)
 	if( nRet != SQL_SUCCESS && nRet != SQL_SUCCESS_WITH_INFO && nRet != SQL_NO_DATA )
 	{
 		TCHAR	tszMessage[SQL_MAX_MESSAGE_LENGTH] = { 0, };
-		CDBError()(SQL_HANDLE_STMT, m_hStmt, tszMessage);
+		TCHAR	tszSQLState[SQL_MAX_MESSAGE_LENGTH] = { 0, };
+		CDBError()(SQL_HANDLE_STMT, m_hStmt, tszMessage, tszSQLState);
 		LOG_ERROR(_T("%s, QueryInfo[%s], Ret[%d], ErrorMsg : %s"), __TFUNCTION__, ptszQueryInfo, nRet, tszMessage);
 		return false;
 	}
@@ -487,6 +507,10 @@ bool CBaseODBC::ExecDirect(const TCHAR* ptszQueryInfo)
 // 4. BindCol
 // 5. BulkOperations
 // 6. Commit
+// @brief 테이블의 여러 행에 대해 일괄 작업(Bulk Operations)을 수행함
+// @param operation - 수행할 작업 유형 (SQL_ADD, SQL_UPDATE_BY_BOOKMARK, SQL_DELETE_BY_BOOKMARK 등)
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::BulkOperations(SQLSMALLINT operation)
 {
 	// 테이블의 여러 행에 대해 일괄 작업(bulk operations)을 수행하는 데 사용
@@ -509,7 +533,12 @@ bool CBaseODBC::BulkOperations(SQLSMALLINT operation)
 }
 
 //***************************************************************************
-//
+// @brief 명령(Statement) 핸들의 속성을 설정함
+// @param fAttribute - 설정할 속성 ID
+// @param rgbValue - 속성 값 포인터
+// @param cbValueMax - 값의 바이트 크기
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::SetStmtAttr(SQLINTEGER fAttribute, SQLPOINTER rgbValue, SQLINTEGER cbValueMax)
 {
 	SQLRETURN nRet = SQL_ERROR;
@@ -526,7 +555,11 @@ bool CBaseODBC::SetStmtAttr(SQLINTEGER fAttribute, SQLPOINTER rgbValue, SQLINTEG
 }
 
 //***************************************************************************
-//
+// @brief 일괄 처리(Bulk Fetch)를 위한 행 바인딩 및 배열 크기 속성을 설정함
+// @param nQueryResultRecordSize - 결과 레코드의 크기
+// @param nMaxRowSize - 한 번에 처리할 최대 행 개수
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::AllSets(LONG_PTR nQueryResultRecordSize, LONG_PTR nMaxRowSize)
 {
 	SQLRETURN nRet = SQL_ERROR;
@@ -545,14 +578,6 @@ bool CBaseODBC::AllSets(LONG_PTR nQueryResultRecordSize, LONG_PTR nMaxRowSize)
 		if( SQL_SUCCESS != nRet )
 			return false;
 
-		/*
-		// 각 행의 작업 상태를 저장할 배열의 포인터를 설정
-		SQLUSMALLINT* pnStatus = new SQLUSMALLINT[nMaxRowSize];
-		nRet = SQLSetStmtAttr(m_hStmt, SQL_ATTR_ROW_STATUS_PTR, (SQLPOINTER)pnStatus, 0);
-		if( SQL_SUCCESS != nRet )
-			return false;
-		*/
-
 		// 작업된 행의 개수를 저장할 포인터를 설정
 		nRet = SQLSetStmtAttr(m_hStmt, SQL_ATTR_ROWS_FETCHED_PTR, (SQLPOINTER)m_nFetchedRows, 0);
 		if( SQL_SUCCESS != nRet )
@@ -563,7 +588,9 @@ bool CBaseODBC::AllSets(LONG_PTR nQueryResultRecordSize, LONG_PTR nMaxRowSize)
 }
 
 //***************************************************************************
-//	
+// @brief 다음 결과 행을 가져옴 (SQLFetch 래퍼)
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::Fetch(void)
 {
 	SQLRETURN nRet = SQLFetch(m_hStmt);
@@ -585,21 +612,28 @@ bool CBaseODBC::Fetch(void)
 }
 
 //***************************************************************************
-//	
+// @brief 다음 결과 행을 가져오고 원본 SQLRETURN 값을 반환함
+// @return SQLRETURN 결과 값
+//***************************************************************************
 SQLRETURN CBaseODBC::GetFetch(void)
 {
 	return ::SQLFetch(m_hStmt);
 }
 
 //***************************************************************************
-//	
+// @brief 다중 결과 셋(Multiple Results)에서 다음 결과 셋으로 이동함
+// @return SQLRETURN 결과 값
+//***************************************************************************
 SQLRETURN CBaseODBC::MoreResults(void)
 {
 	return SQLMoreResults(m_hStmt);
 }
 
 //***************************************************************************
-//	
+// @brief 트랜잭션 자동 커밋 모드를 설정함
+// @param valuePtr - 설정할 자동 커밋 모드 값 (SQL_AUTOCOMMIT_ON 또는 SQL_AUTOCOMMIT_OFF)
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::SetAutoCommitMode(SQLPOINTER valuePtr)
 {
 	if( SQL_NULL_HDBC == m_hConn )
@@ -615,7 +649,9 @@ bool CBaseODBC::SetAutoCommitMode(SQLPOINTER valuePtr)
 }
 
 //***************************************************************************
-//	
+// @brief 현재 트랜잭션을 커밋함
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::Commit()
 {
 	SQLRETURN	nRet;
@@ -626,7 +662,9 @@ bool CBaseODBC::Commit()
 }
 
 //***************************************************************************
-//	
+// @brief 현재 트랜잭션을 롤백함
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::Rollback()
 {
 	SQLRETURN	nRet;
@@ -637,18 +675,18 @@ bool CBaseODBC::Rollback()
 }
 
 //***************************************************************************
-//	
-/// @brief 일반적인 ODBC 매개변수(Parameter) 바인딩 함수
-/// @param ipar - 매개변수 순번 (1부터 시작)
-/// @param fParamType - 매개변수 타입 (SQL_PARAM_INPUT, SQL_PARAM_OUTPUT 등)
-/// @param fCType - C 데이터 타입 (예: SQL_C_LONG, SQL_C_CHAR 등)
-/// @param fSqlType - SQL 데이터 타입 (예: SQL_INTEGER, SQL_VARCHAR 등)
-/// @param cbColDef - 대상 컬럼의 크기 또는 길이
-/// @param ibScale - 소수점 자릿수
-/// @param rgbValue - 값에 대한 버퍼 포인터
-/// @param cbValueMax - 버퍼의 최대 바이트 크기
-/// @param pcbValue - 데이터의 실제 길이나 상태를 반환받을 변수 포인터
-/// @return 성공 시 true, 실패 시 false
+// @brief 일반적인 ODBC 매개변수(Parameter) 바인딩 함수
+// @param ipar - 매개변수 순번 (1부터 시작)
+// @param fParamType - 매개변수 타입 (SQL_PARAM_INPUT, SQL_PARAM_OUTPUT 등)
+// @param fCType - C 데이터 타입 (예: SQL_C_LONG, SQL_C_CHAR 등)
+// @param fSqlType - SQL 데이터 타입 (예: SQL_INTEGER, SQL_VARCHAR 등)
+// @param cbColDef - 대상 컬럼의 크기 또는 길이
+// @param ibScale - 소수점 자릿수
+// @param rgbValue - 값에 대한 버퍼 포인터
+// @param cbValueMax - 버퍼의 최대 바이트 크기
+// @param pcbValue - 데이터의 실제 길이나 상태를 반환받을 변수 포인터
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::BindParameter(SQLUSMALLINT ipar, SQLSMALLINT fParamType, SQLSMALLINT fCType, SQLSMALLINT fSqlType, SQLULEN cbColDef, SQLSMALLINT ibScale, SQLPOINTER rgbValue, SQLLEN cbValueMax, SQLLEN* pcbValue)
 {
 	SQLRETURN nRet = SQLBindParameter(m_hStmt, ipar, fParamType, fCType, fSqlType, cbColDef, ibScale, rgbValue, cbValueMax, pcbValue);
@@ -663,11 +701,11 @@ bool CBaseODBC::BindParameter(SQLUSMALLINT ipar, SQLSMALLINT fParamType, SQLSMAL
 }
 
 //***************************************************************************
-//	
-/// @brief 자동 증가하는 순번을 사용하여 입력(Input) 문자열 매개변수를 바인딩
-/// @param ptszValue - 바인딩할 문자열 값
-/// @param plDataLength - 데이터 길이를 나타내는 포인터
-/// @return 성공 시 true, 실패 시 false
+// @brief 자동 증가하는 순번을 사용하여 입력(Input) 문자열 매개변수를 바인딩
+// @param ptszValue - 바인딩할 문자열 값
+// @param plDataLength - 데이터 길이를 나타내는 포인터
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::BindParamInput(const TCHAR* ptszValue, SQLLEN* plDataLength)
 {
 	CDBParamAttr& dbParam = m_DBParamAttrMgr((TCHAR*)ptszValue);
@@ -685,12 +723,12 @@ bool CBaseODBC::BindParamInput(const TCHAR* ptszValue, SQLLEN* plDataLength)
 }
 
 //***************************************************************************
-//	
-/// @brief 인덱스를 지정하여 입력(Input) 문자열 매개변수를 바인딩 (문자열 길이에 따라 타입 동적 결정)
-/// @param iParamIndex - 매개변수 순번 (인덱스)
-/// @param ptszValue - 바인딩할 문자열 값
-/// @param lDataLength - 데이터 길이 참조
-/// @return 성공 시 true, 실패 시 false
+// @brief 인덱스를 지정하여 입력(Input) 문자열 매개변수를 바인딩 (문자열 길이에 따라 타입 동적 결정)
+// @param iParamIndex - 매개변수 순번 (인덱스)
+// @param ptszValue - 바인딩할 문자열 값
+// @param lDataLength - 데이터 길이 참조
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::BindParamInput(int32 iParamIndex, const TCHAR* ptszValue, SQLLEN& lDataLength)
 {
 	SQLSMALLINT nCDataType = SQL_C_DEFAULT;
@@ -725,13 +763,13 @@ bool CBaseODBC::BindParamInput(int32 iParamIndex, const TCHAR* ptszValue, SQLLEN
 }
 
 //***************************************************************************
-//	
-/// @brief 인덱스를 지정하여 입력(Input) 바이너리(Binary) 데이터 매개변수를 바인딩
-/// @param iParamIndex - 매개변수 순번 (인덱스)
-/// @param pbData - 바이너리 데이터 버퍼 포인터
-/// @param nBufferLength - 버퍼 크기 (바이트 단위)
-/// @param lDataLength - 데이터 길이 참조
-/// @return 성공 시 true, 실패 시 false
+// @brief 인덱스를 지정하여 입력(Input) 바이너리(Binary) 데이터 매개변수를 바인딩
+// @param iParamIndex - 매개변수 순번 (인덱스)
+// @param pbData - 바이너리 데이터 버퍼 포인터
+// @param nBufferLength - 버퍼 크기 (바이트 단위)
+// @param lDataLength - 데이터 길이 참조
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::BindParamInput(int32 iParamIndex, const BYTE* pbData, int32 nBufferLength, SQLLEN& lDataLength)
 {
 	SQLSMALLINT cType = SQL_C_BINARY;
@@ -766,11 +804,11 @@ bool CBaseODBC::BindParamInput(int32 iParamIndex, const BYTE* pbData, int32 nBuf
 }
 
 //***************************************************************************
-//	
-/// @brief 자동 증가하는 순번을 사용하여 출력(Output) 문자열 매개변수를 바인딩
-/// @param ptszValue - 출력값을 저장할 문자열 버퍼
-/// @param nBufferLength - 버퍼 크기 참조
-/// @return 성공 시 true, 실패 시 false
+// @brief 자동 증가하는 순번을 사용하여 출력(Output) 문자열 매개변수를 바인딩
+// @param ptszValue - 출력값을 저장할 문자열 버퍼
+// @param nBufferLength - 버퍼 크기 참조
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::BindParamOutput(TCHAR* ptszValue, int32& nBufferLength)
 {
 	CDBParamAttr& dbParam = m_DBParamAttrMgr(ptszValue, nBufferLength);
@@ -788,13 +826,13 @@ bool CBaseODBC::BindParamOutput(TCHAR* ptszValue, int32& nBufferLength)
 }
 
 //***************************************************************************
-//	
-/// @brief 인덱스를 지정하여 출력(Output) 문자열 매개변수를 바인딩
-/// @param iParamIndex - 매개변수 순번 (인덱스)
-/// @param ptszValue - 출력값을 저장할 문자열 버퍼
-/// @param nBufferLength - 버퍼 크기 참조
-/// @param lDataLength - 데이터 길이 참조
-/// @return 성공 시 true, 실패 시 false
+// @brief 인덱스를 지정하여 출력(Output) 문자열 매개변수를 바인딩
+// @param iParamIndex - 매개변수 순번 (인덱스)
+// @param ptszValue - 출력값을 저장할 문자열 버퍼
+// @param nBufferLength - 버퍼 크기 참조
+// @param lDataLength - 데이터 길이 참조
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::BindParamOutput(int32 iParamIndex, TCHAR* ptszValue, int32& nBufferLength, SQLLEN& lDataLength)
 {
 	CDBParamAttr& dbParam = m_DBParamAttrMgr(ptszValue, nBufferLength);
@@ -812,13 +850,13 @@ bool CBaseODBC::BindParamOutput(int32 iParamIndex, TCHAR* ptszValue, int32& nBuf
 }
 
 //***************************************************************************
-//	
-/// @brief 인덱스를 지정하여 출력(Output) 바이너리(Binary) 데이터 매개변수를 바인딩
-/// @param iParamIndex - 매개변수 순번 (인덱스)
-/// @param pbData - 출력 바이너리를 저장할 버퍼 포인터
-/// @param nBufferLength - 버퍼 크기
-/// @param lDataLength - 데이터 길이 참조
-/// @return 성공 시 true, 실패 시 false
+// @brief 인덱스를 지정하여 출력(Output) 바이너리(Binary) 데이터 매개변수를 바인딩
+// @param iParamIndex - 매개변수 순번 (인덱스)
+// @param pbData - 출력 바이너리를 저장할 버퍼 포인터
+// @param nBufferLength - 버퍼 크기
+// @param lDataLength - 데이터 길이 참조
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::BindParamOutput(int32 iParamIndex, BYTE* pbData, int32 nBufferLength, SQLLEN& lDataLength)
 {
 	SQLSMALLINT cType = SQL_C_BINARY;
@@ -853,14 +891,14 @@ bool CBaseODBC::BindParamOutput(int32 iParamIndex, BYTE* pbData, int32 nBufferLe
 }
 
 //***************************************************************************
-//	
-/// @brief 결과 셋의 컬럼을 일반적인 방식으로 바인딩 (SQLBindCol 래퍼)
-/// @param ColumnNumber - 컬럼 순번 (1부터 시작)
-/// @param TargetType - 대상 C 데이터 타입
-/// @param TargetValue - 결과 값을 받을 버퍼 포인터
-/// @param BufferLength - 버퍼의 바이트 크기
-/// @param plDataLength - 실제 데이터 길이를 받을 변수 포인터
-/// @return 성공 시 true, 실패 시 false
+// @brief 결과 셋의 컬럼을 일반적인 방식으로 바인딩 (SQLBindCol 래퍼)
+// @param ColumnNumber - 컬럼 순번 (1부터 시작)
+// @param TargetType - 대상 C 데이터 타입
+// @param TargetValue - 결과 값을 받을 버퍼 포인터
+// @param BufferLength - 버퍼의 바이트 크기
+// @param plDataLength - 실제 데이터 길이를 받을 변수 포인터
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::BindCol(SQLUSMALLINT ColumnNumber, SQLSMALLINT TargetType, SQLPOINTER TargetValue, SQLLEN BufferLength, SQLLEN* plDataLength)
 {
 	SQLRETURN nRet = SQLBindCol(m_hStmt, ColumnNumber, TargetType, TargetValue, BufferLength, plDataLength);
@@ -875,12 +913,12 @@ bool CBaseODBC::BindCol(SQLUSMALLINT ColumnNumber, SQLSMALLINT TargetType, SQLPO
 }
 
 //***************************************************************************
-//	
-/// @brief 자동 증가하는 순번을 사용하여 결과 셋의 문자열 컬럼을 바인딩
-/// @param ptszValue - 문자열 결과 값을 받을 버퍼
-/// @param nBufferLength - 버퍼 크기 참조
-/// @param plDataLength - 실제 데이터 길이를 받을 변수 포인터
-/// @return 성공 시 true, 실패 시 false
+// @brief 자동 증가하는 순번을 사용하여 결과 셋의 문자열 컬럼을 바인딩
+// @param ptszValue - 문자열 결과 값을 받을 버퍼
+// @param nBufferLength - 버퍼 크기 참조
+// @param plDataLength - 실제 데이터 길이를 받을 변수 포인터
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::BindCol(TCHAR* ptszValue, int32& nBufferLength, SQLLEN* plDataLength)
 {
 	CDBColAttr& dbCol = m_DBColAttrMgr(ptszValue, nBufferLength);
@@ -899,13 +937,13 @@ bool CBaseODBC::BindCol(TCHAR* ptszValue, int32& nBufferLength, SQLLEN* plDataLe
 }
 
 //***************************************************************************
-//	
-/// @brief 인덱스를 지정하여 결과 셋의 문자열 컬럼을 바인딩
-/// @param iColIndex - 컬럼 순번 (인덱스)
-/// @param ptszValue - 문자열 결과 값을 받을 버퍼
-/// @param nBufferLength - 버퍼 크기 참조
-/// @param lDataLength - 데이터 길이 참조
-/// @return 성공 시 true, 실패 시 false
+// @brief 인덱스를 지정하여 결과 셋의 문자열 컬럼을 바인딩
+// @param iColIndex - 컬럼 순번 (인덱스)
+// @param ptszValue - 문자열 결과 값을 받을 버퍼
+// @param nBufferLength - 버퍼 크기 참조
+// @param lDataLength - 데이터 길이 참조
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::BindCol(int32 iColIndex, TCHAR* ptszValue, int32& nBufferLength, SQLLEN& lDataLength)
 {
 	CDBColAttr& dbCol = m_DBColAttrMgr(ptszValue, nBufferLength);
@@ -922,13 +960,13 @@ bool CBaseODBC::BindCol(int32 iColIndex, TCHAR* ptszValue, int32& nBufferLength,
 }
 
 //***************************************************************************
-//	
-/// @brief 인덱스를 지정하여 결과 셋의 64비트 정수(int64) 컬럼을 바인딩
-/// @param iColIndex - 컬럼 순번 (인덱스)
-/// @param targetType - 대상 C 데이터 타입 (예: SQL_C_SBIGINT)
-/// @param value - 값을 저장할 int64 변수 참조
-/// @param lDataLength - 데이터 길이 참조
-/// @return 성공 시 true, 실패 시 false
+// @brief 인덱스를 지정하여 결과 셋의 64비트 정수(int64) 컬럼을 바인딩
+// @param iColIndex - 컬럼 순번 (인덱스)
+// @param targetType - 대상 C 데이터 타입 (예: SQL_C_SBIGINT)
+// @param value - 값을 저장할 int64 변수 참조
+// @param lDataLength - 데이터 길이 참조
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::BindCol(int32 iColIndex, SQLSMALLINT targetType, int64& value, SQLLEN& lDataLength)
 {
 	int32 nBufferLength = sizeof(int64);
@@ -945,13 +983,13 @@ bool CBaseODBC::BindCol(int32 iColIndex, SQLSMALLINT targetType, int64& value, S
 }
 
 //***************************************************************************
-//	
-/// @brief 인덱스를 지정하여 결과 셋의 부호 없는 64비트 정수(uint64) 컬럼을 바인딩
-/// @param iColIndex - 컬럼 순번 (인덱스)
-/// @param targetType - 대상 C 데이터 타입
-/// @param value - 값을 저장할 uint64 변수 참조
-/// @param lDataLength - 데이터 길이 참조
-/// @return 성공 시 true, 실패 시 false
+// @brief 인덱스를 지정하여 결과 셋의 부호 없는 64비트 정수(uint64) 컬럼을 바인딩
+// @param iColIndex - 컬럼 순번 (인덱스)
+// @param targetType - 대상 C 데이터 타입
+// @param value - 값을 저장할 uint64 변수 참조
+// @param lDataLength - 데이터 길이 참조
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::BindCol(int32 iColIndex, SQLSMALLINT targetType, uint64& value, SQLLEN& lDataLength)
 {
 	int32 nBufferLength = sizeof(uint64);
@@ -968,14 +1006,14 @@ bool CBaseODBC::BindCol(int32 iColIndex, SQLSMALLINT targetType, uint64& value, 
 }
 
 //***************************************************************************
-//	
-/// @brief 대용량 데이터나 단일 컬럼 값을 직접 가져오는 함수 (SQLGetData 래퍼)
-/// @param ColumnNumber - 컬럼 순번 (1부터 시작)
-/// @param TargetType - 대상 C 데이터 타입
-/// @param TargetValue - 값을 저장할 버퍼 포인터
-/// @param BufferLength - 버퍼의 바이트 크기
-/// @param plDataLength - 실제 데이터 길이를 받을 변수 포인터
-/// @return 성공 시 true, 실패 시 false
+// @brief 대용량 데이터나 단일 컬럼 값을 직접 가져오는 함수 (SQLGetData 래퍼)
+// @param ColumnNumber - 컬럼 순번 (1부터 시작)
+// @param TargetType - 대상 C 데이터 타입
+// @param TargetValue - 값을 저장할 버퍼 포인터
+// @param BufferLength - 버퍼의 바이트 크기
+// @param plDataLength - 실제 데이터 길이를 받을 변수 포인터
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::GetData(SQLUSMALLINT ColumnNumber, SQLSMALLINT TargetType, SQLPOINTER TargetValue, SQLLEN BufferLength, SQLLEN* plDataLength)
 {
 	SQLRETURN nRet = SQLGetData(m_hStmt, ColumnNumber, TargetType, TargetValue, BufferLength, plDataLength);
@@ -990,12 +1028,12 @@ bool CBaseODBC::GetData(SQLUSMALLINT ColumnNumber, SQLSMALLINT TargetType, SQLPO
 }
 
 //***************************************************************************
-//	
-/// @brief 인덱스를 지정하여 문자열 형태의 데이터를 직접 가져옴 (유니코드/멀티바이트 분기 처리 포함)
-/// @param iColNum - 컬럼 순번 (인덱스)
-/// @param ptszData - 문자열 데이터를 저장할 버퍼
-/// @param nBufferLength - 버퍼 크기 참조 (입출력)
-/// @return 성공 시 true, 실패 시 false
+// @brief 인덱스를 지정하여 문자열 형태의 데이터를 직접 가져옴 (유니코드/멀티바이트 분기 처리 포함)
+// @param iColNum - 컬럼 순번 (인덱스)
+// @param ptszData - 문자열 데이터를 저장할 버퍼
+// @param nBufferLength - 버퍼 크기 참조 (입출력)
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::GetData(int32 iColNum, TCHAR* ptszData, int32& nBufferLength)
 {
 	SQLLEN		lDataLength;
@@ -1013,7 +1051,9 @@ bool CBaseODBC::GetData(int32 iColNum, TCHAR* ptszData, int32& nBufferLength)
 }
 
 //***************************************************************************
-//	
+// @brief 결과 셋의 총 컬럼 개수를 반환함
+// @return 컬럼 개수
+//***************************************************************************
 short CBaseODBC::GetNumCols()
 {
 	short		temp;
@@ -1025,7 +1065,9 @@ short CBaseODBC::GetNumCols()
 }
 
 //***************************************************************************
-//	
+// @brief 쿼리 실행으로 영향을 받은 행(Row)의 개수를 반환함
+// @return 행 개수 (실패 시 -1)
+//***************************************************************************
 int64 CBaseODBC::RowCount()
 {
 	int64		i64RowCount;
@@ -1039,7 +1081,9 @@ int64 CBaseODBC::RowCount()
 }
 
 //***************************************************************************
-//	
+// @brief 현재 커서가 위치한 행 번호를 반환함
+// @return 행 번호 (실패 시 -1)
+//***************************************************************************
 long CBaseODBC::RowNumber()
 {
 	long lRowNumber = -1;
@@ -1050,7 +1094,11 @@ long CBaseODBC::RowNumber()
 }
 
 //***************************************************************************
-//	
+// @brief 결과 셋의 특정 컬럼에 대한 상세 메타데이터 정보를 가져옴
+// @param iColNum - 컬럼 순번 (인덱스)
+// @param ColDescription - 컬럼 정보를 저장할 구조체 (출력)
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CBaseODBC::DescribeCol(int32 iColNum, COL_DESCRIPTION& ColDescription)
 {
 	SQLRETURN	nRet;

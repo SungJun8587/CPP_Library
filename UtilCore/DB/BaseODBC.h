@@ -54,7 +54,6 @@ public:
 	void		UnBindColStmt(void);
 
 	//***************************************************************************
-	//
 	// - fParamType = SQL_PARAM_INPUT | SQL_PARAM_OUTPUT | SQL_PARAM_INPUTOUTPUT
 	// - fCType = SQL_C_LONG | SQL_C_CHAR | ...
 	// - fSqlType = SQL_CHAR | SQL_VARCHAR | SQL_INT | SQL_BIGINT | SQL_NUMERIC | SQL_DATETIME | ...
@@ -122,22 +121,22 @@ public:
 	long		RowNumber();		
 	bool		DescribeCol(int32 iColNum, COL_DESCRIPTION& ColDescription); 
 
-private:
-	SQLHENV		m_hEnv;
-	SQLHDBC		m_hConn;
-	SQLHSTMT	m_hStmt;
+private:	
+	SQLHENV		m_hEnv;						// ODBC 환경 핸들 (Environment Handle)
+	SQLHDBC		m_hConn;					// ODBC 데이터베이스 연결 핸들 (Connection Handle)
+	SQLHSTMT	m_hStmt;					// SQL 쿼리 실행 및 결과를 다루기 위한 문장 핸들 (Statement Handle)
 
-	EDBClass        m_DbClass;
-	bool			m_bLoadExcelFile;
-	int16			m_nParamNum;
-	int16			m_nColNum;
-	SQLINTEGER		m_nFetchedRows[1];
+	EDBClass        m_DbClass;				// 데이터베이스 종류 (Enum 타입)
+	bool			m_bLoadExcelFile;		// 엑셀 파일 로드 여부 플래그
+	int16			m_nParamNum;			// SQL 쿼리에 바인딩된 파라미터 총 개수
+	int16			m_nColNum;				// 쿼리 결과셋의 컬럼 총 개수
+	SQLINTEGER		m_nFetchedRows[1];		// Fetch 작업 시 한 번에 가져온(fetched) 행의 수 배열
 
-	CDBParamAttrMgr		m_DBParamAttrMgr;
-	CDBColAttrMgr		m_DBColAttrMgr;
+	CDBParamAttrMgr		m_DBParamAttrMgr;	// 파라미터 속성을 관리하는 매니저 객체
+	CDBColAttrMgr		m_DBColAttrMgr;		// 컬럼 속성을 관리하는 매니저 객체
 
-	TCHAR		m_tszDSN[DATABASE_DSN_STRLEN];
-	TCHAR		m_tszQueryInfo[SQL_MAX_MESSAGE_LENGTH];
+	TCHAR		m_tszDSN[DATABASE_DSN_STRLEN];			// 데이터 소스 이름 (DSN) 문자열 버퍼
+	TCHAR		m_tszQueryInfo[SQL_MAX_MESSAGE_LENGTH];	// 실행할 쿼리문 또는 관련 정보를 저장하는 문자열 버퍼
 };
 
 #include "BaseODBC.inl"
