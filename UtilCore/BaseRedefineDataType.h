@@ -70,10 +70,6 @@ using Atomic = std::atomic<T>;
 
 #define USING_SHARED_PTR(name)	using name##Ref = std::shared_ptr<class name>;
 
-USING_SHARED_PTR(CIocpCore);
-USING_SHARED_PTR(CIocpObject);
-USING_SHARED_PTR(CSendBuffer);
-USING_SHARED_PTR(CSendBufferChunk);
 USING_SHARED_PTR(CJob);
 USING_SHARED_PTR(CJobQueue);
 

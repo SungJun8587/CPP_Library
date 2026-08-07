@@ -89,7 +89,7 @@ void CThreadManager::JoinLastThreads(size_t count)
 
         if( count == 0 || _threads.empty() ) return;
 
-        size_t actualCount = std::min(count, _threads.size());
+        size_t actualCount = (std::min)(count, _threads.size());
         size_t startIndex = _threads.size() - actualCount;
 
         localThreads.reserve(actualCount);

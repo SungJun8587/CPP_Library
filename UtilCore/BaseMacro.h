@@ -18,7 +18,6 @@
 #define CRASH								{ char *p = 0; *p = 1; }
 #define SAFE_DELETE(p)						{ if ( p ) delete p; p = nullptr; } 
 #define SAFE_DELETE_ARRAY(p)				{ if ( p ) delete[] p; p = nullptr; }
-#define USING_SHARED_PTR(name)	using name##Ref = std::shared_ptr<class name>;
 
 #define CRASH_CAUSE(cause)						\
 {											\

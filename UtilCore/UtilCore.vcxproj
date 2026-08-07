@@ -73,8 +73,10 @@
     <ClInclude Include="Memory\MemoryPool.h" />
     <ClInclude Include="Memory\ObjectPool.h" />
     <ClInclude Include="Memory\RawAllocator.h" />
+    <ClInclude Include="Memory\RefCountable.h" />
     <ClInclude Include="Memory\Singleton.h" />
     <ClInclude Include="Memory\Stream.h" />
+    <ClInclude Include="NetworkRedefineDataType.h" />
     <ClInclude Include="Network\IocpCore.h" />
     <ClInclude Include="Network\IocpEvent.h" />
     <ClInclude Include="Network\RecvBuffer.h" />
@@ -84,7 +86,6 @@
     <ClInclude Include="pch.h" />
     <ClInclude Include="ServerConfig.h" />
     <ClInclude Include="ServerConnectInfo.h" />
-    <ClInclude Include="ServiceSvr.h" />
     <ClInclude Include="Thread\CacheAlignment.h" />
     <ClInclude Include="Thread\CriticalSection.h" />
     <ClInclude Include="Thread\DeadLockProfiler.h" />
@@ -99,6 +100,7 @@
     <ClInclude Include="Util\CalculatedElapsedTime.h" />
     <ClInclude Include="Util\CommonUtil.h" />
     <ClInclude Include="Util\EncodingConvert.h" />
+    <ClInclude Include="Util\TypeCast.h" />
     <ClInclude Include="Util\WinCharsetConv.h" />
     <ClInclude Include="Util\DateTimeUtil.h" />
     <ClInclude Include="Util\Endian.h" />
@@ -110,6 +112,7 @@
     <ClInclude Include="Util\ShellUtil.h" />
     <ClInclude Include="Util\StringUtil.h" />
     <ClInclude Include="Util\WebUtil.h" />
+    <ClInclude Include="WindowsServiceBase.h" />
     <ClInclude Include="XML\RapidXMLUtil.h" />
   </ItemGroup>
   <ItemGroup>
@@ -148,7 +151,6 @@
     <ClCompile Include="Network\SendBuffer.cpp" />
     <ClCompile Include="Network\SocketUtil.cpp" />
     <ClCompile Include="ServerConfig.cpp" />
-    <ClCompile Include="ServiceSvr.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -174,6 +176,7 @@
     <ClCompile Include="Util\ShellUtil.cpp" />
     <ClCompile Include="Util\StringUtil.cpp" />
     <ClCompile Include="Util\WebUtil.cpp" />
+    <ClCompile Include="WindowsServiceBase.cpp" />
     <ClCompile Include="XML\RapidXMLUtil.cpp" />
   </ItemGroup>
   <ItemGroup>

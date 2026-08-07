@@ -23,8 +23,6 @@
 #include <Util/WinCharsetConv.h>
 #endif
 
-#include <vector>
-
 #define SWAP16(s) (((((s) & 0xff) << 8) | (((s) >> 8) & 0xff))) 
 #define SWAP32(l) (((((l) & 0xff000000) >> 24) | (((l) & 0x00ff0000) >> 8) | (((l) & 0x0000ff00) << 8) | (((l) & 0x000000ff) << 24)))  
 
@@ -41,7 +39,6 @@
 #define FILEINFO_CREATETIME					1
 #define FILEINFO_ACCESSTIME					2
 #define FILEINFO_LASTWRITETIME				3
-#define MAX_FILENAME_CONVERT_INDEX_NUM		10000
 
 enum class EEncoding
 {

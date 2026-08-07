@@ -44,12 +44,14 @@ private:
         //***************************************************************************
         // @brief 셀 내부에 저장된 데이터의 포인터를 반환합니다.
         // @return T* 데이터 포인터
+        //***************************************************************************
         T* GetDataPtr() noexcept { return reinterpret_cast<T*>(Storage); }
     };
 
 public:
     //***************************************************************************
     // @brief SPMCLockFreeQueue 객체를 생성합니다.
+    //***************************************************************************
     SPMCLockFreeQueue()
     {
         for( std::size_t i = 0; i < Capacity; ++i )
@@ -60,6 +62,7 @@ public:
 
     //***************************************************************************
     // @brief 소멸자. 남은 데이터를 모두 비웁니다.
+    //***************************************************************************
     ~SPMCLockFreeQueue()
     {
         T temp;
@@ -79,28 +82,33 @@ public:
     // @brief 큐에 데이터를 논블로킹 방식으로 삽입합니다. (Lvalue)
     // @param value 삽입할 값
     // @return true: 삽입 성공, false: 큐가 가득 참
+    //***************************************************************************
     bool TryPush(const T& value) { return EmplacePush(value); }
 
     //***************************************************************************
     // @brief 큐에 데이터를 논블로킹 방식으로 삽입합니다. (Rvalue)
     // @param value 삽입할 값
     // @return true: 삽입 성공, false: 큐가 가득 참
+    //***************************************************************************
     bool TryPush(T&& value) { return EmplacePush(std::move(value)); }
 
     //***************************************************************************
     // @brief 큐에 데이터를 블로킹 방식으로 삽입합니다. (Lvalue)
     // @param value 삽입할 값
+    //***************************************************************************
     void Push(const T& value) { BlockingEmplacePush(value); }
 
     //***************************************************************************
     // @brief 큐에 데이터를 블로킹 방식으로 삽입합니다. (Rvalue)
     // @param value 삽입할 값
+    //***************************************************************************
     void Push(T&& value) { BlockingEmplacePush(std::move(value)); }
 
     //***************************************************************************
     // @brief 큐에서 데이터를 논블로킹 방식으로 꺼냅니다.
     // @param outValue 꺼낸 데이터가 저장될 참조 변수
     // @return true: 데이터 추출 성공, false: 큐가 비어있음
+    //***************************************************************************
     bool TryPop(T& outValue)
     {
         Cell* cell;
@@ -130,6 +138,7 @@ public:
     //***************************************************************************
     // @brief 큐에서 데이터를 블로킹 방식으로 꺼냅니다.
     // @param outValue 꺼낸 데이터가 저장될 참조 변수
+    //***************************************************************************
     void Pop(T& outValue)
     {
         for( int i = 0; i < kSpinBeforeSleepCount; ++i )
@@ -151,6 +160,7 @@ public:
     //***************************************************************************
     // @brief 대략적인 현재 큐 크기를 반환합니다.
     // @return std::size_t 대략적인 요소 개수
+    //***************************************************************************
     std::size_t SizeApprox() const noexcept
     {
         const std::size_t enq = m_EnqueuePos.load(std::memory_order_relaxed);
@@ -161,6 +171,7 @@ public:
     //***************************************************************************
     // @brief 큐의 최대 용량을 반환합니다.
     // @return constexpr std::size_t 큐 용량
+    //***************************************************************************
     constexpr std::size_t GetCapacity() const noexcept { return Capacity; }
 
 private:
@@ -168,15 +179,18 @@ private:
 
     //***************************************************************************
     // @brief 대기 중인 소비자(popper)에게 데이터가 있음을 알립니다.
+    //***************************************************************************
     void NotifyNotEmpty() { if( m_WaitingPoppers.load(std::memory_order_relaxed) > 0 ) m_NotEmptyCv.notify_one(); }
 
     //***************************************************************************
     // @brief 대기 중인 생산자(pusher)에게 빈 공간이 생겼음을 알립니다.
+    //***************************************************************************
     void NotifyNotFull() { if( m_WaitingPushers.load(std::memory_order_relaxed) > 0 ) m_NotFullCv.notify_one(); }
 
     //***************************************************************************
     // @brief 블로킹 방식으로 데이터를 큐에 임플레이스 삽입합니다.
     // @param value 삽입할 값 (포워딩 참조)
+    //***************************************************************************
     template <typename U>
     void BlockingEmplacePush(U&& value)
     {
@@ -200,6 +214,7 @@ private:
     // @brief 논블로킹 방식으로 데이터를 큐에 임플레이스 삽입합니다.
     // @param value 삽입할 값 (포워딩 참조)
     // @return true: 삽입 성공, false: 큐가 가득 참
+    //***************************************************************************
     template <typename U>
     bool EmplacePush(U&& value)
     {
@@ -220,13 +235,13 @@ private:
         return true;
     }
 
-    static constexpr std::size_t kIndexMask = Capacity - 1;
-    alignas(LFQ_CACHE_LINE_SIZE) Cell m_Buffer[Capacity];
-    alignas(LFQ_CACHE_LINE_SIZE) std::atomic<std::size_t> m_EnqueuePos;
-    alignas(LFQ_CACHE_LINE_SIZE) std::atomic<std::size_t> m_DequeuePos;
-    std::mutex m_NotEmptyMutex, m_NotFullMutex;
-    std::condition_variable m_NotEmptyCv, m_NotFullCv;
-    std::atomic<int> m_WaitingPoppers{ 0 }, m_WaitingPushers{ 0 };
+    static constexpr std::size_t kIndexMask = Capacity - 1;                // 큐 인덱스 계산용 마스크 (Capacity가 2의 거듭제곱일 때 모듈로 연산 대체)
+    alignas(LFQ_CACHE_LINE_SIZE) Cell m_Buffer[Capacity];                  // 큐의 실제 데이터를 저장하는 링 버퍼 배열 (캐시 라인 정렬)
+    alignas(LFQ_CACHE_LINE_SIZE) std::atomic<std::size_t> m_EnqueuePos;    // 데이터가 삽입될 다음 위치 (단일 프로듀서 전용, 캐시 라인 정렬)
+    alignas(LFQ_CACHE_LINE_SIZE) std::atomic<std::size_t> m_DequeuePos;    // 데이터가 추출될 다음 위치 (멀티 컨슈머 경쟁, 캐시 라인 정렬)
+    std::mutex m_NotEmptyMutex, m_NotFullMutex;                            // 큐가 비어있거나 가득 찼을 때 블로킹을 위한 뮤텍스
+    std::condition_variable m_NotEmptyCv, m_NotFullCv;                     // 큐 상태 변화(비어있지 않음 / 가득 차지 않음)를 통보하는 조건 변수
+    std::atomic<int> m_WaitingPoppers{ 0 }, m_WaitingPushers{ 0 };         // 현재 대기 중인 소비자 및 생산자의 스레드 수
 };
 
 #endif // __SPMCLOCKFREEQUEUE_H__

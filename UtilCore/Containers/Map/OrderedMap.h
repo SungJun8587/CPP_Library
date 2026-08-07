@@ -44,8 +44,8 @@ protected:
 	void				clearObjectMap(void);
 
 protected:
-	ObjectMap			_objectMap;
-	std::shared_mutex	_mutex;
+	ObjectMap			_objectMap;    // 키-값 데이터를 저장하는 내부 맵 객체
+	std::shared_mutex	_mutex;        // 스레드 안전한 접근을 보장하기 위한 공유 뮤텍스 (읽기/쓰기 락 지원)
 };
 
 #include "OrderedMap.inl"

@@ -213,4 +213,82 @@ wstring TStringToWString(const _tstring& src)
 	return AnsiToUnicode(src);
 #endif
 }
+
+//***************************************************************************
+// @brief char 버퍼(ANSI)를 std::wstring으로 변환합니다. 널 종료에 의존하지 않고
+//        dataLength만큼만 읽습니다.
+// @param ansi 원본 ANSI 버퍼
+// @param dataLength 버퍼의 유효 문자(char) 개수
+// @return 변환된 std::wstring (실패 시 빈 문자열)
+//***************************************************************************
+std::wstring AnsiToUnicode(const char* ansi, int32_t dataLength)
+{
+	if( ansi == nullptr || dataLength <= 0 ) return L"";
+	return AnsiToUnicode(std::string(ansi, dataLength));
+}
+
+//***************************************************************************
+// @brief wchar_t 버퍼(Unicode)를 std::string(ANSI)으로 변환합니다. 널 종료에
+//        의존하지 않고 dataLength만큼만 읽습니다.
+// @param unicode 원본 Unicode 버퍼
+// @param dataLength 버퍼의 유효 문자(wchar_t) 개수
+// @return 변환된 std::string (실패 시 빈 문자열)
+//***************************************************************************
+std::string UnicodeToAnsi(const wchar_t* unicode, int32_t dataLength)
+{
+	if( unicode == nullptr || dataLength <= 0 ) return "";
+	return UnicodeToAnsi(std::wstring(unicode, dataLength));
+}
+
+//***************************************************************************
+// @brief wchar_t 버퍼(Unicode)를 UTF-8 std::string으로 변환합니다. 널 종료에
+//        의존하지 않고 dataLength만큼만 읽습니다.
+// @param unicode 원본 Unicode 버퍼
+// @param dataLength 버퍼의 유효 문자(wchar_t) 개수
+// @return 변환된 UTF-8 std::string (실패 시 빈 문자열)
+//***************************************************************************
+std::string UnicodeToUtf8(const wchar_t* unicode, int32_t dataLength)
+{
+	if( unicode == nullptr || dataLength <= 0 ) return "";
+	return UnicodeToUtf8(std::wstring(unicode, dataLength));
+}
+
+//***************************************************************************
+// @brief char 버퍼(UTF-8)를 std::wstring으로 변환합니다. 널 종료에 의존하지
+//        않고 dataLength만큼만 읽습니다.
+// @param utf8 원본 UTF-8 버퍼
+// @param dataLength 버퍼의 유효 문자(char) 개수
+// @return 변환된 std::wstring (실패 시 빈 문자열)
+//***************************************************************************
+std::wstring Utf8ToUnicode(const char* utf8, int32_t dataLength)
+{
+	if( utf8 == nullptr || dataLength <= 0 ) return L"";
+	return Utf8ToUnicode(std::string(utf8, dataLength));
+}
+
+//***************************************************************************
+// @brief char 버퍼(ANSI)를 UTF-8 std::string으로 변환합니다. 널 종료에
+//        의존하지 않고 dataLength만큼만 읽습니다.
+// @param ansi 원본 ANSI 버퍼
+// @param dataLength 버퍼의 유효 문자(char) 개수
+// @return 변환된 UTF-8 std::string (실패 시 빈 문자열)
+//***************************************************************************
+std::string AnsiToUtf8(const char* ansi, int32_t dataLength)
+{
+	if( ansi == nullptr || dataLength <= 0 ) return "";
+	return AnsiToUtf8(std::string(ansi, dataLength));
+}
+
+//***************************************************************************
+// @brief char 버퍼(UTF-8)를 ANSI std::string으로 변환합니다. 널 종료에
+//        의존하지 않고 dataLength만큼만 읽습니다.
+// @param utf8 원본 UTF-8 버퍼
+// @param dataLength 버퍼의 유효 문자(char) 개수
+// @return 변환된 ANSI std::string (실패 시 빈 문자열)
+//***************************************************************************
+std::string Utf8ToAnsi(const char* utf8, int32_t dataLength)
+{
+	if( utf8 == nullptr || dataLength <= 0 ) return "";
+	return Utf8ToAnsi(std::string(utf8, dataLength));
+}
 #endif

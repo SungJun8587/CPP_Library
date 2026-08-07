@@ -7,8 +7,6 @@
 #ifndef __IOCPEVENT_H__
 #define __IOCPEVENT_H__
 
-//class Session;
-
 //***************************************************************************
 // @enum EventType
 // @brief IocpEvent가 어떤 종류의 비동기 I/O인지 식별하는 열거형.
@@ -124,8 +122,11 @@ class AcceptEvent : public CIocpEvent
 {
 public:
     AcceptEvent() : CIocpEvent(EventType::Accept) {}
+
 public:
-    //CSessionRef  session = nullptr;  // 연결 수락을 위해 미리 준비된 세션
+    // AcceptEx에 전달할 미리 생성된 세션.
+    // Listener::ProcessAccept()에서 static_pointer_cast<CSession>으로 캐스팅해 사용.
+    CIocpObjectRef  session;
 };
 
 //***************************************************************************
@@ -143,7 +144,7 @@ public:
 };
 
 //***************************************************************************
-// @class CSendEvent
+// @class SendEvent
 // @brief 데이터 전송(WSASend) 완료 이벤트 클래스.
 // @details
 // 사용: CSession::RegisterSend() → WSASend(Scatter-Gather) 호출 시
@@ -166,6 +167,7 @@ class SendEvent : public CIocpEvent
 {
 public:
     SendEvent() : CIocpEvent(EventType::Send) {}
+
 public:
     // WSASend pending 중 SendBuffer 수명 보장. ProcessSend 완료 후 clear()
     CVector<CSendBufferRef>   sendBuffers;

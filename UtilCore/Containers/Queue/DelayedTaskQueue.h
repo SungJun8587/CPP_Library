@@ -29,6 +29,7 @@
 //          - CAdoConnPool, COdbcConnPool의 백그라운드 재연결 로직에서 지수 백오프(exponential backoff) 재시도 지연 실행
 //          - 게임 서버에서 버프 / 디버프 만료, 스킬 쿨다운 종료, 리스폰 타이머 등 시간 기반 이벤트 처리
 //          - 세션, 커넥션 idle timeout 감지(일정 시간 뒤에도 갱신되지 않으면 종료 처리 작업을 실행)
+//***************************************************************************
 struct DelayedTask
 {
     std::chrono::steady_clock::time_point ExecuteTime; // 작업이 실행되어야 할 절대 시간
@@ -64,6 +65,7 @@ struct DelayedTask
 //  - **SPMC(Single Producer, Multiple Consumer)** 또는 단일 소비자 루프에 적합
 //    → 하나의 스레드가 예약 작업을 넣고, 하나 이상의 소비자 스레드가
 //      ProcessExpiredTasks()를 통해 실행 가능
+//***************************************************************************
 class CDelayedTaskQueue
 {
 public:

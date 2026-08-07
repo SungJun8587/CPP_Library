@@ -26,6 +26,13 @@ string		TStringToString(const _tstring& src);
 
 _tstring	WStringToTString(const std::wstring& src);
 wstring		TStringToWString(const _tstring& src);
+
+std::wstring AnsiToUnicode(const char* ansi, int32 dataLength);
+std::string  UnicodeToAnsi(const wchar_t* unicode, int32 dataLength);
+std::string  UnicodeToUtf8(const wchar_t* unicode, int32 dataLength);
+std::wstring Utf8ToUnicode(const char* utf8, int32 dataLength);
+std::string  AnsiToUtf8(const char* ansi, int32 dataLength);
+std::string  Utf8ToAnsi(const char* utf8, int32 dataLength);
 #endif
 
 #endif // ndef __ENCODINGCONVERT_H__

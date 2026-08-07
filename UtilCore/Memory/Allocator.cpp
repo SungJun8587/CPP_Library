@@ -137,6 +137,10 @@ void* StompAllocator::Alloc(int32 size)
 //        감지한 뒤, 데이터 페이지만 디커밋하고 free-list에 등록합니다.
 void StompAllocator::Release(void* ptr)
 {
+	// ptr == nullptr 이면 이 역산이 잘못된(주소 0 기반) RegionMeta를
+	// 가리키게 되어 그대로 역참조 시 크래시가 나므로, 방어 처리
+	if( ptr == nullptr ) return;
+
 	const int64 address = reinterpret_cast<int64>(ptr);
 	int8* dataPagesBase = reinterpret_cast<int8*>(address - (address % PAGE_SIZE));
 	RegionMeta* meta = reinterpret_cast<RegionMeta*>(dataPagesBase - PAGE_SIZE);
@@ -176,6 +180,8 @@ void* PoolAllocator::Alloc(int32 size)
 //        판별합니다.
 void PoolAllocator::Release(void* ptr)
 {
+	if( ptr == nullptr ) return;
+
 #if defined(USE_GPMEMORY)
 	gpMemory->Release(ptr);
 #else

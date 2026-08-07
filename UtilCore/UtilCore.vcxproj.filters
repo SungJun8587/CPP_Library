@@ -91,7 +91,6 @@
     <ClInclude Include="BaseMacro.h" />
     <ClInclude Include="BaseRedefineDataType.h" />
     <ClInclude Include="ServerConfig.h" />
-    <ClInclude Include="ServiceSvr.h" />
     <ClInclude Include="Memory\Singleton.h">
       <Filter>Memory</Filter>
     </ClInclude>
@@ -304,6 +303,14 @@
     <ClInclude Include="Network\RingBuffer.h">
       <Filter>Network</Filter>
     </ClInclude>
+    <ClInclude Include="WindowsServiceBase.h" />
+    <ClInclude Include="NetworkRedefineDataType.h" />
+    <ClInclude Include="Memory\RefCountable.h">
+      <Filter>Memory</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\TypeCast.h">
+      <Filter>Util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">
@@ -336,7 +343,6 @@
     </ClCompile>
     <ClCompile Include="BaseGlobal.cpp" />
     <ClCompile Include="ServerConfig.cpp" />
-    <ClCompile Include="ServiceSvr.cpp" />
     <ClCompile Include="Thread\ThreadManager.cpp">
       <Filter>Thread</Filter>
     </ClCompile>
@@ -467,6 +473,7 @@
     <ClCompile Include="Network\RingBuffer.cpp">
       <Filter>Network</Filter>
     </ClCompile>
+    <ClCompile Include="WindowsServiceBase.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="DB\BaseODBC.inl">

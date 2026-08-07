@@ -40,13 +40,13 @@
 #include <cctype>
 #include <sstream>
 #include <filesystem>
-#include <algorithm>
 
 #include <iostream>
 using namespace std;
 
 #include <BaseDefine.h>
 #include <BaseRedefineDataType.h>
+#include <NetworkRedefineDataType.h>
 #include <BaseMacro.h>
 
 #include <Util/BaseFile.h>
@@ -63,6 +63,7 @@ using namespace std;
 #include <Memory/Singleton.h>
 #include <Memory/MemBuffer.h>
 #include <Memory/Stream.h>
+#include <Memory/RefCountable.h>
 
 #include <Thread/CacheAlignment.h>
 #include <Thread/CriticalSection.h>
@@ -121,7 +122,7 @@ using namespace std;
 #include <Util/Endian.h>
 #include <Util/BufferReader.h>
 #include <Util/BufferWriter.h>
-
+#include <Util/TypeCast.h>
 
 #include <Excel/XlntUtil.h>
 
@@ -147,6 +148,6 @@ using namespace std;
 #include <DB/MySQL/MySQLConnPool.h>
 #include <DB/MySQL/MySQLAsyncSrv.h>
 
-#include <ServiceSvr.h>
+#include <WindowsServiceBase.h>
 
 #endif // ndef __UTILCORE_H__

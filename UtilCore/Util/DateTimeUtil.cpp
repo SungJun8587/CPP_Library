@@ -8,7 +8,11 @@
 #include "DateTimeUtil.h"
 
 //***************************************************************************
-//
+// @brief TIMESTAMP_STRUCT 데이터를 time_t로 변환하여 할당합니다.
+// @param t 대상 time_t 참조
+// @param ts 변환할 TIMESTAMP_STRUCT 상수 참조
+// @return 변환된 time_t 참조
+//***************************************************************************
 time_t& operator<<(time_t& t, const TIMESTAMP_STRUCT& ts)
 {
 	SYSTEMTIME st;
@@ -19,7 +23,11 @@ time_t& operator<<(time_t& t, const TIMESTAMP_STRUCT& ts)
 }
 
 //***************************************************************************
-//
+// @brief time_t 데이터를 TIMESTAMP_STRUCT로 변환하여 할당합니다.
+// @param ts 대상 TIMESTAMP_STRUCT 참조
+// @param t 변환할 time_t 상수 참조
+// @return 변환된 TIMESTAMP_STRUCT 참조
+//***************************************************************************
 TIMESTAMP_STRUCT& operator<<(TIMESTAMP_STRUCT& ts, const time_t& t)
 {
 	SYSTEMTIME st;
@@ -30,7 +38,11 @@ TIMESTAMP_STRUCT& operator<<(TIMESTAMP_STRUCT& ts, const time_t& t)
 }
 
 //***************************************************************************
-//
+// @brief SYSTEMTIME 데이터를 time_t로 변환하여 할당합니다.
+// @param t 대상 time_t 참조
+// @param stime 변환할 SYSTEMTIME 상수 참조
+// @return 변환된 time_t 참조
+//***************************************************************************
 time_t& operator<<(time_t& t, const SYSTEMTIME& stime)
 {
 	struct tm tmp;
@@ -52,7 +64,11 @@ time_t& operator<<(time_t& t, const SYSTEMTIME& stime)
 }
 
 //***************************************************************************
-//
+// @brief time_t 데이터를 SYSTEMTIME으로 변환하여 할당합니다.
+// @param stime 대상 SYSTEMTIME 참조
+// @param t 변환할 time_t 상수 참조
+// @return 변환된 SYSTEMTIME 참조
+//***************************************************************************
 SYSTEMTIME& operator<<(SYSTEMTIME& stime, const time_t& t)
 {
 	struct tm tmp;
@@ -84,7 +100,11 @@ SYSTEMTIME& operator<<(SYSTEMTIME& stime, const time_t& t)
 }
 
 //***************************************************************************
-//
+// @brief SYSTEMTIME 데이터를 TIMESTAMP_STRUCT로 변환하여 할당합니다.
+// @param ts 대상 TIMESTAMP_STRUCT 참조
+// @param stime 변환할 SYSTEMTIME 상수 참조
+// @return 변환된 TIMESTAMP_STRUCT 참조
+//***************************************************************************
 TIMESTAMP_STRUCT& operator<<(TIMESTAMP_STRUCT& ts, const SYSTEMTIME& stime)
 {
 	ts.year = stime.wYear;
@@ -98,7 +118,11 @@ TIMESTAMP_STRUCT& operator<<(TIMESTAMP_STRUCT& ts, const SYSTEMTIME& stime)
 }
 
 //***************************************************************************
-//
+// @brief TIMESTAMP_STRUCT 데이터를 SYSTEMTIME으로 변환하여 할당합니다.
+// @param stime 대상 SYSTEMTIME 참조
+// @param ts 변환할 TIMESTAMP_STRUCT 상수 참조
+// @return 변환된 SYSTEMTIME 참조
+//***************************************************************************
 SYSTEMTIME& operator<<(SYSTEMTIME& stime, const TIMESTAMP_STRUCT& ts)
 {
 	stime.wYear = ts.year;
@@ -112,7 +136,11 @@ SYSTEMTIME& operator<<(SYSTEMTIME& stime, const TIMESTAMP_STRUCT& ts)
 }
 
 //***************************************************************************
-//
+// @brief 두 SYSTEMTIME 값의 동등 여부를 비교합니다.
+// @param stime1 비교할 첫 번째 SYSTEMTIME 참조
+// @param stime2 비교할 두 번째 SYSTEMTIME 참조
+// @return 같으면 true, 다르면 false
+//***************************************************************************
 bool  operator==(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 {
 	FILETIME ft1, ft2;
@@ -127,8 +155,12 @@ bool  operator==(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 	return (*pnVal1 == *pnVal2);
 }
 
+//************************************************Y**************************
+// @brief 첫 번째 SYSTEMTIME이 두 번째 SYSTEMTIME보다 큰지 비교합니다.
+// @param stime1 비교할 첫 번째 SYSTEMTIME 참조
+// @param stime2 비교할 두 번째 SYSTEMTIME 참조
+// @return stime1이 더 크면 true, 아니면 false
 //***************************************************************************
-//
 bool  operator>(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 {
 	FILETIME ft1, ft2;
@@ -144,7 +176,11 @@ bool  operator>(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 }
 
 //***************************************************************************
-//
+// @brief 첫 번째 SYSTEMTIME이 두 번째 SYSTEMTIME보다 크거나 같은지 비교합니다.
+// @param stime1 비교할 첫 번째 SYSTEMTIME 참조
+// @param stime2 비교할 두 번째 SYSTEMTIME 참조
+// @return stime1이 크거나 같으면 true, 아니면 false
+//***************************************************************************
 bool  operator>=(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 {
 	FILETIME ft1, ft2;
@@ -160,7 +196,11 @@ bool  operator>=(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 }
 
 //***************************************************************************
-//
+// @brief 첫 번째 SYSTEMTIME이 두 번째 SYSTEMTIME보다 작은지 비교합니다.
+// @param stime1 비교할 첫 번째 SYSTEMTIME 참조
+// @param stime2 비교할 두 번째 SYSTEMTIME 참조
+// @return stime1이 더 작으면 true, 아니면 false
+//***************************************************************************
 bool  operator<(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 {
 	FILETIME ft1, ft2;
@@ -176,7 +216,11 @@ bool  operator<(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 }
 
 //***************************************************************************
-//
+// @brief 첫 번째 SYSTEMTIME이 두 번째 SYSTEMTIME보다 작거나 같은지 비교합니다.
+// @param stime1 비교할 첫 번째 SYSTEMTIME 참조
+// @param stime2 비교할 두 번째 SYSTEMTIME 참조
+// @return stime1이 작거나 같으면 true, 아니면 false
+//***************************************************************************
 bool  operator<=(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 {
 	FILETIME ft1, ft2;
@@ -192,7 +236,11 @@ bool  operator<=(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 }
 
 //***************************************************************************
-//
+// @brief 두 SYSTEMTIME 간의 시간 차이를 초(sec) 단위로 계산합니다.
+// @param stime1 첫 번째 SYSTEMTIME 상수 참조
+// @param stime2 두 번째 SYSTEMTIME 상수 참조 (기준)
+// @return 초 단위 시간 차이 (stime1이 이전이거나 같으면 0)
+//***************************************************************************
 uint64 operator-(const SYSTEMTIME& stime1, const SYSTEMTIME& stime2)
 {
 	FILETIME fTm1, fTm2;
@@ -210,29 +258,39 @@ uint64 operator-(const SYSTEMTIME& stime1, const SYSTEMTIME& stime2)
 }
 
 //***************************************************************************
-//
+// @brief 문자열 형태의 날짜/시간을 파싱하여 SYSTEMTIME 구조체에 할당합니다.
+// @param stime 대상 SYSTEMTIME 참조
+// @param tszDateTime "YYYY-MM-DD HH:MM:SS" 형식의 문자열
+// @return 변환된 SYSTEMTIME 참조
+//***************************************************************************
 SYSTEMTIME& operator<<(SYSTEMTIME& stime, TCHAR* tszDateTime)
 {
 	_stscanf_s(tszDateTime, _T("%hu-%hu-%hu %hu:%hu:%hu")
-			   , &stime.wYear, &stime.wMonth, &stime.wDay
-			   , &stime.wHour, &stime.wMinute, &stime.wSecond);
+		, &stime.wYear, &stime.wMonth, &stime.wDay
+		, &stime.wHour, &stime.wMinute, &stime.wSecond);
 
 	return stime;
 }
 
 //***************************************************************************
-//
+// @brief SYSTEMTIME 구조체 값을 포맷팅된 날짜/시간 문자열로 변환합니다.
+// @param tszDateTime 결과를 저장할 TCHAR 버퍼
+// @param stime 변환할 SYSTEMTIME 참조
+// @return 변환된 TCHAR 문자열 포인터
+//***************************************************************************
 TCHAR* operator<<(TCHAR* tszDateTime, SYSTEMTIME& stime)
 {
 	_sntprintf_s(tszDateTime, STD_DATETIME_STRLEN, _TRUNCATE, _T("%04d-%02d-%02d %02d:%02d:%02d")
-				 , stime.wYear, stime.wMonth, stime.wDay
-				 , stime.wHour, stime.wMinute, stime.wSecond);
+		, stime.wYear, stime.wMonth, stime.wDay
+		, stime.wHour, stime.wMinute, stime.wSecond);
 
 	return tszDateTime;
 }
 
 //***************************************************************************
-//
+// @brief 현재 시스템의 타임스탬프 값을 반환합니다.
+// @return 현재 time_t 타임스탬프
+//***************************************************************************
 time_t GetCurTimestamp()
 {
 	time_t now = time(nullptr);
@@ -240,7 +298,9 @@ time_t GetCurTimestamp()
 }
 
 //***************************************************************************
-// return YYYYMMDDhhmmss(14 char)
+// @brief 현재 지역 날짜 및 시간(YYYYMMDDhhmmss, 14자리)을 가져옵니다.
+// @param ptszDateTime 결과를 저장할 TCHAR 버퍼
+//***************************************************************************
 void GetCurDateTime(TCHAR* ptszDateTime)
 {
 	if( ptszDateTime == nullptr ) return;
@@ -252,7 +312,9 @@ void GetCurDateTime(TCHAR* ptszDateTime)
 }
 
 //***************************************************************************
-// return YYYYMMDD(8 char)
+// @brief 현재 지역 날짜(YYYYMMDD, 8자리)를 가져옵니다.
+// @param ptszDate 결과를 저장할 TCHAR 버퍼
+//***************************************************************************
 void GetCurDate(TCHAR* ptszDate)
 {
 	if( ptszDate == nullptr ) return;
@@ -264,7 +326,9 @@ void GetCurDate(TCHAR* ptszDate)
 }
 
 //***************************************************************************
-// return YYYYMMDDhhmmss
+// @brief 어제의 날짜 및 시간(YYYYMMDDhhmmss)을 가져옵니다.
+// @param ptszDateTime 결과를 저장할 TCHAR 버퍼
+//***************************************************************************
 void GetYesterdayTime(TCHAR* ptszDateTime)
 {
 	if( ptszDateTime == nullptr ) return;
@@ -298,7 +362,9 @@ void GetYesterdayTime(TCHAR* ptszDateTime)
 }
 
 //***************************************************************************
-// return YYYYMMDD
+// @brief 어제의 날짜(YYYYMMDD)를 가져옵니다.
+// @param ptszDate 결과를 저장할 TCHAR 버퍼
+//***************************************************************************
 void GetYesterday(TCHAR* ptszDate)
 {
 	if( ptszDate == nullptr ) return;
@@ -332,7 +398,10 @@ void GetYesterday(TCHAR* ptszDate)
 }
 
 //***************************************************************************
-//
+// @brief SYSTEMTIME 구조체를 time_t 타임스탬프로 변환합니다.
+// @param tTime 변환할 SYSTEMTIME 객체
+// @return 변환된 time_t 값
+//***************************************************************************
 time_t GetTimestampToDateTime(const SYSTEMTIME tTime)
 {
 	struct tm time;
@@ -351,7 +420,10 @@ time_t GetTimestampToDateTime(const SYSTEMTIME tTime)
 }
 
 //***************************************************************************
-// YYYYMMDDhhmmss
+// @brief YYYYMMDDhhmmss 형식의 문자열을 time_t 타임스탬프로 변환합니다.
+// @param ptszDateTime 변환할 날짜/시간 문자열
+// @return 변환된 time_t 값
+//***************************************************************************
 time_t GetTimestampToDateTime(const TCHAR* ptszDateTime)
 {
 	struct tm time;
@@ -371,7 +443,11 @@ time_t GetTimestampToDateTime(const TCHAR* ptszDateTime)
 }
 
 //***************************************************************************
-//
+// @brief time_t 타임스탬프를 SYSTEMTIME 구조체로 변환합니다.
+// @param tTime 결과를 저장할 SYSTEMTIME 참조
+// @param timestamp 변환할 time_t 값
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool  GetSystemTimeToTimestamp(SYSTEMTIME& tTime, const time_t timestamp)
 {
 	struct tm tm_info;
@@ -390,7 +466,11 @@ bool  GetSystemTimeToTimestamp(SYSTEMTIME& tTime, const time_t timestamp)
 }
 
 //***************************************************************************
-//
+// @brief time_t 타임스탬프를 YYYYMMDDhhmmss 형식의 문자열로 변환합니다.
+// @param ptszDateTime 결과를 저장할 TCHAR 버퍼
+// @param timestamp 변환할 time_t 값
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool  GetDateTimeToTimestamp(TCHAR* ptszDateTime, const time_t timestamp)
 {
 	struct tm tm_info;
@@ -404,7 +484,10 @@ bool  GetDateTimeToTimestamp(TCHAR* ptszDateTime, const time_t timestamp)
 }
 
 //***************************************************************************
-// YYYYMMDDhhmmss
+// @brief YYYYMMDDhhmmss 형식의 문자열이 유효한 날짜 및 시간인지 검증합니다.
+// @param ptszDateTime 검증할 날짜/시간 문자열
+// @return 유효하면 true, 아니면 false
+//***************************************************************************
 bool  IsValidDateTime(const TCHAR* ptszDateTime)
 {
 	int i = 0;
@@ -437,7 +520,10 @@ bool  IsValidDateTime(const TCHAR* ptszDateTime)
 }
 
 //***************************************************************************
-// YYYYMMDD
+// @brief YYYYMMDD 형식의 문자열이 유효한 날짜인지 검증합니다.
+// @param ptszDate 검증할 날짜 문자열
+// @return 유효하면 true, 아니면 false
+//***************************************************************************
 bool  IsValidDate(const TCHAR* ptszDate)
 {
 	int i = 0;
@@ -464,7 +550,10 @@ bool  IsValidDate(const TCHAR* ptszDate)
 }
 
 //***************************************************************************
-// hhmmss
+// @brief hhmmss 형식의 문자열이 유효한 시간인지 검증합니다.
+// @param ptszTime 검증할 시간 문자열
+// @return 유효하면 true, 아니면 false
+//***************************************************************************
 bool  IsValidTime(const TCHAR* ptszTime)
 {
 	int i = 0;
@@ -484,7 +573,10 @@ bool  IsValidTime(const TCHAR* ptszTime)
 }
 
 //***************************************************************************
-//
+// @brief 지정한 날짜/시간과 오늘을 비교합니다.
+// @param ptszDate 비교할 날짜/시간 문자열 (YYYYMMDD 또는 YYYYMMDDhhmmss)
+// @return 음수: 오늘보다 이전, 0: 오늘과 같음, 양수: 오늘보다 이후 (오류 시 -9999)
+//***************************************************************************
 int CompareToday(const TCHAR* ptszDate)
 {
 	if( ptszDate == nullptr ) return -9999;
@@ -508,7 +600,12 @@ int CompareToday(const TCHAR* ptszDate)
 }
 
 //***************************************************************************
-// return YYYYMMDD
+// @brief 기준 날짜에서 지정한 간격(일 단위)만큼 더하거나 뺀 날짜를 계산합니다.
+// @param ptszDestDate 결과 날짜(YYYYMMDD)가 저장될 버퍼
+// @param ptszSrcDate 기준 날짜(YYYYMMDD) 문자열
+// @param nInterval 가감할 일수 간격 (양수: 과거, 음수: 미래)
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool  GetDateIntervalDate(TCHAR* ptszDestDate, const TCHAR* ptszSrcDate, const int nInterval)
 {
 	int nYear(0), nMonth(0), nDay(0);
@@ -619,7 +716,11 @@ bool  GetDateIntervalDate(TCHAR* ptszDestDate, const TCHAR* ptszSrcDate, const i
 }
 
 //***************************************************************************
-// return YYYYMMDD
+// @brief 오늘 기준에서 지정한 간격(일 단위)만큼 더하거나 뺀 날짜를 계산합니다.
+// @param ptszDate 결과 날짜(YYYYMMDD)가 저장될 버퍼
+// @param nInterval 가감할 일수 간격 (양수: 과거, 음수: 미래)
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool  GetDateIntervalToday(TCHAR* ptszDate, const int nInterval)
 {
 	if( ptszDate == nullptr ) return false;
@@ -720,7 +821,12 @@ bool  GetDateIntervalToday(TCHAR* ptszDate, const int nInterval)
 }
 
 //***************************************************************************
-//
+// @brief 두 날짜/시간 문자열 간의 시간 차이를 초(sec) 단위로 계산합니다.
+// @param ptszTime1 첫 번째 날짜/시간 문자열 (YYYYMMDDhhmmss)
+// @param ptszTime2 두 번째 날짜/시간 문자열 (YYYYMMDDhhmmss)
+// @param lSecInterval 계산된 초 간격이 저장될 변수 참조
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool  GetIntervalSec(const TCHAR* ptszTime1, const TCHAR* ptszTime2, long& lSecInterval)
 {
 	if( _tcslen(ptszTime1) != 14 || _tcslen(ptszTime2) != 14 ) return false;
@@ -761,7 +867,11 @@ bool  GetIntervalSec(const TCHAR* ptszTime1, const TCHAR* ptszTime2, long& lSecI
 }
 
 //***************************************************************************
-//
+// @brief 문자열 날짜/시간을 SQL_TIMESTAMP_STRUCT 구조체로 변환합니다.
+// @param stDateTime 결과 SQL_TIMESTAMP_STRUCT 참조
+// @param ptszDateTime 변환할 날짜/시간 문자열 (YYYYMMDDhhmmss)
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool  GetSqlTime(SQL_TIMESTAMP_STRUCT& stDateTime, const TCHAR* ptszDateTime)
 {
 	int nYear(0), nMonth(0), nDay(0), nHour(0), nMinute(0), nSec(0);
@@ -789,7 +899,11 @@ bool  GetSqlTime(SQL_TIMESTAMP_STRUCT& stDateTime, const TCHAR* ptszDateTime)
 }
 
 //***************************************************************************
-//
+// @brief 문자열 날짜/시간을 SYSTEMTIME 구조체로 변환합니다.
+// @param tTime 결과 SYSTEMTIME 참조
+// @param ptszDateTime 변환할 날짜/시간 문자열 (YYYYMMDDhhmmss)
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool  GetSystemTime(SYSTEMTIME& tTime, const TCHAR* ptszDateTime)
 {
 	int nYear(0), nMonth(0), nDay(0), nHour(0), nMinute(0), nSec(0);
@@ -817,7 +931,11 @@ bool  GetSystemTime(SYSTEMTIME& tTime, const TCHAR* ptszDateTime)
 }
 
 //***************************************************************************
-//
+// @brief 월 번호(1~12)에 해당하는 영문 월 이름을 가져옵니다.
+// @param ptszMonthName 결과를 저장할 TCHAR 버퍼
+// @param nMonth 월 번호 (1 ~ 12)
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool  GetMonthName(TCHAR* ptszMonthName, const int nMonth)
 {
 	const static TCHAR atszMonthNames[][MONTH_ENAME_STRLEN] =
@@ -833,7 +951,13 @@ bool  GetMonthName(TCHAR* ptszMonthName, const int nMonth)
 }
 
 //***************************************************************************
-//
+// @brief 특정 연, 월, 일에 해당하는 영문 요일 이름을 가져옵니다.
+// @param ptszDayOfWeek 결과를 저장할 TCHAR 버퍼
+// @param nYear 연도
+// @param nMonth 월
+// @param nDay 일
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool  GetDayOfWeek(TCHAR* ptszDayOfWeek, const int nYear, const int nMonth, const int nDay)
 {
 	int		nDayOfWeek;
@@ -852,7 +976,12 @@ bool  GetDayOfWeek(TCHAR* ptszDayOfWeek, const int nYear, const int nMonth, cons
 }
 
 //***************************************************************************
-//
+// @brief 특정 연, 월, 일의 요일 인덱스를 계산합니다.
+// @param nYear 연도
+// @param nMonth 월
+// @param nDay 일
+// @return 요일 인덱스 (0: 일요일 ~ 6: 토요일, 실패 시 -1)
+//***************************************************************************
 int	DayOfWeek(const int nYear, const int nMonth, const int nDay)
 {
 	int		nDayOfWeek;
@@ -861,7 +990,7 @@ int	DayOfWeek(const int nYear, const int nMonth, const int nDay)
 	if( nMonth < 0 && nMonth <= 12 ) return -1;
 	if( nDay < 0 ) return -1;
 	if( nDay > (pnDaysBeforeMonth[nMonth + 1] - pnDaysBeforeMonth[nMonth])
-	   && (nMonth != 2 || nDay != 29 || !IsLeapYear(nYear)) ) return -1;
+		&& (nMonth != 2 || nDay != 29 || !IsLeapYear(nYear)) ) return -1;
 
 	/* the day of Jan 1, nYear */
 	nDayOfWeek = 6 + nYear % 7 + CountOfFeb29(nYear) % 7 + 14;	/* + 14 : makes nDayOfWeek >= 0 */
@@ -879,7 +1008,10 @@ int	DayOfWeek(const int nYear, const int nMonth, const int nDay)
 }
 
 //***************************************************************************
-//
+// @brief 특정 연도까지의 2월 29일(윤일) 누적 횟수를 계산합니다.
+// @param nYear 연도
+// @return 윤일 누적 횟수
+//***************************************************************************
 int	CountOfFeb29(int nYear)
 {
 	int		nCount = 0;
@@ -894,7 +1026,10 @@ int	CountOfFeb29(int nYear)
 }
 
 //***************************************************************************
-//
+// @brief 지정한 연도가 윤년인지 여부를 확인합니다.
+// @param nYear 연도
+// @return 윤년이면 true, 아니면 false
+//***************************************************************************
 bool  IsLeapYear(int nYear)
 {
 	if( nYear % 4 != 0 ) return false;
@@ -903,7 +1038,11 @@ bool  IsLeapYear(int nYear)
 }
 
 //***************************************************************************
-//
+// @brief 초(sec)를 hhmmss 형식의 문자열로 변환합니다.
+// @param ptszTime 결과를 저장할 TCHAR 버퍼
+// @param lSecond 변환할 총 초 값
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool  GetTimeOfSecond(TCHAR* ptszTime, const long lSecond)
 {
 	int	nHour = 0, nMinute = 0, nSec = 0;
@@ -933,7 +1072,13 @@ bool  GetTimeOfSecond(TCHAR* ptszTime, const long lSecond)
 }
 
 //***************************************************************************
-//
+// @brief 초(sec)를 시, 분, 초 단위의 정수로 각각 분할합니다.
+// @param nHour 시간이 저장될 변수 참조
+// @param nMinute 분이 저장될 변수 참조
+// @param nSec 초가 저장될 변수 참조
+// @param lSecond 변환할 총 초 값
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool  GetTimeOfSecond(int& nHour, int& nMinute, int& nSec, const long lSecond)
 {
 	int	nRemindHour = 0;
@@ -961,18 +1106,24 @@ bool  GetTimeOfSecond(int& nHour, int& nMinute, int& nSec, const long lSecond)
 }
 
 //***************************************************************************
-//
+// @brief SYSTEMTIME을 표준 GMT(UTC) 형식의 문자열로 변환합니다.
+// @param ptszStdDateTime 결과를 저장할 TCHAR 버퍼
+// @param sTime 변환할 SYSTEMTIME 객체
+//***************************************************************************
 void GetGMTTime(TCHAR* ptszStdDateTime, SYSTEMTIME sTime)
 {
 	const static TCHAR atszWdayList[][4] = { _T("Sun"), _T("Mon"), _T("Tue"), _T("Wed"), _T("Thu"), _T("Fri"), _T("Sat") };
 	const static TCHAR atszMonList[][4] = { _T("Jan"), _T("Feb"), _T("Mar"), _T("Apr"), _T("May"), _T("Jun"), _T("Jul"), _T("Aug"), _T("Sep"), _T("Oct"), _T("Nov"), _T("Dec") };
 
 	_stprintf_s(ptszStdDateTime, STD_DATETIME_STRLEN, _T("%s, %d %s %04d %02d:%02d:%02d GMT"), atszWdayList[sTime.wDayOfWeek],
-				sTime.wDay, atszMonList[sTime.wMonth - 1], sTime.wYear, sTime.wHour, sTime.wMinute, sTime.wSecond);
+		sTime.wDay, atszMonList[sTime.wMonth - 1], sTime.wYear, sTime.wHour, sTime.wMinute, sTime.wSecond);
 }
 
 //***************************************************************************
-//
+// @brief 로컬 타임스탬프를 GMT 타임스탬프로 변환합니다.
+// @param dest 변환된 GMT time_t가 저장될 참조
+// @param src 변환할 로컬 time_t 상수 참조
+//***************************************************************************
 void ConvertLocaltimeToGMT(time_t& dest, const time_t& src)
 {
 	struct tm tm_src;
@@ -990,7 +1141,10 @@ void ConvertLocaltimeToGMT(time_t& dest, const time_t& src)
 }
 
 //***************************************************************************
-//
+// @brief GMT 타임스탬프를 로컬 타임스탬프로 변환합니다.
+// @param dest 변환된 로컬 time_t가 저장될 참조
+// @param src 변환할 GMT time_t 상수 참조
+//***************************************************************************
 void ConvertGMTToLocaltime(time_t& dest, const time_t& src)
 {
 	struct tm tm_src;
@@ -1008,7 +1162,11 @@ void ConvertGMTToLocaltime(time_t& dest, const time_t& src)
 }
 
 //***************************************************************************
-//
+// @brief 두 SYSTEMTIME 간의 분(minute) 단위 간격을 계산합니다.
+// @param stime1 첫 번째 SYSTEMTIME 참조
+// @param stime2 두 번째 SYSTEMTIME 참조 (기준)
+// @return 분 단위 시간 차이 (stime2가 이전이거나 같으면 0)
+//***************************************************************************
 uint64 TIME::DifMinute(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 {
 	uint64 nRet = 0;
@@ -1032,7 +1190,10 @@ uint64 TIME::DifMinute(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 }
 
 //***************************************************************************
-//
+// @brief SYSTEMTIME 객체에 지정된 시간(100나노초 단위 틱)을 더합니다.
+// @param stime 연산 대상 SYSTEMTIME 참조
+// @param nAddTime 더할 시간 값 (100나노초 단위)
+//***************************************************************************
 void TIME::IncreaseSystemTime(SYSTEMTIME& stime, __int64 nAddTime)
 {
 	FILETIME ftm;
