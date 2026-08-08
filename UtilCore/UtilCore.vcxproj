@@ -28,6 +28,7 @@
     <ClInclude Include="Containers\Map\OrderedMap.h" />
     <ClInclude Include="Containers\Map\UnOrderedMap.h" />
     <ClInclude Include="Containers\Queue\BlockingTaskQueue.h" />
+    <ClInclude Include="Containers\Queue\ChunkedBlockingQueue.h" />
     <ClInclude Include="Containers\Queue\ChunkedSwapQueue.h" />
     <ClInclude Include="Containers\Queue\DelayedTaskQueue.h" />
     <ClInclude Include="Containers\Queue\DoubleBufferQueue.h" />
@@ -81,6 +82,11 @@
     <ClInclude Include="Network\IocpEvent.h" />
     <ClInclude Include="Network\RecvBuffer.h" />
     <ClInclude Include="Network\RingBuffer.h" />
+    <ClInclude Include="Network\RioCore.h" />
+    <ClInclude Include="Network\RioEvent.h" />
+    <ClInclude Include="Network\RioEventPool.h" />
+    <ClInclude Include="Network\RioObject.h" />
+    <ClInclude Include="Network\RioWorker.h" />
     <ClInclude Include="Network\SendBuffer.h" />
     <ClInclude Include="Network\SocketUtil.h" />
     <ClInclude Include="pch.h" />
@@ -148,6 +154,7 @@
     <ClCompile Include="Network\IocpEvent.cpp" />
     <ClCompile Include="Network\RecvBuffer.cpp" />
     <ClCompile Include="Network\RingBuffer.cpp" />
+    <ClCompile Include="Network\RioCore.cpp" />
     <ClCompile Include="Network\SendBuffer.cpp" />
     <ClCompile Include="Network\SocketUtil.cpp" />
     <ClCompile Include="ServerConfig.cpp" />

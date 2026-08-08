@@ -83,6 +83,7 @@ using namespace std;
 #include <Containers/Queue/DelayedTaskQueue.h>
 #include <Containers/Queue/ChunkedSwapQueue.h>
 #include <Containers/Queue/DoubleBufferQueue.h>
+#include <Containers/Queue/ChunkedBlockingQueue.h>
 
 #include <Containers/Queue/SPSCLockFreeQueue.h>
 #include <Containers/Queue/SPMCLockFreeQueue.h>
@@ -100,6 +101,11 @@ using namespace std;
 #include <Network/RingBuffer.h>
 #include <Network/IocpEvent.h>
 #include <Network/IocpCore.h>
+#include <Network/RioObject.h>
+#include <Network/RioEvent.h>
+#include <Network/RioEventPool.h>
+#include <Network/RioCore.h>
+//#include <Network/RioWorker.h>
 
 #include <BaseGlobal.h>
 #include <BaseTLS.h>

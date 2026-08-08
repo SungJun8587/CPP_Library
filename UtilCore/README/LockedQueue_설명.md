@@ -176,25 +176,71 @@ packetQueue.Stop(); // 종료 처리
 
 ---
 
-# ⚖️ 큐 클래스 통합 비교 표
+## 🛑 CChunkedBlockingQueue
+- **목적**: 청킹 단위 + 블로킹 대기 지원  
+- **구현 방식**: `mutex` + `condition_variable` + 청킹 스왑  
+- **장점**:  
+  - 소비자가 지정된 청크 단위로 안전하게 가져감  
+  - 데이터 없을 때 블로킹 대기 → CPU 낭비 없음  
+  - 종료 제어(graceful shutdown) 지원  
+- **성능**: 소비자가 한 번에 가져가는 양을 제한하면서도 블로킹 대기를 지원 → 안정성과 성능 균형 확보.  
+- **효율성**: 폭주 트래픽 제어 + 안정적 종료 제어가 동시에 가능.  
+- **사용 예시**:  
+  - 대량 요청 처리 시 안정적 워커 스레드 운영  
+  - IOCP 서버 패킷 전달 시 청킹 + 블로킹 대기  
+- **게임 서버 적용**:  
+  - 네트워크 패킷 전달(IOCP)  
+  - 대량 요청 처리 시 안정적 워커 스레드 운영  
+  - 종료 제어가 필요한 네트워크 파이프라인  
+- **실전 예제**:
+```cpp
+CChunkedBlockingQueue<int> packetQueue;
 
-| 특징 | **CDelayedTaskQueue** | **CDoubleBufferQueue** | **CSpinLockQueue** | **CBlockingTaskQueue** | **CChunkedSwapQueue** |
-|------|--------------------------|--------------------------|--------------------------|--------------------------|--------------------------|
-| **패턴** | SPMC | MPSC | MPMC | MPMC | SPMC |
-| **목적** | 특정 시점 이후 작업 실행 | 초고속 배치 처리 | 범용 작업 큐 | 블로킹 대기 지원 | 부하 제어 및 청킹 처리 |
-| **구현 방식** | priority_queue + condition_variable | 더블 버퍼링, 원자적 스왑 | 스핀락 + 아토믹 카운터 | mutex + condition_variable | 청킹 스왑 + 아토믹 카운터 |
-| **중점** | 시간 기반 실행 | 배치 처리 성능 | 직관적 범용 큐 | 안전한 블로킹 대기 | 부하 제어 및 분산 |
-| **락 방식** | Mutex + Condition Variable | Spinlock + Atomic | Spinlock | Mutex + Condition Variable | Spinlock |
-| **종료 처리** | Stop 플래그, 대기 스레드 깨움 | Stop 플래그, 데이터 유입 차단 | Stop 플래그, Push 차단 | Stop 플래그, 모든 스레드 깨움 | Stop 플래그, Push 차단 |
-| **장점** | 정밀 타이머, 효율적 대기 | 제로-할당, 락 경합 최소화 | 직관적, 빠른 상태 확인 | 안전한 종료, graceful shutdown | 폭주 트래픽 제어 |
-| **사용 예시** | 네트워크 재전송, 게임 이벤트 | 로그/통계 수집, DB 결과 | 글로벌 JobQueue | 워커 파이프라인 | IOCP 패킷 전달 |
-| **게임 서버 적용** | 타이머/스케줄링 | 로그/통계 수집 | 작업 분배 | 종료 제어 | 실시간 부하 제어 |
+std::thread producer([&packetQueue]() {
+    for (int i = 0; i < 50; ++i) {
+        packetQueue.Push(i);
+    }
+    packetQueue.SetProducerDone();
+});
+
+std::thread consumer([&packetQueue]() {
+    std::queue<int> outQueue;
+    while (packetQueue.SwapChunkBlocking(outQueue, 10)) {
+        while (!outQueue.empty()) {
+            std::cout << "처리된 패킷: " << outQueue.front() << std::endl;
+            outQueue.pop();
+        }
+    }
+    std::cout << "생산자 종료, 소비자도 종료" << std::endl;
+});
+
+producer.join();
+packetQueue.Stop(); // 종료 처리
+consumer.join();
+```
 
 ---
 
-## 🚀 설계 인사이트
+# ⚖️ 큐 클래스 통합 비교 표 (업데이트)
+
+| 특징 | **CDelayedTaskQueue** | **CDoubleBufferQueue** | **CSpinLockQueue** | **CBlockingTaskQueue** | **CChunkedSwapQueue** | **CChunkedBlockingQueue** |
+|------|--------------------------|--------------------------|--------------------------|--------------------------|--------------------------|--------------------------|
+| **패턴** | SPMC | MPSC | MPMC | MPMC | SPMC | SPMC |
+| **목적** | 특정 시점 이후 작업 실행 | 초고속 배치 처리 | 범용 작업 큐 | 블로킹 대기 지원 | 부하 제어 및 청킹 처리 | 청킹 + 블로킹 대기 |
+| **구현 방식** | priority_queue + condition_variable | 더블 버퍼링, 원자적 스왑 | 스핀락 + 아토믹 카운터 | mutex + condition_variable | 청킹 스왑 + 아토믹 카운터 | mutex + condition_variable + 청킹 |
+| **중점** | 시간 기반 실행 | 배치 처리 성능 | 직관적 범용 큐 | 안전한 블로킹 대기 | 부하 제어 및 분산 | 안정적 청킹 + 블로킹 |
+| **락 방식** | Mutex + Condition Variable | Spinlock + Atomic | Spinlock | Mutex + Condition Variable | Spinlock | Mutex + Condition Variable |
+| **종료 처리** | Stop 플래그, 대기 스레드 깨움 | Stop 플래그, 데이터 유입 차단 | Stop 플래그, Push 차단 | Stop 플래그, 모든 스레드 깨움 | Stop 플래그, Push 차단 | Stop 플래그, 모든 스레드 깨움 |
+| **장점** | 정밀 타이머, 효율적 대기 | 제로-할당, 락 경합 최소화 | 직관적, 빠른 상태 확인 | 안전한 종료, graceful shutdown | 폭주 트래픽 제어 | 폭주 트래픽 제어 + 종료 안정성 |
+| **사용 예시** | 네트워크 재전송, 게임 이벤트 | 로그/통계 수집, DB 결과 | 글로벌 JobQueue | 워커 파이프라인 | IOCP 패킷 전달 | IOCP 패킷 전달 + 안정적 종료 |
+| **게임 서버 적용** | 타이머/스케줄링 | 로그/통계 수집 | 작업 분배 | 종료 제어 | 실시간 부하 제어 | 실시간 부하 제어 + 종료 제어 |
+
+---
+
+## 🚀 설계 인사이트 (업데이트)
 - **CDelayedTaskQueue** → 시간 기반 이벤트 처리에 최적  
 - **CDoubleBufferQueue** → 초고속 로그/통계 수집에 적합  
 - **CSpinLockQueue** → 단순하고 직관적인 범용 작업 큐  
 - **CBlockingTaskQueue** → 블로킹 대기와 종료 제어가 필요한 파이프라인에 적합  
 - **CChunkedSwapQueue** → 폭주 트래픽 제어 및 실시간 안정성 확보에 최적  
+- **CChunkedBlockingQueue** → 폭주 트래픽 제어 + 안정적 종료 제어까지 필요한 환경에 최적  

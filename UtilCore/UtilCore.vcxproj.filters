@@ -311,6 +311,24 @@
     <ClInclude Include="Util\TypeCast.h">
       <Filter>Util</Filter>
     </ClInclude>
+    <ClInclude Include="Containers\Queue\ChunkedBlockingQueue.h">
+      <Filter>Containers\Queue</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\RioObject.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\RioEvent.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\RioEventPool.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\RioCore.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\RioWorker.h">
+      <Filter>Network</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">
@@ -474,6 +492,9 @@
       <Filter>Network</Filter>
     </ClCompile>
     <ClCompile Include="WindowsServiceBase.cpp" />
+    <ClCompile Include="Network\RioCore.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="DB\BaseODBC.inl">
