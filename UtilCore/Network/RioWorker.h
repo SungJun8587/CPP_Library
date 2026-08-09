@@ -56,26 +56,24 @@ public:
     CRioWorker& operator=(CRioWorker&&) = delete;
 
     //***************************************************************************
-    // @brief RIO 워커 및 내부 CRioCore 엔진을 초기화합니다.
-    // @details eventPool의 용량이 이번에 계산된 totalCapacity보다 작으면 그 차이만큼
-    //          자동으로 CRioEventPool::Initialize()를 추가 호출하여 CQ 용량과
-    //          이벤트 풀 용량이 서로 어긋나지 않도록 맞춥니다.
-    // @param representativeSocket 함수 테이블 바인딩용 대표 소켓
-    // @param maxSessionCount 시스템 최대 동시 접속 세션 수
-    // @param maxOutstandingRecv 세션당 최대 수신 허용치
-    // @param maxOutstandingSend 세션당 최대 송신 허용치
-    // @param cqIdentifier 무결성 검증을 위한 고유 CQ 키
-    // @param eventPool 이벤트를 할당받고 반환할 CRioEventPool 포인터
-    // @param timeoutMs GQCS 대기 타임아웃 (밀리초 단위, 기본값 20ms)
-    // @return 초기화 성공 시 true, 실패 시 false 반환
-    //***************************************************************************
+        // @brief RIO 워커 및 내부 CRioCore 엔진을 초기화합니다.
+        // @details eventPool의 용량이 이번에 계산된 totalCapacity보다 작으면 그 차이만큼
+        //          자동으로 CRioEventPool::Initialize()를 추가 호출하여 CQ 용량과
+        //          이벤트 풀 용량이 서로 어긋나지 않도록 맞춥니다.
+        // @param representativeSocket 함수 테이블 바인딩용 대표 소켓
+        // @param maxSessionCount 시스템 최대 동시 접속 세션 수
+        // @param maxOutstandingRecv 세션당 최대 수신 허용치
+        // @param maxOutstandingSend 세션당 최대 송신 허용치
+        // @param cqIdentifier 무결성 검증을 위한 고유 CQ 키
+        // @param eventPool 이벤트를 할당받고 반환할 CRioEventPool 포인터
+        // @return 초기화 성공 시 true, 실패 시 false 반환
+        //***************************************************************************
     bool Initialize(SOCKET representativeSocket,
         DWORD maxSessionCount,
         DWORD maxOutstandingRecv,
         DWORD maxOutstandingSend,
         ULONG_PTR cqIdentifier,
-        CRioEventPool* eventPool,
-        DWORD timeoutMs = 20)
+        CRioEventPool* eventPool)
     {
         if( eventPool == nullptr )
             return false;
@@ -98,8 +96,8 @@ public:
         _cqIdentifier = cqIdentifier;
         _eventPool = eventPool;
 
-        // 내부 CRioCore 초기화 (CQ 및 전용 IOCP 생성)
-        return _rioCore.Initialize(representativeSocket, static_cast<ULONG>(totalCapacity), _cqIdentifier, _eventPool, timeoutMs);
+        // 내부 CRioCore 초기화
+        return _rioCore.Initialize(representativeSocket, static_cast<ULONG>(totalCapacity), _cqIdentifier, _eventPool);
     }
 
     //***************************************************************************

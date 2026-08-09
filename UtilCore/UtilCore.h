@@ -90,6 +90,8 @@ using namespace std;
 #include <Containers/Queue/MPSCLockFreeQueue.h>
 #include <Containers/Queue/MPMCLockFreeQueue.h>
 
+#include <Containers/Stack/LockFreeSlotStack.h>
+
 #include <Job/Job.h>
 #include <Job/JobTimer.h>
 #include <Job/JobQueue.h>
@@ -105,7 +107,8 @@ using namespace std;
 #include <Network/RioEvent.h>
 #include <Network/RioEventPool.h>
 #include <Network/RioCore.h>
-//#include <Network/RioWorker.h>
+#include <Network/RioBuffer.h>
+#include <Network/RioWorker.h>
 
 #include <BaseGlobal.h>
 #include <BaseTLS.h>

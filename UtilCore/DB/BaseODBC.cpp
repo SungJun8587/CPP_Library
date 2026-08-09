@@ -354,23 +354,23 @@ bool CBaseODBC::GetServerCharacterSet(TCHAR* ptszCharset, int32 nBufferLength)
 	// DBMS 종류에 따른 조회 쿼리 설정
 	switch( m_DbClass )
 	{
-	case EDBClass::MSSQL:
-		// SQL Server의 서버 전역 캐릭터셋/정렬 방식(Collation) 조회
-		_stprintf_s(tszQuery, _T("SELECT @@SERVERNAME, SERVERPROPERTY('Collation')"));
-		break;
+		case EDBClass::MSSQL:
+			// SQL Server의 서버 전역 캐릭터셋/정렬 방식(Collation) 조회
+			_stprintf_s(tszQuery, _T("SELECT @@SERVERNAME, SERVERPROPERTY('Collation')"));
+			break;
 
-	case EDBClass::MYSQL:
-		// MySQL의 서버 캐릭터셋(character_set_server) 조회
-		_stprintf_s(tszQuery, _T("SHOW VARIABLES LIKE 'character_set_server'"));
-		break;
+		case EDBClass::MYSQL:
+			// MySQL의 서버 캐릭터셋(character_set_server) 조회
+			_stprintf_s(tszQuery, _T("SHOW VARIABLES LIKE 'character_set_server'"));
+			break;
 
-	case EDBClass::ORACLE:
-		// Oracle의 데이터베이스 캐릭터셋 정보 조회
-		_stprintf_s(tszQuery, _T("SELECT * FROM NLS_DATABASE_PARAMETERS WHERE PARAMETER = 'NLS_CHARACTERSET'"));
-		break;
+		case EDBClass::ORACLE:
+			// Oracle의 데이터베이스 캐릭터셋 정보 조회
+			_stprintf_s(tszQuery, _T("SELECT * FROM NLS_DATABASE_PARAMETERS WHERE PARAMETER = 'NLS_CHARACTERSET'"));
+			break;
 
-	default:
-		return false;
+		default:
+			return false;
 	}
 
 	// 쿼리 직접 실행
@@ -412,8 +412,6 @@ bool CBaseODBC::PrepareQuery(const TCHAR* ptszQueryInfo)
 			return false;
 		}
 	}
-
-	ClearStmt();
 
 	_tcsncpy_s(m_tszQueryInfo, SQL_MAX_MESSAGE_LENGTH, ptszQueryInfo, _TRUNCATE);
 

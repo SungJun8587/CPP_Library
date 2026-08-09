@@ -26,7 +26,11 @@ bool CDBQueryProcess::GetDBSystemInfo(int32& iSystemCount, std::unique_ptr<DB_SY
 
 	query = GetDBSystemQuery(_dbClass);
 
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
+	if( _dbConn.ExecDirect(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
 	pDBSystemInfo = unique_ptr<DB_SYSTEM_INFO>(new DB_SYSTEM_INFO);
 
@@ -34,7 +38,13 @@ bool CDBQueryProcess::GetDBSystemInfo(int32& iSystemCount, std::unique_ptr<DB_SY
 	_dbConn.BindCol(pDBSystemInfo->tszCharacterSet, iCharSetSize);
 	_dbConn.BindCol(pDBSystemInfo->tszCollation, iCharSetSize);
 
-	if( _dbConn.Fetch() == false ) return false;
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -53,15 +63,31 @@ bool CDBQueryProcess::GetDBSystemDataTypeInfo(int& iDatatypeCount, std::unique_p
 	query = query + "SELECT COUNT(*) AS [datatype_count] FROM sys.types WHERE system_type_id = user_type_id;";
 	query = query + "\r\n" + GetDBSystemDataTypeQuery(_dbClass);
 
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
+	if( _dbConn.ExecDirect(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
 	_dbConn.BindCol(iDatatypeCount);
 
-	if( _dbConn.Fetch() == false ) return false;
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
-	if( iDatatypeCount == 0 ) return false;
+	if( iDatatypeCount == 0 )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
-	if( _dbConn.MoreResults() != SQL_SUCCESS ) return false;
+	if( _dbConn.MoreResults() != SQL_SUCCESS )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
 	pDBSystemDataType = unique_ptr<DB_SYSTEM_DATATYPE[]>(new DB_SYSTEM_DATATYPE[iDatatypeCount]);
 
@@ -76,7 +102,13 @@ bool CDBQueryProcess::GetDBSystemDataTypeInfo(int& iDatatypeCount, std::unique_p
 	_dbConn.BindCol(pDBSystemDataType[0].tszCollation, iCharSetSize);
 	_dbConn.BindCol(pDBSystemDataType[0].IsNullable);
 
-	if( _dbConn.Fetch() == false ) return false;
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -96,15 +128,31 @@ bool CDBQueryProcess::GetDatabaseList(int& iDBCount, std::unique_ptr<DB_INFO[]>&
 
 	query = query + "\r\n" + GetDatabaseListQuery(_dbClass);
 
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
+	if( _dbConn.ExecDirect(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
 	_dbConn.BindCol(iDBCount);
 
-	if( _dbConn.Fetch() == false ) return false;
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
-	if( iDBCount == 0 ) return false;
+	if( iDBCount == 0 )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
-	if( _dbConn.MoreResults() != SQL_SUCCESS ) return false;
+	if( _dbConn.MoreResults() != SQL_SUCCESS )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
 	pDatabase = unique_ptr<DB_INFO[]>(new DB_INFO[iDBCount]);
 
@@ -113,7 +161,13 @@ bool CDBQueryProcess::GetDatabaseList(int& iDBCount, std::unique_ptr<DB_INFO[]>&
 
 	_dbConn.BindCol(pDatabase[0].tszDBName, iDBNameSize);
 
-	if( _dbConn.Fetch() == false ) return false;
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -141,15 +195,31 @@ bool CDBQueryProcess::MSSQLGetRowStoreIndexFragmentationCheck(const TCHAR* ptszT
 
 	query = query + "\r\n" + MSSQLGetRowStoreIndexFragmentationCheckQuery(ptszTableName);
 
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
+	if( _dbConn.ExecDirect(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
 	_dbConn.BindCol(iIndexCount);
 
-	if( _dbConn.Fetch() == false ) return false;
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
-	if( iIndexCount == 0 ) return false;
+	if( iIndexCount == 0 )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
-	if( _dbConn.MoreResults() != SQL_SUCCESS ) return false;
+	if( _dbConn.MoreResults() != SQL_SUCCESS )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
 	pIndexFragmentation = unique_ptr<MSSQL_INDEX_FRAGMENTATION[]>(new MSSQL_INDEX_FRAGMENTATION[iIndexCount]);
 
@@ -168,7 +238,13 @@ bool CDBQueryProcess::MSSQLGetRowStoreIndexFragmentationCheck(const TCHAR* ptszT
 	_dbConn.BindCol(pIndexFragmentation[0].PageCount);
 	_dbConn.BindCol(pIndexFragmentation[0].tszAllocUnitTypeDesc, iBuffSize);
 
-	if( _dbConn.Fetch() == false ) return false;
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -204,15 +280,31 @@ bool CDBQueryProcess::MSSQLGetColumnStoreIndexFragmentationCheck(const TCHAR* pt
 
 	query = query + "\r\n" + MSSQLGetColumnStoreIndexFragmentationCheckQuery(ptszTableName);
 
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
+	if( _dbConn.ExecDirect(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
 	_dbConn.BindCol(iIndexCount);
 
-	if( _dbConn.Fetch() == false ) return false;
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
-	if( iIndexCount == 0 ) return false;
+	if( iIndexCount == 0 )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
-	if( _dbConn.MoreResults() != SQL_SUCCESS ) return false;
+	if( _dbConn.MoreResults() != SQL_SUCCESS )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
 	pIndexFragmentation = unique_ptr<MSSQL_INDEX_FRAGMENTATION[]>(new MSSQL_INDEX_FRAGMENTATION[iIndexCount]);
 
@@ -227,7 +319,13 @@ bool CDBQueryProcess::MSSQLGetColumnStoreIndexFragmentationCheck(const TCHAR* pt
 	_dbConn.BindCol(pIndexFragmentation[0].tszIndexType, iObjectTypeDescSize);
 	_dbConn.BindCol(pIndexFragmentation[0].AvgFragmentationInPercent);
 
-	if( _dbConn.Fetch() == false ) return false;
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -240,7 +338,13 @@ bool CDBQueryProcess::MSSQLIndexOptionSet(const TCHAR* ptszSchemaName, const TCH
 
 	_tstring query = MSSQLIndexOptionSetQuery(ptszSchemaName, ptszTableName, ptszIndexName, indexOptions);
 
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
+	if( _dbConn.ExecDirect(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -253,7 +357,13 @@ bool CDBQueryProcess::MSSQLAlterIndexFragmentationNonOption(const TCHAR* ptszSch
 
 	_tstring query = MSSQLAlterIndexFragmentationNonOptionQuery(ptszSchemaName, ptszTableName, ptszIndexName, indexFragmentation);
 
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
+	if( _dbConn.ExecDirect(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -266,7 +376,13 @@ bool CDBQueryProcess::MSSQLAlterIndexFragmentationOption(const TCHAR* ptszSchema
 
 	_tstring query = MSSQLAlterIndexFragmentationOptionQuery(ptszSchemaName, ptszTableName, ptszIndexName, indexFragmentation, indexOptions);
 
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
+	if( _dbConn.ExecDirect(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -289,17 +405,27 @@ _tstring CDBQueryProcess::MSSQLHelpText(const EDBObjectType dbObject, const TCHA
 	// EXEC sp_helptext [ObjectName]
 	//	ObjectName : [PROCEDURE|FUNCTION|TRIGGERS|EVENTS|VIEW] NAME
 	query = MSSQLGetHelpTextQuery(dbObject);
-	if( _dbConn.PrepareQuery(query.c_str()) == false ) return body;
+	if( _dbConn.PrepareQuery(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return body;
+	}
 
 	_dbConn.BindParamInput(1, ptszObjectName, sdwObjectName);
 	_dbConn.BindCol(tszText, iBuffSize);
 
-	if( _dbConn.Execute() == false ) return body;
+	if( _dbConn.Execute() == false )
+	{
+		_dbConn.ClearStmt();
+		return body;
+	}
 
 	while( _dbConn.Fetch() )
 	{
 		body.append(tszText);
 	}
+
+	_dbConn.ClearStmt();
 
 	return body;
 }
@@ -314,7 +440,13 @@ bool CDBQueryProcess::MSSQLRenameObject(const TCHAR* ptszObjectName, const TCHAR
 	if( ptszObjectName == nullptr || _tcslen(ptszObjectName) < 1 ) return false;
 
 	query = MSSQLGetRenameObjectQuery(ptszObjectName, ptszChgObjectName, renameObjectType);
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
+	if( _dbConn.ExecDirect(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -594,7 +726,11 @@ _tstring CDBQueryProcess::MSSQLGetExtendedProperty(const MSSQL_ExtendedProperty 
 
 	query = query + "SELECT CAST(fn.[value] AS NVARCHAR(4000)) AS comment ";
 	query = query + "\n" + "FROM sys.fn_listextendedproperty(?, ?, ?, ?, ?, ?, ?) AS fn";
-	if( _dbConn.PrepareQuery(query.c_str()) == false ) return ret;
+	if( _dbConn.PrepareQuery(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return ret;
+	}
 
 	_dbConn.BindParamInput(1, extendedProperty._propertyName.c_str(), sdwPropertyName);
 	_dbConn.BindParamInput(2, extendedProperty._level0_object_type.c_str(), sdwLevel0_object_type);
@@ -606,18 +742,32 @@ _tstring CDBQueryProcess::MSSQLGetExtendedProperty(const MSSQL_ExtendedProperty 
 
 	_dbConn.BindCol(tszDescription, iBuffSize);
 
-	if( _dbConn.Execute() == false ) return ret;
-	if( _dbConn.Fetch() == false ) return ret;
+	if( _dbConn.Execute() == false )
+	{
+		_dbConn.ClearStmt();
+		return ret;
+	}
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return ret;
+	}
 
 	// 결과 레코드가 1개인 경우에만 성공 처리
 	int64 iRowCount = _dbConn.RowCount();
-	if( iRowCount != 1 ) return ret;
+	if( iRowCount != 1 )
+	{
+		_dbConn.ClearStmt();
+		return ret;
+	}
 
 	if( tszDescription != nullptr && _tcslen(tszDescription) > 0 )
 	{
 		ret.resize(iBuffSize);
 		ret.assign(tszDescription);
 	}
+
+	_dbConn.ClearStmt();
 
 	return ret;
 }
@@ -636,7 +786,11 @@ bool CDBQueryProcess::MSSQLAddExtendedProperty(const MSSQL_ExtendedProperty exte
 	if( extendedProperty._level2_object_type.size() > 0 && extendedProperty._level2_object_name.size() > 0 )
 	{
 		query = _T("EXEC sp_addextendedproperty ?, ?, ?, ?, ?, ?, ?, ?");
-		if( _dbConn.PrepareQuery(query.c_str()) == false ) return false;
+		if( _dbConn.PrepareQuery(query.c_str()) == false )
+		{
+			_dbConn.ClearStmt();
+			return false;
+		}
 
 		_dbConn.BindParamInput(extendedProperty._propertyName.c_str());
 		_dbConn.BindParamInput(extendedProperty._propertyValue.c_str());
@@ -650,7 +804,11 @@ bool CDBQueryProcess::MSSQLAddExtendedProperty(const MSSQL_ExtendedProperty exte
 	else
 	{
 		query = _T("EXEC sp_addextendedproperty ?, ?, ?, ?, ?, ?");
-		if( _dbConn.PrepareQuery(query.c_str()) == false ) return false;
+		if( _dbConn.PrepareQuery(query.c_str()) == false )
+		{
+			_dbConn.ClearStmt();
+			return false;
+		}
 
 		_dbConn.BindParamInput(extendedProperty._propertyName.c_str());
 		_dbConn.BindParamInput(extendedProperty._propertyValue.c_str());
@@ -661,7 +819,12 @@ bool CDBQueryProcess::MSSQLAddExtendedProperty(const MSSQL_ExtendedProperty exte
 	}
 
 	if( _dbConn.Execute() == false )
+	{
+		_dbConn.ClearStmt();
 		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -680,7 +843,11 @@ bool CDBQueryProcess::MSSQLUpdateExtendedProperty(const MSSQL_ExtendedProperty e
 	if( extendedProperty._level2_object_type.size() > 0 && extendedProperty._level2_object_name.size() > 0 )
 	{
 		query = _T("EXEC sp_updateextendedproperty ?, ?, ?, ?, ?, ?, ?, ?");
-		if( _dbConn.PrepareQuery(query.c_str()) == false ) return false;
+		if( _dbConn.PrepareQuery(query.c_str()) == false )
+		{
+			_dbConn.ClearStmt();
+			return false;
+		}
 
 		_dbConn.BindParamInput(extendedProperty._propertyName.c_str());
 		_dbConn.BindParamInput(extendedProperty._propertyValue.c_str());
@@ -694,7 +861,11 @@ bool CDBQueryProcess::MSSQLUpdateExtendedProperty(const MSSQL_ExtendedProperty e
 	else
 	{
 		query = _T("EXEC sp_updateextendedproperty ?, ?, ?, ?, ?, ?");
-		if( _dbConn.PrepareQuery(query.c_str()) == false ) return false;
+		if( _dbConn.PrepareQuery(query.c_str()) == false )
+		{
+			_dbConn.ClearStmt();
+			return false;
+		}
 
 		_dbConn.BindParamInput(extendedProperty._propertyName.c_str());
 		_dbConn.BindParamInput(extendedProperty._propertyValue.c_str());
@@ -705,7 +876,12 @@ bool CDBQueryProcess::MSSQLUpdateExtendedProperty(const MSSQL_ExtendedProperty e
 	}
 
 	if( _dbConn.Execute() == false )
+	{
+		_dbConn.ClearStmt();
 		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -724,7 +900,11 @@ bool CDBQueryProcess::MSSQLDropExtendedProperty(const MSSQL_ExtendedProperty ext
 	if( extendedProperty._level2_object_type.size() > 0 && extendedProperty._level2_object_name.size() > 0 )
 	{
 		query = _T("EXEC sp_dropextendedproperty ?, ?, ?, ?, ?, ?, ?");
-		if( _dbConn.PrepareQuery(query.c_str()) == false ) return false;
+		if( _dbConn.PrepareQuery(query.c_str()) == false )
+		{
+			_dbConn.ClearStmt();
+			return false;
+		}
 
 		_dbConn.BindParamInput(extendedProperty._propertyName.c_str());
 		_dbConn.BindParamInput(extendedProperty._level0_object_type.c_str());
@@ -737,7 +917,11 @@ bool CDBQueryProcess::MSSQLDropExtendedProperty(const MSSQL_ExtendedProperty ext
 	else
 	{
 		query = _T("EXEC sp_dropextendedproperty ?, ?, ?, ?, ?");
-		if( _dbConn.PrepareQuery(query.c_str()) == false ) return false;
+		if( _dbConn.PrepareQuery(query.c_str()) == false )
+		{
+			_dbConn.ClearStmt();
+			return false;
+		}
 
 		_dbConn.BindParamInput(extendedProperty._propertyName.c_str());
 		_dbConn.BindParamInput(extendedProperty._level0_object_type.c_str());
@@ -747,7 +931,12 @@ bool CDBQueryProcess::MSSQLDropExtendedProperty(const MSSQL_ExtendedProperty ext
 	}
 
 	if( _dbConn.Execute() == false )
+	{
+		_dbConn.ClearStmt();
 		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -768,15 +957,31 @@ bool CDBQueryProcess::MYSQLGetCharacterSets(const TCHAR* ptszCharset, int32& iCh
 
 	query = query + "\r\n" + MYSQLGetCharacterSetsQuery(ptszCharset);
 
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
+	if( _dbConn.ExecDirect(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
 	_dbConn.BindCol(iCharsetCount);
 
-	if( _dbConn.Fetch() == false ) return false;
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
-	if( iCharsetCount == 0 ) return false;
+	if( iCharsetCount == 0 )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
-	if( _dbConn.MoreResults() != SQL_SUCCESS ) return false;
+	if( _dbConn.MoreResults() != SQL_SUCCESS )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
 	pCharacterSet = unique_ptr<MYSQL_CHARACTER_SET[]>(new MYSQL_CHARACTER_SET[iCharsetCount]);
 
@@ -787,7 +992,13 @@ bool CDBQueryProcess::MYSQLGetCharacterSets(const TCHAR* ptszCharset, int32& iCh
 	_dbConn.BindCol(pCharacterSet[0].tszDefaultCollation, iCollationSize);
 	_dbConn.BindCol(pCharacterSet[0].tszDescription, iDescriptionSize);
 
-	if( _dbConn.Fetch() == false ) return false;
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -808,15 +1019,31 @@ bool CDBQueryProcess::MYSQLGetCollations(const TCHAR* ptszCharset, int32& iChars
 
 	query = query + "\r\n" + MYSQLGetCollationsQuery(ptszCharset);
 
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
+	if( _dbConn.ExecDirect(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
 	_dbConn.BindCol(iCharsetCount);
 
-	if( _dbConn.Fetch() == false ) return false;
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
-	if( iCharsetCount == 0 ) return false;
+	if( iCharsetCount == 0 )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
-	if( _dbConn.MoreResults() != SQL_SUCCESS ) return false;
+	if( _dbConn.MoreResults() != SQL_SUCCESS )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
 	pCollation = unique_ptr<MYSQL_COLLATION[]>(new MYSQL_COLLATION[iCharsetCount]);
 
@@ -831,7 +1058,13 @@ bool CDBQueryProcess::MYSQLGetCollations(const TCHAR* ptszCharset, int32& iChars
 	_dbConn.BindCol(pCollation[0].tszPadAttribute, iSize);
 	_dbConn.BindCol(pCollation[0].SortLen);
 
-	if( _dbConn.Fetch() == false ) return false;
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -851,15 +1084,31 @@ bool CDBQueryProcess::MYSQLGetCharacterSetCollations(const TCHAR* ptszCharset, i
 
 	query = query + "\r\n" + MYSQLGetCharacterSetCollationsQuery(ptszCharset);
 
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
+	if( _dbConn.ExecDirect(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
 	_dbConn.BindCol(iCharsetCount);
 
-	if( _dbConn.Fetch() == false ) return false;
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
-	if( iCharsetCount == 0 ) return false;
+	if( iCharsetCount == 0 )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
-	if( _dbConn.MoreResults() != SQL_SUCCESS ) return false;
+	if( _dbConn.MoreResults() != SQL_SUCCESS )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
 	pCharacterSetCollation = unique_ptr<MYSQL_CHARACTER_SET_COLLATION[]>(new MYSQL_CHARACTER_SET_COLLATION[iCharsetCount]);
 
@@ -869,7 +1118,13 @@ bool CDBQueryProcess::MYSQLGetCharacterSetCollations(const TCHAR* ptszCharset, i
 	_dbConn.BindCol(pCharacterSetCollation[0].tszCharacterSet, iCharacterSetSize);
 	_dbConn.BindCol(pCharacterSetCollation[0].tszCollation, iCollationSize);
 
-	if( _dbConn.Fetch() == false ) return false;
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -887,15 +1142,31 @@ bool CDBQueryProcess::MYSQLGetStorageEngines(int32& iStorageEngineCount, std::un
 	query = query + "SELECT COUNT(*) AS `engine_count` FROM INFORMATION_SCHEMA.ENGINES;";
 	query = query + "\r\n" + MYSQLGetEnginesQuery();
 
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
+	if( _dbConn.ExecDirect(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
 	_dbConn.BindCol(iStorageEngineCount);
 
-	if( _dbConn.Fetch() == false ) return false;
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
-	if( iStorageEngineCount == 0 ) return false;
+	if( iStorageEngineCount == 0 )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
-	if( _dbConn.MoreResults() != SQL_SUCCESS ) return false;
+	if( _dbConn.MoreResults() != SQL_SUCCESS )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
 	pStorageEngine = unique_ptr<MYSQL_STORAGE_ENGINE[]>(new MYSQL_STORAGE_ENGINE[iStorageEngineCount]);
 
@@ -909,7 +1180,13 @@ bool CDBQueryProcess::MYSQLGetStorageEngines(int32& iStorageEngineCount, std::un
 	_dbConn.BindCol(pStorageEngine[0].tszXA, iSize);
 	_dbConn.BindCol(pStorageEngine[0].tszSavepoints, iSize);
 
-	if( _dbConn.Fetch() == false ) return false;
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -922,7 +1199,13 @@ bool CDBQueryProcess::MYSQLAlterTable(const TCHAR* ptszTableName, const TCHAR* p
 
 	_tstring query = MYSQLGetAlterTableQuery(ptszTableName, ptszCharacterSet, ptszCollation, ptszEngine);
 
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
+	if( _dbConn.ExecDirect(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -935,7 +1218,13 @@ bool CDBQueryProcess::MYSQLAlterTableCollation(const TCHAR* ptszTableName, const
 
 	_tstring query = MYSQLGetAlterTableCollationQuery(ptszTableName, ptszCharacterSet, ptszCollation);
 
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
+	if( _dbConn.ExecDirect(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -954,15 +1243,31 @@ bool CDBQueryProcess::MYSQLGetTableFragmentationCheck(const TCHAR* ptszTableName
 
 	query = query + "\r\n" + MYSQLGetTableFragmentationCheckQuery(ptszTableName);
 
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
+	if( _dbConn.ExecDirect(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
 	_dbConn.BindCol(iTableCount);
 
-	if( _dbConn.Fetch() == false ) return false;
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
-	if( iTableCount == 0 ) return false;
+	if( iTableCount == 0 )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
-	if( _dbConn.MoreResults() != SQL_SUCCESS ) return false;
+	if( _dbConn.MoreResults() != SQL_SUCCESS )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
 	pTableFragmentation = unique_ptr<MYSQL_TABLE_FRAGMENTATION[]>(new MYSQL_TABLE_FRAGMENTATION[iTableCount]);
 
@@ -973,7 +1278,13 @@ bool CDBQueryProcess::MYSQLGetTableFragmentationCheck(const TCHAR* ptszTableName
 	_dbConn.BindCol(pTableFragmentation[0].TotalSize);
 	_dbConn.BindCol(pTableFragmentation[0].DataFreeSize);
 
-	if( _dbConn.Fetch() == false ) return false;
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -986,7 +1297,13 @@ bool CDBQueryProcess::MYSQLOptimizeTable(const TCHAR* ptszTableName)
 
 	_tstring query = MYSQLGetOptimizeTableQuery(ptszTableName);
 
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
+	if( _dbConn.ExecDirect(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -1007,17 +1324,27 @@ _tstring CDBQueryProcess::MYSQLShowTable(const TCHAR* ptszTableName)
 	if( ptszTableName == nullptr || _tcslen(ptszTableName) < 1 ) return body;
 
 	query = MYSQLGetShowObjectQuery(EDBObjectType::TABLE, ptszTableName);
-	if( _dbConn.PrepareQuery(query.c_str()) == false ) return body;
+	if( _dbConn.PrepareQuery(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return body;
+	}
 
 	_dbConn.BindCol(tszName, iNameSize);
 	_dbConn.BindCol(tszBody, iBodySize);
 
-	if( _dbConn.Execute() == false ) return body;
+	if( _dbConn.Execute() == false )
+	{
+		_dbConn.ClearStmt();
+		return body;
+	}
 
 	while( _dbConn.Fetch() )
 	{
 		body.append(tszBody);
 	}
+
+	_dbConn.ClearStmt();
 
 	return body;
 }
@@ -1043,7 +1370,11 @@ _tstring CDBQueryProcess::MYSQLShowObject(const EDBObjectType dbObject, const TC
 	if( ptszObjectName == nullptr || _tcslen(ptszObjectName) < 1 ) return body;
 
 	query = MYSQLGetShowObjectQuery(dbObject, ptszObjectName);
-	if( _dbConn.PrepareQuery(query.c_str()) == false ) return body;
+	if( _dbConn.PrepareQuery(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return body;
+	}
 
 	_dbConn.BindCol(tszName, iNameSize);
 	_dbConn.BindCol(tszSqlmode, iBaseSize);
@@ -1052,12 +1383,18 @@ _tstring CDBQueryProcess::MYSQLShowObject(const EDBObjectType dbObject, const TC
 	_dbConn.BindCol(tszCollationConnection, iBaseSize);
 	_dbConn.BindCol(tszDatabaseCollation, iBaseSize);
 
-	if( _dbConn.Execute() == false ) return body;
+	if( _dbConn.Execute() == false )
+	{
+		_dbConn.ClearStmt();
+		return body;
+	}
 
 	while( _dbConn.Fetch() )
 	{
 		body.append(tszBody);
 	}
+
+	_dbConn.ClearStmt();
 
 	return body;
 }
@@ -1070,7 +1407,13 @@ bool CDBQueryProcess::MYSQLRenameObject(const TCHAR* ptszTableName, const TCHAR*
 
 	_tstring query = MYSQLGetRenameObjectQuery(ptszTableName, ptszChgName, ptszColumnName, ptszDataTypeDesc, bIsNullable, ptszDefaultDefinition, bIsIdentity, ptszCharacterSet, ptszCollation, ptszComment);
 
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
+	if( _dbConn.ExecDirect(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -1091,16 +1434,34 @@ _tstring CDBQueryProcess::MYSQLGetTableColumnComment(const TCHAR* ptszTableName,
 	if( ptszTableName == nullptr || _tcslen(ptszTableName) < 1 ) return ret;
 
 	query = MYSQLGetTableColumnCommentQuery(ptszTableName, ptszColumnName);
-	if( _dbConn.PrepareQuery(query.c_str()) == false ) return ret;
+	if( _dbConn.PrepareQuery(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return ret;
+	}
 
 	_dbConn.BindCol(tszDescription, iBuffSize);
 
-	if( _dbConn.Execute() == false ) return ret;
-	if( _dbConn.Fetch() == false ) return ret;
+	if( _dbConn.Execute() == false )
+	{
+		_dbConn.ClearStmt();
+		return ret;
+	}
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return ret;
+	}
 
 	// 결과 레코드가 1개인 경우에만 성공 처리
 	int64 iRowCount = _dbConn.RowCount();
-	if( iRowCount != 1 ) return ret;
+	if( iRowCount != 1 )
+	{
+		_dbConn.ClearStmt();
+		return ret;
+	}
+
+	_dbConn.ClearStmt();
 
 	ret.resize(iBuffSize);
 	ret.assign(tszDescription);
@@ -1119,7 +1480,13 @@ bool CDBQueryProcess::MYSQLProcessTableColumnComment(const TCHAR* ptszTableName,
 
 	_tstring query = MYSQLProcessTableColumnCommentQuery(ptszTableName, ptszComment, ptszColumnName, ptszDataTypeDesc, bIsNullable, ptszDefaultDefinition, bIsIdentity, ptszCharacterSet, ptszCollation);
 
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
+	if( _dbConn.ExecDirect(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -1139,16 +1506,34 @@ _tstring CDBQueryProcess::MYSQLGetProcedureComment(const TCHAR* ptszProcName)
 	if( ptszProcName == nullptr || _tcslen(ptszProcName) < 1 ) return ret;
 
 	query = MYSQLGetProcedureCommentQuery(ptszProcName);
-	if( _dbConn.PrepareQuery(query.c_str()) == false ) return ret;
+	if( _dbConn.PrepareQuery(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return ret;
+	}
 
 	_dbConn.BindCol(tszDescription, iBuffSize);
 
-	if( _dbConn.Execute() == false ) return ret;
-	if( _dbConn.Fetch() == false ) return ret;
+	if( _dbConn.Execute() == false )
+	{
+		_dbConn.ClearStmt();
+		return ret;
+	}
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return ret;
+	}
 
 	// 결과 레코드가 1개인 경우에만 성공 처리
 	int64 iRowCount = _dbConn.RowCount();
-	if( iRowCount != 1 ) return ret;
+	if( iRowCount != 1 )
+	{
+		_dbConn.ClearStmt();
+		return ret;
+	}
+
+	_dbConn.ClearStmt();
 
 	ret.resize(iBuffSize);
 	ret.assign(tszDescription);
@@ -1166,7 +1551,13 @@ bool CDBQueryProcess::MYSQLProcessProcedureComment(const TCHAR* ptszProcName, co
 
 	_tstring query = MYSQLProcessProcedureCommentQuery(ptszProcName, ptszComment);
 
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
+	if( _dbConn.ExecDirect(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -1186,16 +1577,34 @@ _tstring CDBQueryProcess::MYSQLGetFunctionComment(const TCHAR* ptszFuncName)
 	if( ptszFuncName == nullptr || _tcslen(ptszFuncName) < 1 ) return ret;
 
 	query = MYSQLGetFunctionCommentQuery(ptszFuncName);
-	if( _dbConn.PrepareQuery(query.c_str()) == false ) return ret;
+	if( _dbConn.PrepareQuery(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return ret;
+	}
 
 	_dbConn.BindCol(tszDescription, iBuffSize);
 
-	if( _dbConn.Execute() == false ) return ret;
-	if( _dbConn.Fetch() == false ) return ret;
+	if( _dbConn.Execute() == false )
+	{
+		_dbConn.ClearStmt();
+		return ret;
+	}
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return ret;
+	}
 
 	// 결과 레코드가 1개인 경우에만 성공 처리
 	int64 iRowCount = _dbConn.RowCount();
-	if( iRowCount != 1 ) return ret;
+	if( iRowCount != 1 )
+	{
+		_dbConn.ClearStmt();
+		return ret;
+	}
+
+	_dbConn.ClearStmt();
 
 	ret.resize(iBuffSize);
 	ret.assign(tszDescription);
@@ -1213,7 +1622,13 @@ bool CDBQueryProcess::MYSQLProcessFunctionComment(const TCHAR* ptszFuncName, con
 
 	_tstring query = MYSQLProcessFunctionCommentQuery(ptszFuncName, ptszComment);
 
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
+	if( _dbConn.ExecDirect(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -1229,7 +1644,13 @@ bool CDBQueryProcess::ORACLEProcessTableColumnComment(const TCHAR* ptszTableName
 
 	_tstring query = ORACLEProcessTableColumnCommentQuery(ptszTableName, ptszDescription, ptszColumnName);
 
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
+	if( _dbConn.ExecDirect(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -1250,16 +1671,34 @@ _tstring CDBQueryProcess::ORACLEMetaDataGetDDL(const EDBObjectType dbObject, con
 	if( ptszObjectName == nullptr || _tcslen(ptszObjectName) < 1 ) return ret;
 
 	query = ORACLEMetaDataGetDDLQuery(dbObject, ptszObjectName, ptszSchemaName);
-	if( _dbConn.PrepareQuery(query.c_str()) == false ) return ret;
+	if( _dbConn.PrepareQuery(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return ret;
+	}
 
 	_dbConn.BindCol(tszDescription, iBuffSize);
 
-	if( _dbConn.Execute() == false ) return ret;
-	if( _dbConn.Fetch() == false ) return ret;
+	if( _dbConn.Execute() == false )
+	{
+		_dbConn.ClearStmt();
+		return ret;
+	}
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return ret;
+	}
 
 	// 결과 레코드가 1개인 경우에만 성공 처리
 	int64 iRowCount = _dbConn.RowCount();
-	if( iRowCount != 1 ) return ret;
+	if( iRowCount != 1 )
+	{
+		_dbConn.ClearStmt();
+		return ret;
+	}
+
+	_dbConn.ClearStmt();
 
 	ret.resize(iBuffSize);
 	ret.assign(tszDescription);
@@ -1281,16 +1720,34 @@ _tstring CDBQueryProcess::ORACLEGetUserSource(const EDBObjectType dbObject, cons
 	if( ptszObjectName == nullptr || _tcslen(ptszObjectName) < 1 ) return ret;
 
 	query = ORACLEGetUserSourceQuery(dbObject, ptszObjectName);
-	if( _dbConn.PrepareQuery(query.c_str()) == false ) return ret;
+	if( _dbConn.PrepareQuery(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return ret;
+	}
 
 	_dbConn.BindCol(tszDescription, iBuffSize);
 
-	if( _dbConn.Execute() == false ) return ret;
-	if( _dbConn.Fetch() == false ) return ret;
+	if( _dbConn.Execute() == false )
+	{
+		_dbConn.ClearStmt();
+		return ret;
+	}
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return ret;
+	}
 
 	// 결과 레코드가 1개인 경우에만 성공 처리
 	int64 iRowCount = _dbConn.RowCount();
-	if( iRowCount != 1 ) return ret;
+	if( iRowCount != 1 )
+	{
+		_dbConn.ClearStmt();
+		return ret;
+	}
+
+	_dbConn.ClearStmt();
 
 	ret.resize(iBuffSize);
 	ret.assign(tszDescription);
@@ -1307,7 +1764,13 @@ bool CDBQueryProcess::ORACLEGetAnalyzeIndexFragmentationCheck(const TCHAR* ptszI
 
 	_tstring query = ORACLEGetAnalyzeIndexFragmentationCheckQuery(ptszIndexName);
 
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
+	if( _dbConn.ExecDirect(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -1326,15 +1789,31 @@ bool CDBQueryProcess::ORACLEGetIndexFragmentationCheck(const TCHAR* ptszIndexNam
 
 	query = query + "\r\n" + ORACLEGetIndexFragmentationCheckQuery(ptszIndexName);
 
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
+	if( _dbConn.ExecDirect(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
 	_dbConn.BindCol(iCount);
 
-	if( _dbConn.Fetch() == false ) return false;
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
-	if( iCount == 0 ) return false;
+	if( iCount == 0 )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
-	if( _dbConn.MoreResults() != SQL_SUCCESS ) return false;
+	if( _dbConn.MoreResults() != SQL_SUCCESS )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
 	pIndexFragmentation = unique_ptr<ORACLE_INDEX_FRAGMENTATION[]>(new ORACLE_INDEX_FRAGMENTATION[iCount]);
 
@@ -1346,7 +1825,13 @@ bool CDBQueryProcess::ORACLEGetIndexFragmentationCheck(const TCHAR* ptszIndexNam
 	_dbConn.BindCol(pIndexFragmentation[0].tszOK, iOKSize);
 	_dbConn.BindCol(pIndexFragmentation[0].tszLastAnalyzed, iLastAnalyzedSize);
 
-	if( _dbConn.Fetch() == false ) return false;
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -1360,7 +1845,13 @@ bool CDBQueryProcess::ORACLEGetAnalyzeIndexStatFragmentationCheck(const TCHAR* p
 
 	_tstring query = ORACLEGetAnalyzeIndexStatFragmentationCheckQuery(ptszIndexName);
 
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
+	if( _dbConn.ExecDirect(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -1379,15 +1870,31 @@ bool CDBQueryProcess::ORACLEGetIndexStatFragmentationCheck(const TCHAR* ptszInde
 
 	query = query + "\r\n" + ORACLEGetIndexStatFragmentationCheckQuery(ptszIndexName);
 
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
+	if( _dbConn.ExecDirect(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
 	_dbConn.BindCol(iCount);
 
-	if( _dbConn.Fetch() == false ) return false;
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
-	if( iCount == 0 ) return false;
+	if( iCount == 0 )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
-	if( _dbConn.MoreResults() != SQL_SUCCESS ) return false;
+	if( _dbConn.MoreResults() != SQL_SUCCESS )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
 
 	pIndexStatFragmentation = unique_ptr<ORACLE_INDEX_STAT_FRAGMENTATION[]>(new ORACLE_INDEX_STAT_FRAGMENTATION[iCount]);
 
@@ -1398,7 +1905,13 @@ bool CDBQueryProcess::ORACLEGetIndexStatFragmentationCheck(const TCHAR* ptszInde
 	_dbConn.BindCol(pIndexStatFragmentation[0].PctDeleted);
 	_dbConn.BindCol(pIndexStatFragmentation[0].Distinctiveness);
 
-	if( _dbConn.Fetch() == false ) return false;
+	if( _dbConn.Fetch() == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }
@@ -1412,7 +1925,13 @@ bool CDBQueryProcess::ORACLEGetIndexRebuild(const TCHAR* ptszIndexName)
 
 	_tstring query = ORACLEGetIndexRebuildQuery(ptszIndexName);
 
-	if( _dbConn.ExecDirect(query.c_str()) == false ) return false;
+	if( _dbConn.ExecDirect(query.c_str()) == false )
+	{
+		_dbConn.ClearStmt();
+		return false;
+	}
+
+	_dbConn.ClearStmt();
 
 	return true;
 }

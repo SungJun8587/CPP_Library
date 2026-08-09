@@ -46,6 +46,9 @@
     <Filter Include="Containers\Map">
       <UniqueIdentifier>{d44b777c-6935-4bb4-a8d3-509b399fb56e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Containers\Stack">
+      <UniqueIdentifier>{7379ad2d-f40c-44d6-b24b-f816670a36ff}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Memory\Containers.h">
@@ -327,6 +330,12 @@
       <Filter>Network</Filter>
     </ClInclude>
     <ClInclude Include="Network\RioWorker.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Containers\Stack\LockFreeSlotStack.h">
+      <Filter>Containers\Stack</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\RioBuffer.h">
       <Filter>Network</Filter>
     </ClInclude>
   </ItemGroup>
