@@ -1,79 +1,72 @@
 ﻿
 //***************************************************************************
-// RioObject.h : RIO 비동기 오브젝트 인터페이스 (I/O Drain 보장)
+// RioObject.h : interface for the CRioObject class.
 //
 //***************************************************************************
 
 #ifndef __RIOOBJECT_H__
 #define __RIOOBJECT_H__
 
-#include <winsock2.h>
-#include <memory>
-#include <atomic>
-#include <cstdint>
+#ifndef __RIOCOMMON_H__
+#include <Network/RioCommon.h>
+#endif
+
+#ifndef __RIOEVENT_H__
+#include <Network/RioEvent.h>
+#endif
 
 class CRioEvent;
 
-//===========================================================================
-// @class CRioObject
-// @brief RIO 비동기 처리를 수행하는 대상(예: CSession)의 추상 기반 클래스.
-// @details 원자적 I/O 카운터를 통해 Shutdown 시점의 완벽한 Outstanding I/O Drain을 보장합니다.
-//===========================================================================
+//***************************************************************************
+// @brief RIO 비동기 I/O의 논리적 Owner 객체
+//
+// @details
+//      CRioSend / CRioReceive에서 RIO RequestContext에 연결되는
+//      CRioEvent가 CRioObject의 shared_ptr을 보유합니다.
+//
+//      따라서 RIO completion이 도착하기 전까지 CRioObject의
+//      객체 lifetime은 안전하게 유지됩니다.
+//
+// [스레드 안전성 및 Lock-Free 동기화]
+//      CRioObject는 다수의 워커 스레드(Worker Thread)에서 동시에 I/O 카운트를
+//      조작할 수 있으므로, std::atomic 카운터와 Lock-Free CAS(Compare-And-Swap) Loop를
+//      사용하여 Mutex 락 없이 빠른 동기화를 제공합니다.
+//
+// [enable_shared_from_this 상속]
+//      I/O 요청 등록 시 자기 자신의 std::shared_ptr을 안전하게 생성하여
+//      CRioEvent에 소유권을 넘겨주기 위해 enable_shared_from_this를 상속받습니다.
+//
+// [추상 클래스 및 다형성]
+//      Dispatch() 순수 가상 함수를 통해 RIO 완료 알림을 세션/소켓 등
+//      구체적인 비즈니스 로직 클래스로 디스패치하는 추상 기반 클래스입니다.
+//***************************************************************************
 class CRioObject : public std::enable_shared_from_this<CRioObject>
 {
 public:
-    //***************************************************************************
-    // @brief CRioObject 생성자
-    // @details 진행 중인 I/O 카운터를 0으로 초기화합니다.
-    //***************************************************************************
-    CRioObject() : _outstandingIoCount(0) {}
+    CRioObject() noexcept;
+    virtual ~CRioObject() noexcept;
 
-    //***************************************************************************
-    // @brief 가상 소멸자
-    //***************************************************************************
-    virtual ~CRioObject() = default;
+    CRioObject(const CRioObject&) = delete;
+    CRioObject& operator=(const CRioObject&) = delete;
 
-    //***************************************************************************
-    // @brief 세션이 보유한 소켓 핸들을 반환합니다.
-    // @return SOCKET 소켓 핸들
-    //***************************************************************************
-    virtual SOCKET GetSocket() const = 0;
+    CRioObject(CRioObject&&) = delete;
+    CRioObject& operator=(CRioObject&&) = delete;
 
-    //***************************************************************************
-    // @brief RIO 비동기 I/O 완료 시 호출되는 핵심 디스패치 메서드
-    // @param rioEvent 완료된 RIO 이벤트 포인터
-    // @param numOfBytes 실제 전송 혹은 수신된 바이트 수
-    // @param status Winsock 에러 코드 (NO_ERROR: 성공, 그 외 WSAE* 에러 코드)
-    //
-    // @warning 호출 계약 (CRioCore::ProcessRioResult 기준):
-    //     이 함수가 반환된 직후 CRioCore가 rioEvent를 즉시 이벤트 풀로 반환합니다.
-    //     따라서 구현체는 이 함수 안에서:
-    //       - rioEvent 포인터를 보관하거나 재사용해서는 안 됩니다.
-    //       - 후속 RIOReceive/RIOSend를 등록할 때는 반드시 CRioEventPool::Alloc()으로
-    //         새 이벤트를 새로 발급받아 사용해야 합니다.
-    //     이 계약을 어기면 풀로 반환된 이벤트를 다른 Alloc() 호출이 동시에 가져가는
-    //     이중 사용(use-after-free) 상황이 발생할 수 있습니다.
-    //***************************************************************************
-    virtual void Dispatch(CRioEvent* rioEvent, ULONG numOfBytes = 0, LONG status = NO_ERROR) noexcept = 0;
+    bool IncrementIoCount() noexcept;
+    void DecrementIoCount() noexcept;
+    uint32_t GetIoCount() const noexcept;
+    bool HasOutstandingIo() const noexcept;
 
-    //***************************************************************************
-    // @brief 비동기 I/O 요청이 시작될 때 카운터를 원자적으로 증가시킵니다.
-    //***************************************************************************
-    void IncrementIoCount() { _outstandingIoCount.fetch_add(1, std::memory_order_relaxed); }
+    virtual void Dispatch(
+        CRioEvent* rioEvent,
+        ULONG bytesTransferred,
+        LONG status) noexcept = 0;
 
-    //***************************************************************************
-    // @brief 비동기 I/O 완료가 처리될 때 카운터를 원자적으로 감소시킵니다.
-    //***************************************************************************
-    void DecrementIoCount() noexcept { _outstandingIoCount.fetch_sub(1, std::memory_order_relaxed); }
-
-    //***************************************************************************
-    // @brief 현재 진행 중인 Outstanding I/O 총 개수를 조회합니다.
-    // @return int32 진행 중인 I/O 카운터 값
-    //***************************************************************************
-    int32 GetIoCount() const { return _outstandingIoCount.load(std::memory_order_acquire); }
+protected:
+    void ResetIoCount() noexcept;
 
 private:
-    std::atomic<int32> _outstandingIoCount; // 현재 진행 중인 비동기 I/O 요청 총 개수
+    std::atomic<uint32_t> _ioCount{ 0 };        // 현재 진행 중인 비동기 RIO I/O 카운터
 };
 
 #endif // __RIOOBJECT_H__

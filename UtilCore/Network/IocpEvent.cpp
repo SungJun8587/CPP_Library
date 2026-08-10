@@ -1,4 +1,5 @@
-﻿//***************************************************************************
+﻿
+//***************************************************************************
 // IocpEvent.cpp: implementation of the CIocpEvent class.
 //
 //***************************************************************************
@@ -10,7 +11,7 @@
 // @brief IocpEvent 생성자
 // @param type 이벤트 타입
 //***************************************************************************
-CIocpEvent::CIocpEvent(EventType type) : eventType(type)
+CIocpEvent::CIocpEvent(Iocp::EventType type) : eventType(type)
 {
 	Init();
 }

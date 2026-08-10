@@ -7,11 +7,13 @@
 #ifndef __IOCPCORE_H__
 #define __IOCPCORE_H__
 
+#ifndef	__IOCPCOMMON_H__
+#include <Network/IocpCommon.h>
+#endif
+
 #ifndef	__IOCPEVENT_H__
 #include <Network/IocpEvent.h>
 #endif
-
-#include <winternl.h>
 
 //***************************************************************************
 // @class CIocpObject
@@ -83,8 +85,6 @@ public:
 //***************************************************************************
 class CIocpCore
 {
-    enum { BATCH_SIZE = 64 };   // DispatchBatch 1회 최대 수거 개수
-
 public:
     CIocpCore();
     ~CIocpCore();

@@ -338,6 +338,18 @@
     <ClInclude Include="Network\RioBuffer.h">
       <Filter>Network</Filter>
     </ClInclude>
+    <ClInclude Include="Network\RioReceive.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\RioSend.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\RioCommon.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\IocpCommon.h">
+      <Filter>Network</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">
@@ -502,6 +514,24 @@
     </ClCompile>
     <ClCompile Include="WindowsServiceBase.cpp" />
     <ClCompile Include="Network\RioCore.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\RioReceive.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\RioSend.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\RioObject.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\RioEvent.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\RioEventPool.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\RioWorker.cpp">
       <Filter>Network</Filter>
     </ClCompile>
   </ItemGroup>

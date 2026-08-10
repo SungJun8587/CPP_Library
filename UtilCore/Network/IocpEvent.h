@@ -7,21 +7,9 @@
 #ifndef __IOCPEVENT_H__
 #define __IOCPEVENT_H__
 
-//***************************************************************************
-// @enum EventType
-// @brief IocpEvent가 어떤 종류의 비동기 I/O인지 식별하는 열거형.
-//
-// @details
-// Session::Dispatch에서 switch문으로 분기해 적절한 Process 함수를 호출합니다.
-//***************************************************************************
-enum class EventType : uint8
-{
-    Connect,        // ConnectEx 완료 (클라이언트 → 서버 연결 성공)
-    Disconnect,     // DisconnectEx 완료 (연결 종료 및 소켓 초기화 완료)
-    Accept,         // AcceptEx 완료 (서버 → 클라이언트 연결 수락)
-    Recv,           // WSARecv 완료 (데이터 수신)
-    Send,           // WSASend 완료 (데이터 전송)
-};
+#ifndef	__IOCPCOMMON_H__
+#include <Network/IocpCommon.h>
+#endif
 
 //***************************************************************************
 // @class IocpEvent
@@ -55,7 +43,7 @@ public:
     // @brief IocpEvent 생성자
     // @param type 이벤트 타입
     //***************************************************************************
-    CIocpEvent(EventType type);
+    CIocpEvent(Iocp::EventType type);
 
     //***************************************************************************
     // @brief OVERLAPPED 구조체의 모든 필드를 0으로 초기화합니다.
@@ -71,8 +59,8 @@ public:
     void            Init();
 
 public:
-    EventType       eventType;  // I/O 종류 식별자
-    CIocpObjectRef  owner;      // 이 이벤트를 소유한 Session/Listener (shared_ptr)
+    Iocp::EventType     eventType;  // I/O 종류 식별자
+    CIocpObjectRef      owner;      // 이 이벤트를 소유한 Session/Listener (shared_ptr)
 };
 
 //***************************************************************************
@@ -83,7 +71,7 @@ public:
 class ConnectEvent : public CIocpEvent
 {
 public:
-    ConnectEvent() : CIocpEvent(EventType::Connect) {}
+    ConnectEvent() : CIocpEvent(Iocp::EventType::Connect) {}
 };
 
 //***************************************************************************
@@ -100,7 +88,7 @@ public:
 class DisconnectEvent : public CIocpEvent
 {
 public:
-    DisconnectEvent() : CIocpEvent(EventType::Disconnect) {}
+    DisconnectEvent() : CIocpEvent(Iocp::EventType::Disconnect) {}
 };
 
 //***************************************************************************
@@ -121,7 +109,7 @@ public:
 class AcceptEvent : public CIocpEvent
 {
 public:
-    AcceptEvent() : CIocpEvent(EventType::Accept) {}
+    AcceptEvent() : CIocpEvent(Iocp::EventType::Accept) {}
 
 public:
     // AcceptEx에 전달할 미리 생성된 세션.
@@ -140,7 +128,7 @@ public:
 class RecvEvent : public CIocpEvent
 {
 public:
-    RecvEvent() : CIocpEvent(EventType::Recv) {}
+    RecvEvent() : CIocpEvent(Iocp::EventType::Recv) {}
 };
 
 //***************************************************************************
@@ -166,7 +154,7 @@ public:
 class SendEvent : public CIocpEvent
 {
 public:
-    SendEvent() : CIocpEvent(EventType::Send) {}
+    SendEvent() : CIocpEvent(Iocp::EventType::Send) {}
 
 public:
     // WSASend pending 중 SendBuffer 수명 보장. ProcessSend 완료 후 clear()

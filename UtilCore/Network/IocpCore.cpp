@@ -82,13 +82,13 @@ bool CIocpCore::Dispatch(uint32 timeoutMs)
 //***************************************************************************
 int32 CIocpCore::DispatchBatch(uint32 timeoutMs)
 {
-    OVERLAPPED_ENTRY    entries[BATCH_SIZE];
+    OVERLAPPED_ENTRY    entries[Iocp::kBatchSize];
     ULONG               numRemoved = 0;
 
     BOOL success = ::GetQueuedCompletionStatusEx(
         _iocpHandle,
         entries,
-        BATCH_SIZE,
+        Iocp::kBatchSize,
         OUT & numRemoved,
         timeoutMs,
         FALSE   // alertable I/O 미사용 (APC 콜백 불필요)
