@@ -51,6 +51,8 @@ public:
         CRioCore& core,
         RIO_RQ requestQueue,
         const RIO_BUF& buffer,
+        CRioBuffer* bufferOwner,
+        uint32_t slotIndex,
         CRioEvent* rioEvent,
         CRioObject* owner,
         DWORD flags = 0) noexcept;
@@ -60,6 +62,7 @@ public:
         RIO_RQ requestQueue,
         const RIO_BUF* data,
         ULONG dataBufferCount,
+        const CRioEvent::BufferBinding* dataBindings,
         const RIO_BUF* localAddress,
         const RIO_BUF* remoteAddress,
         const RIO_BUF* control,

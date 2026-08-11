@@ -9,42 +9,53 @@
 
 //***************************************************************************
 // @brief 단일 RIO_BUF 기반 RIOSend
-//
-// @param core RIO 핵심 처리를 담당하는 CRioCore 참조
-// @param requestQueue I/O 요청을 제출할 RIO Request Queue 핸들
-// @param buffer 송신할 데이터가 담긴 RIO 버퍼 정보
-// @param rioEvent 완료 처리 시 식별자로 사용될 RIO 이벤트 객체
-// @param owner I/O 수명 주기를 관리하는 CRioObject 소유자 포인터
-// @param flags RIO 송신 옵션 플래그 (기본값: 0)
-//
-// @return 성공 시 true, 검증 실패 또는 제출 실패 시 false
-//
-// @details
-//      1. 파라미터 및 RIO_BUF(BufferId, Length)의 유효성을 검사합니다.
-//      2. owner->shared_from_this()를 통해 스마트 포인터를 안전하게 획득합니다.
-//      3. IncrementIoCount()로 Outstanding I/O 카운터를 증가시킵니다.
-//      4. rioEvent->SetOwnerShared()를 호출하여 비동기 완료 전까지 소유자 객체가 파괴되지 않도록 바인딩합니다.
-//      5. core.SubmitIo()를 통해 Windows RIO API(RIOSend)를 호출합니다.
-//      6. 제출 실패 시 TakeOwner() 및 DecrementIoCount()를 호출하여 획득한 소유권과 카운터를 롤백(Rollback)합니다.
+// @param core          RIO 핵심 처리를 담당하는 CRioCore 참조
+// @param requestQueue  I/O 요청을 제출할 RIO Request Queue
+// @param buffer        송신할 RIO Buffer descriptor
+// @param bufferOwner   buffer가 속한 CRioBuffer
+// @param slotIndex     AllocSlot()으로 확보한 slot index
+// @param rioEvent      완료 처리 시 식별자로 사용될 RIO 이벤트
+// @param owner         I/O lifetime을 관리하는 CRioObject
+// @param flags         RIO 송신 옵션 플래그
+// @return 성공 시 true
+// @note
+//      성공적으로 Submission된 이후 slot의 소유권은
+//      CRioEvent로 이전됩니다.
+//      호출자는 FreeSlot()을 직접 호출해서는 안 됩니다.
 //***************************************************************************
 bool CRioSend::Send(
     CRioCore& core,
     RIO_RQ requestQueue,
     const RIO_BUF& buffer,
+    CRioBuffer* bufferOwner,
+    uint32_t slotIndex,
     CRioEvent* rioEvent,
     CRioObject* owner,
     DWORD flags) noexcept
 {
-    if( requestQueue == RIO_INVALID_RQ || rioEvent == nullptr || owner == nullptr )
+    if( requestQueue == RIO_INVALID_RQ ||
+        rioEvent == nullptr ||
+        owner == nullptr ||
+        bufferOwner == nullptr )
     {
         return false;
     }
 
-    if( buffer.BufferId == RIO_INVALID_BUFFERID || buffer.Length == 0 )
+    if( buffer.BufferId == RIO_INVALID_BUFFERID ||
+        buffer.Length == 0 )
     {
         return false;
     }
 
+    if( slotIndex == Rio::kInvalidSlotIndex )
+    {
+        assert(false && "CRioSend::Send invalid slot index");
+        return false;
+    }
+
+    //***********************************************************************
+    // Owner lifetime 확보
+    //***********************************************************************
     CRioObjectRef ownerRef;
 
     try
@@ -61,66 +72,103 @@ bool CRioSend::Send(
         return false;
     }
 
+    //***********************************************************************
+    // CRioObject outstanding I/O count 확보
+    //***********************************************************************
     if( !owner->IncrementIoCount() )
     {
         return false;
     }
 
-    try
+    //***********************************************************************
+    // CRioEvent 초기화
+    //***********************************************************************
+    rioEvent->Initialize(
+        Rio::EventType::Send,
+        ownerRef);
+
+    //***********************************************************************
+    // Buffer-slot ownership binding
+    //
+    // 성공적인 RIO submission 이후 completion이 처리될 때까지
+    // CRioEvent가 해당 slot 정보를 유지합니다.
+    //***********************************************************************
+    if( !rioEvent->BindBufferSlot(
+        bufferOwner,
+        slotIndex) )
     {
-        rioEvent->SetOwnerShared(ownerRef);
-    }
-    catch( ... )
-    {
+        (void)rioEvent->TakeOwner();
+
         owner->DecrementIoCount();
+
         return false;
     }
 
+    //***********************************************************************
+    // RIO Submission
+    //***********************************************************************
     const bool submitted = core.SubmitIo(
         [&]() noexcept -> bool
         {
-            return core.GetRioTable().RIOSend(requestQueue, const_cast<PRIO_BUF>(&buffer), 1, flags, reinterpret_cast<PVOID>(rioEvent)) != FALSE;
+            return core.GetRioTable().RIOSend(
+                requestQueue,
+                const_cast<PRIO_BUF>(&buffer),
+                1,
+                flags,
+                reinterpret_cast<PVOID>(rioEvent)) != FALSE;
         });
 
     if( !submitted )
     {
-        rioEvent->TakeOwner();
+        //*******************************************************************
+        // Submission 실패 Rollback
+        //
+        // 아직 RIO completion이 발생하지 않았으므로
+        // Event에 등록했던 Buffer binding을 제거합니다.
+        //*******************************************************************
+        rioEvent->ClearBufferBindings();
+
+        (void)rioEvent->TakeOwner();
+
         owner->DecrementIoCount();
+
         return false;
     }
 
+    //***********************************************************************
+    // Submission 성공
+    //
+    // 이후 slot의 소유권은 CRioEvent가 보유합니다.
+    // 호출자는 FreeSlot()을 호출해서는 안 됩니다.
+    //***********************************************************************
     return true;
 }
 
 //***************************************************************************
-// @brief 확장 RIOSendEx
-//
-// @param core RIO 핵심 처리를 담당하는 CRioCore 참조
-// @param requestQueue I/O 요청을 제출할 RIO Request Queue 핸들
-// @param data 송신할 RIO_BUF 버퍼 배열 포인터 (Scatter-Gather 송신 지원)
-// @param dataBufferCount 송신 버퍼 배열의 개수
-// @param localAddress 로컬 주소 정보 버퍼 포인터 (선택 사항)
-// @param remoteAddress 원격 주소 정보 버퍼 포인터 (선택 사항)
-// @param control 제어 메시지 버퍼 포인터 (선택 사항)
-// @param rioEvent 완료 처리 시 식별자로 사용될 RIO 이벤트 객체
-// @param owner I/O 수명 주기를 관리하는 CRioObject 소유자 포인터
-// @param flags RIO 송신 옵션 플래그 (기본값: 0)
-//
-// @return 성공 시 true, 검증 실패 또는 제출 실패 시 false
-//
-// @details
-//      - Scatter-Gather I/O 및 주소/제어 버퍼 지정을 지원하는 RIOSendEx 커널 API를 호출합니다.
-//      - 다단계 롤백 처리:
-//        * shared_from_this() 실패 시 -> 즉시 false 반환
-//        * IncrementIoCount() 실패 시 -> 즉시 false 반환
-//        * SetOwnerShared() 예외 발생 시 -> DecrementIoCount() 수행 후 false 반환
-//        * SubmitIo() 커널 제출 실패 시 -> rioEvent->TakeOwner()로 참조 해제 및 DecrementIoCount() 수행 후 false 반환
+// @brief Scatter-Gather RIOSendEx
+// @param core             RIO 핵심 처리를 담당하는 CRioCore 참조
+// @param requestQueue     I/O 요청을 제출할 RIO Request Queue
+// @param data              송신 데이터 RIO_BUF 배열
+// @param dataBufferCount   송신 데이터 RIO_BUF 개수
+// @param dataBindings      각 data RIO_BUF에 대응하는 BufferBinding 배열
+// @param localAddress      로컬 주소 정보 버퍼
+// @param remoteAddress     원격 주소 정보 버퍼
+// @param control           제어 메시지 버퍼
+// @param rioEvent          완료 처리 시 식별자로 사용될 RIO 이벤트
+// @param owner             I/O lifetime을 관리하는 CRioObject
+// @param flags             RIO 송신 옵션 플래그
+// @return 성공 시 true
+// @note
+//      dataBindings[i]는 data[i]와 1:1 대응합니다.
+//      성공적으로 Submission된 모든 slot의 소유권은
+//      CRioEvent로 이전됩니다.
 //***************************************************************************
 bool CRioSend::SendEx(
     CRioCore& core,
     RIO_RQ requestQueue,
     const RIO_BUF* data,
     ULONG dataBufferCount,
+    const CRioEvent::BufferBinding* dataBindings,
     const RIO_BUF* localAddress,
     const RIO_BUF* remoteAddress,
     const RIO_BUF* control,
@@ -128,16 +176,23 @@ bool CRioSend::SendEx(
     CRioObject* owner,
     DWORD flags) noexcept
 {
-    if( requestQueue == RIO_INVALID_RQ || data == nullptr || dataBufferCount == 0 )
+    if( requestQueue == RIO_INVALID_RQ ||
+        data == nullptr ||
+        dataBufferCount == 0 ||
+        dataBindings == nullptr )
     {
         return false;
     }
 
-    if( rioEvent == nullptr || owner == nullptr )
+    if( rioEvent == nullptr ||
+        owner == nullptr )
     {
         return false;
     }
 
+    //***********************************************************************
+    // Owner lifetime 확보
+    //***********************************************************************
     CRioObjectRef ownerRef;
 
     try
@@ -154,29 +209,110 @@ bool CRioSend::SendEx(
         return false;
     }
 
+    //***********************************************************************
+    // CRioObject outstanding I/O count 확보
+    //***********************************************************************
     if( !owner->IncrementIoCount() )
     {
         return false;
     }
 
-    try
+    //***********************************************************************
+    // CRioEvent 초기화
+    //***********************************************************************
+    rioEvent->Initialize(
+        Rio::EventType::Send,
+        ownerRef);
+
+    //***********************************************************************
+    // Scatter-Gather Buffer-slot binding
+    //
+    // data[i] <-> dataBindings[i]
+    //
+    // 모든 binding이 성공해야 Submission을 진행합니다.
+    //***********************************************************************
+    for( ULONG i = 0; i < dataBufferCount; ++i )
     {
-        rioEvent->SetOwnerShared(ownerRef);
-    }
-    catch( ... )
-    {
-        owner->DecrementIoCount();
-        return false;
+        const CRioEvent::BufferBinding& binding = dataBindings[i];
+
+        if( binding.buffer == nullptr ||
+            binding.slotIndex == Rio::kInvalidSlotIndex )
+        {
+            rioEvent->ClearBufferBindings();
+
+            (void)rioEvent->TakeOwner();
+
+            owner->DecrementIoCount();
+
+            return false;
+        }
+
+        if( data[i].BufferId == RIO_INVALID_BUFFERID ||
+            data[i].Length == 0 )
+        {
+            rioEvent->ClearBufferBindings();
+
+            (void)rioEvent->TakeOwner();
+
+            owner->DecrementIoCount();
+
+            return false;
+        }
+
+        if( !rioEvent->BindBufferSlot(
+            binding.buffer,
+            binding.slotIndex) )
+        {
+            rioEvent->ClearBufferBindings();
+
+            (void)rioEvent->TakeOwner();
+
+            owner->DecrementIoCount();
+
+            return false;
+        }
     }
 
-    const bool submitted = core.SubmitIo([&]() noexcept -> bool { return core.GetRioTable().RIOSendEx(requestQueue, const_cast<PRIO_BUF>(data), dataBufferCount, const_cast<PRIO_BUF>(localAddress), const_cast<PRIO_BUF>(remoteAddress), const_cast<PRIO_BUF>(control), nullptr, flags, reinterpret_cast<PVOID>(rioEvent)) != FALSE; });
+    //***********************************************************************
+    // RIOSendEx Submission
+    //***********************************************************************
+    const bool submitted = core.SubmitIo(
+        [&]() noexcept -> bool
+        {
+            return core.GetRioTable().RIOSendEx(
+                requestQueue,
+                const_cast<PRIO_BUF>(data),
+                dataBufferCount,
+                const_cast<PRIO_BUF>(localAddress),
+                const_cast<PRIO_BUF>(remoteAddress),
+                const_cast<PRIO_BUF>(control),
+                nullptr,
+                flags,
+                reinterpret_cast<PVOID>(rioEvent)) != FALSE;
+        });
 
     if( !submitted )
     {
-        rioEvent->TakeOwner();
+        //*******************************************************************
+        // Submission 실패 Rollback
+        //
+        // RIO completion은 발생하지 않으므로
+        // 모든 Buffer binding을 즉시 제거합니다.
+        //*******************************************************************
+        rioEvent->ClearBufferBindings();
+
+        (void)rioEvent->TakeOwner();
+
         owner->DecrementIoCount();
+
         return false;
     }
 
+    //***********************************************************************
+    // Submission 성공
+    //
+    // 모든 data slot의 소유권은 CRioEvent가 보유합니다.
+    // 호출자는 FreeSlot()을 호출해서는 안 됩니다.
+    //***********************************************************************
     return true;
 }

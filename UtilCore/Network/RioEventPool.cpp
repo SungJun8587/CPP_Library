@@ -22,8 +22,8 @@
 //      - MemoryBlock vector push 실패 시 전체 rollback합니다.
 //
 // [롤백(Rollback) 및 Strong Exception Guarantee]
-//      Placement New 생성 루프나 CVector push_back 중 예외 발생 시, 
-//      기할당된 Raw Buffer 해제 및 이미 생성된 CRioEvent 객체들의 역순(Reverse) 
+//      Placement New 생성 루프나 CVector push_back 중 예외 발생 시,
+//      기할당된 Raw Buffer 해제 및 이미 생성된 CRioEvent 객체들의 역순(Reverse)
 //      소멸자를 명시적으로 호출하여 메모리/자원 누수 없는 강력한 예외 안전성을 보장합니다.
 //***************************************************************************
 bool CRioEventPool::Initialize(size_t capacity)
@@ -58,9 +58,7 @@ bool CRioEventPool::Initialize(size_t capacity)
         catch( ... )
         {
             for( size_t j = constructedCount; j > 0; --j )
-            {
                 newBlock[j - 1].~CRioEvent();
-            }
 
             ::operator delete(rawBuffer);
             return false;
@@ -81,9 +79,7 @@ bool CRioEventPool::Initialize(size_t capacity)
     catch( ... )
     {
         for( size_t j = constructedCount; j > 0; --j )
-        {
             newBlock[j - 1].~CRioEvent();
-        }
 
         ::operator delete(rawBuffer);
         return false;
@@ -130,7 +126,7 @@ bool CRioEventPool::Initialize(size_t capacity)
 //      - Critical Section: 오직 포인터 변경(_head = _head->GetNextFree())만 빠르게 완료
 //      - Non-Critical Section: Lock 해제 후 _owner(shared_ptr 복사/레퍼런스 카운팅) 설정 수행
 //***************************************************************************
-CRioEvent* CRioEventPool::Alloc(CRioEvent::EventType type, CRioObjectRef ownerObj)
+CRioEvent* CRioEventPool::Alloc(Rio::EventType type, CRioObjectRef ownerObj)
 {
     CRioEvent* evt = nullptr;
 
@@ -144,10 +140,11 @@ CRioEvent* CRioEventPool::Alloc(CRioEvent::EventType type, CRioObjectRef ownerOb
 
             // InUse 객체에서는 stale Free List link를 제거합니다.
             evt->SetNextFree(nullptr);
+            _inUseCount.fetch_add(1, std::memory_order_relaxed);
 
 #ifdef _DEBUG
-            assert(evt->GetDebugState() == EEventState::Free && "Double Allocation or Corrupted Event State Detected!");
-            evt->SetDebugState(EEventState::InUse);
+            assert(evt->GetDebugState() == Rio::EEventState::Free && "Double Allocation or Corrupted Event State Detected!");
+            evt->SetDebugState(Rio::EEventState::InUse);
 #endif
         }
     }
@@ -195,7 +192,7 @@ CRioEvent* CRioEventPool::Alloc(CRioEvent::EventType type, CRioObjectRef ownerOb
 // @param evt 반환할 CRioEvent 포인터
 //
 // [스레드 안전한 반환 처리]
-//      Alloc과 마찬가지로 Lock 외부에서 Reset()을 호출해 _owner shared_ptr의 
+//      Alloc과 마찬가지로 Lock 외부에서 Reset()을 호출해 _owner shared_ptr의
 //      레퍼런스 감소 및 객체 해제 작업을 먼저 수행하여 Lock 보유 시간을 최소화합니다.
 //***************************************************************************
 void CRioEventPool::Free(CRioEvent* evt)
@@ -204,7 +201,7 @@ void CRioEventPool::Free(CRioEvent* evt)
         return;
 
 #ifdef _DEBUG
-    assert(evt->GetDebugState() == EEventState::InUse && "Double Free Detected!");
+    assert(evt->GetDebugState() == Rio::EEventState::InUse && "Double Free Detected!");
 #endif
 
     // ---------------------------------------------------------------------
@@ -216,8 +213,8 @@ void CRioEventPool::Free(CRioEvent* evt)
         PLockGuard guard(_lock, __FUNCTION__);
 
 #ifdef _DEBUG
-        assert(evt->GetDebugState() == EEventState::InUse && "CRioEvent state changed unexpectedly before Free List publish!");
-        evt->SetDebugState(EEventState::Free);
+        assert(evt->GetDebugState() == Rio::EEventState::InUse && "CRioEvent state changed unexpectedly before Free List publish!");
+        evt->SetDebugState(Rio::EEventState::Free);
 #endif
 
         // -----------------------------------------------------------------
@@ -225,6 +222,7 @@ void CRioEventPool::Free(CRioEvent* evt)
         // -----------------------------------------------------------------
         evt->SetNextFree(_head);
         _head = evt;
+        _inUseCount.fetch_sub(1, std::memory_order_relaxed);
     }
 }
 
@@ -250,11 +248,25 @@ void CRioEventPool::Free(CRioEvent* evt)
 // [명시적 소멸자 호출 및 메모리 해제]
 //      _memoryBlocks 배열을 순회하며 Placement New로 할당되었던 각 객체의
 //      명시적 소멸자(~CRioEvent())를 호출한 뒤 ::operator delete를 실행합니다.
+//
+// [중요]
+//      InUse 이벤트가 하나라도 존재하면 Release를 수행하지 않습니다.
+//      Debug 빌드에서는 assert를 발생시키며, Release 빌드에서는 안전하게
+//      반환하여 UAF가 발생하는 것을 방지합니다.
 //***************************************************************************
 void CRioEventPool::Release() noexcept
 {
     PLockGuard guard(_lock, __FUNCTION__);
 
+    const size_t inUseCount = _inUseCount.load(std::memory_order_acquire);
+
+    if( inUseCount != 0 )
+    {
+        assert(false && "CRioEventPool::Release() called while events are still InUse");
+        std::terminate();
+    }
+
+#ifdef _DEBUG
     for( size_t i = 0; i < _memoryBlocks.size(); ++i )
     {
         void* rawBuffer = _memoryBlocks[i].ptr;
@@ -267,11 +279,27 @@ void CRioEventPool::Release() noexcept
 
         for( size_t j = 0; j < count; ++j )
         {
-#ifdef _DEBUG
-            assert(blockPtr[j].GetDebugState() == EEventState::Free && "Releasing CRioEventPool while an event is still InUse!");
-#endif
-            blockPtr[j].~CRioEvent();
+            if( blockPtr[j].GetDebugState() != Rio::EEventState::Free )
+            {
+                assert(false && "Releasing CRioEventPool while an event is still InUse!");
+                return;
+            }
         }
+    }
+#endif
+
+    for( size_t i = 0; i < _memoryBlocks.size(); ++i )
+    {
+        void* rawBuffer = _memoryBlocks[i].ptr;
+        size_t count = _memoryBlocks[i].count;
+
+        if( rawBuffer == nullptr )
+            continue;
+
+        CRioEvent* blockPtr = static_cast<CRioEvent*>(rawBuffer);
+
+        for( size_t j = 0; j < count; ++j )
+            blockPtr[j].~CRioEvent();
 
         ::operator delete(rawBuffer);
     }
@@ -282,6 +310,7 @@ void CRioEventPool::Release() noexcept
 
     _exhaustionCount.store(0, std::memory_order_relaxed);
     _lastLogTick.store(0, std::memory_order_relaxed);
+    _inUseCount.store(0, std::memory_order_relaxed);
 }
 
 //***************************************************************************
@@ -305,7 +334,7 @@ size_t CRioEventPool::GetCapacity() const
 // [Atomic CAS 기반 로그 쓰로틀링(Log Throttling)]
 //      풀 고갈 시 순간적으로 수천/수만 번 발생하는 패킷 처리 실패 로그로 인해
 //      I/O 병목이 더욱 악화되는 'Log Storm' 현상을 방지합니다.
-//      compare_exchange_weak를 사용해 5초(5000ms) 간격으로 단 1개의 스레드만 
+//      compare_exchange_weak를 사용해 5초(5000ms) 간격으로 단 1개의 스레드만
 //      누적 고갈 횟수(missedCount)를 인쇄하도록 스레드 안전하게 통제합니다.
 //***************************************************************************
 void CRioEventPool::RecordExhaustion()
@@ -317,7 +346,11 @@ void CRioEventPool::RecordExhaustion()
 
     if( currentTick - lastTick >= 5000 )
     {
-        if( _lastLogTick.compare_exchange_weak(lastTick, currentTick, std::memory_order_relaxed, std::memory_order_relaxed) )
+        if( _lastLogTick.compare_exchange_weak(
+            lastTick,
+            currentTick,
+            std::memory_order_relaxed,
+            std::memory_order_relaxed) )
         {
             const ULONGLONG missedCount = _exhaustionCount.exchange(0, std::memory_order_relaxed);
             const size_t currentCapacity = GetCapacity();
@@ -341,14 +374,12 @@ void CRioEventPool::RecordExhaustion()
 void CRioEventPool::_DEBUG_SET_INITIAL_STATE(CRioEvent* evt)
 {
     if( evt != nullptr )
-    {
-        evt->SetDebugState(EEventState::Free);
-    }
+        evt->SetDebugState(Rio::EEventState::Free);
 }
 
 #else
 
-void _DEBUG_SET_INITIAL_STATE(CRioEvent*) noexcept
+void CRioEventPool::_DEBUG_SET_INITIAL_STATE(CRioEvent*) noexcept
 {
 }
 

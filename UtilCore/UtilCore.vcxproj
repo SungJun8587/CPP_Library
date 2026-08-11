@@ -160,6 +160,7 @@
     <ClCompile Include="Network\IocpEvent.cpp" />
     <ClCompile Include="Network\RecvBuffer.cpp" />
     <ClCompile Include="Network\RingBuffer.cpp" />
+    <ClCompile Include="Network\RioBuffer.cpp" />
     <ClCompile Include="Network\RioCore.cpp" />
     <ClCompile Include="Network\RioEvent.cpp" />
     <ClCompile Include="Network\RioEventPool.cpp" />

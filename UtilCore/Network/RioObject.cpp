@@ -40,6 +40,7 @@ CRioObject::~CRioObject() noexcept
     if( ioCount != 0 )
     {
         assert(false && "CRioObject destroyed while outstanding I/O exists");
+        std::terminate();
     }
 }
 
@@ -92,7 +93,11 @@ bool CRioObject::IncrementIoCount() noexcept
 //***************************************************************************
 void CRioObject::DecrementIoCount() noexcept
 {
-    uint32_t current = _ioCount.load(std::memory_order_acquire);
+    // 루프 진입 전 최초 1회 읽는 값이므로 acquire가 필요 없다.
+    // CAS가 실패할 경우 재시도용 값은 compare_exchange_weak의
+    // failure order(relaxed)로 갱신되며, 실제 release-acquire 동기화는
+    // CAS 성공 시의 release와 GetIoCount()의 acquire 페어링이 담당한다.
+    uint32_t current = _ioCount.load(std::memory_order_relaxed);
 
     for( ;; )
     {
@@ -155,8 +160,10 @@ void CRioObject::ResetIoCount() noexcept
 
     assert(current == 0 && "ResetIoCount called while I/O is outstanding");
 
-    if( current == 0 )
+    if( current != 0 )
     {
-        _ioCount.store(0, std::memory_order_release);
+        return;
     }
+
+    _ioCount.store(0, std::memory_order_relaxed);
 }

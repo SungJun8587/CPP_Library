@@ -39,8 +39,13 @@ namespace Iocp
         Recv,           // WSARecv 완료 (데이터 수신)
         Send,           // WSASend 완료 (데이터 전송)
     };
-
 }
+
+#include <Network/SendBuffer.h>
+#include <Network/RecvBuffer.h>
+#include <Network/RingBuffer.h>
+#include <Network/IocpEvent.h>
+#include <Network/IocpCore.h>
 
 #endif // __IOCPCOMMON_H__
 

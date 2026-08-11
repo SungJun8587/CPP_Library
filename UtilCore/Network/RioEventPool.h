@@ -7,7 +7,7 @@
 #ifndef __RIOEVENTPOOL_H__
 #define __RIOEVENTPOOL_H__
 
-#ifndef CONTAINERS_H
+#ifndef __CONTAINERS_H__
 #include <Memory/Containers.h>
 #endif
 
@@ -58,14 +58,37 @@
 //      보유한 상태에서 수행되지 않습니다.
 //
 // [Lock 경합 최소화 최적화]
+//
 //      CRioEvent::Initialize() 및 CRioEvent::Reset()과 같이 shared_ptr 레퍼런스
 //      카운트 제어나 메모리 설정 작업은 Lock 경계 '외부'에서 수행됩니다.
+//
 //      따라서 임계 영역(Critical Section) 내부에서는 단순 포인터 교환(Push/Pop)만
 //      수행되어 스레드 간 Lock 경합(Contention)을 최소화합니다.
 //
 // [메모리 단편화 방지]
+//
 //      CVector<MemoryBlock>을 통해 청크(Chunk) 단위 대량 할당을 관리하므로
 //      C-Runtime Heap 단편화를 방지하고 캐시 지역성(Cache Locality)을 향상시킵니다.
+//
+// [IMPORTANT LIFETIME RULE]
+//
+//      Alloc()/Free()가 실행 중인 동안 Release()가 동시에 호출되어서는 안 됩니다.
+//
+//      Shutdown 시 반드시 다음 순서를 보장해야 합니다.
+//
+//          1. Stop Accept
+//          2. Stop new RIO Post
+//          3. Shutdown sockets
+//          4. RIO Completion Drain
+//          5. Outstanding RIO I/O == 0
+//          6. RIO CQ shutdown
+//          7. EventPool Release
+//          8. Object destruction
+//
+//      특히 Alloc()이 Free List에서 이벤트를 Pop한 후 Initialize()를 수행하는
+//      구간 또는 Free()가 Reset()을 수행하는 구간에서 Release()가 실행되면
+//      이벤트 메모리가 동시에 해제될 수 있으므로 외부 lifecycle에서 이를 금지합니다.
+//
 //***************************************************************************
 class CRioEventPool
 {
@@ -96,13 +119,23 @@ public:
 
 public:
     bool Initialize(size_t capacity);
-    CRioEvent* Alloc(CRioEvent::EventType type, CRioObjectRef ownerObj);
+    CRioEvent* Alloc(Rio::EventType type, CRioObjectRef ownerObj);
     void Free(CRioEvent* evt);
     void Release() noexcept;
     size_t GetCapacity() const;
 
 private:
     void RecordExhaustion();
+
+    //***************************************************************************
+    // @brief 현재 사용 중인(할당된) 이벤트 개수 반환
+    // @details 스레드 안전하게 원자적 연산(memory_order_acquire)으로 읽어옵니다.
+    // @return size_t 현재 외부에서 사용 중인 CRioEvent의 수량
+    //***************************************************************************
+    size_t GetInUseCount() const noexcept
+    {
+        return _inUseCount.load(std::memory_order_acquire);
+    }
 
 #ifdef _DEBUG
     void _DEBUG_SET_INITIAL_STATE(CRioEvent* evt);
@@ -113,17 +146,18 @@ private:
 private:
     struct MemoryBlock
     {
-        void* ptr{ nullptr }; // OS에서 할당받은 원본 메모리 버퍼 포인터
-        size_t count{ 0 };    // 블록 내 CRioEvent 객체 개수
+        void* ptr{ nullptr };
+        size_t count{ 0 };
     };
 
 private:
-    mutable PLock _lock;                        // Free List 조작 및 멤버 변수 보호용 플랫폼 락
-    CRioEvent* _head;                           // 현재 Free List의 Head 이벤트 포인터 (LIFO)
-    size_t _capacity;                           // 풀의 전체 이벤트 용량
-    CVector<MemoryBlock> _memoryBlocks;         // OS로부터 할당받은 메모리 블록 목록
-    std::atomic<ULONGLONG> _exhaustionCount;    // 풀 고갈 발생 누적 횟수
-    std::atomic<ULONGLONG> _lastLogTick;        // 마지막 고갈 로그 출력 타임스탬프 (ms)
+    mutable PLock _lock;                            // Free List 조작 및 멤버 변수 보호용 플랫폼 락
+    CRioEvent* _head;                               // 현재 Free List의 Head 이벤트 포인터 (LIFO)
+    size_t _capacity;                               // 풀의 전체 이벤트 용량
+    CVector<MemoryBlock>    _memoryBlocks;          // OS로부터 할당받은 메모리 블록 목록
+    std::atomic<ULONGLONG>  _exhaustionCount;       // 풀 고갈 발생 누적 횟수
+    std::atomic<ULONGLONG>  _lastLogTick;           // 마지막 고갈 로그 출력 타임스탬프 (ms)
+    std::atomic<size_t>     _inUseCount{ 0 };       // 현재 외부에서 할당되어 사용 중인 이벤트 개수
 };
 
 #endif // __RIOEVENTPOOL_H__

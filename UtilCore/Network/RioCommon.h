@@ -62,6 +62,51 @@ namespace Rio
         Drain = 1   // Shutdown 시 블로킹 대기 없이 잔여 이벤트만 비우고 즉시 반환
     };
 
+    //**********************************************************************************************************************
+    // @brief 슬롯의 할당 및 사용 상태를 정의하는 열거형
+    //**********************************************************************************************************************
+    enum class SlotState : uint8_t
+    {
+        Free = 0,           // 슬롯이 비어 있어 AllocSlot()을 통해 할당 가능한 상태
+        Allocated = 1       // 슬롯이 할당되어 현재 사용 중인 상태(FreeSlot()을 통해서만 Free 상태로 전환 가능)
+    };
+
+    //***************************************************************************
+    // @brief CRioEvent 디버그 Lifecycle 상태
+    //
+    // NOTE:
+    //      이 상태는 CRioEventPool의 Free List 보호 락 내부에서만 변경됩니다.
+    //      따라서 별도의 atomic이 필요하지 않습니다.
+    //
+    // Lifecycle:
+    //
+    //      Constructor
+    //          |
+    //          v
+    //        Free
+    //          |
+    //          v
+    //        InUse
+    //          |
+    //          v
+    //        Free
+    //
+    //***************************************************************************
+    enum class EEventState : uint8_t
+    {
+        Free = 0,
+        InUse = 1
+    };
+
+    //***************************************************************************
+    // @brief 비동기 RIO 작업의 종류
+    //***************************************************************************
+    enum class EventType : uint8_t
+    {
+        Receive = 0,        
+        Send = 1            
+    };
+
     //******************************************************************************************************************
     // @brief 한 번의 RIODequeueCompletion() 호출에서 수거할 최대 completion 수
     //******************************************************************************************************************
@@ -75,7 +120,23 @@ namespace Rio
     static constexpr int32 kInvalidCompletion = -5;     // 유효하지 않은 완료 패킷 수신
 
     static constexpr std::chrono::milliseconds kDefaultDrainTimeout{ 5000 }; // 기본 Drain 타임아웃 (5초)
+
+    //**********************************************************************************************************************
+    // @brief 유효하지 않은 슬롯 인덱스를 나타내는 센티널(Sentinel) 상숫값
+    // @details AllocSlot() 등의 함수가 슬롯 할당 실패 시 반환하거나, 초기화되지 않은 슬롯 인덱스를
+    //          표시할 때 사용합니다. uint32_t의 최댓값(0xFFFFFFFFu, UINT32_MAX)을 가리킵니다.
+    //**********************************************************************************************************************
+    static constexpr uint32_t kInvalidSlotIndex = 0xFFFFFFFFu;
 }
+
+#include <Network/RioObject.h>
+#include <Network/RioEvent.h>
+#include <Network/RioEventPool.h>
+#include <Network/RioCore.h>
+#include <Network/RioBuffer.h>
+#include <Network/RioWorker.h>
+#include <Network/RioSend.h>
+#include <Network/RioReceive.h>
 
 #endif // __RIOCOMMON_H__
 

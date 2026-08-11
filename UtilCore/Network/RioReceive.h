@@ -48,24 +48,24 @@ public:
     CRioReceive& operator=(const CRioReceive&) = delete;
 
     static bool Receive(
-        CRioCore& core,
-        RIO_RQ requestQueue,
-        const RIO_BUF& buffer,
-        CRioEvent* rioEvent,
-        CRioObject* owner,
-        DWORD flags = 0) noexcept;
+            CRioCore& core,
+            RIO_RQ requestQueue,
+            const RIO_BUF& buffer,
+            CRioEvent* rioEvent,
+            CRioObject* owner,
+            DWORD flags) noexcept;
 
     static bool ReceiveEx(
-        CRioCore& core,
-        RIO_RQ requestQueue,
-        const RIO_BUF* data,
-        ULONG dataBufferCount,
-        const RIO_BUF* localAddress,
-        const RIO_BUF* remoteAddress,
-        const RIO_BUF* control,
-        CRioEvent* rioEvent,
-        CRioObject* owner,
-        DWORD flags = 0) noexcept;
+            CRioCore& core,
+            RIO_RQ requestQueue,
+            const RIO_BUF* data,
+            ULONG dataBufferCount,
+            const RIO_BUF* localAddress,
+            const RIO_BUF* remoteAddress,
+            const RIO_BUF* control,
+            CRioEvent* rioEvent,
+            CRioObject* owner,
+            DWORD flags) noexcept;
 };
 
 #endif // __RIO_RECEIVE_H__

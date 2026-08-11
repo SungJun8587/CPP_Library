@@ -534,6 +534,9 @@
     <ClCompile Include="Network\RioWorker.cpp">
       <Filter>Network</Filter>
     </ClCompile>
+    <ClCompile Include="Network\RioBuffer.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="DB\BaseODBC.inl">

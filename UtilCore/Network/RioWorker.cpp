@@ -58,6 +58,16 @@ bool CRioWorker::Initialize(
         return false;
 
     uint64_t totalIoPerSession = static_cast<uint64_t>(maxOutstandingRecv) + static_cast<uint64_t>(maxOutstandingSend);
+
+    if( totalIoPerSession == 0 )
+        return false;
+
+    // maxSessionCount * totalIoPerSession 곱셈이 실제로 오버플로 없이
+    // 수행되도록, 곱셈 이전에 나눗셈으로 상한을 먼저 검사한다.
+    // (곱셈 후 결과를 검사하는 방식은 곱셈 자체의 오버플로를 막지 못한다.)
+    if( static_cast<uint64_t>(maxSessionCount) > static_cast<uint64_t>(RIO_MAX_CQ_SIZE) / totalIoPerSession )
+        return false;
+
     uint64_t totalCapacity = (static_cast<uint64_t>(maxSessionCount) * totalIoPerSession) + kCqBurstMargin;
 
     if( totalCapacity == 0 || totalCapacity > RIO_MAX_CQ_SIZE )
@@ -72,11 +82,17 @@ bool CRioWorker::Initialize(
             return false;
     }
 
+    // 내부 CRioCore 초기화
+    //
+    // 실패 시 CRioWorker의 멤버 상태(_cqIdentifier/_eventPool)가
+    // 초기화된 것처럼 오염되지 않도록, 성공 확인 후에만 대입한다.
+    if( !_rioCore.Initialize(representativeSocket, static_cast<ULONG>(totalCapacity), cqIdentifier, eventPool) )
+        return false;
+
     _cqIdentifier = cqIdentifier;
     _eventPool = eventPool;
 
-    // 내부 CRioCore 초기화
-    return _rioCore.Initialize(representativeSocket, static_cast<ULONG>(totalCapacity), _cqIdentifier, _eventPool);
+    return true;
 }
 
 //***************************************************************************
@@ -101,6 +117,11 @@ int32 CRioWorker::ProcessLoopOnce()
 //***************************************************************************
 void CRioWorker::Start()
 {
+    // Initialize() 성공 이후에만 _eventPool이 설정되므로,
+    // 미초기화(또는 초기화 실패) 상태에서 Start()가 호출되는 것을 방지한다.
+    if( _eventPool == nullptr )
+        return;
+
     _isRunning.store(true, std::memory_order_release);
 }
 

@@ -15,36 +15,14 @@
 #include <Network/RioObject.h>
 #endif
 
+#ifndef __RIOBUFFER_H__
+#include <Network/RioBuffer.h>
+#endif
+
 class CRioObject;
+class CRioBuffer;
 
 using CRioObjectRef = std::shared_ptr<CRioObject>;
-
-//***************************************************************************
-// @brief CRioEvent 디버그 Lifecycle 상태
-//
-// NOTE:
-//      이 상태는 CRioEventPool의 Free List 보호 락 내부에서만 변경됩니다.
-//      따라서 별도의 atomic이 필요하지 않습니다.
-//
-// Lifecycle:
-//
-//      Constructor
-//          |
-//          v
-//        Free
-//          |
-//          v
-//        InUse
-//          |
-//          v
-//        Free
-//
-//***************************************************************************
-enum class EEventState : uint8_t
-{
-    Free = 0,
-    InUse = 1
-};
 
 //***************************************************************************
 // @class CRioEvent
@@ -107,14 +85,13 @@ enum class EEventState : uint8_t
 class CRioEvent
 {
 public:
-
     //***************************************************************************
-    // @brief 비동기 RIO 작업의 종류
+    // @brief RIO Buffer slot ownership binding
     //***************************************************************************
-    enum class EventType : uint8_t
+    struct BufferBinding
     {
-        Receive = 0,
-        Send = 1
+        CRioBuffer* buffer{ nullptr };
+        uint32_t slotIndex{ Rio::kInvalidSlotIndex };
     };
 
 public:
@@ -128,21 +105,44 @@ public:
     CRioEvent& operator=(CRioEvent&&) = delete;
 
 public:
-    void Initialize(EventType type, const CRioObjectRef& ownerObj) noexcept;
+    void Initialize(Rio::EventType type, const CRioObjectRef& ownerObj) noexcept;
     void Reset() noexcept;
 
     //***************************************************************************
     // @brief 이벤트 타입을 반환합니다.
     // @return EventType (Receive 또는 Send)
     //***************************************************************************
-    EventType GetEventType() const noexcept
+    Rio::EventType GetEventType() const noexcept
     {
         return _eventType;
     }
 
-    void SetOwnerShared(const CRioObjectRef& ownerObj) noexcept;
     CRioObjectRef TakeOwner() noexcept;
     CRioObjectRef GetOwnerShared() const noexcept;
+
+    bool BindBufferSlot(CRioBuffer* buffer, uint32_t slotIndex) noexcept;
+
+    //***************************************************************************
+    // @brief 등록된 Buffer-slot binding 개수를 반환합니다.
+    //***************************************************************************
+    size_t GetBufferBindingCount() const noexcept
+    {
+        return _bufferBindings.size();
+    }
+
+    const BufferBinding* GetBufferBinding(size_t index) const noexcept;
+    const CVector<BufferBinding>& GetBufferBindings() const noexcept;
+
+    //***************************************************************************
+    // @brief Buffer-slot binding 전체를 제거합니다.
+    // @note
+    //      실제 CRioBuffer::FreeSlot() 호출은 하지 않습니다.
+    //      소유 slot 반환은 CRioCore가 FreeSlot()을 수행한 후 호출해야 합니다.
+    //***************************************************************************
+    void ClearBufferBindings() noexcept
+    {
+        _bufferBindings.clear();
+    }
 
     //***************************************************************************
     // @brief Free List의 다음 이벤트를 설정합니다.
@@ -167,12 +167,11 @@ public:
     }
 
 #ifdef _DEBUG
-
     //***************************************************************************
     // @brief 디버그 빌드에서 현재 Lifecycle 상태를 반환합니다.
     // @return EEventState (Free 또는 InUse)
     //***************************************************************************
-    EEventState GetDebugState() const noexcept
+    Rio::EEventState GetDebugState() const noexcept
     {
         return _debugState;
     }
@@ -181,20 +180,18 @@ public:
     // @brief 디버그 빌드에서 Lifecycle 상태를 설정합니다.
     // @param state 설정하고자 하는 상태 값
     //***************************************************************************
-    void SetDebugState(EEventState state) noexcept
+    void SetDebugState(Rio::EEventState state) noexcept
     {
         _debugState = state;
     }
-
 #endif
 
 private:
-
     //***************************************************************************
     // @brief 현재 이벤트의 종류
     // @details 1바이트(uint8_t) 크기의 송/수신 구분 플래그입니다.
     //***************************************************************************
-    EventType _eventType{ EventType::Receive };
+    Rio::EventType _eventType{ Rio::EventType::Receive };
 
     //***************************************************************************
     // @brief RIO completion이 처리될 때까지 lifetime을 유지하는 Owner
@@ -202,6 +199,15 @@ private:
     //          시점까지 소유 객체(CRioObject)의 강한 참조 카운트를 유지합니다.
     //***************************************************************************
     CRioObjectRef _owner;
+
+    //***************************************************************************
+    // @brief RIO completion까지 유지되는 Buffer-slot ownership 목록
+    // @note
+    //      RIOSendEx / RIOReceiveEx의 Scatter-Gather를 지원하기 위해
+    //      복수 binding을 저장합니다.
+    //      binding 자체는 pointer + uint32_t로 구성되어 매우 작습니다.
+    //***************************************************************************
+    CVector<BufferBinding> _bufferBindings;
 
     //***************************************************************************
     // @brief CRioEventPool Free List 연결 포인터
@@ -217,7 +223,7 @@ private:
     // @brief 디버그 전용 Lifecycle 상태
     // @details 이중 Free(Double-Free) 및 미할당 객체 사용(Use-After-Free) 검출용입니다.
     //***************************************************************************
-    EEventState _debugState{ EEventState::Free };
+    Rio::EEventState _debugState{ Rio::EEventState::Free };
 #endif
 };
 

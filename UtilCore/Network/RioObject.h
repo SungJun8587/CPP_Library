@@ -57,10 +57,7 @@ public:
     uint32_t GetIoCount() const noexcept;
     bool HasOutstandingIo() const noexcept;
 
-    virtual void Dispatch(
-        CRioEvent* rioEvent,
-        ULONG bytesTransferred,
-        LONG status) noexcept = 0;
+    virtual void Dispatch(CRioEvent* rioEvent, ULONG bytesTransferred, LONG status) = 0;
 
 protected:
     void ResetIoCount() noexcept;

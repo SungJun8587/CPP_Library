@@ -206,21 +206,22 @@ void CRioCore::StopInternal()
 {
     std::unique_lock<std::shared_mutex> submissionLock(_submissionMutex);
 
-    Rio::State current = _state.load(std::memory_order_acquire);
+    const Rio::State current = _state.load(std::memory_order_acquire);
 
-    if( current != Rio::State::Running && current != Rio::State::Initialized )
+    if( current == Rio::State::Running || current == Rio::State::Initialized )
+    {
+        _state.store(Rio::State::Stopping, std::memory_order_release);
+    }
+    else if( current != Rio::State::Stopping && current != Rio::State::Faulted )
     {
         return;
     }
-
-    _state.store(Rio::State::Stopping, std::memory_order_release);
 
     if( _iocpHandle != NULL && _workerRunning.load(std::memory_order_acquire) )
     {
         if( !::PostQueuedCompletionStatus(_iocpHandle, 0, 0, nullptr) )
         {
-            _workerFaulted.store(true, std::memory_order_release);
-            _state.store(Rio::State::Faulted, std::memory_order_release);
+            MarkFaulted(false);
         }
     }
 }
@@ -832,32 +833,38 @@ void CRioCore::ProcessRioResult(LONG status, ULONG bytesTransferred, CRioEvent* 
 {
     OutstandingIoGuard ioGuard{ this };
 
+    //******************************************************************************************************************
+    // 1. RequestContext 검증
+    //******************************************************************************************************************
     if( rioEvent == nullptr )
     {
         _workerFaulted.store(true, std::memory_order_release);
         _cqCorrupted.store(true, std::memory_order_release);
-
         assert(false && "Invalid RIO RequestContext");
         return;
     }
 
+    //******************************************************************************************************************
+    // 2. Buffer binding 참조
+    //******************************************************************************************************************
+    const CVector<CRioEvent::BufferBinding>& bufferBindings = rioEvent->GetBufferBindings();
+
+    //******************************************************************************************************************
+    // 3. Owner 회수
+    //******************************************************************************************************************
     CRioObjectRef rioObject = rioEvent->TakeOwner();
 
     if( rioObject == nullptr )
     {
-        // RequestContext 자체는 유효하므로 OutstandingIoGuard를 통해
-        // 해당 completion의 outstanding count는 정상적으로 감소한다.
-        //
-        // 그러나 completion이 정상적인 CRioObject ownership을 가지지 않는 것은
-        // completion context와 object lifetime의 일관성이 깨진 상태이므로
-        // CQ corruption으로 취급하고 이후 정상적인 completion 처리를 중단한다.
         _workerFaulted.store(true, std::memory_order_release);
         _cqCorrupted.store(true, std::memory_order_release);
-
         assert(false && "RIO completion has no owner");
         return;
     }
 
+    //******************************************************************************************************************
+    // 4. Application Dispatch
+    //******************************************************************************************************************
     {
         ObjectIoCountGuard objectIoGuard{ rioObject.get() };
 
@@ -874,20 +881,6 @@ void CRioCore::ProcessRioResult(LONG status, ULONG bytesTransferred, CRioEvent* 
         }
         catch( ... )
         {
-            // Callback 예외는 CQ corruption이 아니다.
-            //
-            // RIO completion 자체는 정상적으로 식별되었고 ownership도 확보되었으므로
-            // OutstandingIoGuard / ObjectIoCountGuard가 정상적으로 카운트를 회수한다.
-            //
-            // 따라서:
-            //
-            //     callback exception
-            //         -> WorkerFaulted
-            //         -> State::Faulted
-            //         -> CQ는 계속 유효한 것으로 취급
-            //
-            // CQ corruption으로 처리하면 정상적인 RIO completion queue까지
-            // 불필요하게 폐기 대상으로 판단하게 되므로 _cqCorrupted를 변경하지 않는다.
             _workerFaulted.store(true, std::memory_order_release);
 
             Rio::State current = _state.load(std::memory_order_acquire);
@@ -904,6 +897,55 @@ void CRioCore::ProcessRioResult(LONG status, ULONG bytesTransferred, CRioEvent* 
         }
     }
 
+    //******************************************************************************************************************
+    // 5. Buffer-slot 반환
+    //******************************************************************************************************************
+    bool bufferReleaseFailed = false;
+
+    for( const CRioEvent::BufferBinding& binding : bufferBindings )
+    {
+        if( binding.buffer == nullptr )
+        {
+            bufferReleaseFailed = true;
+            assert(false && "CRioEvent contains null CRioBuffer binding");
+            continue;
+        }
+
+        if( binding.slotIndex == Rio::kInvalidSlotIndex )
+        {
+            bufferReleaseFailed = true;
+            assert(false && "CRioEvent contains invalid Buffer slot index");
+            continue;
+        }
+
+        if( !binding.buffer->FreeSlot(binding.slotIndex) )
+        {
+            bufferReleaseFailed = true;
+            assert(false && "CRioBuffer::FreeSlot() failed during RIO completion");
+        }
+    }
+
+    //******************************************************************************************************************
+    // 6. Buffer release 실패 처리
+    //******************************************************************************************************************
+    if( bufferReleaseFailed )
+    {
+        _workerFaulted.store(true, std::memory_order_release);
+
+        Rio::State current = _state.load(std::memory_order_acquire);
+
+        while( current == Rio::State::Running || current == Rio::State::Stopping )
+        {
+            if( _state.compare_exchange_weak(current, Rio::State::Faulted, std::memory_order_acq_rel, std::memory_order_acquire) )
+            {
+                break;
+            }
+        }
+    }
+
+    //******************************************************************************************************************
+    // 7. EventPool 반환
+    //******************************************************************************************************************
     if( _eventPool != nullptr )
     {
         try
@@ -912,13 +954,6 @@ void CRioCore::ProcessRioResult(LONG status, ULONG bytesTransferred, CRioEvent* 
         }
         catch( ... )
         {
-            // EventPool::Free() 예외는 application/runtime fault로 처리한다.
-            // 이미 completion identity가 확보되었으므로 OutstandingIoGuard가
-            // outstanding I/O count를 정상적으로 감소시킨다.
-            //
-            // 단, event pool 자체의 내부 무결성을 보장할 수 없으므로
-            // 이후 worker/shutdown 경로에서는 WorkerFaulted를 통해
-            // 정상 종료가 아닌 오류 종료로 판정한다.
             _workerFaulted.store(true, std::memory_order_release);
 
             Rio::State current = _state.load(std::memory_order_acquire);
@@ -936,14 +971,8 @@ void CRioCore::ProcessRioResult(LONG status, ULONG bytesTransferred, CRioEvent* 
     }
     else
     {
-        // EventPool이 null이면 현재 completion의 event lifetime을 정상적으로
-        // 반환할 수 없는 상태이므로 CQ/runtime 무결성을 신뢰하지 않는다.
-        //
-        // 다만 해당 completion의 RequestContext와 ownership은 이미 확인되었으므로
-        // OutstandingIoGuard는 정상적으로 outstanding count를 감소시킨다.
         _cqCorrupted.store(true, std::memory_order_release);
         _workerFaulted.store(true, std::memory_order_release);
-
         assert(false && "EventPool became null while completion was outstanding");
     }
 }
@@ -976,7 +1005,7 @@ bool CRioCore::IncrementIoCount() noexcept
 //**********************************************************************************************************************
 void CRioCore::DecrementIoCount() noexcept
 {
-    uint32 current = _outstandingIo.load(std::memory_order_acquire);
+    uint32 current = _outstandingIo.load(std::memory_order_relaxed);
 
     for( ;; )
     {
