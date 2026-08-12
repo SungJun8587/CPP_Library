@@ -8,7 +8,7 @@
 #define __IOCPEVENT_H__
 
 #ifndef	__IOCPCOMMON_H__
-#include <Network/IocpCommon.h>
+#include <Network/IOCP/IocpCommon.h>
 #endif
 
 //***************************************************************************

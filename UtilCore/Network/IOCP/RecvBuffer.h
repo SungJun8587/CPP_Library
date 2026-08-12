@@ -7,6 +7,10 @@
 #ifndef __RECVBUFFER_H__
 #define __RECVBUFFER_H__
 
+#ifndef	__IOCPCOMMON_H__
+#include <Network/IOCP/IocpCommon.h>
+#endif
+
 //***************************************************************************
 // @class RecvBuffer
 // @brief 네트워크 수신 데이터를 버퍼링하고 관리하는 클래스입니다.

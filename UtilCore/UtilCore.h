@@ -98,8 +98,7 @@ using namespace std;
 #include <Job/GlobalQueue.h>
 
 #include <Network/SocketUtil.h>
-#include <Network/IocpCommon.h>
-#include <Network/RioCommon.h>
+#include <Network/NetworkCommon.h>
 
 #include <BaseGlobal.h>
 #include <BaseTLS.h>

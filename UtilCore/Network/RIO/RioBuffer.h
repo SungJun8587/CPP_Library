@@ -8,7 +8,7 @@
 #define __RIOBUFFER_H__
 
 #ifndef __RIOCOMMON_H__
-#include <Network/RioCommon.h>
+#include <Network/RIO/RioCommon.h>
 #endif
 
 #ifndef __LOCKFREESLOTSTACK_H__

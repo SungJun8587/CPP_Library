@@ -41,12 +41,6 @@ namespace Iocp
     };
 }
 
-#include <Network/SendBuffer.h>
-#include <Network/RecvBuffer.h>
-#include <Network/RingBuffer.h>
-#include <Network/IocpEvent.h>
-#include <Network/IocpCore.h>
-
 #endif // __IOCPCOMMON_H__
 
 

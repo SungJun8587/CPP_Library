@@ -8,24 +8,25 @@
 #define __RIO_SEND_H__
 
 #ifndef __RIOCOMMON_H__
-#include <Network/RioCommon.h>
+#include <Network/Rio/RioCommon.h>
 #endif
 
 #ifndef	__RIOEVENT_H__
-#include <Network/RioEvent.h>
+#include <Network/Rio/RioEvent.h>
 #endif
 
 #ifndef	__RIOOBJECT_H__
-#include <Network/RioObject.h>
+#include <Network/Rio/RioObject.h>
 #endif
 
 #ifndef __RIOCORE_H__
-#include <Network/RioCore.h>
+#include <Network/Rio/RioCore.h>
 #endif
 
 class CRioCore;
 class CRioEvent;
 class CRioObject;
+class CRioBuffer;
 
 //***************************************************************************
 // @brief RIO 송신 Submission을 담당하는 정적 유틸리티 클래스
@@ -34,8 +35,10 @@ class CRioObject;
 //      - RIO(Registered I/O) API를 사용하여 네트워크 데이터 송신 요청을 커널에 제출합니다.
 //      - 모든 메서드는 static noexcept로 구성되어 인스턴스화 없이 사용됩니다.
 //      - I/O 요청 등록 성공 시 CRioObject의 I/O 카운트를 증가시키고
-//        CRioEvent에 shared_ptr 소유권을 설정하여 완료 시점까지 객체 수명을 유지합니다.
-//      - 커널 Submission 실패 시 I/O 카운트 차감 및 소유권 해제(Rollback)를 원자적으로 수행합니다.
+//        CRioEvent에 Owner shared_ptr을 연결하여 completion까지 객체 수명을 유지합니다.
+//      - RIO Buffer slot을 사용하는 경우 해당 slot ownership도 CRioEvent로 이전합니다.
+//      - Submission 실패 시 Buffer slot을 먼저 FreeSlot()으로 반환한 뒤
+//        Event binding 및 Owner를 rollback합니다.
 //***************************************************************************
 class CRioSend final
 {

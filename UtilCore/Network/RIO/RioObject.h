@@ -8,11 +8,11 @@
 #define __RIOOBJECT_H__
 
 #ifndef __RIOCOMMON_H__
-#include <Network/RioCommon.h>
+#include <Network/RIO/RioCommon.h>
 #endif
 
 #ifndef __RIOEVENT_H__
-#include <Network/RioEvent.h>
+#include <Network/RIO/RioEvent.h>
 #endif
 
 class CRioEvent;
@@ -39,6 +39,14 @@ class CRioEvent;
 // [추상 클래스 및 다형성]
 //      Dispatch() 순수 가상 함수를 통해 RIO 완료 알림을 세션/소켓 등
 //      구체적인 비즈니스 로직 클래스로 디스패치하는 추상 기반 클래스입니다.
+//
+// [_ioCount lifecycle]
+//      _ioCount는 IncrementIoCount() -> RIO submission -> completion ->
+//      DecrementIoCount() 경로로만 관리됩니다.
+//      외부에서 임의로 값을 재설정하는 API(예: ResetIoCount())는 존재하지
+//      않으며, 이는 의도적인 설계입니다. 그런 API가 존재하면 진행 중인
+//      submission/completion과 경쟁하여 lifecycle invariant를 깨뜨릴 수
+//      있습니다.
 //***************************************************************************
 class CRioObject : public std::enable_shared_from_this<CRioObject>
 {
@@ -58,9 +66,6 @@ public:
     bool HasOutstandingIo() const noexcept;
 
     virtual void Dispatch(CRioEvent* rioEvent, ULONG bytesTransferred, LONG status) = 0;
-
-protected:
-    void ResetIoCount() noexcept;
 
 private:
     std::atomic<uint32_t> _ioCount{ 0 };        // 현재 진행 중인 비동기 RIO I/O 카운터

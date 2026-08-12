@@ -11,6 +11,10 @@
 #include <Memory/Containers.h>
 #endif
 
+#ifndef	__IOCPCOMMON_H__
+#include <Network/IOCP/IocpCommon.h>
+#endif
+
 #include <array>
 
 extern thread_local CSendBufferChunkRef	LSendBufferChunk;

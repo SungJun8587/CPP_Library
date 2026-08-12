@@ -8,15 +8,15 @@
 #define __RIOEVENT_H__
 
 #ifndef __RIOCOMMON_H__
-#include <Network/RioCommon.h>
+#include <Network/RIO/RioCommon.h>
 #endif
 
 #ifndef __RIOOBJECT_H__
-#include <Network/RioObject.h>
+#include <Network/RIO/RioObject.h>
 #endif
 
 #ifndef __RIOBUFFER_H__
-#include <Network/RioBuffer.h>
+#include <Network/RIO/RioBuffer.h>
 #endif
 
 class CRioObject;

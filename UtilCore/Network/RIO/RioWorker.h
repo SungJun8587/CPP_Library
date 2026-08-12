@@ -8,15 +8,15 @@
 #define __RIOWORKER_H__
 
 #ifndef __RIOCOMMON_H__
-#include <Network/RioCommon.h>
+#include <Network/RIO/RioCommon.h>
 #endif
 
 #ifndef __RIOCORE_H__
-#include <Network/RioCore.h>
+#include <Network/RIO/RioCore.h>
 #endif
 
 #ifndef	__RIOEVENTPOOL_H__
-#include <Network/RioEventPool.h>
+#include <Network/RIO/RioEventPool.h>
 #endif
 
 //***************************************************************************

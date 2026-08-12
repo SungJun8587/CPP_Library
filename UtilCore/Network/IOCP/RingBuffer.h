@@ -7,18 +7,12 @@
 #ifndef __RINGBUFFER_H__
 #define __RINGBUFFER_H__
 
-#include <cassert>
-#include <new>
-#include <stdexcept>
-#include <limits>
-
 #ifndef	__ALLOCATOR_H__
 #include <Memory/Allocator.h>
 #endif
 
-// Windows IOCP 환경에서 WSABUF를 사용하기 위한 헤더
-#ifndef _WINSOCK2API_
-#include <winsock2.h>
+#ifndef	__IOCPCOMMON_H__
+#include <Network/IOCP/IocpCommon.h>
 #endif
 
 //***************************************************************************

@@ -12,15 +12,15 @@
 #endif
 
 #ifndef __RIOCOMMON_H__
-#include <Network/RioCommon.h>
+#include <Network/RIO/RioCommon.h>
 #endif
 
 #ifndef __RIOEVENT_H__
-#include <Network/RioEvent.h>
+#include <Network/RIO/RioEvent.h>
 #endif
 
 #ifndef __RIOOBJECT_H__
-#include <Network/RioObject.h>
+#include <Network/RIO/RioObject.h>
 #endif
 
 //***************************************************************************

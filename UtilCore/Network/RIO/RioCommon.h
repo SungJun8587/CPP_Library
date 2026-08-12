@@ -72,39 +72,62 @@ namespace Rio
     };
 
     //***************************************************************************
-    // @brief CRioEvent 디버그 Lifecycle 상태
+    // @enum EEventState
+    // @brief CRioEvent 객체의 디버그 및 메모리 상태 추적용 열거형입니다.
+    // @details
+    //      CRioEventPool 내 Free List의 보호 락(Lock) 내부에서만 상태가 변경되므로
+    //      별도의 원자적 연산(std::atomic) 없이 안전하게 관리됩니다.
     //
-    // NOTE:
-    //      이 상태는 CRioEventPool의 Free List 보호 락 내부에서만 변경됩니다.
-    //      따라서 별도의 atomic이 필요하지 않습니다.
-    //
-    // Lifecycle:
-    //
-    //      Constructor
-    //          |
-    //          v
-    //        Free
-    //          |
-    //          v
-    //        InUse
-    //          |
-    //          v
-    //        Free
-    //
+    //      [Lifecycle Flow]
+    //      Constructor -> Free <---> InUse
     //***************************************************************************
     enum class EEventState : uint8_t
     {
-        Free = 0,
-        InUse = 1
+        Free = 0,   // 이벤트 객체가 풀(Pool)에 반납되어 재사용 가능한 상태
+        InUse = 1   // 이벤트 객체가 할당되어 비동기 I/O 요청 처리에 사용 중인 상태
     };
 
     //***************************************************************************
-    // @brief 비동기 RIO 작업의 종류
+    // @enum EventType
+    // @brief 비동기 RIO I/O 작업의 유형을 정의하는 열거형입니다.
+    // @details
+    //      RIO 완료 통지(Completion) 이벤트가 발생했을 때 처리해야 할
+    //      I/O 작업(수신/송신)의 종류를 구분하는 데 사용됩니다.
     //***************************************************************************
     enum class EventType : uint8_t
     {
-        Receive = 0,        
-        Send = 1            
+        Receive = 0,    // 비동기 패킷 수신 요청 작업 (RIOReceive)
+        Send = 1        // 비동기 패킷 송신 요청 작업 (RIOSend / RIOSendEx)
+    };
+
+    //***************************************************************************
+    // @enum SessionState
+    // @brief RIO 세션의 라이프사이클 상태를 정의하는 열거형입니다.
+    // @details
+    //      세션의 생성부터 완전 종료까지의 원자적 상태 전이를 추적합니다.
+    //***************************************************************************
+    enum class SessionState : uint8_t
+    {
+        None = 0,   // 초기화되지 않은 미정의 상태
+        Active,     // 연결이 활성화되어 I/O 요청 및 송수신 처리가 가능한 상태
+        Closing,    // 종료 절차가 시작되어 신규 I/O 제출이 차단된 상태
+        Closed      // 세션 연결이 완전 종료되고 정리 대기/완료된 상태
+    };
+
+    //***************************************************************************
+    // @enum ServerState
+    // @brief 서버 엔진의 동작 라이프사이클 상태를 정의하는 열거형입니다.
+    // @details
+    //      서버 인스턴스의 생성부터 리소스 완전 해제까지의 구동 상태 전이를 관리합니다.
+    //***************************************************************************
+    enum class ServerState : uint8_t
+    {
+        Created = 0,    // 서버 객체가 생성되었으나 초기화되지 않은 상태
+        Initialized,    // RIO 커널 자원 및 네트워크 바인딩 초기화가 완료된 상태
+        Running,        // I/O 완료 통지 루프 및 서비스가 정상 동작 중인 상태
+        Stopping,       // 서버 정지 요청을 받아 세션 CloseAll 및 잔여 I/O 정리를 진행 중인 상태
+        Stopped,        // 모든 세션 정리 및 네트워크 I/O 처리가 안전하게 정지된 상태
+        Shutdown        // 서버 할당 자원이 완벽히 해제되고 최종 종료된 상태
     };
 
     //******************************************************************************************************************
@@ -127,16 +150,21 @@ namespace Rio
     //          표시할 때 사용합니다. uint32_t의 최댓값(0xFFFFFFFFu, UINT32_MAX)을 가리킵니다.
     //**********************************************************************************************************************
     static constexpr uint32_t kInvalidSlotIndex = 0xFFFFFFFFu;
-}
 
-#include <Network/RioObject.h>
-#include <Network/RioEvent.h>
-#include <Network/RioEventPool.h>
-#include <Network/RioCore.h>
-#include <Network/RioBuffer.h>
-#include <Network/RioWorker.h>
-#include <Network/RioSend.h>
-#include <Network/RioReceive.h>
+    //***************************************************************************
+    // @brief Accept 폴링 주기
+    // @details
+    //      Accept 루프에서 클라이언트 접속이 없을 때 대기할 시간 간격을 정의합니다.
+    //***************************************************************************
+    constexpr std::chrono::milliseconds kAcceptPollInterval(1);
+
+    //***************************************************************************
+    // @brief Listen 소켓 Backlog 최소 값
+    // @details
+    //      Listen 소켓 생성 시 설정 가능한 연결 대기 큐(Backlog)의 최소 허용치입니다.
+    //***************************************************************************
+    constexpr int kListenBacklogMinimum = 1;
+}
 
 #endif // __RIOCOMMON_H__
 

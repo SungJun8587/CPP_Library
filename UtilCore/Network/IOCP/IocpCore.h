@@ -8,11 +8,11 @@
 #define __IOCPCORE_H__
 
 #ifndef	__IOCPCOMMON_H__
-#include <Network/IocpCommon.h>
+#include <Network/IOCP/IocpCommon.h>
 #endif
 
 #ifndef	__IOCPEVENT_H__
-#include <Network/IocpEvent.h>
+#include <Network/IOCP/IocpEvent.h>
 #endif
 
 //***************************************************************************

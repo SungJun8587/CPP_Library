@@ -20,14 +20,12 @@ CRioObject::CRioObject() noexcept
 
 //***************************************************************************
 // @brief CRioObject 소멸자
-//
 // @note
 //      객체가 소멸되는 시점에는 Outstanding I/O가 남아 있어서는 안 됩니다.
 //
 //      CRioEvent가 Completion 전까지 shared_ptr<CRioObject>를 보유하기
 //      때문에 정상적인 CRio lifecycle에서는 이 시점에 IoCount가 0이어야
 //      합니다.
-//
 // @details
 //      memory_order_acquire 로드를 통해 타 스레드에서 마지막 DecrementIoCount()가
 //      수행한 Release 메모리 오더링과 동기화하여 검사합니다.
@@ -46,11 +44,9 @@ CRioObject::~CRioObject() noexcept
 
 //***************************************************************************
 // @brief Outstanding I/O reference를 하나 증가시킵니다.
-//
 // @details
 //      Lock-Free 알고리즘인 compare_exchange_weak (CAS) 루프를 수행합니다.
 //      Spurious Failure(의사 실패)를 고려해 루프 내에서 실패 시 자동 재시도합니다.
-//
 //      단순 카운트 증가 목적이므로 메모리 동기화 오버헤드를 최소화하기 위해
 //      std::memory_order_relaxed 메모리 순서를 사용합니다.
 //***************************************************************************
@@ -79,13 +75,10 @@ bool CRioObject::IncrementIoCount() noexcept
 
 //***************************************************************************
 // @brief Outstanding I/O reference를 하나 감소시킵니다.
-//
 // @note
 //      이 함수는 void 반환형입니다.
-//
 //      CRioCore::ProcessRioResult()의 ObjectIoCountGuard는
 //      Dispatch()가 정상적으로 반환된 이후 이 함수를 호출합니다.
-//
 // @details
 //      CAS 루프 성공 시 std::memory_order_release 오더링을 적용합니다.
 //      이로써 Dispatch() 로직 및 I/O 처리 과정에서 발생한 모든 메모리 변경 사항이
@@ -120,7 +113,6 @@ void CRioObject::DecrementIoCount() noexcept
 
 //***************************************************************************
 // @brief 현재 Outstanding I/O 개수를 반환합니다.
-//
 // @details
 //      std::memory_order_acquire를 사용하여 DecrementIoCount()의 Release 오더링과
 //      동기화 페어(Acquire-Release semantics)를 이룹니다.
@@ -132,38 +124,9 @@ uint32_t CRioObject::GetIoCount() const noexcept
 
 //***************************************************************************
 // @brief Outstanding I/O가 존재하는지 확인합니다.
-//
 // @return true: 진행 중인 I/O 존재, false: 진행 중인 I/O 없음
 //***************************************************************************
 bool CRioObject::HasOutstandingIo() const noexcept
 {
     return GetIoCount() != 0;
-}
-
-//***************************************************************************
-// @brief I/O Count를 0으로 초기화합니다.
-//
-// @note
-//      실제 runtime submission/completion 경로에서는 사용하지 않는 것을
-//      권장합니다.
-//
-//      이미 Outstanding I/O가 존재하는 상태에서 호출하면 lifecycle
-//      invariant가 깨질 수 있습니다.
-//
-// @details
-//      안전성을 위해 0일 때만 무조건 0을 저장하도록 방어 검사를 수행하며,
-//      std::memory_order_release로 리셋을 확정 반영합니다.
-//***************************************************************************
-void CRioObject::ResetIoCount() noexcept
-{
-    const uint32_t current = _ioCount.load(std::memory_order_acquire);
-
-    assert(current == 0 && "ResetIoCount called while I/O is outstanding");
-
-    if( current != 0 )
-    {
-        return;
-    }
-
-    _ioCount.store(0, std::memory_order_relaxed);
 }

@@ -8,19 +8,19 @@
 #define __RIOCORE_H__
 
 #ifndef __RIOCOMMON_H__
-#include <Network/RioCommon.h>
+#include <Network/RIO/RioCommon.h>
 #endif
 
 #ifndef __RIOEVENT_H__
-#include <Network/RioEvent.h>
+#include <Network/RIO/RioEvent.h>
 #endif
 
 #ifndef __RIOEVENTPOOL_H__
-#include <Network/RioEventPool.h>
+#include <Network/RIO/RioEventPool.h>
 #endif
 
 #ifndef __RIOOBJECT_H__
-#include <Network/RioObject.h>
+#include <Network/RIO/RioObject.h>
 #endif
 
 class CRioEvent;
