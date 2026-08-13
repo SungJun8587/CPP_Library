@@ -300,24 +300,24 @@ size_t CRioServer::GetClosedSessionCount() const noexcept
 //***************************************************************************
 bool CRioServer::CreateListenSocket(const sockaddr_in& address, int backlog) noexcept
 {
-    SOCKET listenSocket = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    // accept()로 수락된 클라이언트 소켓은 리슨 소켓의 속성을 상속받으므로,
+    // RIO 큐 생성이 가능하려면 리슨 소켓 자체가 WSA_FLAG_REGISTERED_IO로 생성돼야 한다.
+    SOCKET listenSocket = CSocketUtils::CreateRioSocket();
     if( listenSocket == INVALID_SOCKET ) return false;
 
-    BOOL reuseAddress = TRUE;
-
-    if( ::setsockopt(listenSocket, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&reuseAddress), sizeof(reuseAddress)) == SOCKET_ERROR )
+    if( !CSocketUtils::SetReuseAddress(listenSocket, true) )
     {
         CloseSocket(listenSocket);
         return false;
     }
 
-    if( ::bind(listenSocket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == SOCKET_ERROR )
+    if( !CSocketUtils::Bind(listenSocket, CNetAddress(address)) )
     {
         CloseSocket(listenSocket);
         return false;
     }
 
-    if( ::listen(listenSocket, backlog) == SOCKET_ERROR )
+    if( !CSocketUtils::Listen(listenSocket, backlog) )
     {
         CloseSocket(listenSocket);
         return false;
@@ -344,9 +344,7 @@ bool CRioServer::CreateListenSocket(const sockaddr_in& address, int backlog) noe
 bool CRioServer::ConfigureListenSocket() noexcept
 {
     if( _listenSocket == INVALID_SOCKET ) return false;
-
-    u_long nonBlocking = 1;
-    return ::ioctlsocket(_listenSocket, FIONBIO, &nonBlocking) == 0;
+    return CSocketUtils::SetNonBlocking(_listenSocket, true);
 }
 
 //***************************************************************************
@@ -395,15 +393,16 @@ bool CRioServer::AcceptOne() noexcept
     if( listenSocket == INVALID_SOCKET ) return false;
 
     sockaddr_in clientAddress{};
-    int clientAddressLength = sizeof(clientAddress);
-
-    SOCKET clientSocket = ::accept(listenSocket, reinterpret_cast<sockaddr*>(&clientAddress), &clientAddressLength);
+    SOCKET clientSocket = CSocketUtils::Accept(listenSocket, clientAddress);
 
     if( clientSocket == INVALID_SOCKET )
     {
         const int error = ::WSAGetLastError();
         if( error == WSAEWOULDBLOCK || error == WSAEINTR ) return false;
         if( !_running.load(std::memory_order_acquire) ) return false;
+
+        // WOULDBLOCK/INTR 이외의 실제 에러(WSAEMFILE, WSAENOBUFS 등)를 로그로 남긴다.
+        CSocketUtils::ReportError(_T("CRioServer::AcceptOne accept()"), error);
         return false;
     }
 
@@ -471,11 +470,8 @@ bool CRioServer::CreateRequestQueue(SOCKET socket, RIO_RQ& outRequestQueue) noex
     if( rioTable.RIOCreateRequestQueue == nullptr ) return false;
 
     // CRioCore 또는 연관 클래스에서 RIO_CQ 핸들을 가져와 전달합니다.
-    //RIO_CQ receiveCq = _core->GetReceiveQueue(); // 프로젝트 구조에 맞는 CQ 가져오기
-    //RIO_CQ sendCq = _core->GetSendQueue();       // 프로젝트 구조에 맞는 CQ 가져오기
-
-    RIO_CQ receiveCq = nullptr;
-    RIO_CQ sendCq = nullptr;
+    RIO_CQ receiveCq = _core->GetReceiveQueue(); // 프로젝트 구조에 맞는 CQ 가져오기
+    RIO_CQ sendCq = _core->GetSendQueue();       // 프로젝트 구조에 맞는 CQ 가져오기
 
     RIO_RQ requestQueue = rioTable.RIOCreateRequestQueue(socket, 1, 1, 1, 1, receiveCq, sendCq, nullptr);
     if( requestQueue == RIO_INVALID_RQ ) return false;
@@ -711,10 +707,7 @@ void CRioServer::CloseListenSocket() noexcept
 //***************************************************************************
 void CRioServer::CloseSocket(SOCKET socket) noexcept
 {
-    if( socket == INVALID_SOCKET ) return;
-
-    (void)::shutdown(socket, SD_BOTH);
-    (void)::closesocket(socket);
+    CSocketUtils::CloseGraceful(socket);
 }
 
 //***************************************************************************

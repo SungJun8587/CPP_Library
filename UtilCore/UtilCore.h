@@ -97,7 +97,6 @@ using namespace std;
 #include <Job/JobQueue.h>
 #include <Job/GlobalQueue.h>
 
-#include <Network/SocketUtil.h>
 #include <Network/NetworkCommon.h>
 
 #include <BaseGlobal.h>

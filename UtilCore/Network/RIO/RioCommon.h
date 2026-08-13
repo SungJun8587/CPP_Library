@@ -7,10 +7,16 @@
 #ifndef __RIOCOMMON_H__
 #define __RIOCOMMON_H__
 
+//***************************************************************************
+// @brief Windows 헤더 빌드 최적화 (불필요한 API 헤더 포함 제외)
+//***************************************************************************
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
 
+//***************************************************************************
+// @brief 최소 지원 OS 버전 설정 (Windows 8 / Windows Server 2012 이상 - RIO API 지원)
+//***************************************************************************
 #ifndef _WIN32_WINNT
 #define _WIN32_WINNT 0x0602
 #endif
@@ -18,11 +24,6 @@
 #ifndef __BASEREDEFINEDATATYPE_H__
 #include <BaseRedefineDataType.h>
 #endif
-
-#include <winsock2.h>
-#include <mswsock.h>
-#include <cstdint>
-#include <chrono>
 
 namespace Rio
 {
@@ -44,7 +45,7 @@ namespace Rio
     enum class State : int32
     {
         Uninitialized = 0,  // 초기화 전 상태
-        Initializing = 1,   // 초기화 진행 중 상태
+        Initializing = 1,    // 초기화 진행 중 상태
         Initialized = 2,    // CQ/IOCP 생성 및 초기화 완료 상태
         Running = 3,        // 워커 구동 중 및 I/O 제출/디스패치 정상 작동 상태
         Stopping = 4,       // 정지 요청 진입, 신규 I/O 제출 차단 및 Drain 시작 상태
@@ -101,6 +102,16 @@ namespace Rio
     };
 
     //***************************************************************************
+    // @enum RioCqType
+    // @brief Completion Queue 구분용 열거형
+    //***************************************************************************
+    enum class RioCqType : uint8_t
+    {
+        Receive,    // 수신 Completion Queue
+        Send        // 송신 Completion Queue
+    };
+
+    //***************************************************************************
     // @enum SessionState
     // @brief RIO 세션의 라이프사이클 상태를 정의하는 열거형입니다.
     // @details
@@ -135,14 +146,26 @@ namespace Rio
     //******************************************************************************************************************
     static constexpr ULONG kBatchSize = 64;
 
-    // DispatchBatch 및 내부 처리 반환용 내부 상태 상숫값
-    static constexpr int32 kCorruptCq = -1;             // CQ 오염 발생
-    static constexpr int32 kStopped = -2;               // Core 정지 완료
-    static constexpr int32 kNotifyError = -3;           // RIONotify 실패
-    static constexpr int32 kIocpError = -4;             // GQCS 오류 발생
+    //***************************************************************************
+    // @brief DispatchBatch 및 내부 처리 반환용 오류/상태 상숫값
+    //***************************************************************************
+    static constexpr int32 kCorruptCq = -1;             // CQ 오염 발생 (RIO_CORRUPT_CQ)
+    static constexpr int32 kStopped = -2;               // Core 엔진 정지 완료
+    static constexpr int32 kNotifyError = -3;           // RIONotify 호출 실패
+    static constexpr int32 kIocpError = -4;             // GetQueuedCompletionStatus 오류 발생
     static constexpr int32 kInvalidCompletion = -5;     // 유효하지 않은 완료 패킷 수신
 
-    static constexpr std::chrono::milliseconds kDefaultDrainTimeout{ 5000 }; // 기본 Drain 타임아웃 (5초)
+    //***************************************************************************
+    // @brief IOCP CompletionKey 구분용 식별 비트 태그 (Tag Mask)
+    //***************************************************************************
+    constexpr ULONG_PTR kReceiveCompletionTag = 0x01;   // 수신 Completion 이벤트 비트 태그
+    constexpr ULONG_PTR kSendCompletionTag = 0x02;      // 송신 Completion 이벤트 비트 태그
+    constexpr ULONG_PTR kCompletionTagMask = 0x03;      // Completion 태그 마스크
+
+    //***************************************************************************
+    // @brief 기본 Drain 대기 타임아웃 (5초)
+    //***************************************************************************
+    static constexpr std::chrono::milliseconds kDefaultDrainTimeout{ 5000 };
 
     //**********************************************************************************************************************
     // @brief 유효하지 않은 슬롯 인덱스를 나타내는 센티널(Sentinel) 상숫값
@@ -167,5 +190,3 @@ namespace Rio
 }
 
 #endif // __RIOCOMMON_H__
-
-

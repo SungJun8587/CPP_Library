@@ -12,7 +12,6 @@
 // @details
 //      Pool에 의해 생성된 직후에는 아직 사용 중인 I/O가 없으므로
 //      Free 상태로 초기화합니다.
-//
 //      모든 초기화 표현식은 예외를 발생시키지 않는 noexcept 조건으로 수행됩니다.
 //***************************************************************************
 CRioEvent::CRioEvent() noexcept
@@ -28,14 +27,11 @@ CRioEvent::CRioEvent() noexcept
 
 //***************************************************************************
 // @brief CRioEvent 소멸자
-//
 // @details
 //      정상적인 lifecycle에서는 CRioEventPool::Release()가
 //      outstanding I/O가 모두 종료된 이후 호출되므로
 //      Owner가 남아 있지 않아야 합니다.
-//
 //      다만 방어적으로 shared_ptr을 여기서 해제합니다.
-//
 //      _nextFree 포인터 역시 dangling reference를 방지하기 위해 null로 초기화합니다.
 //***************************************************************************
 CRioEvent::~CRioEvent() noexcept

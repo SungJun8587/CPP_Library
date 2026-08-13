@@ -82,9 +82,12 @@
     <ClInclude Include="Network\IOCP\IocpCommon.h" />
     <ClInclude Include="Network\IOCP\IocpCore.h" />
     <ClInclude Include="Network\IOCP\IocpEvent.h" />
+    <ClInclude Include="Network\IOCP\IocpListener.h" />
+    <ClInclude Include="Network\IOCP\IocpSession.h" />
     <ClInclude Include="Network\IOCP\RecvBuffer.h" />
     <ClInclude Include="Network\IOCP\RingBuffer.h" />
     <ClInclude Include="Network\IOCP\SendBuffer.h" />
+    <ClInclude Include="Network\NetAddress.h" />
     <ClInclude Include="Network\NetworkCommon.h" />
     <ClInclude Include="Network\RIO\RioBuffer.h" />
     <ClInclude Include="Network\RIO\RioCommon.h" />
@@ -98,7 +101,7 @@
     <ClInclude Include="Network\RIO\RioSession.h" />
     <ClInclude Include="Network\RIO\RioSessionManager.h" />
     <ClInclude Include="Network\RIO\RioWorker.h" />
-    <ClInclude Include="Network\SocketUtil.h" />
+    <ClInclude Include="Network\SocketUtils.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="ServerConfig.h" />
     <ClInclude Include="ServerConnectInfo.h" />
@@ -162,9 +165,12 @@
     <ClCompile Include="Memory\Stream.cpp" />
     <ClCompile Include="Network\IOCP\IocpCore.cpp" />
     <ClCompile Include="Network\IOCP\IocpEvent.cpp" />
+    <ClCompile Include="Network\IOCP\IocpListener.cpp" />
+    <ClCompile Include="Network\IOCP\IocpSession.cpp" />
     <ClCompile Include="Network\IOCP\RecvBuffer.cpp" />
     <ClCompile Include="Network\IOCP\RingBuffer.cpp" />
     <ClCompile Include="Network\IOCP\SendBuffer.cpp" />
+    <ClCompile Include="Network\NetAddress.cpp" />
     <ClCompile Include="Network\RIO\RioBuffer.cpp" />
     <ClCompile Include="Network\RIO\RioCore.cpp" />
     <ClCompile Include="Network\RIO\RioEvent.cpp" />
@@ -176,7 +182,7 @@
     <ClCompile Include="Network\RIO\RioSession.cpp" />
     <ClCompile Include="Network\RIO\RioSessionManager.cpp" />
     <ClCompile Include="Network\RIO\RioWorker.cpp" />
-    <ClCompile Include="Network\SocketUtil.cpp" />
+    <ClCompile Include="Network\SocketUtils.cpp" />
     <ClCompile Include="ServerConfig.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>

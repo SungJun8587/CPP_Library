@@ -7,12 +7,25 @@
 #ifndef __NETWORKCOMMON_H__
 #define __NETWORKCOMMON_H__
 
+#include <winsock2.h>
+#include <mswsock.h>
+#include <ws2tcpip.h>
+#include <winternl.h>
+
+#pragma comment(lib, "ws2_32.lib")
+#pragma comment(lib, "mswsock.lib")
+
+#include <Network/NetAddress.h>
+#include <Network/SocketUtils.h>
+
 #include <Network/IOCP/IocpCommon.h>
 #include <Network/IOCP/SendBuffer.h>
 #include <Network/IOCP/RecvBuffer.h>
 #include <Network/IOCP/RingBuffer.h>
 #include <Network/IOCP/IocpEvent.h>
 #include <Network/IOCP/IocpCore.h>
+#include <Network/IOCP/IocpListener.h>
+#include <Network/IOCP/IocpSession.h>
 
 #include <Network/RIO/RioCommon.h>
 #include <Network/RIO/RioObject.h>

@@ -109,12 +109,22 @@ public:
 class AcceptEvent : public CIocpEvent
 {
 public:
-    AcceptEvent() : CIocpEvent(Iocp::EventType::Accept) {}
+    //***************************************************************************
+        // @brief AcceptEvent 생성자
+        // @details eventType을 EventType::Accept로 초기화하고 버퍼를 0으로 채웁니다.
+        //***************************************************************************
+    AcceptEvent() : CIocpEvent(Iocp::EventType::Accept)
+    {
+        ::ZeroMemory(acceptBuffer, sizeof(acceptBuffer));
+    }
 
 public:
     // AcceptEx에 전달할 미리 생성된 세션.
     // Listener::ProcessAccept()에서 static_pointer_cast<CSession>으로 캐스팅해 사용.
     CIocpObjectRef  session;
+
+    // AcceptEx 주소 정보 파싱용 내부 버퍼 (IPv4/IPv6 주소 및 여유 공간 포함 128 bytes)
+    BYTE            acceptBuffer[128];
 };
 
 //***************************************************************************

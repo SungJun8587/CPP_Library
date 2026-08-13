@@ -204,7 +204,7 @@
     <ClInclude Include="XML\RapidXMLUtil.h">
       <Filter>XML</Filter>
     </ClInclude>
-    <ClInclude Include="Network\SocketUtil.h">
+    <ClInclude Include="Network\SocketUtils.h">
       <Filter>Network</Filter>
     </ClInclude>
     <ClInclude Include="Job\Job.h">
@@ -368,6 +368,15 @@
     <ClInclude Include="Network\RIO\RioServer.h">
       <Filter>Network\RIO</Filter>
     </ClInclude>
+    <ClInclude Include="Network\IOCP\IocpListener.h">
+      <Filter>Network\IOCP</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\NetAddress.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\IOCP\IocpSession.h">
+      <Filter>Network\IOCP</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">
@@ -467,7 +476,7 @@
     <ClCompile Include="XML\RapidXMLUtil.cpp">
       <Filter>XML</Filter>
     </ClCompile>
-    <ClCompile Include="Network\SocketUtil.cpp">
+    <ClCompile Include="Network\SocketUtils.cpp">
       <Filter>Network</Filter>
     </ClCompile>
     <ClCompile Include="Thread\SRWLock.cpp">
@@ -563,6 +572,15 @@
     </ClCompile>
     <ClCompile Include="Network\RIO\RioServer.cpp">
       <Filter>Network\RIO</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\IOCP\IocpListener.cpp">
+      <Filter>Network\IOCP</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\NetAddress.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\IOCP\IocpSession.cpp">
+      <Filter>Network\IOCP</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

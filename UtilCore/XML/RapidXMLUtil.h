@@ -13,17 +13,18 @@
 #include <tchar.h>
 #endif
 
+#include <string>
+#include <vector>
+#include <map>
+#include <type_traits>
+
 #ifndef __BASEREDEFINEDATATYPE_H__
 #include <BaseRedefineDataType.h> 
 #endif
 
-#ifndef __ICONVUTIL_H__
-#include <Util/IconvUtil.h> 
+#ifndef __ENCODINGCONVERT_H__
+#include <Util/EncodingConvert.h>
 #endif
-
-#include <vector>
-#include <map>
-#include <type_traits>
 
 #include <rapidxml.hpp>
 #include <rapidxml_utils.hpp>
@@ -38,19 +39,33 @@ using namespace rapidxml;
 #define MapValue		_T("Value")
 #define ItemName		_T("Item")
 
+inline std::string TcharToUtf8(const _tstring& input)
+{
+#ifdef _UNICODE
+	return UnicodeToUtf8(input);
+#else
+	return AnsiToUtf8(input);
+#endif
+}
+
+inline _tstring Utf8ToTchar(const std::string& input)
+{
+#ifdef _UNICODE
+	return Utf8ToUnicode(input);
+#else
+	return Utf8ToAnsi(input);
+#endif
+}
+
 class CXMLNode
 {
 public:
 	CXMLNode(xml_node<>* node = nullptr) : _node(node)
 	{
-		_unicodeToUtf8 = new Iconv::CIconvUtil("WCHAR_T", "UTF-8");		// WCHAR_T -> UTF-8 변환
-		_utf8ToUnicode = new Iconv::CIconvUtil("UTF-8", "WCHAR_T");		// UTF-8 -> WCHAR_T 변환
 	}
 
 	~CXMLNode()
 	{
-		delete _utf8ToUnicode;
-		delete _unicodeToUtf8;
 	}
 
 	bool IsValid()
@@ -76,37 +91,11 @@ public:
 	double				GetDoubleValue(double defaultValue = 0.0);
 	const TCHAR*		GetStringValue(const TCHAR* defaultValue = _T(""));
 
-	CXMLNode				FindChild(const TCHAR* ptszKey);
+	CXMLNode			FindChild(const TCHAR* ptszKey);
 	CVector<CXMLNode>	FindChildren(const TCHAR* ptszKey);
 
 private:
-	//***************************************************************************
-	// TCHAR → UTF-8(char) 변환
-	string TcharToUtf8(const _tstring& input) const
-	{
-#ifdef UNICODE
-		return _unicodeToUtf8->Convert(input);
-#else
-		return input;
-#endif
-	}
-
-	//***************************************************************************
-	// UTF-8(char) → TCHAR 변환
-	_tstring Utf8ToTchar(const string& input) const
-	{
-#ifdef UNICODE
-		return _utf8ToUnicode->ConvertW(input);
-#else
-		return input;
-#endif
-	}
-
-private:
 	rapidxml::xml_node<>*		_node = nullptr;
-
-	Iconv::CIconvUtil* _unicodeToUtf8;	// WCHAR_T -> UTF-8 변환
-	Iconv::CIconvUtil* _utf8ToUnicode;	// UTF-8 -> WCHAR_T 변환
 };
 
 class CRapidXMLUtil
@@ -254,13 +243,7 @@ public:
 	template <typename T>
 	static void Serialize(const T& value, xml_node<>* parent, xml_document<>& doc, const TCHAR* ptszTagName = ItemName)
 	{
-		string nodeName;
-
-#ifdef UNICODE
-		nodeName = Iconv::CIconvUtil::ConvertEncoding(ptszTagName, "WCHAR_T", "UTF-8");
-#else
-		nodeName = ptszTagName;
-#endif
+		std::string nodeName = TcharToUtf8(ptszTagName);
 
 		xml_node<>* node = doc.allocate_node(node_type::node_element, doc.allocate_string(nodeName.c_str()), doc.allocate_string(std::to_string(value).c_str()));
 		parent->append_node(node);
@@ -270,16 +253,9 @@ public:
 	// 문자열 타입 직렬화 함수
 	static void Serialize(const _tstring& value, xml_node<>* parent, xml_document<>& doc, const TCHAR* ptszTagName = ItemName)
 	{
-		string nodeName;
-		string nodeValue;
+		std::string nodeName = TcharToUtf8(ptszTagName);
+		std::string nodeValue = TcharToUtf8(value);
 
-#ifdef UNICODE
-		nodeName = Iconv::CIconvUtil::ConvertEncoding(ptszTagName, "WCHAR_T", "UTF-8");
-		nodeValue = Iconv::CIconvUtil::ConvertEncoding(value, "WCHAR_T", "UTF-8");
-#else
-		nodeName = ptszTagName;
-		nodeValue = value;
-#endif
 		xml_node<>* node = doc.allocate_node(node_type::node_element, doc.allocate_string(nodeName.c_str()), doc.allocate_string(nodeValue.c_str()));
 		parent->append_node(node);
 	}
@@ -295,35 +271,8 @@ public:
 		}
 		else if constexpr( std::is_same_v<T, _tstring> )
 		{
-#ifdef UNICODE
-			if( node ) value = Iconv::CIconvUtil::ConvertEncodingW(node->value(), "UTF-8", "WCHAR_T");
-#else
-			if( node ) value = node->value();
-#endif
+			if( node ) value = Utf8ToTchar(node->value());
 		}
-	}
-
-private:
-	//***************************************************************************
-	// TCHAR → UTF-8(char) 변환
-	string TcharToUtf8(const _tstring& input) const
-	{
-#ifdef UNICODE
-		return _unicodeToUtf8->Convert(input);
-#else
-		return input;
-#endif
-	}
-
-	//***************************************************************************
-	// UTF-8(char) → TCHAR 변환
-	_tstring Utf8ToTchar(const string& input) const
-	{
-#ifdef UNICODE
-		return _utf8ToUnicode->ConvertW(input);
-#else
-		return input;
-#endif	
 	}
 
 private:
@@ -355,9 +304,6 @@ private:
 private:
 	rapidxml::xml_document<>	_doc;			// XML은 항상 char 기반 저장
 	std::string					_xmlString;     // UTF-8로 저장
-
-	Iconv::CIconvUtil* _unicodeToUtf8;	// WCHAR_T -> UTF-8 변환
-	Iconv::CIconvUtil* _utf8ToUnicode;	// UTF-8 -> WCHAR_T 변환
 };
 
 #include "XML/RapidXMLUtil.inl"

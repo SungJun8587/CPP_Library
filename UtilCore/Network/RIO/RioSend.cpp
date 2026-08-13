@@ -10,17 +10,8 @@
 namespace
 {
     //***************************************************************************
-    // @brief CRioEvent가 이미 보유한(=BindBufferSlot에 성공해 기록된) Buffer slot
-    //        ownership을 모두 반환합니다.
-    // @param rioEvent  버퍼 바인딩 롤백을 수행할 CRioEvent 객체 포인터
-    // @note
-    //      RIO submission 실패 시에만 호출됩니다. 정상 completion 경로에서는
-    //      CRioCore::ProcessRioResult()가 동일한 작업을 수행합니다.
-    //      FreeSlot()을 먼저 수행한 뒤 ClearBufferBindings()를 호출해야 합니다.
-    //      ClearBufferBindings()만 호출하면 실제 slot ownership이 유실(leak)됩니다.
-    //      이 함수는 CRioEvent에 이미 "기록된" binding만 처리합니다.
-    //      BindBufferSlot() 호출 자체가 실패해 아직 event에 기록되지 못한
-    //      slot은 호출자가 별도로 FreeSlot()해야 합니다.
+    // @brief CRioEvent에 바인딩된 슬롯 자원을 즉시 반환합니다.
+    // @param rioEvent 바인딩 정보를 가지고 있는 이벤트 객체
     //***************************************************************************
     void RollbackBufferBindings(CRioEvent* rioEvent) noexcept
     {
@@ -49,25 +40,56 @@ namespace
 
         rioEvent->ClearBufferBindings();
     }
+
+    //***************************************************************************
+    // @brief Submission 실패시 완벽한 역순 롤백 트랜잭션을 수행합니다.
+    //        Buffer Slot 반환 -> Event Owner 반환 -> Object IoCount-- -> EventPool Free
+    // @param core RIO 코어 객체 참조
+    // @param rioEvent 롤백할 RIO 이벤트 객체
+    // @param owner 대상 RIO 객체 포인터
+    //***************************************************************************
+    void RollbackSubmission(CRioCore& core, CRioEvent* rioEvent, CRioObject* owner) noexcept
+    {
+        if( rioEvent == nullptr )
+        {
+            if( owner != nullptr )
+            {
+                owner->DecrementIoCount();
+            }
+            return;
+        }
+
+        RollbackBufferBindings(rioEvent);
+
+        CRioObjectRef rollbackOwner = rioEvent->TakeOwner();
+
+        if( rollbackOwner )
+        {
+            rollbackOwner->DecrementIoCount();
+        }
+        else if( owner != nullptr )
+        {
+            owner->DecrementIoCount();
+        }
+
+        if( core.GetEventPool() != nullptr )
+        {
+            core.GetEventPool()->Free(rioEvent);
+        }
+    }
 }
 
 //***************************************************************************
-// @brief 단일 RIO_BUF 기반 RIOSend
-// @param core          RIO 핵심 처리를 담당하는 CRioCore 참조
-// @param requestQueue  I/O 요청을 제출할 RIO Request Queue
-// @param buffer        송신할 RIO Buffer descriptor
-// @param bufferOwner   buffer가 속한 CRioBuffer
-// @param slotIndex     AllocSlot()으로 확보한 slot index
-// @param rioEvent      완료 처리 시 식별자로 사용될 RIO 이벤트
-// @param owner         I/O lifetime을 관리하는 CRioObject
-// @param flags         RIO 송신 옵션 플래그
-// @return 성공 시 true, 실패 시 false
-// @note
-//      성공적으로 Submission된 이후 slot의 소유권은
-//      CRioEvent로 이전됩니다.
-//      호출자는 FreeSlot()을 직접 호출해서는 안 됩니다.
-//      실패 시에는 이 함수가 (bufferOwner, slotIndex)에 대한 FreeSlot()까지
-//      책임지고 수행합니다. 호출자가 다시 FreeSlot()을 호출하면 double-free입니다.
+// @brief 단일 버퍼 기반 RIO Send 요청을 등록합니다.
+// @param core RIO 코어 객체
+// @param requestQueue RIO 요청 큐 핸들
+// @param buffer 전송 대상 RIO_BUF 구조체
+// @param bufferOwner 버퍼 소유자 객체
+// @param slotIndex 버퍼 슬롯 인덱스
+// @param rioEvent 작업에 사용할 RIO 이벤트 객체
+// @param owner 비동기 완료 결과를 디스패치할 RIO 객체
+// @param flags RIOSend 옵션 플래그
+// @return bool 제출 성공 여부
 //***************************************************************************
 bool CRioSend::Send(
     CRioCore& core,
@@ -95,9 +117,6 @@ bool CRioSend::Send(
         return false;
     }
 
-    //***********************************************************************
-    // Owner lifetime 확보
-    //***********************************************************************
     CRioObjectRef ownerRef;
 
     try
@@ -114,45 +133,26 @@ bool CRioSend::Send(
         return false;
     }
 
-    //***********************************************************************
-    // CRioObject outstanding I/O count 확보
-    //***********************************************************************
+    // 1. Object IoCount++
     if( !owner->IncrementIoCount() )
     {
         return false;
     }
 
-    //***********************************************************************
-    // CRioEvent 초기화
-    //***********************************************************************
+    // 2. Event Owner 연결
     rioEvent->Initialize(Rio::EventType::Send, ownerRef);
 
-    //***********************************************************************
-    // Buffer-slot ownership binding
-    //
-    // 성공적인 RIO submission 이후 completion이 처리될 때까지
-    // CRioEvent가 해당 slot 정보를 유지합니다.
-    //***********************************************************************
+    // 3. Buffer Slot 보유
     if( !rioEvent->BindBufferSlot(bufferOwner, slotIndex) )
     {
-        //*******************************************************************
-        // BindBufferSlot() 자체가 실패했으므로 event에는 아직 이 slot이
-        // 기록되지 않았습니다. RollbackBufferBindings()로는 회수되지 않으므로
-        // 여기서 직접 FreeSlot()해야 leak이 발생하지 않습니다.
-        //*******************************************************************
+        // BindBufferSlot 자체 실패 시에는 event에 미기록 상태이므로 직접 FreeSlot 후 롤백
         bufferOwner->FreeSlot(slotIndex);
-
-        (void)rioEvent->TakeOwner();
-
-        owner->DecrementIoCount();
-
+        RollbackSubmission(core, rioEvent, owner);
         return false;
     }
 
-    //***********************************************************************
-    // RIO Submission
-    //***********************************************************************
-    const bool submitted = core.SubmitIo(
+    // 4. Submit
+    const bool submitted = core.TrySubmit(
         [&]() noexcept -> bool
         {
             return core.GetRioTable().RIOSend(
@@ -165,52 +165,27 @@ bool CRioSend::Send(
 
     if( !submitted )
     {
-        //*******************************************************************
-        // Submission 실패 Rollback
-        //
-        // 아직 RIO completion이 발생하지 않았으므로 Event에 기록된
-        // Buffer binding을 FreeSlot()까지 포함해 완전히 되돌립니다.
-        //*******************************************************************
-        RollbackBufferBindings(rioEvent);
-
-        (void)rioEvent->TakeOwner();
-
-        owner->DecrementIoCount();
-
+        RollbackSubmission(core, rioEvent, owner);
         return false;
     }
 
-    //***********************************************************************
-    // Submission 성공
-    //
-    // 이후 slot의 소유권은 CRioEvent가 보유합니다.
-    // 호출자는 FreeSlot()을 호출해서는 안 됩니다.
-    //***********************************************************************
     return true;
 }
 
 //***************************************************************************
-// @brief Scatter-Gather RIOSendEx
-// @param core              RIO 핵심 처리를 담당하는 CRioCore 참조
-// @param requestQueue      I/O 요청을 제출할 RIO Request Queue
-// @param data              송신 데이터 RIO_BUF 배열
-// @param dataBufferCount   송신 데이터 RIO_BUF 개수
-// @param dataBindings      각 data RIO_BUF에 대응하는 BufferBinding 배열
-// @param localAddress      로컬 주소 정보 버퍼 (선택적)
-// @param remoteAddress     원격 주소 정보 버퍼 (선택적)
-// @param control           제어 메시지 버퍼 (선택적)
-// @param rioEvent          완료 처리 시 식별자로 사용될 RIO 이벤트
-// @param owner             I/O lifetime을 관리하는 CRioObject
-// @param flags             RIO 송신 옵션 플래그
-// @return 성공 시 true, 실패 시 false
-// @note
-//      dataBindings[i]는 data[i]와 1:1 대응합니다.
-//      성공적으로 Submission된 모든 slot의 소유권은
-//      CRioEvent로 이전됩니다.
-//      실패 시 이미 event에 바인딩된 slot(0..i-1)은 RollbackBufferBindings()가,
-//      이번 반복에서 실패한 slot(i)은 각 실패 분기에서 직접 FreeSlot()이
-//      담당합니다. 단, binding 자체가 애초에 무효(sentinel)인 경우는
-//      해제할 실체가 없으므로 FreeSlot()을 호출하지 않습니다.
+// @brief 다중 버퍼 및 확장 옵션 기반의 RIOSendEx 요청을 등록합니다.
+// @param core RIO 코어 객체
+// @param requestQueue RIO 요청 큐 핸들
+// @param data 전송할 RIO_BUF 배열
+// @param dataBufferCount 데이터 버퍼 개수
+// @param dataBindings 각 데이터 버퍼에 대한 바인딩 정보 배열
+// @param localAddress 로컬 주소 RIO_BUF (선택 사항)
+// @param remoteAddress 원격 주소 RIO_BUF (선택 사항)
+// @param control 제어 데이터 RIO_BUF (선택 사항)
+// @param rioEvent 작업에 사용할 RIO 이벤트 객체
+// @param owner 비동기 완료 결과를 디스패치할 RIO 객체
+// @param flags RIOSendEx 옵션 플래그
+// @return bool 제출 성공 여부
 //***************************************************************************
 bool CRioSend::SendEx(
     CRioCore& core,
@@ -235,9 +210,6 @@ bool CRioSend::SendEx(
         return false;
     }
 
-    //***********************************************************************
-    // Owner lifetime 확보
-    //***********************************************************************
     CRioObjectRef ownerRef;
 
     try
@@ -254,84 +226,39 @@ bool CRioSend::SendEx(
         return false;
     }
 
-    //***********************************************************************
-    // CRioObject outstanding I/O count 확보
-    //***********************************************************************
     if( !owner->IncrementIoCount() )
     {
         return false;
     }
 
-    //***********************************************************************
-    // CRioEvent 초기화
-    //***********************************************************************
     rioEvent->Initialize(Rio::EventType::Send, ownerRef);
 
-    //***********************************************************************
-    // Scatter-Gather Buffer-slot binding
-    //
-    // data[i] <-> dataBindings[i]
-    //
-    // 모든 binding이 성공해야 Submission을 진행합니다.
-    //***********************************************************************
     for( ULONG i = 0; i < dataBufferCount; ++i )
     {
         const CRioEvent::BufferBinding& binding = dataBindings[i];
 
         if( binding.buffer == nullptr || binding.slotIndex == Rio::kInvalidSlotIndex )
         {
-            //*******************************************************************
-            // binding 자체가 무효(sentinel)이므로 해제할 실체가 없습니다.
-            // 0..i-1까지 이미 event에 기록된 slot만 되돌립니다.
-            //*******************************************************************
-            RollbackBufferBindings(rioEvent);
-
-            (void)rioEvent->TakeOwner();
-
-            owner->DecrementIoCount();
-
+            RollbackSubmission(core, rioEvent, owner);
             return false;
         }
 
         if( data[i].BufferId == RIO_INVALID_BUFFERID || data[i].Length == 0 )
         {
-            //*******************************************************************
-            // binding[i]는 유효한 slot이지만 아직 event에 기록되지 않았으므로
-            // RollbackBufferBindings()로는 회수되지 않습니다. 직접 FreeSlot().
-            //*******************************************************************
             binding.buffer->FreeSlot(binding.slotIndex);
-
-            RollbackBufferBindings(rioEvent);
-
-            (void)rioEvent->TakeOwner();
-
-            owner->DecrementIoCount();
-
+            RollbackSubmission(core, rioEvent, owner);
             return false;
         }
 
         if( !rioEvent->BindBufferSlot(binding.buffer, binding.slotIndex) )
         {
-            //*******************************************************************
-            // BindBufferSlot() 자체가 실패해 event에 기록되지 못했으므로
-            // 마찬가지로 직접 FreeSlot()해야 합니다.
-            //*******************************************************************
             binding.buffer->FreeSlot(binding.slotIndex);
-
-            RollbackBufferBindings(rioEvent);
-
-            (void)rioEvent->TakeOwner();
-
-            owner->DecrementIoCount();
-
+            RollbackSubmission(core, rioEvent, owner);
             return false;
         }
     }
 
-    //***********************************************************************
-    // RIOSendEx Submission
-    //***********************************************************************
-    const bool submitted = core.SubmitIo(
+    const bool submitted = core.TrySubmit(
         [&]() noexcept -> bool
         {
             return core.GetRioTable().RIOSendEx(
@@ -348,26 +275,9 @@ bool CRioSend::SendEx(
 
     if( !submitted )
     {
-        //*******************************************************************
-        // Submission 실패 Rollback
-        //
-        // 이 시점에는 모든 slot이 이미 event에 성공적으로 기록되어 있으므로
-        // RollbackBufferBindings() 하나로 전부 회수됩니다.
-        //*******************************************************************
-        RollbackBufferBindings(rioEvent);
-
-        (void)rioEvent->TakeOwner();
-
-        owner->DecrementIoCount();
-
+        RollbackSubmission(core, rioEvent, owner);
         return false;
     }
 
-    //***********************************************************************
-    // Submission 성공
-    //
-    // 모든 data slot의 소유권은 CRioEvent가 보유합니다.
-    // 호출자는 FreeSlot()을 호출해서는 안 됩니다.
-    //***********************************************************************
     return true;
 }
