@@ -52,6 +52,6 @@ namespace Iocp
     };
 }
 
-#endif // __IOCPCOMMON_H__
+#endif // ndef __IOCPCOMMON_H__
 
 

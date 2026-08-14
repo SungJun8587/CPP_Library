@@ -111,4 +111,4 @@ private:
 	static CSendBufferChunkRef	GetChunk();
 };
 
-#endif // __SENDBUFFER_H__
+#endif // ndef __SENDBUFFER_H__

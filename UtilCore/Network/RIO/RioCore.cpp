@@ -1,5 +1,4 @@
-﻿
-//***************************************************************************
+﻿//***************************************************************************
 // RioCore.cpp : implementation of the CRioCore class.
 //
 //***************************************************************************
@@ -10,12 +9,10 @@
 #include <algorithm>
 #include <limits>
 
-thread_local CRioCore* CRioCore::_tlsDispatchCore = nullptr;    // 현재 스레드의 Dispatch Core TLS 포인터 정의 및 초기화
+thread_local CRioCore* CRioCore::_tlsDispatchCore = nullptr;
 
 //***************************************************************************
-// @brief CRioCore 기본 생성자
-// @details
-//      멤버 변수 및 RIO/IOCP 관련 구조체들을 ZeroMemory로 초기화합니다.
+// @brief 기본 생성자
 //***************************************************************************
 CRioCore::CRioCore()
 {
@@ -27,10 +24,7 @@ CRioCore::CRioCore()
 }
 
 //***************************************************************************
-// @brief CRioCore 소멸자
-// @details
-//      객체 파기 전 명시적인 Shutdown()이 완료되었는지 검증하며,
-//      Closed 상태가 아닐 경우 std::terminate()를 통해 프로세스를 보호합니다.
+// @brief 소멸자
 //***************************************************************************
 CRioCore::~CRioCore()
 {
@@ -47,18 +41,20 @@ CRioCore::~CRioCore()
 }
 
 //***************************************************************************
-// @brief RIO 함수 테이블 및 Receive/Send CQ와 IOCP를 초기화합니다.
-// @param socket RIO 함수 확장 로드에 사용할 소켓
-// @param maxCompletionResults Completion Queue의 최대 결과 수
-// @param cqIdentifier CQ 구분용 고유 태그
-// @param eventPool 완료 후 반환할 EventPool 포인터
-// @return 성공 시 true, 실패 시 false
+// @brief RIO Core Engine을 초기화합니다.
+// @param socket RIO 함수 테이블 로드 및 바인딩을 위한 소켓
+// @param maxCompletionResults Completion Queue에서 한 번에 처리할 최대 결과 수
+// @param cqIdentifier CQ 구분 식별자 Tag
+// @param eventPool I/O에 사용될 RIO Event Pool 객체 Pointer
+// @return 초기화 성공 여부
 //***************************************************************************
-bool CRioCore::Initialize(SOCKET socket, ULONG maxCompletionResults, ULONG_PTR cqIdentifier, CRioEventPool* eventPool)
+bool CRioCore::Initialize(
+    SOCKET socket,
+    ULONG maxCompletionResults,
+    ULONG_PTR cqIdentifier,
+    CRioEventPool* eventPool)
 {
-    if( eventPool == nullptr ) return false;
-    if( socket == INVALID_SOCKET ) return false;
-    if( cqIdentifier == 0 ) return false;
+    if( eventPool == nullptr || socket == INVALID_SOCKET || cqIdentifier == 0 ) return false;
     if( (cqIdentifier & Rio::kCompletionTagMask) != 0 ) return false;
     if( maxCompletionResults == 0 || maxCompletionResults > RIO_MAX_CQ_SIZE ) return false;
 
@@ -72,7 +68,10 @@ bool CRioCore::Initialize(SOCKET socket, ULONG maxCompletionResults, ULONG_PTR c
     GUID guid = WSAID_MULTIPLE_RIO;
     DWORD bytes = 0;
 
-    const int ioctlResult = ::WSAIoctl(socket, SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER, &guid, sizeof(guid), &tempRioTable, sizeof(tempRioTable), &bytes, nullptr, nullptr);
+    const int ioctlResult = ::WSAIoctl(
+        socket, SIO_GET_MULTIPLE_EXTENSION_FUNCTION_POINTER,
+        &guid, sizeof(guid), &tempRioTable, sizeof(tempRioTable),
+        &bytes, nullptr, nullptr);
 
     if( ioctlResult == SOCKET_ERROR )
     {
@@ -94,7 +93,6 @@ bool CRioCore::Initialize(SOCKET socket, ULONG maxCompletionResults, ULONG_PTR c
     }
 
     HANDLE tempIocp = ::CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, 1);
-
     if( tempIocp == nullptr )
     {
         _state.store(Rio::State::Uninitialized, std::memory_order_release);
@@ -117,7 +115,6 @@ bool CRioCore::Initialize(SOCKET socket, ULONG maxCompletionResults, ULONG_PTR c
     _sendNotification.Iocp.Overlapped = &_sendOverlapped;
 
     RIO_CQ tempReceiveCq = tempRioTable.RIOCreateCompletionQueue(maxCompletionResults, &_receiveNotification);
-
     if( tempReceiveCq == RIO_INVALID_CQ )
     {
         ::CloseHandle(tempIocp);
@@ -128,7 +125,6 @@ bool CRioCore::Initialize(SOCKET socket, ULONG maxCompletionResults, ULONG_PTR c
     }
 
     RIO_CQ tempSendCq = tempRioTable.RIOCreateCompletionQueue(maxCompletionResults, &_sendNotification);
-
     if( tempSendCq == RIO_INVALID_CQ )
     {
         tempRioTable.RIOCloseCompletionQueue(tempReceiveCq);
@@ -158,13 +154,11 @@ bool CRioCore::Initialize(SOCKET socket, ULONG maxCompletionResults, ULONG_PTR c
     _lastShutdownResult = Rio::ShutdownResult::Success;
 
     _state.store(Rio::State::Initialized, std::memory_order_release);
-
     return true;
 }
 
 //***************************************************************************
-// @brief 외부에서 명시적인 정지를 호출합니다.
-// @details Dispatch 콜백 내부 호출 방지용 단성 검증 후 StopInternal을 수행합니다.
+// @brief 외부에서 RIO Engine 정지를 요청합니다.
 //***************************************************************************
 void CRioCore::RequestStop()
 {
@@ -179,7 +173,7 @@ void CRioCore::RequestStop()
 }
 
 //***************************************************************************
-// @brief Admission을 차단하고 Worker 스레드를 깨웁니다.
+// @brief 내부 정지 로직을 수행합니다.
 //***************************************************************************
 void CRioCore::StopInternal()
 {
@@ -191,7 +185,11 @@ void CRioCore::StopInternal()
     {
         _state.store(Rio::State::Stopping, std::memory_order_release);
     }
-    else if( current != Rio::State::Stopping && current != Rio::State::Faulted )
+    else if( current == Rio::State::Stopping || current == Rio::State::Faulted )
+    {
+        // Already stopping/faulted.
+    }
+    else
     {
         return;
     }
@@ -206,7 +204,7 @@ void CRioCore::StopInternal()
 }
 
 //***************************************************************************
-// @brief Worker 내부 예외 발생 시 Fault 상태로 전환합니다.
+// @brief 내부 예외/결함 상태를 설정합니다.
 //***************************************************************************
 void CRioCore::FaultInternal() noexcept
 {
@@ -214,9 +212,9 @@ void CRioCore::FaultInternal() noexcept
 }
 
 //***************************************************************************
-// @brief Dispatch 진입점 함수입니다.
-// @param mode 디스패치 모드
-// @return 처리 결과
+// @brief Batch 단위로 완료 이벤트를 디스패치합니다.
+// @param mode 디스패치 모드 (Wait/Drain)
+// @return 처리된 완료 이벤트 개수 또는 에러 코드
 //***************************************************************************
 int32 CRioCore::DispatchBatch(Rio::DispatchMode mode)
 {
@@ -231,21 +229,19 @@ int32 CRioCore::DispatchBatch(Rio::DispatchMode mode)
 }
 
 //***************************************************************************
-// @brief CQ 하나에서 완료 결과를 non-blocking 방식으로 수거합니다.
-// @param cq 수거할 RIO_CQ 핸들
-// @param results 결과를 담을 RIORESULT 배열
-// @param numResults [out] 수거된 결과 개수
-// @return 성공 시 true, CQ 손상 등 에러 발생 시 false
+// @brief Completion Queue에서 완료 결과를 꺼내옵니다.
+// @param cq 타겟 Completion Queue Handle
+// @param results 결과를 저장할 RIORESULT 배열 Pointer
+// @param numResults [out] 디큐된 결과 개수
+// @return 성공 여부
 //***************************************************************************
 bool CRioCore::DrainCompletionQueue(RIO_CQ cq, RIORESULT* results, ULONG& numResults) noexcept
 {
     numResults = 0;
 
-    if( cq == RIO_INVALID_CQ || results == nullptr ) return false;
-    if( _rioTable.RIODequeueCompletion == nullptr ) return false;
+    if( cq == RIO_INVALID_CQ || results == nullptr || _rioTable.RIODequeueCompletion == nullptr ) return false;
 
     const ULONG resultCount = _rioTable.RIODequeueCompletion(cq, results, Rio::kBatchSize);
-
     if( resultCount == RIO_CORRUPT_CQ ) return false;
 
     numResults = resultCount;
@@ -253,33 +249,42 @@ bool CRioCore::DrainCompletionQueue(RIO_CQ cq, RIORESULT* results, ULONG& numRes
 }
 
 //***************************************************************************
-// @brief CQ notification을 다시 등록합니다.
-// @param cq 등록할 RIO_CQ 핸들
-// @return 성공 또는 WSAEALREADY 상태일 경우 true
+// @brief Completion Queue의 알림을 요청합니다.
+// @param cq 타겟 Completion Queue Handle
+// @return 성공 여부
 //***************************************************************************
 bool CRioCore::NotifyCompletionQueue(RIO_CQ cq) noexcept
 {
-    if( cq == RIO_INVALID_CQ ) return false;
-    if( _rioTable.RIONotify == nullptr ) return false;
+    if( cq == RIO_INVALID_CQ || _rioTable.RIONotify == nullptr ) return false;
 
     const int result = _rioTable.RIONotify(cq);
-
     return result == ERROR_SUCCESS || result == WSAEALREADY;
 }
 
 //***************************************************************************
-// @brief Receive/Send CQ 실제 Dispatch 내부 로직을 수행합니다.
-// @param mode 디스패치 실행 모드
-// @return 처리된 I/O 개수 또는 오류 코드
+// @brief DispatchBatch의 실제 내부 구현부입니다.
+// @param mode 디스패치 모드
+// @return 처리된 완료 이벤트 개수 또는 에러 코드
+//
+// @note
+//      [수정: _cqConsumerMutex 범위 축소]
+//      기존에는 "CQ Lock 획득 -> Dequeue -> DispatchResults()(=Dispatch 콜백까지 포함)"
+//      전체가 하나의 lock scope 안에 있어, 무거운 사용자 Dispatch()가 실행되는 동안
+//      다른 CQ(Receive/Send)를 소비하려는 스레드까지 차단되는 문제가 있었습니다.
+//      이는 "무거운 Dispatch는 CQ consumer lock 밖에서 수행한다"는 기존 invariant와
+//      맞지 않으므로, Drain(Dequeue)만 lock 안에서 수행하고 그 결과를 lock 밖에서
+//      DispatchResults()로 넘기도록 모든 CQ 접근 지점(6곳)을 수정했습니다.
 //***************************************************************************
 int32 CRioCore::_DispatchBatchImpl(Rio::DispatchMode mode)
 {
-    if( _receiveCqCorrupted.load(std::memory_order_acquire) || _sendCqCorrupted.load(std::memory_order_acquire) ) return Rio::kCorruptCq;
+    if( _receiveCqCorrupted.load(std::memory_order_acquire) || _sendCqCorrupted.load(std::memory_order_acquire) )
+    {
+        return Rio::kCorruptCq;
+    }
 
     if( mode == Rio::DispatchMode::Wait )
     {
         const std::thread::id workerId = _workerThreadId.load(std::memory_order_acquire);
-
         if( workerId == std::thread::id{} || std::this_thread::get_id() != workerId )
         {
             assert(false && "DispatchBatch(Wait) must only be called from worker thread");
@@ -289,39 +294,45 @@ int32 CRioCore::_DispatchBatchImpl(Rio::DispatchMode mode)
 
     RIORESULT results[Rio::kBatchSize]{};
 
-    //***************************************************************************
     // 1. Receive CQ Drain
-    //***************************************************************************
     {
-        std::unique_lock<std::mutex> cqLock(_cqConsumerMutex);
-
         ULONG numResults = 0;
+        bool drainSucceeded = false;
 
-        if( !DrainCompletionQueue(_receiveCq, results, numResults) )
+        {
+            std::unique_lock<std::mutex> cqLock(_cqConsumerMutex);
+            drainSucceeded = DrainCompletionQueue(_receiveCq, results, numResults);
+        }
+
+        if( !drainSucceeded )
         {
             _receiveCqCorrupted.store(true, std::memory_order_release);
             MarkFaulted(true, false);
             return Rio::kCorruptCq;
         }
 
+        // Dispatch는 CQ Consumer Lock을 해제한 이후 수행합니다.
         if( numResults > 0 ) return DispatchResults(Rio::RioCqType::Receive, results, numResults);
     }
 
-    //***************************************************************************
     // 2. Send CQ Drain
-    //***************************************************************************
     {
-        std::unique_lock<std::mutex> cqLock(_cqConsumerMutex);
-
         ULONG numResults = 0;
+        bool drainSucceeded = false;
 
-        if( !DrainCompletionQueue(_sendCq, results, numResults) )
+        {
+            std::unique_lock<std::mutex> cqLock(_cqConsumerMutex);
+            drainSucceeded = DrainCompletionQueue(_sendCq, results, numResults);
+        }
+
+        if( !drainSucceeded )
         {
             _sendCqCorrupted.store(true, std::memory_order_release);
             MarkFaulted(false, true);
             return Rio::kCorruptCq;
         }
 
+        // Dispatch는 CQ Consumer Lock을 해제한 이후 수행합니다.
         if( numResults > 0 ) return DispatchResults(Rio::RioCqType::Send, results, numResults);
     }
 
@@ -335,53 +346,67 @@ int32 CRioCore::_DispatchBatchImpl(Rio::DispatchMode mode)
 
     if( mode == Rio::DispatchMode::Drain ) return 0;
 
-    //***************************************************************************
     // 3. Receive CQ Notify
-    //***************************************************************************
     {
-        std::unique_lock<std::mutex> cqLock(_cqConsumerMutex);
+        ULONG numResults = 0;
+        bool notifySucceeded = false;
+        bool drainSucceeded = false;
 
-        if( !NotifyCompletionQueue(_receiveCq) )
+        {
+            std::unique_lock<std::mutex> cqLock(_cqConsumerMutex);
+
+            notifySucceeded = NotifyCompletionQueue(_receiveCq);
+
+            if( notifySucceeded ) drainSucceeded = DrainCompletionQueue(_receiveCq, results, numResults);
+        }
+
+        if( !notifySucceeded )
         {
             _receiveCqCorrupted.store(true, std::memory_order_release);
             MarkFaulted(true, false);
             return Rio::kNotifyError;
         }
 
-        ULONG numResults = 0;
-
-        if( !DrainCompletionQueue(_receiveCq, results, numResults) )
+        if( !drainSucceeded )
         {
             _receiveCqCorrupted.store(true, std::memory_order_release);
             MarkFaulted(true, false);
             return Rio::kCorruptCq;
         }
 
+        // Dispatch는 CQ Consumer Lock을 해제한 이후 수행합니다.
         if( numResults > 0 ) return DispatchResults(Rio::RioCqType::Receive, results, numResults);
     }
 
-    //***************************************************************************
     // 4. Send CQ Notify
-    //***************************************************************************
     {
-        std::unique_lock<std::mutex> cqLock(_cqConsumerMutex);
+        ULONG numResults = 0;
+        bool notifySucceeded = false;
+        bool drainSucceeded = false;
 
-        if( !NotifyCompletionQueue(_sendCq) )
+        {
+            std::unique_lock<std::mutex> cqLock(_cqConsumerMutex);
+
+            notifySucceeded = NotifyCompletionQueue(_sendCq);
+
+            if( notifySucceeded ) drainSucceeded = DrainCompletionQueue(_sendCq, results, numResults);
+        }
+
+        if( !notifySucceeded )
         {
             _sendCqCorrupted.store(true, std::memory_order_release);
             MarkFaulted(false, true);
             return Rio::kNotifyError;
         }
 
-        ULONG numResults = 0;
-
-        if( !DrainCompletionQueue(_sendCq, results, numResults) )
+        if( !drainSucceeded )
         {
             _sendCqCorrupted.store(true, std::memory_order_release);
             MarkFaulted(false, true);
             return Rio::kCorruptCq;
         }
 
+        // Dispatch는 CQ Consumer Lock을 해제한 이후 수행합니다.
         if( numResults > 0 ) return DispatchResults(Rio::RioCqType::Send, results, numResults);
     }
 
@@ -393,9 +418,7 @@ int32 CRioCore::_DispatchBatchImpl(Rio::DispatchMode mode)
         return Rio::kStopped;
     }
 
-    //***************************************************************************
-    // 5. Shared IOCP Wait
-    //***************************************************************************
+    // 5. IOCP Wait
     DWORD bytesTransferred = 0;
     ULONG_PTR completionKey = 0;
     LPOVERLAPPED overlapped = nullptr;
@@ -404,6 +427,10 @@ int32 CRioCore::_DispatchBatchImpl(Rio::DispatchMode mode)
 
     if( !gqcsResult )
     {
+        // [수정: Faulted 전이 누락] GQCS 실패 시에도 다른 에러 경로와 동일하게
+        // MarkFaulted()로 워커 결함 상태를 통일합니다.
+        MarkFaulted(false, false);
+
         if( overlapped != nullptr )
         {
             assert(false && "GetQueuedCompletionStatus failed with completion packet");
@@ -414,6 +441,7 @@ int32 CRioCore::_DispatchBatchImpl(Rio::DispatchMode mode)
         return Rio::kIocpError;
     }
 
+    // Stop packet
     if( IsStopPacket(completionKey, overlapped) )
     {
         state = _state.load(std::memory_order_acquire);
@@ -427,8 +455,13 @@ int32 CRioCore::_DispatchBatchImpl(Rio::DispatchMode mode)
         return 0;
     }
 
+    // Invalid completion packet
     if( !IsValidCompletionPacket(completionKey, overlapped) )
     {
+        // [수정: Faulted 전이 누락] 잘못된 completion packet도 다른 corrupt 경로와
+        // 동일하게 MarkFaulted()로 통일합니다.
+        MarkFaulted(false, false);
+
         assert(false && "Unexpected IOCP completion packet");
         return Rio::kInvalidCompletion;
     }
@@ -448,19 +481,24 @@ int32 CRioCore::_DispatchBatchImpl(Rio::DispatchMode mode)
     }
     else
     {
+        // [수정: Faulted 전이 누락]
+        MarkFaulted(false, false);
+
         assert(false && "Invalid CQ completion packet");
         return Rio::kInvalidCompletion;
     }
 
-    //***************************************************************************
     // 6. Target CQ Drain
-    //***************************************************************************
     {
-        std::unique_lock<std::mutex> cqLock(_cqConsumerMutex);
-
         ULONG numResults = 0;
+        bool drainSucceeded = false;
 
-        if( !DrainCompletionQueue(targetCq, results, numResults) )
+        {
+            std::unique_lock<std::mutex> cqLock(_cqConsumerMutex);
+            drainSucceeded = DrainCompletionQueue(targetCq, results, numResults);
+        }
+
+        if( !drainSucceeded )
         {
             if( targetCqType == Rio::RioCqType::Receive )
             {
@@ -478,16 +516,17 @@ int32 CRioCore::_DispatchBatchImpl(Rio::DispatchMode mode)
 
         if( numResults == 0 ) return 0;
 
+        // Dispatch는 CQ Consumer Lock을 해제한 이후 수행합니다.
         return DispatchResults(targetCqType, results, numResults);
     }
 }
 
 //***************************************************************************
-// @brief CQ별 Fault 격리가 반영된 DispatchResults
-// @param cqType 처리 대상 CQ 열거형
-// @param results Completion 이벤트 배열
-// @param numResults 처리할 완료 건수
-// @return int32 처리 완료 건수 또는 오류 코드
+// @brief 꺼내온 RIO 결과를 순회하며 각 이벤트를 처리(Dispatch)합니다.
+// @param cqType CQ 타입 (Receive/Send)
+// @param results RIORESULT 배열
+// @param numResults 결과 개수
+// @return 성공적으로 처리된 개수 또는 에러 코드
 //***************************************************************************
 int32 CRioCore::DispatchResults(Rio::RioCqType cqType, RIORESULT* results, ULONG numResults) noexcept
 {
@@ -499,10 +538,12 @@ int32 CRioCore::DispatchResults(Rio::RioCqType cqType, RIORESULT* results, ULONG
         {
             if( cqType == Rio::RioCqType::Receive )
             {
+                _receiveCqCorrupted.store(true, std::memory_order_release);
                 MarkFaulted(true, false);
             }
             else
             {
+                _sendCqCorrupted.store(true, std::memory_order_release);
                 MarkFaulted(false, true);
             }
 
@@ -512,16 +553,22 @@ int32 CRioCore::DispatchResults(Rio::RioCqType cqType, RIORESULT* results, ULONG
 
         CRioEvent* rioEvent = reinterpret_cast<CRioEvent*>(static_cast<ULONG_PTR>(results[i].RequestContext));
 
-        ProcessRioResult(results[i].Status, results[i].BytesTransferred, rioEvent);
+        ProcessRioResult(cqType, results[i].Status, results[i].BytesTransferred, rioEvent);
 
-        if( _receiveCqCorrupted.load(std::memory_order_acquire) || _sendCqCorrupted.load(std::memory_order_acquire) ) return Rio::kCorruptCq;
+        if( _receiveCqCorrupted.load(std::memory_order_acquire) || _sendCqCorrupted.load(std::memory_order_acquire) )
+        {
+            return Rio::kCorruptCq;
+        }
     }
 
     return static_cast<int32>(numResults);
 }
 
 //***************************************************************************
-// @brief 수신된 IOCP 완료 패킷이 유효한 completion 패킷인지 검증합니다.
+// @brief 올바른 Completion 패킷인지 검증합니다.
+// @param completionKey Completion Key
+// @param overlapped Overlapped 구조체 Pointer
+// @return 유효성 여부
 //***************************************************************************
 bool CRioCore::IsValidCompletionPacket(ULONG_PTR completionKey, LPOVERLAPPED overlapped) const noexcept
 {
@@ -529,7 +576,10 @@ bool CRioCore::IsValidCompletionPacket(ULONG_PTR completionKey, LPOVERLAPPED ove
 }
 
 //***************************************************************************
-// @brief Stop 요청용 IOCP 완료 패킷인지 확인합니다.
+// @brief Stop 요청 패킷인지 확인합니다.
+// @param completionKey Completion Key
+// @param overlapped Overlapped 구조체 Pointer
+// @return Stop 패킷 여부
 //***************************************************************************
 bool CRioCore::IsStopPacket(ULONG_PTR completionKey, LPOVERLAPPED overlapped) const noexcept
 {
@@ -537,7 +587,10 @@ bool CRioCore::IsStopPacket(ULONG_PTR completionKey, LPOVERLAPPED overlapped) co
 }
 
 //***************************************************************************
-// @brief Receive CQ 전용 Completion Packet인지 검증합니다.
+// @brief Receive 완료 패킷인지 확인합니다.
+// @param completionKey Completion Key
+// @param overlapped Overlapped 구조체 Pointer
+// @return Receive 패킷 여부
 //***************************************************************************
 bool CRioCore::IsReceiveCompletionPacket(ULONG_PTR completionKey, LPOVERLAPPED overlapped) const noexcept
 {
@@ -545,7 +598,10 @@ bool CRioCore::IsReceiveCompletionPacket(ULONG_PTR completionKey, LPOVERLAPPED o
 }
 
 //***************************************************************************
-// @brief Send CQ 전용 Completion Packet인지 검증합니다.
+// @brief Send 완료 패킷인지 확인합니다.
+// @param completionKey Completion Key
+// @param overlapped Overlapped 구조체 Pointer
+// @return Send 패킷 여부
 //***************************************************************************
 bool CRioCore::IsSendCompletionPacket(ULONG_PTR completionKey, LPOVERLAPPED overlapped) const noexcept
 {
@@ -553,18 +609,16 @@ bool CRioCore::IsSendCompletionPacket(ULONG_PTR completionKey, LPOVERLAPPED over
 }
 
 //***************************************************************************
-// @brief CRioCore를 종료하고 자원을 순차 파기합니다.
-// @param drainTimeout Drain 대기 시간 limit
-// @return ShutdownResult 처리 결과
+// @brief RIO Core Engine을 안전하게 종료하고 리소스를 해제합니다.
+// @param drainTimeout 잔여 I/O 처리 대기 제한시간
+// @return Shutdown 수행 결과
 //***************************************************************************
 Rio::ShutdownResult CRioCore::Shutdown(std::chrono::milliseconds drainTimeout)
 {
     if( _tlsDispatchCore == this )
     {
         assert(false && "Shutdown() must not be called from Dispatch callback");
-
         std::lock_guard<std::mutex> lifecycleLock(_lifecycleMutex);
-
         _lastShutdownResult = Rio::ShutdownResult::InvalidCall;
         return _lastShutdownResult;
     }
@@ -573,9 +627,7 @@ Rio::ShutdownResult CRioCore::Shutdown(std::chrono::milliseconds drainTimeout)
 
     std::thread threadToJoin;
 
-    //***************************************************************************
     // Phase 1. Admission Close
-    //***************************************************************************
     {
         std::unique_lock<std::mutex> lifecycleLock(_lifecycleMutex);
 
@@ -591,6 +643,13 @@ Rio::ShutdownResult CRioCore::Shutdown(std::chrono::milliseconds drainTimeout)
 
         if( currentState == Rio::State::Uninitialized )
         {
+            // [수정: Uninitialized -> Closed 누락]
+            // Initialize()를 한 번도 하지 않은 상태에서 Shutdown()이 호출되면
+            // state를 Closed로 전이하지 않고 그대로 반환하고 있었습니다.
+            // 소멸자는 최종 state가 Closed가 아니면 std::terminate()하므로,
+            // Initialize() 없이 생성만 하고 소멸시키는 것만으로 프로세스가
+            // 죽는 문제가 있었습니다. 여기서 명시적으로 Closed로 전이합니다.
+            _state.store(Rio::State::Closed, std::memory_order_release);
             _lastShutdownResult = Rio::ShutdownResult::Success;
             _shutdownDone = true;
             return _lastShutdownResult;
@@ -604,28 +663,21 @@ Rio::ShutdownResult CRioCore::Shutdown(std::chrono::milliseconds drainTimeout)
         }
 
         _shutdownInProgress = true;
-
         StopInternal();
 
         if( _workerThread.joinable() ) threadToJoin = std::move(_workerThread);
     }
 
-    //***************************************************************************
     // Phase 2. Dispatch Domain Exclusive
-    //***************************************************************************
     std::unique_lock<std::shared_mutex> dispatchGateLock(_dispatchGate);
 
-    //***************************************************************************
     // Phase 3. Worker Join
-    //***************************************************************************
     if( threadToJoin.joinable() ) threadToJoin.join();
 
     _workerRunning.store(false, std::memory_order_release);
     _workerThreadId.store(std::thread::id{}, std::memory_order_release);
 
-    //***************************************************************************
     // Phase 4. CQ Drain
-    //***************************************************************************
     Rio::ShutdownResult finalResult = Rio::ShutdownResult::Success;
 
     {
@@ -668,7 +720,6 @@ Rio::ShutdownResult CRioCore::Shutdown(std::chrono::milliseconds drainTimeout)
             if( _outstandingIo.load(std::memory_order_acquire) == 0 ) break;
 
             const auto now = std::chrono::steady_clock::now();
-
             if( now >= deadline )
             {
                 finalResult = Rio::ShutdownResult::DrainTimeout;
@@ -678,32 +729,22 @@ Rio::ShutdownResult CRioCore::Shutdown(std::chrono::milliseconds drainTimeout)
             const auto remaining = deadline - now;
             const auto sleepDuration = std::min(remaining, std::chrono::duration_cast<std::chrono::steady_clock::duration>(kDrainPollInterval));
 
-            if( sleepDuration > std::chrono::steady_clock::duration::zero() ) std::this_thread::sleep_for(sleepDuration);
+            if( sleepDuration > std::chrono::steady_clock::duration::zero() )
+            {
+                std::this_thread::sleep_for(sleepDuration);
+            }
         }
     }
 
-    //***************************************************************************
     // Phase 5. Drain Validation
-    //***************************************************************************
     if( finalResult == Rio::ShutdownResult::Success )
     {
-        if( _outstandingIo.load(std::memory_order_acquire) != 0 )
-        {
-            finalResult = Rio::ShutdownResult::DrainTimeout;
-        }
-        else if( _receiveCqCorrupted.load(std::memory_order_acquire) || _sendCqCorrupted.load(std::memory_order_acquire) )
-        {
-            finalResult = Rio::ShutdownResult::CorruptCq;
-        }
-        else if( _workerFaulted.load(std::memory_order_acquire) )
-        {
-            finalResult = Rio::ShutdownResult::DispatchError;
-        }
+        if( _outstandingIo.load(std::memory_order_acquire) != 0 ) finalResult = Rio::ShutdownResult::DrainTimeout;
+        else if( _receiveCqCorrupted.load(std::memory_order_acquire) || _sendCqCorrupted.load(std::memory_order_acquire) ) finalResult = Rio::ShutdownResult::CorruptCq;
+        else if( _workerFaulted.load(std::memory_order_acquire) ) finalResult = Rio::ShutdownResult::DispatchError;
     }
 
-    //***************************************************************************
-    // Phase 6. Resource Destruction (Faulted 상태라도 _outstandingIo == 0일 때만 해제)
-    //***************************************************************************
+    // Phase 6. Resource Destruction
     bool resourceDestroySucceeded = false;
 
     if( _outstandingIo.load(std::memory_order_acquire) == 0 )
@@ -751,14 +792,10 @@ Rio::ShutdownResult CRioCore::Shutdown(std::chrono::milliseconds drainTimeout)
         }
     }
 
-    //***************************************************************************
     // Phase 7. Dispatch Domain Release
-    //***************************************************************************
     dispatchGateLock.unlock();
 
-    //***************************************************************************
     // Phase 8. Lifecycle Commit
-    //***************************************************************************
     {
         std::unique_lock<std::mutex> lifecycleLock(_lifecycleMutex);
 
@@ -769,15 +806,8 @@ Rio::ShutdownResult CRioCore::Shutdown(std::chrono::milliseconds drainTimeout)
         }
         else
         {
-            if( finalResult == Rio::ShutdownResult::CorruptCq )
-            {
-                _state.store(Rio::State::Faulted, std::memory_order_release);
-            }
-            else
-            {
-                _state.store(Rio::State::Stopping, std::memory_order_release);
-            }
-
+            if( finalResult == Rio::ShutdownResult::CorruptCq ) _state.store(Rio::State::Faulted, std::memory_order_release);
+            else _state.store(Rio::State::Stopping, std::memory_order_release);
             _shutdownDone = false;
         }
 
@@ -785,76 +815,70 @@ Rio::ShutdownResult CRioCore::Shutdown(std::chrono::milliseconds drainTimeout)
         _lastShutdownResult = finalResult;
     }
 
-    //***************************************************************************
     // Phase 9. Notify Waiters
-    //***************************************************************************
     _shutdownCv.notify_all();
 
     return finalResult;
 }
 
 //***************************************************************************
-// @brief Completion 순서 엄격 고정:
-//        TakeOwner() -> Dispatch() -> FreeSlot() -> EventPool::Free() -> CoreOutstandingIo--
-// @param status completion 상태 코드
-// @param bytesTransferred 전송 완료된 바이트 수
-// @param rioEvent 디스패치할 RIO 이벤트 포인터
+// @brief 개별 RIO 결과를 처리하고 해당 이벤트와 리소스를 반환/디스패치합니다.
+// @param cqType CQ 타입
+// @param status RIO 완료 상태
+// @param bytesTransferred 전송된 바이트 수
+// @param rioEvent 디스패치할 RIO Event 객체 Pointer
 //***************************************************************************
-void CRioCore::ProcessRioResult(LONG status, ULONG bytesTransferred, CRioEvent* rioEvent) noexcept
+void CRioCore::ProcessRioResult(
+    Rio::RioCqType cqType,
+    LONG status,
+    ULONG bytesTransferred,
+    CRioEvent* rioEvent) noexcept
 {
-    // OutstandingIoGuard가 함수 종료 시 Core OutstandingIo--를 가장 마지막에 처리합니다.
     OutstandingIoGuard ioGuard{ this };
 
     if( rioEvent == nullptr )
     {
-        MarkFaulted(true, true);
+        if( cqType == Rio::RioCqType::Receive )
+            MarkFaulted(true, false);
+        else
+            MarkFaulted(false, true);
+
         assert(false && "Invalid RIO RequestContext");
         return;
     }
 
-    const CVector<CRioEvent::BufferBinding>& bufferBindings = rioEvent->GetBufferBindings();
-
-    // 1. TakeOwner
     CRioObjectRef rioObject = rioEvent->TakeOwner();
 
     if( rioObject == nullptr )
     {
-        MarkFaulted(true, true);
+        if( cqType == Rio::RioCqType::Receive )
+            MarkFaulted(true, false);
+        else
+            MarkFaulted(false, true);
+
         assert(false && "RIO completion has no owner");
         return;
     }
 
-    // 2. Dispatch
+    // 반드시 전체 completion cleanup 동안 Object lifetime 보호
+    ObjectIoCountGuard objectIoGuard{ rioObject.get() };
+
+    try
     {
-        ObjectIoCountGuard objectIoGuard{ rioObject.get() };
-
-        try
-        {
-            if( status == NO_ERROR )
-            {
-                rioObject->Dispatch(rioEvent, bytesTransferred, NO_ERROR);
-            }
-            else
-            {
-                rioObject->Dispatch(rioEvent, 0, status);
-            }
-        }
-        catch( ... )
-        {
-            _workerFaulted.store(true, std::memory_order_release);
-
-            Rio::State current = _state.load(std::memory_order_acquire);
-
-            while( current == Rio::State::Running || current == Rio::State::Stopping )
-            {
-                if( _state.compare_exchange_weak(current, Rio::State::Faulted, std::memory_order_acq_rel, std::memory_order_acquire) ) break;
-            }
-
-            assert(false && "CRioObject::Dispatch() threw an exception");
-        }
+        if( status == NO_ERROR )
+            rioObject->Dispatch(rioEvent, bytesTransferred, NO_ERROR);
+        else
+            rioObject->Dispatch(rioEvent, 0, status);
+    }
+    catch( ... )
+    {
+        MarkFaulted(false, false);
+        assert(false && "CRioObject::Dispatch() threw an exception");
     }
 
-    // 3. FreeSlot
+    const CVector<CRioEvent::BufferBinding>& bufferBindings =
+        rioEvent->GetBufferBindings();
+
     bool bufferReleaseFailed = false;
 
     for( const CRioEvent::BufferBinding& binding : bufferBindings )
@@ -882,38 +906,36 @@ void CRioCore::ProcessRioResult(LONG status, ULONG bytesTransferred, CRioEvent* 
 
     if( bufferReleaseFailed )
     {
-        MarkFaulted(true, true);
+        if( cqType == Rio::RioCqType::Receive )
+            MarkFaulted(true, false);
+        else
+            MarkFaulted(false, true);
     }
 
-    // 4. EventPool Free
     if( _eventPool != nullptr )
     {
-        try
-        {
-            _eventPool->Free(rioEvent);
-        }
-        catch( ... )
-        {
-            MarkFaulted(true, true);
-            assert(false && "Exception in CRioEventPool::Free()");
-        }
+        _eventPool->Free(rioEvent);
     }
     else
     {
-        MarkFaulted(true, true);
+        if( cqType == Rio::RioCqType::Receive )
+            MarkFaulted(true, false);
+        else
+            MarkFaulted(false, true);
+
         assert(false && "EventPool became null while completion was outstanding");
     }
 }
 
 //***************************************************************************
-// @brief outstanding I/O 카운트를 원자적으로 1 증가시킵니다.
-// @return 성공 시 true, overflow 발생 시 false
+// @brief 진행 중인 I/O 카운터를 원자적으로 1 증가시킵니다.
+// @return 증가 성공 여부
 //***************************************************************************
 bool CRioCore::IncrementIoCount() noexcept
 {
     uint32_t current = _outstandingIo.load(std::memory_order_relaxed);
 
-    for( ;;)
+    for( ;; )
     {
         if( current == std::numeric_limits<uint32_t>::max() )
         {
@@ -921,18 +943,21 @@ bool CRioCore::IncrementIoCount() noexcept
             return false;
         }
 
-        if( _outstandingIo.compare_exchange_weak(current, current + 1, std::memory_order_relaxed, std::memory_order_relaxed) ) return true;
+        if( _outstandingIo.compare_exchange_weak(current, current + 1, std::memory_order_relaxed, std::memory_order_relaxed) )
+        {
+            return true;
+        }
     }
 }
 
 //***************************************************************************
-// @brief outstanding I/O 카운트를 원자적으로 1 감소시킵니다.
+// @brief 진행 중인 I/O 카운터를 원자적으로 1 감소시킵니다.
 //***************************************************************************
 void CRioCore::DecrementIoCount() noexcept
 {
     uint32_t current = _outstandingIo.load(std::memory_order_relaxed);
 
-    for( ;;)
+    for( ;; )
     {
         if( current == 0 )
         {
@@ -940,12 +965,16 @@ void CRioCore::DecrementIoCount() noexcept
             return;
         }
 
-        if( _outstandingIo.compare_exchange_weak(current, current - 1, std::memory_order_release, std::memory_order_relaxed) ) return;
+        if( _outstandingIo.compare_exchange_weak(current, current - 1, std::memory_order_release, std::memory_order_relaxed) )
+        {
+            _shutdownCv.notify_all();
+            return;
+        }
     }
 }
 
 //***************************************************************************
-// @brief CQ 손상 및 Worker 결함 발생 시 Faulted 상태로 전환하고 IOCP 깨움을 유도합니다.
+// @brief Engine의 결함 상태 및 CQ Corrupt 상태를 설정합니다.
 // @param receiveCqCorrupt Receive CQ 손상 여부
 // @param sendCqCorrupt Send CQ 손상 여부
 //***************************************************************************
@@ -960,8 +989,18 @@ void CRioCore::MarkFaulted(bool receiveCqCorrupt, bool sendCqCorrupt) noexcept
 
     while( current == Rio::State::Running || current == Rio::State::Stopping )
     {
-        if( _state.compare_exchange_weak(current, Rio::State::Faulted, std::memory_order_acq_rel, std::memory_order_acquire) ) break;
+        if( _state.compare_exchange_weak(current, Rio::State::Faulted, std::memory_order_acq_rel, std::memory_order_acquire) )
+        {
+            break;
+        }
     }
 
-    if( _iocpHandle != NULL ) ::PostQueuedCompletionStatus(_iocpHandle, 0, 0, nullptr);
+    HANDLE iocp = _iocpHandle;
+
+    if( iocp != NULL )
+    {
+        ::PostQueuedCompletionStatus(iocp, 0, 0, nullptr);
+    }
+
+    _shutdownCv.notify_all();
 }

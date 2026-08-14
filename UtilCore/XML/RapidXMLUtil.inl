@@ -14,11 +14,11 @@ inline const CRapidXMLUtil& CRapidXMLUtil::operator=(const T& value)
     }
     else if constexpr( std::is_same_v<T, _tstring> )
     {
-        node->value(_doc.allocate_string(TcharToUtf8(value).c_str()));
+        node->value(_doc.allocate_string(TStringToUtf8(value).c_str()));
     }
     else if constexpr( std::is_same_v<typename std::decay<T>::type, TCHAR*> || std::is_same_v<typename std::decay<T>::type, const TCHAR*> )
     {
-        node->value(_doc.allocate_string(TcharToUtf8(value).c_str()));
+        node->value(_doc.allocate_string(TStringToUtf8(value).c_str()));
     }
 
     return *this;
@@ -98,7 +98,7 @@ template <typename T>
 inline std::string CRapidXMLUtil::SerializeWithIndent(const T& obj)
 {
     _doc.clear();
-    xml_node<>* root = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(RootName).c_str()));
+    xml_node<>* root = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TStringToUtf8(RootName).c_str()));
     _doc.append_node(root);
 
     SerializeObject(obj, root);
@@ -117,10 +117,10 @@ template <typename T>
 inline std::string CRapidXMLUtil::Serialize(const T& obj)
 {
     _doc.clear();
-    xml_node<>* root = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(RootName).c_str()));
+    xml_node<>* root = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TStringToUtf8(RootName).c_str()));
     _doc.append_node(root);
 
-    return TcharToUtf8(ConvertToXML(_T(""), obj));
+    return TStringToUtf8(ConvertToXML(_T(""), obj));
 }
 
 //***************************************************************************
@@ -146,7 +146,7 @@ inline T CRapidXMLUtil::Deserialize(const std::string& xml)
         _tcerr << _T("Location of error : ") << e.where<TCHAR>() << std::endl;
     }
 
-    xml_node<>* root = _doc.first_node(_doc.allocate_string(TcharToUtf8(RootName).c_str()));
+    xml_node<>* root = _doc.first_node(_doc.allocate_string(TStringToUtf8(RootName).c_str()));
     if( !root )
     {
         _tcerr << _T("Root node not found in XML") << std::endl;
@@ -164,7 +164,7 @@ inline T CRapidXMLUtil::Deserialize(const std::string& xml)
 template <typename T>
 inline void CRapidXMLUtil::AddObject(const T& obj, xml_node<>* parent, const TCHAR* ptszTagName)
 {
-    xml_node<>* classNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(ptszTagName).c_str()));
+    xml_node<>* classNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TStringToUtf8(ptszTagName).c_str()));
     parent->append_node(classNode);
     obj.ToXML(classNode, _doc);
 }
@@ -192,7 +192,7 @@ inline void CRapidXMLUtil::GetObject(T& obj, xml_node<>* node)
 template <typename T>
 inline void CRapidXMLUtil::AddVector(const CVector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName)
 {
-    xml_node<>* containerNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(ptszTagName).c_str()));
+    xml_node<>* containerNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TStringToUtf8(ptszTagName).c_str()));
     parent->append_node(containerNode);
 
     for( const auto& item : container )
@@ -217,10 +217,10 @@ inline void CRapidXMLUtil::AddVector(const CVector<T>& container, xml_node<>* pa
 template <typename T>
 inline void CRapidXMLUtil::GetVector(CVector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName)
 {
-    xml_node<>* containerNode = parent->first_node(TcharToUtf8(ptszTagName).c_str());
+    xml_node<>* containerNode = parent->first_node(TStringToUtf8(ptszTagName).c_str());
     if( containerNode )
     {
-        for( xml_node<>* node = containerNode->first_node(TcharToUtf8(ItemName).c_str()); node; node = node->next_sibling(TcharToUtf8(ItemName).c_str()) )
+        for( xml_node<>* node = containerNode->first_node(TStringToUtf8(ItemName).c_str()); node; node = node->next_sibling(TStringToUtf8(ItemName).c_str()) )
         {
             T item;
 
@@ -247,12 +247,12 @@ inline void CRapidXMLUtil::GetVector(CVector<T>& container, xml_node<>* parent, 
 template <typename T>
 inline void CRapidXMLUtil::AddObjectVector(const CVector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName)
 {
-    xml_node<>* containerNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(ptszTagName).c_str()));
+    xml_node<>* containerNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TStringToUtf8(ptszTagName).c_str()));
     parent->append_node(containerNode);
 
     for( const auto& item : container )
     {
-        xml_node<>* classNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(ItemName).c_str()));
+        xml_node<>* classNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TStringToUtf8(ItemName).c_str()));
         containerNode->append_node(classNode);
         item.ToXML(classNode, _doc);
     }
@@ -267,10 +267,10 @@ inline void CRapidXMLUtil::AddObjectVector(const CVector<T>& container, xml_node
 template <typename T>
 inline void CRapidXMLUtil::GetObjectVector(CVector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName)
 {
-    xml_node<>* containerNode = parent->first_node(TcharToUtf8(ptszTagName).c_str());
+    xml_node<>* containerNode = parent->first_node(TStringToUtf8(ptszTagName).c_str());
     if( containerNode )
     {
-        for( xml_node<>* node = containerNode->first_node(TcharToUtf8(ItemName).c_str()); node; node = node->next_sibling(TcharToUtf8(ItemName).c_str()) )
+        for( xml_node<>* node = containerNode->first_node(TStringToUtf8(ItemName).c_str()); node; node = node->next_sibling(TStringToUtf8(ItemName).c_str()) )
         {
             T item;
             item.FromXML(node);
@@ -288,12 +288,12 @@ inline void CRapidXMLUtil::GetObjectVector(CVector<T>& container, xml_node<>* pa
 template <typename K, typename V>
 inline void CRapidXMLUtil::AddMap(const CMap<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName)
 {
-    xml_node<>* containerNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(ptszTagName).c_str()));
+    xml_node<>* containerNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TStringToUtf8(ptszTagName).c_str()));
     parent->append_node(containerNode);
 
     for( const auto& item : container )
     {
-        xml_node<>* itemNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(ItemName).c_str()));
+        xml_node<>* itemNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TStringToUtf8(ItemName).c_str()));
         containerNode->append_node(itemNode);
 
         if constexpr( std::is_arithmetic<K>::value )
@@ -325,15 +325,15 @@ inline void CRapidXMLUtil::AddMap(const CMap<K, V>& container, xml_node<>* paren
 template <typename K, typename V>
 inline void CRapidXMLUtil::GetMap(CMap<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName)
 {
-    xml_node<>* containerNode = parent->first_node(TcharToUtf8(ptszTagName).c_str());
+    xml_node<>* containerNode = parent->first_node(TStringToUtf8(ptszTagName).c_str());
     if( containerNode )
     {
-        for( xml_node<>* node = containerNode->first_node(TcharToUtf8(ItemName).c_str()); node; node = node->next_sibling(TcharToUtf8(ItemName).c_str()) )
+        for( xml_node<>* node = containerNode->first_node(TStringToUtf8(ItemName).c_str()); node; node = node->next_sibling(TStringToUtf8(ItemName).c_str()) )
         {
             K key;
             V value;
 
-            xml_node<>* keyNode = node->first_node(TcharToUtf8(MapKey).c_str());
+            xml_node<>* keyNode = node->first_node(TStringToUtf8(MapKey).c_str());
             if( keyNode )
             {
                 if constexpr( std::is_arithmetic<K>::value )
@@ -346,7 +346,7 @@ inline void CRapidXMLUtil::GetMap(CMap<K, V>& container, xml_node<>* parent, con
                 }
             }
 
-            xml_node<>* valueNode = node->first_node(TcharToUtf8(MapValue).c_str());
+            xml_node<>* valueNode = node->first_node(TStringToUtf8(MapValue).c_str());
             if( valueNode )
             {
                 if constexpr( std::is_arithmetic<V>::value )
@@ -373,18 +373,18 @@ inline void CRapidXMLUtil::GetMap(CMap<K, V>& container, xml_node<>* parent, con
 template <typename K, typename V>
 inline void CRapidXMLUtil::AddObjectMap(const CMap<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName)
 {
-    xml_node<>* containerNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(ptszTagName).c_str()));
+    xml_node<>* containerNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TStringToUtf8(ptszTagName).c_str()));
     parent->append_node(containerNode);
 
     for( const auto& item : container )
     {
-        xml_node<>* itemNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(ItemName).c_str()));
+        xml_node<>* itemNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TStringToUtf8(ItemName).c_str()));
         containerNode->append_node(itemNode);
 
-        xml_node<>* node = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(MapKey).c_str()), _doc.allocate_string(TcharToUtf8(item.first).c_str()));
+        xml_node<>* node = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TStringToUtf8(MapKey).c_str()), _doc.allocate_string(TStringToUtf8(item.first).c_str()));
         itemNode->append_node(node);
 
-        xml_node<>* classNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(MapValue).c_str()));
+        xml_node<>* classNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TStringToUtf8(MapValue).c_str()));
         itemNode->append_node(classNode);
         item.second.ToXML(classNode, _doc);
     }
@@ -399,21 +399,21 @@ inline void CRapidXMLUtil::AddObjectMap(const CMap<K, V>& container, xml_node<>*
 template <typename K, typename V>
 inline void CRapidXMLUtil::GetObjectMap(CMap<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName)
 {
-    xml_node<>* containerNode = parent->first_node(TcharToUtf8(ptszTagName).c_str());
+    xml_node<>* containerNode = parent->first_node(TStringToUtf8(ptszTagName).c_str());
     if( containerNode )
     {
-        for( xml_node<>* node = containerNode->first_node(TcharToUtf8(ItemName).c_str()); node; node = node->next_sibling(TcharToUtf8(ItemName).c_str()) )
+        for( xml_node<>* node = containerNode->first_node(TStringToUtf8(ItemName).c_str()); node; node = node->next_sibling(TStringToUtf8(ItemName).c_str()) )
         {
             K key;
             V value;
 
-            xml_node<>* keyNode = node->first_node(TcharToUtf8(MapKey).c_str());
+            xml_node<>* keyNode = node->first_node(TStringToUtf8(MapKey).c_str());
             if( keyNode )
             {
-                key = Utf8ToTchar(keyNode->value());
+                key = Utf8ToTString(keyNode->value());
             }
 
-            xml_node<>* valueNode = node->first_node(TcharToUtf8(MapValue).c_str());
+            xml_node<>* valueNode = node->first_node(TStringToUtf8(MapValue).c_str());
             if( valueNode )
             {
                 value.FromXML(valueNode);
@@ -433,7 +433,7 @@ inline void CRapidXMLUtil::GetObjectMap(CMap<K, V>& container, xml_node<>* paren
 template <typename T, typename std::enable_if<std::is_arithmetic<T>::value>::type*>
 inline void CRapidXMLUtil::AddValue(const T& value, xml_node<>* parent, const TCHAR* ptszTagName)
 {
-    xml_node<>* node = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(ptszTagName).c_str()), _doc.allocate_string(std::to_string(value).c_str()));
+    xml_node<>* node = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TStringToUtf8(ptszTagName).c_str()), _doc.allocate_string(std::to_string(value).c_str()));
     parent->append_node(node);
 }
 
@@ -460,7 +460,7 @@ inline _tstring CRapidXMLUtil::ConvertToXML(const _tstring& nodeName, const T& o
     xml_node<char>* root = _doc.first_node();
     if( !root )
     {
-        root = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(RootName).c_str()));
+        root = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TStringToUtf8(RootName).c_str()));
         _doc.append_node(root);
     }
 
@@ -513,7 +513,7 @@ inline _tstring CRapidXMLUtil::ConvertToXML(const _tstring& nodeName, const T& o
 
     std::ostringstream oss;
     oss << _doc;
-    return Utf8ToTchar(oss.str());
+    return Utf8ToTString(oss.str());
 }
 
 //***************************************************************************
@@ -561,15 +561,15 @@ inline std::optional<T> CRapidXMLUtil::ConvertFromXML(const _tstring& nodeName)
     }
     else if constexpr( has_toxml_method<T>::value )
     {
-        GetObject<T>(value, root->first_node(nodeName.size() > 0 ? TcharToUtf8(nodeName).c_str() : nullptr));
+        GetObject<T>(value, root->first_node(nodeName.size() > 0 ? TStringToUtf8(nodeName).c_str() : nullptr));
     }
     else if constexpr( std::is_same_v<T, _tstring> )
     {
-        GetValue(value, root->first_node(nodeName.size() > 0 ? TcharToUtf8(nodeName).c_str() : nullptr));
+        GetValue(value, root->first_node(nodeName.size() > 0 ? TStringToUtf8(nodeName).c_str() : nullptr));
     }
     else if constexpr( std::is_arithmetic<T>::value )
     {
-        GetValue(value, root->first_node(nodeName.size() > 0 ? TcharToUtf8(nodeName).c_str() : nullptr));
+        GetValue(value, root->first_node(nodeName.size() > 0 ? TStringToUtf8(nodeName).c_str() : nullptr));
     }
 
     return optional<T>(value);

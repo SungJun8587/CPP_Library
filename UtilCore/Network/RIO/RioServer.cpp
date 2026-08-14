@@ -1,5 +1,4 @@
-﻿
-//***************************************************************************
+﻿//***************************************************************************
 // RioServer.cpp : implementation of the CRioServer class.
 //
 //***************************************************************************
@@ -7,67 +6,202 @@
 #include "pch.h"
 #include "RioServer.h"
 
+#include <cassert>
+#include <chrono>
+#include <limits>
+
 //***************************************************************************
 // @brief CRioServer 생성자
-// @details
-//      서버 실행에 필요한 Core, EventPool, Buffer 등의 의존성을 전달받아 초기화합니다.
-//      noexcept 키워드로 예외 미발생을 보장합니다.
 //***************************************************************************
-CRioServer::CRioServer(CRioCore& core, CRioEventPool& eventPool, CRioBuffer& receiveBuffer) noexcept
-    : _core(&core), _eventPool(&eventPool), _receiveBuffer(&receiveBuffer), _sessionManager(core)
-    , _lifecycleMutex(), _sessionResourceMutex(), _listenSocket(INVALID_SOCKET), _listenAddress{}
-    , _backlog(SOMAXCONN), _initialized(false), _running(false), _acceptThread(), _nextSessionId(1), _requestQueues()
+CRioServer::CRioServer()
+    : _serverState(Rio::ServerState::Created)
+    , _listenSocket(INVALID_SOCKET)
+    , _sendBufferId(RIO_INVALID_BUFFERID)
 {
 }
 
 //***************************************************************************
 // @brief CRioServer 소멸자
-// @details
-//      객체 소멸 시 Stop()을 호출하여 실행 중인 서버 자원을 안전하게 정리합니다.
 //***************************************************************************
-CRioServer::~CRioServer() noexcept
+CRioServer::~CRioServer()
 {
     Stop();
 }
 
 //***************************************************************************
-// @brief Server 초기화
-// @details
-//      주소 및 백로그 설정을 검증하고 바인딩된 리슨 소켓을 생성하여 서버를 초기화합니다.
-// @return true: 초기화 성공, false: 초기화 실패
+// @brief 서버를 시작하고 소켓 바인딩 및 RIO 엔진을 가동합니다.
+// @param port 수신 대기 포트
+// @param maxSessions 최대 동시 연결 가능 세션 수
+// @return 시작 성공 시 true, 실패 시 false
 //***************************************************************************
-bool CRioServer::Initialize(const sockaddr_in& address, int backlog) noexcept
+bool CRioServer::Start(uint16_t port, uint32_t maxSessions)
 {
-    std::lock_guard<std::mutex> lifecycleLock(_lifecycleMutex);
+    Rio::ServerState expectedState = Rio::ServerState::Created;
+    if( !_serverState.compare_exchange_strong(
+        expectedState,
+        Rio::ServerState::Initialized,
+        std::memory_order_acq_rel,
+        std::memory_order_acquire) )
+    {
+        return false;
+    }
 
-    if( _initialized.load(std::memory_order_acquire) || _running.load(std::memory_order_acquire) ) return false;
-    if( _core == nullptr || _eventPool == nullptr || _receiveBuffer == nullptr ) return false;
-    if( backlog < Rio::kListenBacklogMinimum || address.sin_family != AF_INET ) return false;
-    if( !CreateListenSocket(address, backlog) ) return false;
+    if( maxSessions == 0 )
+    {
+        _serverState.store(Rio::ServerState::Created, std::memory_order_release);
+        return false;
+    }
 
-    _listenAddress = address;
-    _backlog = backlog;
+    if( maxSessions > (std::numeric_limits<uint32_t>::max() / 4u) )
+    {
+        _serverState.store(Rio::ServerState::Created, std::memory_order_release);
+        return false;
+    }
 
-    _initialized.store(true, std::memory_order_release);
-    return true;
-}
+    const uint32_t eventPoolCapacity = maxSessions * 4u;
+    const uint32_t recvBufferSlotCount = maxSessions * 2u;
 
-//***************************************************************************
-// @brief Server 시작
-// @details
-//      초기화 상태를 확인한 후 클라이언트 접속 처리를 위한 Accept 스레드를 생성하여 실행합니다.
-// @return true: 시작 성공, false: 시작 실패
-//***************************************************************************
-bool CRioServer::Start() noexcept
-{
-    std::lock_guard<std::mutex> lifecycleLock(_lifecycleMutex);
+    SOCKET dummySocket = ::WSASocket(
+        AF_INET,
+        SOCK_STREAM,
+        IPPROTO_TCP,
+        nullptr,
+        0,
+        WSA_FLAG_REGISTERED_IO);
 
-    if( !_initialized.load(std::memory_order_acquire) ) return false;
-    if( _running.load(std::memory_order_acquire) ) return true;
-    if( _listenSocket == INVALID_SOCKET ) return false;
-    if( !_sessionManager.GetCore() || _sessionManager.GetCore() != _core ) return false;
+    if( dummySocket == INVALID_SOCKET )
+    {
+        _serverState.store(Rio::ServerState::Created, std::memory_order_release);
+        return false;
+    }
 
-    _running.store(true, std::memory_order_release);
+    // 1. CRioCore 초기화
+    if( !_rioCore.Initialize(dummySocket, Rio::kMaxOutstandingIo, 1001, &_eventPool) )
+    {
+        ::closesocket(dummySocket);
+        _serverState.store(Rio::ServerState::Created, std::memory_order_release);
+        return false;
+    }
+
+    ::closesocket(dummySocket);
+
+    // 2. EventPool 및 BufferPool 초기화
+    if( !_eventPool.Initialize(eventPoolCapacity) )
+    {
+        _rioCore.Shutdown();
+        _serverState.store(Rio::ServerState::Created, std::memory_order_release);
+        return false;
+    }
+
+    const RIO_EXTENSION_FUNCTION_TABLE& rioTable = _rioCore.GetRioTable();
+
+    if( !_globalRecvBufferPool.Initialize(
+        &rioTable,
+        recvBufferSlotCount,
+        Rio::kRecvBufferSlotSize,
+        Rio::kDefaultAlignment) )
+    {
+        _eventPool.Release();
+        _rioCore.Shutdown();
+        _serverState.store(Rio::ServerState::Created, std::memory_order_release);
+        return false;
+    }
+
+    if( !_globalSendBufferPool.Initialize(
+        &rioTable,
+        maxSessions,
+        65536,
+        Rio::kDefaultAlignment) )
+    {
+        _globalRecvBufferPool.Shutdown();
+        _eventPool.Release();
+        _rioCore.Shutdown();
+        _serverState.store(Rio::ServerState::Created, std::memory_order_release);
+        return false;
+    }
+
+    // 3. 송신 버퍼 ID 획득
+    _sendBufferId = _globalSendBufferPool.GetBufferId();
+
+    if( _sendBufferId == RIO_INVALID_BUFFERID )
+    {
+        _globalSendBufferPool.Shutdown();
+        _globalRecvBufferPool.Shutdown();
+        _eventPool.Release();
+        _rioCore.Shutdown();
+        _sendBufferId = RIO_INVALID_BUFFERID;
+        _serverState.store(Rio::ServerState::Created, std::memory_order_release);
+        return false;
+    }
+
+    // 4. Listen 소켓 생성 및 바인딩
+    _listenSocket = ::WSASocket(
+        AF_INET,
+        SOCK_STREAM,
+        IPPROTO_TCP,
+        nullptr,
+        0,
+        WSA_FLAG_REGISTERED_IO);
+
+    if( _listenSocket == INVALID_SOCKET )
+    {
+        _globalSendBufferPool.Shutdown();
+        _globalRecvBufferPool.Shutdown();
+        _eventPool.Release();
+        _rioCore.Shutdown();
+        _sendBufferId = RIO_INVALID_BUFFERID;
+        _serverState.store(Rio::ServerState::Created, std::memory_order_release);
+        return false;
+    }
+
+    sockaddr_in serverAddr{};
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_addr.s_addr = ::htonl(INADDR_ANY);
+    serverAddr.sin_port = ::htons(port);
+
+    if( ::bind(
+        _listenSocket,
+        reinterpret_cast<sockaddr*>(&serverAddr),
+        sizeof(serverAddr)) == SOCKET_ERROR ||
+        ::listen(_listenSocket, SOMAXCONN) == SOCKET_ERROR )
+    {
+        ::closesocket(_listenSocket);
+        _listenSocket = INVALID_SOCKET;
+
+        _globalSendBufferPool.Shutdown();
+        _globalRecvBufferPool.Shutdown();
+        _eventPool.Release();
+        _rioCore.Shutdown();
+
+        _sendBufferId = RIO_INVALID_BUFFERID;
+        _serverState.store(Rio::ServerState::Created, std::memory_order_release);
+        return false;
+    }
+
+    // 5. RIO Worker 구동
+    if( !_rioCore.StartWorker([this]() {
+        while( _rioCore.CanSubmitIo() )
+        {
+            const int32 dispatched = _rioCore.DispatchBatch(Rio::DispatchMode::Wait);
+            if( dispatched < 0 ) break;
+        }
+        }) )
+    {
+        ::closesocket(_listenSocket);
+        _listenSocket = INVALID_SOCKET;
+
+        _globalSendBufferPool.Shutdown();
+        _globalRecvBufferPool.Shutdown();
+        _eventPool.Release();
+        _rioCore.Shutdown();
+
+        _sendBufferId = RIO_INVALID_BUFFERID;
+        _serverState.store(Rio::ServerState::Created, std::memory_order_release);
+        return false;
+    }
+
+    // 6. 서버 Running 상태 전환 및 Accept 스레드 시작
+    _serverState.store(Rio::ServerState::Running, std::memory_order_release);
 
     try
     {
@@ -75,7 +209,33 @@ bool CRioServer::Start() noexcept
     }
     catch( ... )
     {
-        _running.store(false, std::memory_order_release);
+        _serverState.store(Rio::ServerState::Stopping, std::memory_order_release);
+
+        if( _listenSocket != INVALID_SOCKET )
+        {
+            ::closesocket(_listenSocket);
+            _listenSocket = INVALID_SOCKET;
+        }
+
+        _sessionManager.BeginCloseAllSessions();
+
+        while( !_sessionManager.AreAllSessionsClosed() )
+        {
+            _sessionManager.RemoveClosedSessions();
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+
+        _sessionManager.RemoveClosedSessions();
+
+        _rioCore.RequestStop();
+        _rioCore.Shutdown();
+
+        _globalSendBufferPool.Shutdown();
+        _globalRecvBufferPool.Shutdown();
+        _eventPool.Release();
+
+        _sendBufferId = RIO_INVALID_BUFFERID;
+        _serverState.store(Rio::ServerState::Created, std::memory_order_release);
         return false;
     }
 
@@ -83,648 +243,218 @@ bool CRioServer::Start() noexcept
 }
 
 //***************************************************************************
-// @brief Server 종료
-// @note
-//      Shutdown ordering:
-//          1. Stop Accept
-//          2. Stop new Session / RIO post
-//          3. Shutdown Session sockets
-//          4. CRioCore::Shutdown()
-//          5. Outstanding I/O drain
-//          6. RIO_RQ destruction
-//          7. SessionManager cleanup
-// @details
-//      Accept 스레드 종료, 세션 종료, RIO Queue 소멸 및 리소스 정리를 순차적으로 수행합니다.
+// @brief 서버 가동을 정지하고 모든 세션의 드레인 및 자원 회수를 순차적으로 수행합니다.
 //***************************************************************************
-void CRioServer::Stop(std::chrono::milliseconds drainTimeout) noexcept
+void CRioServer::Stop()
 {
+    Rio::ServerState expectedState = Rio::ServerState::Running;
+
+    if( !_serverState.compare_exchange_strong(
+        expectedState,
+        Rio::ServerState::Stopping,
+        std::memory_order_acq_rel,
+        std::memory_order_acquire) )
     {
-        std::lock_guard<std::mutex> lifecycleLock(_lifecycleMutex);
-
-        const bool initialized = _initialized.load(std::memory_order_acquire);
-        const bool running = _running.load(std::memory_order_acquire);
-
-        if( !initialized && !running ) return;
-
-        _running.store(false, std::memory_order_release);
-
-        // Accept()를 깨우기 위해 listen socket을 먼저 닫습니다.
-        if( _listenSocket != INVALID_SOCKET )
+        if( expectedState == Rio::ServerState::Created ||
+            expectedState == Rio::ServerState::Stopped )
         {
-            CloseSocket(_listenSocket);
-            _listenSocket = INVALID_SOCKET;
+            return;
         }
+
+        // 이미 다른 스레드가 Stopping 중인 경우 해당 스레드가 종료 절차를 담당합니다.
+        return;
     }
 
-    // Accept thread는 lifecycle mutex를 사용하지 않으므로 여기서 안전하게 Join할 수 있습니다.
+    // 1. Accept 스레드 종료를 먼저 유도합니다.
+    if( _listenSocket != INVALID_SOCKET )
+    {
+        SOCKET listenSocket = _listenSocket;
+        _listenSocket = INVALID_SOCKET;
+
+        ::closesocket(listenSocket);
+    }
+
     if( _acceptThread.joinable() )
     {
-        if( _acceptThread.get_id() != std::this_thread::get_id() )
-        {
-            _acceptThread.join();
-        }
-        else
-        {
-            assert(false && "CRioServer::Stop self-join");
-        }
+        _acceptThread.join();
     }
 
-    // 신규 Session 생성은 CloseAll()의 _closing=true에 의해 차단됩니다.
-    _sessionManager.CloseAll();
+    // 2. 모든 활성 세션에 Closing 신호 브로드캐스트
+    _sessionManager.BeginCloseAllSessions();
 
-    // 모든 Session의 socket을 먼저 shutdown합니다.
-    CleanupClosedSessions();
+    // 3. 모든 세션이 완전히 Closed 될 때까지 대기합니다.
+    //
+    // 중요:
+    // 세션이 Closed 되기 전에 Global RIO BufferPool/EventPool을 해제하면
+    // 아직 완료되지 않은 RIO completion이 해당 리소스를 참조할 수 있습니다.
+    //
+    // 따라서 timeout 이후에도 리소스 해제를 진행하지 않습니다.
+    // 안전한 RIO shutdown을 위해서는 Outstanding I/O가 완전히 0이 되어야 합니다.
+    int retryCount = 0;
+    const int maxRetries = 1000; // 10ms * 1000 = 10초
 
-    // 아직 Closed 상태이지만 outstanding I/O가 존재하는 Session도 socket shutdown이 필요합니다.
+    while( !_sessionManager.AreAllSessionsClosed() )
     {
-        std::lock_guard<std::mutex> resourceLock(_sessionResourceMutex);
+        _sessionManager.RemoveClosedSessions();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
-        for( const auto& [sessionId, requestQueue] : _requestQueues )
+        if( ++retryCount >= maxRetries )
         {
-            (void)sessionId;
-            (void)requestQueue;
-        }
-    }
-
-    if( _core != nullptr ) (void)_core->Shutdown(drainTimeout);
-
-    // Core drain 이후에는 모든 outstanding RIO I/O가 정상적으로 completion 처리된 상태여야 합니다.
-    CleanupClosedSessions();
-
-    // 남아있는 Closed Session의 RIO_RQ를 최종 제거합니다.
-    {
-        std::lock_guard<std::mutex> resourceLock(_sessionResourceMutex);
-
-        for( auto it = _requestQueues.begin(); it != _requestQueues.end(); )
-        {
-            const SessionId sessionId = it->first;
-            const RIO_RQ requestQueue = it->second;
-
-            SessionPtr session = _sessionManager.FindSession(sessionId);
-
-            if( session == nullptr || (session->IsClosed() && !session->HasOutstandingIo()) )
-            {
-                if( DestroyRequestQueue(requestQueue) )
-                {
-                    it = _requestQueues.erase(it);
-                    continue;
-                }
-            }
-
-            ++it;
+            break;
         }
     }
 
     _sessionManager.RemoveClosedSessions();
 
+    // 4. 타임아웃 방어 후에도 아직 세션이 존재한다면
+    //    RIO BufferPool/EventPool을 절대로 해제하지 않습니다.
+    //
+    //    이 상태에서 강제로 리소스를 해제하면 Outstanding RIO completion이
+    //    해제된 Buffer/Event를 접근할 수 있어 Use-After-Free가 발생할 수 있습니다.
+    if( !_sessionManager.AreAllSessionsClosed() )
     {
-        std::lock_guard<std::mutex> lifecycleLock(_lifecycleMutex);
-        _initialized.store(false, std::memory_order_release);
-    }
-}
-
-//***************************************************************************
-// @brief Server 실행 여부 확인
-// @return true: 실행 중, false: 중지됨
-//***************************************************************************
-bool CRioServer::IsRunning() const noexcept
-{
-    return _running.load(std::memory_order_acquire);
-}
-
-//***************************************************************************
-// @brief Server 초기화 여부 확인
-// @return true: 초기화 완료, false: 미초기화
-//***************************************************************************
-bool CRioServer::IsInitialized() const noexcept
-{
-    return _initialized.load(std::memory_order_acquire);
-}
-
-//***************************************************************************
-// @brief Listen Socket 반환
-// @return 현재 바인딩된 리프닝 소켓 핸들
-//***************************************************************************
-SOCKET CRioServer::GetListenSocket() const noexcept
-{
-    std::lock_guard<std::mutex> lifecycleLock(_lifecycleMutex);
-    return _listenSocket;
-}
-
-//***************************************************************************
-// @brief CRioCore 반환
-// @return 바인딩된 CRioCore 포인터
-//***************************************************************************
-CRioCore* CRioServer::GetCore() const noexcept
-{
-    return _core;
-}
-
-//***************************************************************************
-// @brief CRioEventPool 반환
-// @return 바인딩된 CRioEventPool 포인터
-//***************************************************************************
-CRioEventPool* CRioServer::GetEventPool() const noexcept
-{
-    return _eventPool;
-}
-
-//***************************************************************************
-// @brief Receive CRioBuffer 반환
-// @return 수신 버퍼 포인터
-//***************************************************************************
-CRioBuffer* CRioServer::GetReceiveBuffer() const noexcept
-{
-    return _receiveBuffer;
-}
-
-//***************************************************************************
-// @brief SessionManager 반환
-// @return 세션 관리자 포인터
-//***************************************************************************
-CRioSessionManager* CRioServer::GetSessionManager() noexcept
-{
-    return &_sessionManager;
-}
-
-//***************************************************************************
-// @brief const SessionManager 반환
-// @return const 세션 관리자 포인터
-//***************************************************************************
-const CRioSessionManager* CRioServer::GetSessionManager() const noexcept
-{
-    return &_sessionManager;
-}
-
-//***************************************************************************
-// @brief 전체 Session 개수 반환
-// @return 전체 세션 수
-//***************************************************************************
-size_t CRioServer::GetSessionCount() const noexcept
-{
-    return _sessionManager.GetSessionCount();
-}
-
-//***************************************************************************
-// @brief Active Session 개수 반환
-// @return 활성화된 세션 수
-//***************************************************************************
-size_t CRioServer::GetActiveSessionCount() const noexcept
-{
-    return _sessionManager.GetActiveSessionCount();
-}
-
-//***************************************************************************
-// @brief Closing Session 개수 반환
-// @return 종료 진행 중인 세션 수
-//***************************************************************************
-size_t CRioServer::GetClosingSessionCount() const noexcept
-{
-    return _sessionManager.GetClosingSessionCount();
-}
-
-//***************************************************************************
-// @brief Closed Session 개수 반환
-// @return 완전히 종료된 세션 수
-//***************************************************************************
-size_t CRioServer::GetClosedSessionCount() const noexcept
-{
-    return _sessionManager.GetClosedSessionCount();
-}
-
-//***************************************************************************
-// @brief Listen Socket 생성
-// @details
-//      TCP 소켓을 생성하고 SO_REUSEADDR 옵션 설정, 주소 바인딩 및 리슨 상태로 전환합니다.
-// @return true: 생성 성공, false: 생성 실패
-//***************************************************************************
-bool CRioServer::CreateListenSocket(const sockaddr_in& address, int backlog) noexcept
-{
-    // accept()로 수락된 클라이언트 소켓은 리슨 소켓의 속성을 상속받으므로,
-    // RIO 큐 생성이 가능하려면 리슨 소켓 자체가 WSA_FLAG_REGISTERED_IO로 생성돼야 한다.
-    SOCKET listenSocket = CSocketUtils::CreateRioSocket();
-    if( listenSocket == INVALID_SOCKET ) return false;
-
-    if( !CSocketUtils::SetReuseAddress(listenSocket, true) )
-    {
-        CloseSocket(listenSocket);
-        return false;
-    }
-
-    if( !CSocketUtils::Bind(listenSocket, CNetAddress(address)) )
-    {
-        CloseSocket(listenSocket);
-        return false;
-    }
-
-    if( !CSocketUtils::Listen(listenSocket, backlog) )
-    {
-        CloseSocket(listenSocket);
-        return false;
-    }
-
-    _listenSocket = listenSocket;
-
-    if( !ConfigureListenSocket() )
-    {
-        CloseSocket(_listenSocket);
-        _listenSocket = INVALID_SOCKET;
-        return false;
-    }
-
-    return true;
-}
-
-//***************************************************************************
-// @brief Listen Socket non-blocking 설정
-// @details
-//      Accept thread가 Stop()과 교착하지 않도록 listen socket을 non-blocking으로 설정합니다.
-// @return true: 설정 성공, false: 설정 실패
-//***************************************************************************
-bool CRioServer::ConfigureListenSocket() noexcept
-{
-    if( _listenSocket == INVALID_SOCKET ) return false;
-    return CSocketUtils::SetNonBlocking(_listenSocket, true);
-}
-
-//***************************************************************************
-// @brief Accept Loop
-// @details
-//      서버가 실행 중인 동안 클라이언트 접속 수락을 계속 시도하며 주기적으로 닫힌 세션을 정리합니다.
-//***************************************************************************
-void CRioServer::AcceptLoop() noexcept
-{
-    while( _running.load(std::memory_order_acquire) )
-    {
-        bool accepted = false;
-
-        while( _running.load(std::memory_order_acquire) )
+        // 현재 CRioCore/RIO 정책에서는 강제 리소스 해제보다
+        // Outstanding I/O의 완전한 Drain이 우선되어야 합니다.
+        //
+        // 따라서 여기서는 안전성을 위해 계속 Drain을 기다립니다.
+        while( !_sessionManager.AreAllSessionsClosed() )
         {
-            if( AcceptOne() )
-            {
-                accepted = true;
-                continue;
-            }
+            _sessionManager.RemoveClosedSessions();
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+
+        _sessionManager.RemoveClosedSessions();
+    }
+
+    // 5. RIO Core 정지 및 완료 큐 드레인 수행
+    _rioCore.RequestStop();
+    _rioCore.Shutdown();
+
+    // 6. 리소스 역순 해제
+    _globalSendBufferPool.Shutdown();
+    _globalRecvBufferPool.Shutdown();
+    _eventPool.Release();
+
+    _sendBufferId = RIO_INVALID_BUFFERID;
+
+    _serverState.store(Rio::ServerState::Stopped, std::memory_order_release);
+}
+
+//***************************************************************************
+// @brief 클라이언트의 신규 연결 요청을 대기하고 수락하는 루프 함수
+//***************************************************************************
+void CRioServer::AcceptLoop()
+{
+    while( _serverState.load(std::memory_order_acquire) == Rio::ServerState::Running )
+    {
+        sockaddr_in clientAddr{};
+        int addrLen = sizeof(clientAddr);
+
+        SOCKET clientSocket = ::accept(
+            _listenSocket,
+            reinterpret_cast<sockaddr*>(&clientAddr),
+            &addrLen);
+
+        if( clientSocket == INVALID_SOCKET )
+        {
+            if( _serverState.load(std::memory_order_acquire) != Rio::ServerState::Running )
+                break;
+
+            continue;
+        }
+
+        // accept()가 반환된 직후 Stop()이 실행될 수 있으므로 다시 확인합니다.
+        if( _serverState.load(std::memory_order_acquire) != Rio::ServerState::Running )
+        {
+            ::closesocket(clientSocket);
             break;
         }
 
-        CleanupClosedSessions();
+        RIO_RQ requestQueue = CreateRequestQueueForSocket(clientSocket);
 
-        if( !accepted ) std::this_thread::sleep_for(Rio::kAcceptPollInterval);
-    }
-}
-
-//***************************************************************************
-// @brief 하나의 Client Accept
-// @details
-//      클라이언트 접속을 수락하고 RIO Request Queue 및 세션을 생성하여 초기 Receive 요청을 게시합니다.
-// @return true: 클라이언트 수락 성공, false: 수락 실패 또는 대기 상태
-//***************************************************************************
-bool CRioServer::AcceptOne() noexcept
-{
-    if( !_running.load(std::memory_order_acquire) ) return false;
-
-    SOCKET listenSocket;
-    {
-        std::lock_guard<std::mutex> lifecycleLock(_lifecycleMutex);
-        listenSocket = _listenSocket;
-    }
-
-    if( listenSocket == INVALID_SOCKET ) return false;
-
-    sockaddr_in clientAddress{};
-    SOCKET clientSocket = CSocketUtils::Accept(listenSocket, clientAddress);
-
-    if( clientSocket == INVALID_SOCKET )
-    {
-        const int error = ::WSAGetLastError();
-        if( error == WSAEWOULDBLOCK || error == WSAEINTR ) return false;
-        if( !_running.load(std::memory_order_acquire) ) return false;
-
-        // WOULDBLOCK/INTR 이외의 실제 에러(WSAEMFILE, WSAENOBUFS 등)를 로그로 남긴다.
-        CSocketUtils::ReportError(_T("CRioServer::AcceptOne accept()"), error);
-        return false;
-    }
-
-    if( !_running.load(std::memory_order_acquire) )
-    {
-        CloseSocket(clientSocket);
-        return false;
-    }
-
-    RIO_RQ requestQueue = RIO_INVALID_RQ;
-
-    if( !CreateRequestQueue(clientSocket, requestQueue) )
-    {
-        CloseSocket(clientSocket);
-        return false;
-    }
-
-    SessionPtr session;
-
-    if( !CreateSession(clientSocket, requestQueue, session) )
-    {
-        DestroyRequestQueue(requestQueue);
-        CloseSocket(clientSocket);
-        return false;
-    }
-
-    {
-        std::lock_guard<std::mutex> resourceLock(_sessionResourceMutex);
-
-        const SessionId sessionId = session->GetSessionId();
-        const auto [it, inserted] = _requestQueues.emplace(sessionId, requestQueue);
-
-        if( !inserted )
+        if( requestQueue == RIO_INVALID_RQ )
         {
-            session->Close();
-            DestroyRequestQueue(requestQueue);
-            CloseSocket(clientSocket);
-            return false;
+            ::closesocket(clientSocket);
+            continue;
         }
-    }
 
-    if( !StartInitialReceive(session) )
-    {
-        session->Close();
-        CloseSocket(clientSocket);
-        return false;
-    }
+        // RIO RQ 생성 이후 Stop()이 발생했을 수 있습니다.
+        if( _serverState.load(std::memory_order_acquire) != Rio::ServerState::Running )
+        {
+            ::closesocket(clientSocket);
+            continue;
+        }
 
-    return true;
-}
-
-//***************************************************************************
-// @brief RIO Request Queue 생성
-// @details
-//      RIOCreateRequestQueue API를 호출하여 해당 소켓 전용 RIO_RQ를 생성합니다.
-// @return true: RIO_RQ 생성 성공, false: 생성 실패
-//***************************************************************************
-bool CRioServer::CreateRequestQueue(SOCKET socket, RIO_RQ& outRequestQueue) noexcept
-{
-    outRequestQueue = RIO_INVALID_RQ;
-
-    if( socket == INVALID_SOCKET || _core == nullptr ) return false;
-
-    const RIO_EXTENSION_FUNCTION_TABLE& rioTable = _core->GetRioTable();
-    if( rioTable.RIOCreateRequestQueue == nullptr ) return false;
-
-    // CRioCore 또는 연관 클래스에서 RIO_CQ 핸들을 가져와 전달합니다.
-    RIO_CQ receiveCq = _core->GetReceiveQueue(); // 프로젝트 구조에 맞는 CQ 가져오기
-    RIO_CQ sendCq = _core->GetSendQueue();       // 프로젝트 구조에 맞는 CQ 가져오기
-
-    RIO_RQ requestQueue = rioTable.RIOCreateRequestQueue(socket, 1, 1, 1, 1, receiveCq, sendCq, nullptr);
-    if( requestQueue == RIO_INVALID_RQ ) return false;
-
-    outRequestQueue = requestQueue;
-    return true;
-}
-
-//***************************************************************************
-// @brief Session 생성 및 SessionManager 등록
-// @details
-//      신규 세션 ID를 생성하고 SessionManager에 세션 개체를 할당 등록합니다.
-// @return true: 세션 생성 성공, false: 생성 실패
-//***************************************************************************
-bool CRioServer::CreateSession(SOCKET socket, RIO_RQ requestQueue, SessionPtr& outSession) noexcept
-{
-    outSession.reset();
-
-    if( socket == INVALID_SOCKET || requestQueue == RIO_INVALID_RQ || _core == nullptr ) return false;
-
-    const SessionId sessionId = GenerateSessionId(_nextSessionId);
-    if( !_sessionManager.IsValidSessionId(sessionId) ) return false;
-
-    SessionPtr session = _sessionManager.CreateSession<CRioSession>(sessionId, socket, requestQueue);
-    if( session == nullptr ) return false;
-
-    if( session->GetSessionId() != sessionId || session->GetSocket() != socket || session->GetRequestQueue() != requestQueue || session->GetCore() != _core )
-    {
-        session->Close();
-        return false;
-    }
-
-    outSession = std::move(session);
-    return true;
-}
-
-//***************************************************************************
-// @brief 첫 Receive 요청
-// @details
-//      Receive buffer의 slot을 먼저 확보하고 RIO_BUF를 생성한 뒤 EventPool에서
-//      Receive Event를 확보하여 Session::StartReceive()로 전달합니다.
-// @note
-//      CRioReceive 성공 시 Event가 slot ownership을 보유합니다.
-// @return true: 비동기 Receive 게시 성공, false: 게시 실패
-//***************************************************************************
-bool CRioServer::StartInitialReceive(const SessionPtr& session) noexcept
-{
-    if( session == nullptr || _eventPool == nullptr || _receiveBuffer == nullptr ) return false;
-    if( !session->IsActive() || session->GetCore() != _core || session->GetRequestQueue() == RIO_INVALID_RQ ) return false;
-
-    uint32_t slotIndex = Rio::kInvalidSlotIndex;
-    RIO_BUF rioBuffer{};
-    CRioEvent* rioEvent = nullptr;
-
-    if( !AllocateReceiveEvent(session, slotIndex, rioBuffer, rioEvent) ) return false;
-
-    if( !session->StartReceive(_receiveBuffer, slotIndex, rioBuffer, rioEvent, 0) )
-    {
-        _eventPool->Free(rioEvent);
-        (void)_receiveBuffer->FreeSlot(slotIndex);
-        return false;
-    }
-
-    return true;
-}
-
-//***************************************************************************
-// @brief Receive slot 및 Event 확보
-// @details
-//      수신 버퍼 슬롯 할당, RIO_BUF 정보 획득 및 이벤트 개체 할당을 수행합니다.
-// @return true: 자원 확보 성공, false: 자원 확보 실패
-//***************************************************************************
-bool CRioServer::AllocateReceiveEvent(const SessionPtr& session, uint32_t& outSlotIndex, RIO_BUF& outBuffer, CRioEvent*& outEvent) noexcept
-{
-    outSlotIndex = Rio::kInvalidSlotIndex;
-    outBuffer.BufferId = RIO_INVALID_BUFFERID;
-    outBuffer.Offset = 0;
-    outBuffer.Length = 0;
-    outEvent = nullptr;
-
-    if( session == nullptr || _receiveBuffer == nullptr || _eventPool == nullptr ) return false;
-    if( !session->IsActive() ) return false;
-
-    if( !_receiveBuffer->AllocSlot(outSlotIndex) ) return false;
-
-    if( !_receiveBuffer->GetRioBuffer(outSlotIndex, outBuffer) )
-    {
-        (void)_receiveBuffer->FreeSlot(outSlotIndex);
-        outSlotIndex = Rio::kInvalidSlotIndex;
-        return false;
-    }
-
-    CRioObjectRef ownerRef;
-
-    try
-    {
-        ownerRef = session->shared_from_this();
-    }
-    catch( ... )
-    {
-        (void)_receiveBuffer->FreeSlot(outSlotIndex);
-        outSlotIndex = Rio::kInvalidSlotIndex;
-        return false;
-    }
-
-    if( ownerRef == nullptr )
-    {
-        (void)_receiveBuffer->FreeSlot(outSlotIndex);
-        outSlotIndex = Rio::kInvalidSlotIndex;
-        return false;
-    }
-
-    outEvent = _eventPool->Alloc(Rio::EventType::Receive, ownerRef);
-    if( outEvent == nullptr )
-    {
-        (void)_receiveBuffer->FreeSlot(outSlotIndex);
-        outSlotIndex = Rio::kInvalidSlotIndex;
-        return false;
-    }
-
-    return true;
-}
-
-//***************************************************************************
-// @brief Closed Session 정리
-// @note
-//      RIO_RQ는 반드시 Closed && Outstanding I/O == 0 이후에만 제거합니다.
-//      Socket도 같은 시점에 닫습니다.
-// @details
-//      진행 중인 I/O가 없는 closed 세션을 탐색하여 소켓 닫기 및 RIO_RQ를 파기합니다.
-//***************************************************************************
-void CRioServer::CleanupClosedSessions() noexcept
-{
-    std::lock_guard<std::mutex> resourceLock(_sessionResourceMutex);
-
-    for( auto it = _requestQueues.begin(); it != _requestQueues.end(); )
-    {
-        const SessionId sessionId = it->first;
-        const RIO_RQ requestQueue = it->second;
-
-        SessionPtr session = _sessionManager.FindSession(sessionId);
+        std::shared_ptr<CRioSession> session = CreateSession();
 
         if( session == nullptr )
         {
-            if( DestroyRequestQueue(requestQueue) )
-            {
-                it = _requestQueues.erase(it);
-                continue;
-            }
-            ++it;
+            // [수정] _RIO_EXTENSION_FUNCTION_TABLE에 존재하지 않는 RIOCloseRequestQueue 호출부 제거
+            // RIO_RQ는 연결된 socket이 closesocket() 되면서 함께 정리됩니다.
+            ::closesocket(clientSocket);
             continue;
         }
 
-        if( !session->IsClosed() || session->HasOutstandingIo() )
+        uint64_t sessionId = _sessionManager.GenerateSessionId();
+
+        session->Init(
+            sessionId,
+            &_rioCore,
+            &_globalRecvBufferPool,
+            clientSocket,
+            requestQueue,
+            _sendBufferId);
+
+        // Init() 이후 Stop()이 발생한 경우 세션을 등록하지 않고 종료합니다.
+        if( _serverState.load(std::memory_order_acquire) != Rio::ServerState::Running )
         {
-            ++it;
+            session->Close(CloseReason::ForcedClose);
             continue;
         }
 
-        CloseSessionSocket(session);
-
-        if( !DestroyRequestQueue(requestQueue) )
+        if( !_sessionManager.AddSession(clientSocket, sessionId, session) )
         {
-            ++it;
+            session->Close(CloseReason::InternalError);
             continue;
         }
 
-        it = _requestQueues.erase(it);
+        if( !session->PostInitialReceive() )
+        {
+            // PostInitialReceive() 내부에서 이미 실패 원인에 따라 Close()가 호출됩니다.
+            _sessionManager.RemoveSession(clientSocket, sessionId);
+        }
     }
-
-    _sessionManager.RemoveClosedSessions();
 }
 
 //***************************************************************************
-// @brief Closed Session Socket 정리
-// @details
-//      세션이 보유한 통신 소켓을 안전하게 종결합니다.
+// @brief 지정된 클라이언트 소켓용 RIO Request Queue를 생성합니다.
+// @param clientSocket 바인딩할 클라이언트 소켓
+// @return 생성된 RIO_RQ 핸들 (실패 시 RIO_INVALID_RQ)
 //***************************************************************************
-void CRioServer::CloseSessionSocket(const SessionPtr& session) noexcept
+RIO_RQ CRioServer::CreateRequestQueueForSocket(SOCKET clientSocket)
 {
-    if( session == nullptr ) return;
+    if( clientSocket == INVALID_SOCKET ) return RIO_INVALID_RQ;
 
-    const SOCKET socket = session->GetSocket();
-    if( socket != INVALID_SOCKET ) CloseSocket(socket);
-}
+    if( _serverState.load(std::memory_order_acquire) != Rio::ServerState::Running )
+        return RIO_INVALID_RQ;
 
-//***************************************************************************
-// @brief RIO Request Queue 제거
-// @note
-//      반드시 Outstanding I/O == 0 상태에서 호출해야 합니다.
-// @details
-//      RIOCloseRequestQueue API를 사용하여 RIO 요청 큐를 해제합니다.
-// @return true: 파기 성공, false: 파기 실패
-//***************************************************************************
-bool CRioServer::DestroyRequestQueue(RIO_RQ requestQueue) noexcept
-{
-    if( requestQueue == RIO_INVALID_RQ ) return true;
-    if( _core == nullptr ) return false;
+    const RIO_EXTENSION_FUNCTION_TABLE& rioTable = _rioCore.GetRioTable();
+    if( rioTable.RIOCreateRequestQueue == nullptr ) return RIO_INVALID_RQ;
 
-    /*
-    const RIO_EXTENSION_FUNCTION_TABLE& rioTable = _core->GetRioTable();
-    if( rioTable.RIOCloseRequestQueue == nullptr ) return false;
+    const RIO_CQ receiveCq = _rioCore.GetReceiveQueue();
+    const RIO_CQ sendCq = _rioCore.GetSendQueue();
 
-    return rioTable.RIOCloseRequestQueue(requestQueue) != FALSE;
-    */
+    if( receiveCq == RIO_INVALID_CQ || sendCq == RIO_INVALID_CQ )
+        return RIO_INVALID_RQ;
 
-    // RIO_RQ는 소켓 종료 시 자동으로 해제되므로 별도 처리 없이 true를 반환합니다.
-    return true;
-}
-
-//***************************************************************************
-// @brief Listen Socket 종료
-// @details
-//      서버 리슨 소켓 핸들을 원자적으로 획득하여 닫습니다.
-//***************************************************************************
-void CRioServer::CloseListenSocket() noexcept
-{
-    SOCKET listenSocket = INVALID_SOCKET;
-
-    {
-        std::lock_guard<std::mutex> lifecycleLock(_lifecycleMutex);
-        listenSocket = _listenSocket;
-        _listenSocket = INVALID_SOCKET;
-    }
-
-    CloseSocket(listenSocket);
-}
-
-//***************************************************************************
-// @brief Socket 종료
-// @details
-//      소켓의 송수신을 차단(shutdown)하고 핸들을 해제(closesocket)합니다.
-//***************************************************************************
-void CRioServer::CloseSocket(SOCKET socket) noexcept
-{
-    CSocketUtils::CloseGraceful(socket);
-}
-
-//***************************************************************************
-// @brief SessionId 생성
-// @details
-//      원자적 카운터를 증가시켜 중복되지 않는 세션 식별자를 생성합니다 (0 제외).
-// @return 신규 생성된 SessionId
-//***************************************************************************
-CRioServer::SessionId CRioServer::GenerateSessionId(std::atomic<SessionId>& counter) noexcept
-{
-    SessionId id = counter.fetch_add(1, std::memory_order_relaxed);
-    if( id != 0 ) return id;
-
-    do
-    {
-        id = counter.fetch_add(1, std::memory_order_relaxed);
-    } while( id == 0 );
-
-    return id;
+    return rioTable.RIOCreateRequestQueue(
+        clientSocket,
+        Rio::kMaxOutstandingIo,
+        1,
+        Rio::kMaxOutstandingIo,
+        1,
+        receiveCq,
+        sendCq,
+        nullptr
+    );
 }

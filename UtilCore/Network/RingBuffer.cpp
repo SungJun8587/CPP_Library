@@ -258,3 +258,100 @@ int CRingBuffer::GetWSASendBuffers(WSABUF(&outBuffers)[2]) const
 	}
 	return count;
 }
+
+//***************************************************************************
+// @brief RIO RIOSend를 위한 읽기 가능 영역 RIO_BUF 배열을 생성합니다 (최대 2개 청크).
+// @param outBuffers [out] 크기 2인 RIO_BUF 배열 (참조로 받아 컴파일 타임 크기 강제)
+// @param bufferId RIO 등록 버퍼 식별자 (RIORegisterBuffer로 발급받은 RIO_BUFFERID)
+// @return 생성된 청크 개수 (0 ~ 2)
+//***************************************************************************
+int CRingBuffer::GetRioSendBuffers(RIO_BUF(&outBuffers)[2], RIO_BUFFERID bufferId) const
+{
+	int count = 0;
+	int64 usedSize = GetSizeUsed();
+	if( usedSize <= 0 ) return 0;
+
+	if( _write >= _read )
+	{
+		outBuffers[0].BufferId = bufferId;
+		outBuffers[0].Offset = static_cast<ULONG>(_read - _begin);
+		outBuffers[0].Length = SafeCastToULong(_write - _read);
+		if( outBuffers[0].Length > 0 )
+		{
+			count = 1;
+		}
+	}
+	else
+	{
+		// 1. _read ~ _end
+		if( _end > _read )
+		{
+			outBuffers[count].BufferId = bufferId;
+			outBuffers[count].Offset = static_cast<ULONG>(_read - _begin);
+			outBuffers[count].Length = SafeCastToULong(_end - _read);
+			count++;
+		}
+
+		// 2. _begin ~ _write
+		if( _write > _begin )
+		{
+			outBuffers[count].BufferId = bufferId;
+			outBuffers[count].Offset = 0;
+			outBuffers[count].Length = SafeCastToULong(_write - _begin);
+			count++;
+		}
+	}
+	return count;
+}
+
+//***************************************************************************
+// @brief RIO RIOReceive를 위한 쓰기 가능 영역 RIO_BUF 배열을 생성합니다 (최대 2개 청크).
+// @param outBuffers [out] 크기 2인 RIO_BUF 배열 (참조로 받아 컴파일 타임 크기 강제)
+// @param bufferId RIO 등록 버퍼 식별자 (RIORegisterBuffer로 발급받은 RIO_BUFFERID)
+// @return 생성된 청크 개수 (0 ~ 2)
+//***************************************************************************
+int CRingBuffer::GetRioRecvBuffers(RIO_BUF(&outBuffers)[2], RIO_BUFFERID bufferId) const
+{
+	int count = 0;
+	int64 freeSize = GetSizeFree();
+	if( freeSize <= 0 ) return 0;
+
+	if( _write >= _read )
+	{
+		// 1. _write ~ (_end - 1 if _read == _begin else _end)
+		char* chunk1End = (_read == _begin) ? (_end - 1) : _end;
+		if( chunk1End > _write )
+		{
+			outBuffers[count].BufferId = bufferId;
+			outBuffers[count].Offset = static_cast<ULONG>(_write - _begin);
+			outBuffers[count].Length = SafeCastToULong(chunk1End - _write);
+			count++;
+		}
+
+		// 2. _begin ~ (_read - 1)
+		if( _read > _begin )
+		{
+			char* chunk2End = _read - 1;
+			if( chunk2End > _begin )
+			{
+				outBuffers[count].BufferId = bufferId;
+				outBuffers[count].Offset = 0;
+				outBuffers[count].Length = SafeCastToULong(chunk2End - _begin);
+				count++;
+			}
+		}
+	}
+	else
+	{
+		// _write < _read 인 경우: _write ~ (_read - 1)
+		char* chunkEnd = _read - 1;
+		if( chunkEnd > _write )
+		{
+			outBuffers[0].BufferId = bufferId;
+			outBuffers[0].Offset = static_cast<ULONG>(_write - _begin);
+			outBuffers[0].Length = SafeCastToULong(chunkEnd - _write);
+			count = 1;
+		}
+	}
+	return count;
+}

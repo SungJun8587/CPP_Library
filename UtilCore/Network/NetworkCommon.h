@@ -17,11 +17,11 @@
 
 #include <Network/NetAddress.h>
 #include <Network/SocketUtils.h>
+#include <Network/RingBuffer.h>
 
 #include <Network/IOCP/IocpCommon.h>
 #include <Network/IOCP/SendBuffer.h>
 #include <Network/IOCP/RecvBuffer.h>
-#include <Network/IOCP/RingBuffer.h>
 #include <Network/IOCP/IocpEvent.h>
 #include <Network/IOCP/IocpCore.h>
 #include <Network/IOCP/IocpListener.h>
@@ -33,11 +33,10 @@
 #include <Network/RIO/RioEventPool.h>
 #include <Network/RIO/RioCore.h>
 #include <Network/RIO/RioBuffer.h>
-#include <Network/RIO/RioWorker.h>
 #include <Network/RIO/RioSend.h>
 #include <Network/RIO/RioReceive.h>
 #include <Network/RIO/RioSession.h>
 #include <Network/RIO/RioSessionManager.h>
 #include <Network/RIO/RioServer.h>
 
-#endif // __NETWORKCOMMON_H__
+#endif // ndef __NETWORKCOMMON_H__

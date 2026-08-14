@@ -205,12 +205,42 @@ _tstring WStringToTString(const std::wstring& src)
 // @param src 원본 _tstring 문자열
 // @return 변환된 std::wstring
 //***************************************************************************
-wstring TStringToWString(const _tstring& src)
+std::wstring TStringToWString(const _tstring& src)
 {
 #ifdef _UNICODE
 	return src;
 #else
 	return AnsiToUnicode(src);
+#endif
+}
+
+//***************************************************************************
+// @brief _tstring을 UTF-8 std::string으로 변환합니다. 빌드 환경(_UNICODE)에
+//        따라 Unicode 또는 ANSI에서 UTF-8로 변환을 수행합니다.
+// @param src 원본 _tstring 문자열
+// @return 변환된 UTF-8 std::string
+//***************************************************************************
+std::string TStringToUtf8(const _tstring& src)
+{
+#ifdef _UNICODE
+	return UnicodeToUtf8(src);
+#else
+	return AnsiToUtf8(src);
+#endif
+}
+
+//***************************************************************************
+// @brief UTF-8 std::string을 _tstring으로 변환합니다. 빌드 환경(_UNICODE)에
+//        따라 UTF-8에서 Unicode 또는 ANSI로 변환을 수행합니다.
+// @param src 원본 UTF-8 std::string 문자열
+// @return 변환된 _tstring
+//***************************************************************************
+_tstring Utf8ToTString(const std::string& src)
+{
+#ifdef _UNICODE
+	return Utf8ToUnicode(src);
+#else
+	return Utf8ToAnsi(src);
 #endif
 }
 

@@ -71,4 +71,4 @@ private:
     std::atomic<uint32_t> _ioCount{ 0 };        // 현재 진행 중인 비동기 RIO I/O 카운터
 };
 
-#endif // __RIOOBJECT_H__
+#endif // ndef __RIOOBJECT_H__

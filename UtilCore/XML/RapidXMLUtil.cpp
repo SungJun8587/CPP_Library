@@ -19,7 +19,7 @@ bool CXMLNode::GetBoolAttr(const TCHAR* ptszKey, bool defaultValue)
 {
 	if( _node == nullptr || ptszKey == nullptr ) return defaultValue;
 
-	xml_attribute<>* attr = _node->first_attribute(TcharToUtf8(ptszKey).c_str());
+	xml_attribute<>* attr = _node->first_attribute(TStringToUtf8(ptszKey).c_str());
 	if( attr && attr->value() )
 	{
 		return (_stricmp(attr->value(), "true") == 0 || strcmp(attr->value(), "1") == 0);
@@ -38,7 +38,7 @@ int8 CXMLNode::GetInt8Attr(const TCHAR* ptszKey, int8 defaultValue)
 {
 	if( _node == nullptr || ptszKey == nullptr ) return defaultValue;
 
-	xml_attribute<>* attr = _node->first_attribute(TcharToUtf8(ptszKey).c_str());
+	xml_attribute<>* attr = _node->first_attribute(TStringToUtf8(ptszKey).c_str());
 	if( attr && attr->value() )
 		return static_cast<int8>(atoi(attr->value()));
 
@@ -55,7 +55,7 @@ int16 CXMLNode::GetInt16Attr(const TCHAR* ptszKey, int16 defaultValue)
 {
 	if( _node == nullptr || ptszKey == nullptr ) return defaultValue;
 
-	xml_attribute<>* attr = _node->first_attribute(TcharToUtf8(ptszKey).c_str());
+	xml_attribute<>* attr = _node->first_attribute(TStringToUtf8(ptszKey).c_str());
 	if( attr && attr->value() )
 		return static_cast<int16>(atoi(attr->value()));
 
@@ -72,7 +72,7 @@ int32 CXMLNode::GetInt32Attr(const TCHAR* ptszKey, int32 defaultValue)
 {
 	if( _node == nullptr || ptszKey == nullptr ) return defaultValue;
 
-	xml_attribute<>* attr = _node->first_attribute(TcharToUtf8(ptszKey).c_str());
+	xml_attribute<>* attr = _node->first_attribute(TStringToUtf8(ptszKey).c_str());
 	if( attr && attr->value() )
 		return atoi(attr->value());
 
@@ -89,7 +89,7 @@ int64 CXMLNode::GetInt64Attr(const TCHAR* ptszKey, int64 defaultValue)
 {
 	if( _node == nullptr || ptszKey == nullptr ) return defaultValue;
 
-	xml_attribute<>* attr = _node->first_attribute(TcharToUtf8(ptszKey).c_str());
+	xml_attribute<>* attr = _node->first_attribute(TStringToUtf8(ptszKey).c_str());
 	if( attr && attr->value() )
 		return _atoi64(attr->value());
 
@@ -106,7 +106,7 @@ float CXMLNode::GetFloatAttr(const TCHAR* ptszKey, float defaultValue)
 {
 	if( _node == nullptr || ptszKey == nullptr ) return defaultValue;
 
-	xml_attribute<>* attr = _node->first_attribute(TcharToUtf8(ptszKey).c_str());
+	xml_attribute<>* attr = _node->first_attribute(TStringToUtf8(ptszKey).c_str());
 	if( attr && attr->value() )
 		return static_cast<float>(atof(attr->value()));
 
@@ -123,7 +123,7 @@ double CXMLNode::GetDoubleAttr(const TCHAR* ptszKey, double defaultValue)
 {
 	if( _node == nullptr || ptszKey == nullptr ) return defaultValue;
 
-	xml_attribute<>* attr = _node->first_attribute(TcharToUtf8(ptszKey).c_str());
+	xml_attribute<>* attr = _node->first_attribute(TStringToUtf8(ptszKey).c_str());
 	if( attr && attr->value() )
 		return _atof_l(attr->value(), kr);
 
@@ -140,11 +140,11 @@ const TCHAR* CXMLNode::GetStringAttr(const TCHAR* ptszKey, const TCHAR* defaultV
 {
 	if( _node == nullptr || ptszKey == nullptr ) return defaultValue;
 
-	xml_attribute<>* attr = _node->first_attribute(TcharToUtf8(ptszKey).c_str());
+	xml_attribute<>* attr = _node->first_attribute(TStringToUtf8(ptszKey).c_str());
 	if( attr && attr->value() )
 	{
 		thread_local static _tstring resultStr;
-		resultStr = Utf8ToTchar(attr->value());
+		resultStr = Utf8ToTString(attr->value());
 		if( !resultStr.empty() )
 			return resultStr.c_str();
 	}
@@ -276,7 +276,7 @@ const TCHAR* CXMLNode::GetStringValue(const TCHAR* defaultValue)
 	if( val )
 	{
 		thread_local static _tstring resultStr;
-		resultStr = Utf8ToTchar(val);
+		resultStr = Utf8ToTString(val);
 		if( !resultStr.empty() )
 			return resultStr.c_str();
 	}
@@ -293,7 +293,7 @@ CXMLNode CXMLNode::FindChild(const TCHAR* ptszKey)
 {
 	if( _node == nullptr || ptszKey == nullptr ) return CXMLNode(nullptr);
 
-	return CXMLNode(_node->first_node(TcharToUtf8(ptszKey).c_str()));
+	return CXMLNode(_node->first_node(TStringToUtf8(ptszKey).c_str()));
 }
 
 //***************************************************************************
@@ -307,7 +307,7 @@ CVector<CXMLNode> CXMLNode::FindChildren(const TCHAR* ptszKey)
 
 	if( _node == nullptr || ptszKey == nullptr ) return nodes;
 
-	std::string utf8Key = TcharToUtf8(ptszKey);
+	std::string utf8Key = TStringToUtf8(ptszKey);
 	xml_node<>* node = _node->first_node(utf8Key.c_str());
 	while( node )
 	{
@@ -331,7 +331,7 @@ CRapidXMLUtil::CRapidXMLUtil()
 //***************************************************************************
 CRapidXMLUtil::CRapidXMLUtil(const _tstring& xmlData)
 {
-	_xmlString = TcharToUtf8(xmlData);
+	_xmlString = TStringToUtf8(xmlData);
 	if( !_xmlString.empty() )
 	{
 		_doc.parse<0>(&_xmlString[0]);
@@ -406,7 +406,7 @@ bool CRapidXMLUtil::SaveFile(const _tstring& filename)
 //***************************************************************************
 bool CRapidXMLUtil::SaveFileToXML(const _tstring& filename, const _tstring& xmlData)
 {
-	_xmlString = TcharToUtf8(xmlData);
+	_xmlString = TStringToUtf8(xmlData);
 
 	std::ofstream file(filename);
 	if( !file.is_open() )
@@ -429,7 +429,7 @@ void CRapidXMLUtil::PrintXML() const
 	std::string xmlStr;
 	rapidxml::print(std::back_inserter(xmlStr), _doc);
 
-	_tcout << Utf8ToTchar(xmlStr) << std::endl;
+	_tcout << Utf8ToTString(xmlStr) << std::endl;
 }
 
 //***************************************************************************
@@ -453,7 +453,7 @@ xml_node<>* CRapidXMLUtil::AddNode(xml_node<>* parentNode, const _tstring& nodeN
 {
 	if( parentNode == nullptr ) return nullptr;
 
-	xml_node<>* node = _doc.allocate_node(rapidxml::node_type::node_element, _doc.allocate_string(TcharToUtf8(nodeName).c_str()));
+	xml_node<>* node = _doc.allocate_node(rapidxml::node_type::node_element, _doc.allocate_string(TStringToUtf8(nodeName).c_str()));
 	parentNode->append_node(node);
 
 	return node;
@@ -465,14 +465,14 @@ xml_node<>* CRapidXMLUtil::AddNode(xml_node<>* parentNode, const _tstring& nodeN
 //***************************************************************************
 void CRapidXMLUtil::RemoveNode(const _tstring& nodeName)
 {
-	xml_node<char>* root = _doc.first_node(TcharToUtf8(RootName).c_str());
+	xml_node<char>* root = _doc.first_node(TStringToUtf8(RootName).c_str());
 	if( !root )
 	{
 		_tcout << _T("Root node not found") << std::endl;
 		return;
 	}
 
-	xml_node<char>* targetNode = root->first_node(TcharToUtf8(nodeName).c_str());
+	xml_node<char>* targetNode = root->first_node(TStringToUtf8(nodeName).c_str());
 	if( targetNode )
 	{
 		RemoveNodeRecursive(targetNode);
@@ -493,8 +493,8 @@ void CRapidXMLUtil::AddAttribute(xml_node<>* node, const _tstring& attName, cons
 {
 	if( node == nullptr ) return;
 
-	std::string name = TcharToUtf8(attName);
-	std::string value = TcharToUtf8(attValue);
+	std::string name = TStringToUtf8(attName);
+	std::string value = TStringToUtf8(attValue);
 
 	if( node->first_attribute(name.c_str()) ) return;
 
@@ -515,10 +515,10 @@ void CRapidXMLUtil::SetAttribute(xml_node<>* node, const _tstring& attName, cons
 {
 	if( node == nullptr ) return;
 
-	xml_attribute<>* attr = node->first_attribute(TcharToUtf8(attName).c_str());
+	xml_attribute<>* attr = node->first_attribute(TStringToUtf8(attName).c_str());
 	if( attr )
 	{
-		attr->value(_doc.allocate_string(TcharToUtf8(attValue).c_str()));
+		attr->value(_doc.allocate_string(TStringToUtf8(attValue).c_str()));
 	}
 	else
 	{
@@ -535,7 +535,7 @@ void CRapidXMLUtil::RemoveAttribute(xml_node<>* node, const _tstring& attName)
 {
 	if( node == nullptr ) return;
 
-	std::string utf8AttName = TcharToUtf8(attName);
+	std::string utf8AttName = TStringToUtf8(attName);
 
 	xml_attribute<>* attr = node->first_attribute(utf8AttName.c_str());
 	if( attr )
@@ -559,7 +559,7 @@ void CRapidXMLUtil::AddValue(const _tstring& str, xml_node<>* parent, const TCHA
 {
 	if( parent == nullptr || ptszTagName == nullptr ) return;
 
-	xml_node<>* node = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TcharToUtf8(ptszTagName).c_str()), _doc.allocate_string(TcharToUtf8(str).c_str()));
+	xml_node<>* node = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TStringToUtf8(ptszTagName).c_str()), _doc.allocate_string(TStringToUtf8(str).c_str()));
 	parent->append_node(node);
 }
 
@@ -573,7 +573,7 @@ void CRapidXMLUtil::AddCDataValue(const _tstring& str, xml_node<>* parent, const
 {
 	if( parent == nullptr || ptszTagName == nullptr ) return;
 
-	xml_node<>* node = _doc.allocate_node(node_type::node_cdata, _doc.allocate_string(TcharToUtf8(ptszTagName).c_str()), _doc.allocate_string(TcharToUtf8(str).c_str()));
+	xml_node<>* node = _doc.allocate_node(node_type::node_cdata, _doc.allocate_string(TStringToUtf8(ptszTagName).c_str()), _doc.allocate_string(TStringToUtf8(str).c_str()));
 	parent->append_node(node);
 }
 
@@ -586,7 +586,7 @@ void CRapidXMLUtil::GetValue(_tstring& str, xml_node<>* node)
 {
 	if( node && node->value() )
 	{
-		str = Utf8ToTchar(node->value());
+		str = Utf8ToTString(node->value());
 	}
 }
 

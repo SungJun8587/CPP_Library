@@ -62,11 +62,7 @@ bool CRioObject::IncrementIoCount() noexcept
             return false;
         }
 
-        if( _ioCount.compare_exchange_weak(
-            current,
-            current + 1,
-            std::memory_order_relaxed,
-            std::memory_order_relaxed) )
+        if( _ioCount.compare_exchange_weak(current, current + 1, std::memory_order_relaxed, std::memory_order_relaxed) )
         {
             return true;
         }

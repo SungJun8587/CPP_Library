@@ -49,4 +49,4 @@ private:
 	CVector<BYTE>	_buffer;			// 수신 데이터 저장 버퍼
 };
 
-#endif // __RECVBUFFER_H__
+#endif // ndef __RECVBUFFER_H__

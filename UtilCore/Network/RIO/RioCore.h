@@ -1,4 +1,5 @@
-﻿//***************************************************************************
+﻿
+//***************************************************************************
 // RioCore.h : interface for the CRioCore class.
 //
 //***************************************************************************
@@ -267,7 +268,7 @@ private:
     void FaultInternal() noexcept;
 
     int32 DispatchResults(Rio::RioCqType cqType, RIORESULT* results, ULONG numResults) noexcept;
-    void ProcessRioResult(LONG status, ULONG bytesTransferred, CRioEvent* rioEvent) noexcept;
+    void ProcessRioResult(Rio::RioCqType cqType, LONG status, ULONG bytesTransferred, CRioEvent* rioEvent) noexcept;
 
     bool IncrementIoCount() noexcept;
     void DecrementIoCount() noexcept;
@@ -379,4 +380,4 @@ private:
     Rio::ShutdownResult _lastShutdownResult{ Rio::ShutdownResult::Success }; // 마지막 Shutdown 결과
 };
 
-#endif // __RIOCORE_H__
+#endif // ndef __RIOCORE_H__

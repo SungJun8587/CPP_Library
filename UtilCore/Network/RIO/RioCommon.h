@@ -187,6 +187,13 @@ namespace Rio
     //      Listen 소켓 생성 시 설정 가능한 연결 대기 큐(Backlog)의 최소 허용치입니다.
     //***************************************************************************
     constexpr int kListenBacklogMinimum = 1;
+
+    //***************************************************************************
+    // @brief RIO 기본 버퍼 및 I/O 제한 설정 상수
+    //***************************************************************************
+    constexpr uint32_t kMaxOutstandingIo = 1024;    // 최대 동시 비동기 I/O 처리 요청 수
+    constexpr uint32_t kRecvBufferSlotSize = 8192;  // 수신 버퍼 슬롯 당 크기 (바이트 단위, 예: 8KB)
+    constexpr size_t   kDefaultAlignment = 64;      // 메모리 정렬 기본 단위 (캐시라인 최적화용 64바이트)
 }
 
-#endif // __RIOCOMMON_H__
+#endif // ndef __RIOCOMMON_H__

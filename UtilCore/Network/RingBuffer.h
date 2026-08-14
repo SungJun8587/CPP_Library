@@ -161,6 +161,22 @@ public:
 	int GetWSASendBuffers(WSABUF(&outBuffers)[2]) const;
 
 	//***************************************************************************
+	// @brief RIO RIOSend를 위한 읽기 가능 영역 RIO_BUF 배열을 생성합니다 (최대 2개 청크).
+	// @param outBuffers [out] 크기 2인 RIO_BUF 배열 (참조로 받아 컴파일 타임 크기 강제)
+	// @param bufferId RIO 등록 버퍼 식별자 (RIORegisterBuffer로 발급받은 RIO_BUFFERID)
+	// @return 생성된 청크 개수 (0 ~ 2)
+	//***************************************************************************
+	int GetRioSendBuffers(RIO_BUF(&outBuffers)[2], RIO_BUFFERID bufferId) const;
+
+	//***************************************************************************
+	// @brief RIO RIOReceive를 위한 쓰기 가능 영역 RIO_BUF 배열을 생성합니다 (최대 2개 청크).
+	// @param outBuffers [out] 크기 2인 RIO_BUF 배열 (참조로 받아 컴파일 타임 크기 강제)
+	// @param bufferId RIO 등록 버퍼 식별자 (RIORegisterBuffer로 발급받은 RIO_BUFFERID)
+	// @return 생성된 청크 개수 (0 ~ 2)
+	//***************************************************************************
+	int GetRioRecvBuffers(RIO_BUF(&outBuffers)[2], RIO_BUFFERID bufferId) const;
+
+	//***************************************************************************
 	// @brief 링버퍼의 모든 데이터를 초기화하고 읽기/쓰기 커서를 시작점으로 되돌립니다.
 	//***************************************************************************
 	void Clear()
@@ -264,4 +280,4 @@ private:
 	char* _write; // 다음에 데이터를 쓸 빈 공간이 위치한 버퍼 내 쓰기 커서 포인터
 };
 
-#endif // __RINGBUFFER_H__
+#endif // ndef __RINGBUFFER_H__

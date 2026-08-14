@@ -261,4 +261,4 @@ private:
     bool _initialized{ false };     // 버퍼 정상 초기화 완료 여부 플래그 (_lifecycleMutex 보호 하에 접근)
 };
 
-#endif // __RIOBUFFER_H__
+#endif // ndef __RIOBUFFER_H__

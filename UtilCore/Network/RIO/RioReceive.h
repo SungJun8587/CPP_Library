@@ -75,4 +75,4 @@ public:
         DWORD flags = 0) noexcept;
 };
 
-#endif // __RIO_RECEIVE_H__
+#endif // ndef __RIO_RECEIVE_H__

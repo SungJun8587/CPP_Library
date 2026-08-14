@@ -39,24 +39,20 @@ using namespace rapidxml;
 #define MapValue		_T("Value")
 #define ItemName		_T("Item")
 
-inline std::string TcharToUtf8(const _tstring& input)
-{
-#ifdef _UNICODE
-	return UnicodeToUtf8(input);
-#else
-	return AnsiToUtf8(input);
-#endif
-}
-
-inline _tstring Utf8ToTchar(const std::string& input)
-{
-#ifdef _UNICODE
-	return Utf8ToUnicode(input);
-#else
-	return Utf8ToAnsi(input);
-#endif
-}
-
+//***************************************************************************
+// @class CXMLNode
+// @brief RapidXML의 xml_node<> 포인터를 래핑하여 안전하고 편리한 데이터 접근을 제공하는 클래스입니다.
+//
+// @details
+// RapidXML 노드 개체에 대한 직접적인 접근을 추상화하여, 속성(Attribute) 및 
+// 노드 값(Value)을 다양한 기본 자료형(bool, int, float, double, _tstring 등)으로 
+// 안전하게 변환하여 읽을 수 있는 인터페이스를 제공합니다.
+//
+// 주요 처리 및 특징:
+//  - RapidXML raw 포인터(xml_node<>*) 캡슐화 및 Null 포인터 안정성 제공 (IsValid)
+//  - 다양한 타입별 속성(Get*Attr) 및 노드 값(Get*Value) 추출 기능 지원
+//  - 단일 자식 노드 탐색(FindChild) 및 목록 형태의 다중 자식 노드 탐색(FindChildren) 지원
+//***************************************************************************
 class CXMLNode
 {
 public:
@@ -98,6 +94,21 @@ private:
 	rapidxml::xml_node<>*		_node = nullptr;
 };
 
+//***************************************************************************
+// @class CRapidXMLUtil
+// @brief RapidXML 라이브러리를 기반으로 XML 파싱, 생성, 수정 및 직렬화/역직렬화를 관리하는 유틸리티 클래스입니다.
+//
+// @details
+// XML 문서의 파일 입출력(ParseFromFile, SaveFile), 노드/속성 편집 및 C++ 데이터 구조체,
+// 컨테이너(CVector, CMap)의 자동 XML 직렬화/역직렬화 기능을 종합적으로 관리합니다.
+// 내부적으로 TCHAR 문자열과 UTF-8 간 인코딩 변환을 자동으로 수행합니다.
+//
+// 주요 처리 및 특징:
+//  - XML 파일 및 문자열 파싱, 포맷팅 저장/출력 기능 제공
+//  - 노드, 속성(Attribute), CData의 동적 추가/수정/삭제 관리
+//  - C++ 기본 자료형, 구조체 및 컨테이너(CVector, CMap)의 직렬화/역직렬화 템플릿 지원
+//  - operator[] 연산자 오버로딩 및 Proxy 개체를 통한 직관적인 데이터 접근 지원
+//***************************************************************************
 class CRapidXMLUtil
 {
 public:
@@ -243,7 +254,7 @@ public:
 	template <typename T>
 	static void Serialize(const T& value, xml_node<>* parent, xml_document<>& doc, const TCHAR* ptszTagName = ItemName)
 	{
-		std::string nodeName = TcharToUtf8(ptszTagName);
+		std::string nodeName = TStringToUtf8(ptszTagName);
 
 		xml_node<>* node = doc.allocate_node(node_type::node_element, doc.allocate_string(nodeName.c_str()), doc.allocate_string(std::to_string(value).c_str()));
 		parent->append_node(node);
@@ -253,8 +264,8 @@ public:
 	// 문자열 타입 직렬화 함수
 	static void Serialize(const _tstring& value, xml_node<>* parent, xml_document<>& doc, const TCHAR* ptszTagName = ItemName)
 	{
-		std::string nodeName = TcharToUtf8(ptszTagName);
-		std::string nodeValue = TcharToUtf8(value);
+		std::string nodeName = TStringToUtf8(ptszTagName);
+		std::string nodeValue = TStringToUtf8(value);
 
 		xml_node<>* node = doc.allocate_node(node_type::node_element, doc.allocate_string(nodeName.c_str()), doc.allocate_string(nodeValue.c_str()));
 		parent->append_node(node);
@@ -271,7 +282,7 @@ public:
 		}
 		else if constexpr( std::is_same_v<T, _tstring> )
 		{
-			if( node ) value = Utf8ToTchar(node->value());
+			if( node ) value = Utf8ToTString(node->value());
 		}
 	}
 
