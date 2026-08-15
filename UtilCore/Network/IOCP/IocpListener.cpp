@@ -38,7 +38,7 @@ CIocpListener::~CIocpListener()
 // @param onAccept Accept 완료 시 호출될 외부 후속 처리 콜백
 // @return bool 성공 여부
 //***************************************************************************
-bool CIocpListener::StartAccept(CIocpCoreRef iocpCore, CNetAddress netAddr, SessionFactory sessionFactory,
+bool CIocpListener::StartAccept(CIocpCoreRef iocpCore, CNetAddress netAddr, IocpSessionFactory sessionFactory,
     int32 acceptCount, OnAcceptCallback onAccept)
 {
     _iocpCore = iocpCore;

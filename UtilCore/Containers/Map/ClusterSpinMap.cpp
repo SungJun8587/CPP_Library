@@ -11,12 +11,18 @@
 // Construction/Destruction 
 //***************************************************************************
 
+//***************************************************************************
+// @brief CClusterSpinMap 생성자
+//***************************************************************************
 template<typename T1, typename T2, __int32 nClusterCnt, bool bInnerLock>
 CClusterSpinMap<T1, T2, nClusterCnt, bInnerLock>::CClusterSpinMap(void)
 {
 	clearObjectMap();
 }
 
+//***************************************************************************
+// @brief CClusterSpinMap 소멸자
+//***************************************************************************
 template<typename T1, typename T2, __int32 nClusterCnt, bool bInnerLock>
 CClusterSpinMap<T1, T2, nClusterCnt, bInnerLock>::~CClusterSpinMap(void)
 {
@@ -24,7 +30,7 @@ CClusterSpinMap<T1, T2, nClusterCnt, bInnerLock>::~CClusterSpinMap(void)
 }
 
 //***************************************************************************
-// getSize : 모든 클러스터의 사이즈를 합산
+// @brief 모든 클러스터의 사이즈를 합산합니다.
 // @return INT32 전체 데이터 개수
 //***************************************************************************
 template<typename T1, typename T2, __int32 nClusterCnt, bool bInnerLock>
@@ -43,7 +49,7 @@ INT32 CClusterSpinMap<T1, T2, nClusterCnt, bInnerLock>::getSize(void)
 }
 
 //***************************************************************************
-// InsertObject : 클러스터별 쓰기 락을 이용하여 데이터 삽입
+// @brief 클러스터별 쓰기 락을 이용하여 데이터 삽입
 // @param key 삽입할 데이터의 키
 // @param object 삽입할 객체 값
 // @return bool 삽입 성공 시 true, 이미 존재하면 false
@@ -61,7 +67,7 @@ bool CClusterSpinMap<T1, T2, nClusterCnt, bInnerLock>::InsertObject(T1 key, T2 o
 }
 
 //***************************************************************************
-// FindObject : 단건 반환 형태의 조회
+// @brief 단건 반환 형태의 조회
 // @param key 검색할 데이터의 키
 // @return T2 찾은 객체 값
 //***************************************************************************
@@ -81,7 +87,7 @@ T2 CClusterSpinMap<T1, T2, nClusterCnt, bInnerLock>::FindObject(T1 key)
 }
 
 //***************************************************************************
-// FindObject : 참조자 대입 형태의 조회 (성공 여부 반환)
+// @brief 참조자 대입 형태의 조회 (성공 여부 반환)
 // @param key 검색할 데이터의 키
 // @param object [out] 객체가 복사될 참조자
 // @return bool 검색 성공 시 true, 존재하지 않으면 false
@@ -104,7 +110,7 @@ bool CClusterSpinMap<T1, T2, nClusterCnt, bInnerLock>::FindObject(T1 key, T2& ob
 }
 
 //***************************************************************************
-// EraseObject : 클러스터별 쓰기 락을 이용하여 데이터 삭제
+// @brief 클러스터별 쓰기 락을 이용하여 데이터 삭제
 // @param key 삭제할 데이터의 키
 // @return bool 삭제 성공 시 true, 존재하지 않으면 false
 //***************************************************************************
@@ -126,7 +132,7 @@ bool CClusterSpinMap<T1, T2, nClusterCnt, bInnerLock>::EraseObject(T1 key)
 }
 
 //***************************************************************************
-// clearObjectMap : 전체 클러스터를 순회하며 맵 데이터 비우기
+// @brief 전체 클러스터를 순회하며 맵 데이터 비우기
 //***************************************************************************
 template<typename T1, typename T2, __int32 nClusterCnt, bool bInnerLock>
 void CClusterSpinMap<T1, T2, nClusterCnt, bInnerLock>::clearObjectMap(void)

@@ -44,7 +44,7 @@ void CRioSession::Init(
     RIO_BUFFERID sendBufferId) noexcept
 {
     // Created 상태의 세션만 초기화 허용 (재사용 지점 전면 배제)
-    assert(_state.load(std::memory_order_acquire) == SessionState::Created);
+    assert(_state.load(std::memory_order_acquire) == Rio::SessionState::Created);
     assert(_outstandingIo.load(std::memory_order_acquire) == 0);
 
     assert(core != nullptr);
@@ -59,36 +59,47 @@ void CRioSession::Init(
     _requestQueue.store(requestQueue, std::memory_order_release);
     _sendBufferId = sendBufferId;
 
-    _closeReason.store(CloseReason::None, std::memory_order_release);
+    _closeReason.store(Rio::CloseReason::None, std::memory_order_release);
     _outstandingIo.store(0, std::memory_order_relaxed);
 
     {
-        PRWriteLockGuard sendWriteGuard(_sendLock, "CRioSession_Init_SendLock");
+        PRWriteLockGuard sendWriteGuard(_sendLock, __FUNCTION__);
 
         _isSending = false;
         _sendBuffer.Clear();
         _recvBuffer.Clear();
     }
 
-    _state.store(SessionState::Active, std::memory_order_release);
+    _state.store(Rio::SessionState::Active, std::memory_order_release);
 
     OnConnected();
+}
+
+//***************************************************************************
+// @brief 외부(NetService 등)에서 요청한 세션 강제 종료 처리
+// @param cause 종료 사유 메시지
+//***************************************************************************
+void CRioSession::Disconnect(const TCHAR* cause)
+{
+    // 필요에 따라 cause 로그 기록 가능
+    // RIO 내부 종료 로직 호출 (예: ForcedClose 사유로 세션 닫기)
+    Close(Rio::CloseReason::ForcedClose);
 }
 
 //***************************************************************************
 // @brief 지정된 사유로 세션 종료를 요청합니다 (락 내부에서 상태 전이 후 락 밖에서 실행).
 // @param reason 세션 종료 사유
 //***************************************************************************
-void CRioSession::Close(CloseReason reason) noexcept
+void CRioSession::Close(Rio::CloseReason reason) noexcept
 {
     bool needFinalize = false;
 
     {
-        PLockGuard guard(_ioSubmitLock, "CRioSession_Close");
+        PLockGuard guard(_ioSubmitLock, __FUNCTION__);
 
-        SessionState expected = SessionState::Active;
+        Rio::SessionState expected = Rio::SessionState::Active;
 
-        if( !_state.compare_exchange_strong(expected, SessionState::Closing, std::memory_order_acq_rel, std::memory_order_acquire) )
+        if( !_state.compare_exchange_strong(expected, Rio::SessionState::Closing, std::memory_order_acq_rel, std::memory_order_acquire) )
         {
             return;
         }
@@ -125,7 +136,7 @@ void CRioSession::DecrementIoCountNoLock() noexcept
 //***************************************************************************
 void CRioSession::TryFinalizeClose() noexcept
 {
-    if( _state.load(std::memory_order_acquire) != SessionState::Closing ) return;
+    if( _state.load(std::memory_order_acquire) != Rio::SessionState::Closing ) return;
     if( _outstandingIo.load(std::memory_order_acquire) != 0 ) return;
 
     FinalizeClose();
@@ -136,7 +147,7 @@ void CRioSession::TryFinalizeClose() noexcept
 //***************************************************************************
 void CRioSession::FinalizeClose() noexcept
 {
-    CloseReason closeReason = CloseReason::InternalError;
+    Rio::CloseReason closeReason = Rio::CloseReason::InternalError;
 
     {
         // 중요:
@@ -145,11 +156,11 @@ void CRioSession::FinalizeClose() noexcept
         // OutstandingIo == 0인 순간 다른 submit thread가 Active 상태를
         // 확인하여 다시 I/O를 제출하는 것을 막고, Closed 전환과 resource
         // invalidation을 동일한 submit gate 안에서 수행합니다.
-        PLockGuard guard(_ioSubmitLock, "CRioSession_FinalizeClose");
+        PLockGuard guard(_ioSubmitLock, __FUNCTION__);
 
-        SessionState expected = SessionState::Closing;
+        Rio::SessionState expected = Rio::SessionState::Closing;
 
-        if( !_state.compare_exchange_strong(expected, SessionState::Closed, std::memory_order_acq_rel, std::memory_order_acquire) )
+        if( !_state.compare_exchange_strong(expected, Rio::SessionState::Closed, std::memory_order_acq_rel, std::memory_order_acquire) )
         {
             return;
         }
@@ -165,6 +176,9 @@ void CRioSession::FinalizeClose() noexcept
 
     // 3. 외부 락 범위 밖에서 안전하게 사용자 콜백 호출
     OnDisconnected(closeReason);
+
+    // CSession에 정의된 상위 통지 함수 호출 -> CNetService의 ReleaseSession 자동 연동!
+    CSession::OnDisconnected();
 }
 
 //***************************************************************************
@@ -182,7 +196,7 @@ bool CRioSession::PostInitialReceive() noexcept
 //***************************************************************************
 bool CRioSession::PostReceiveInternal() noexcept
 {
-    CloseReason failureReason = CloseReason::None;
+    Rio::CloseReason failureReason = Rio::CloseReason::None;
 
     uint32_t slotIndex = Rio::kInvalidSlotIndex;
     CRioEvent* rioEvent = nullptr;
@@ -199,9 +213,9 @@ bool CRioSession::PostReceiveInternal() noexcept
         // 단순히 OutstandingIo를 증가시킨 후 락을 풀면
         // Close() -> FinalizeClose()가 먼저 실행되어 socket/RQ가
         // 무효화된 뒤 RIO submit이 수행될 수 있습니다.
-        PLockGuard guard(_ioSubmitLock, "CRioSession_PostReceiveInternal");
+        PLockGuard guard(_ioSubmitLock, __FUNCTION__);
 
-        if( _state.load(std::memory_order_acquire) != SessionState::Active ) return false;
+        if( _state.load(std::memory_order_acquire) != Rio::SessionState::Active ) return false;
 
         core = _core;
         bufferPool = _globalRecvBufferPool;
@@ -211,13 +225,13 @@ bool CRioSession::PostReceiveInternal() noexcept
 
         if( !bufferPool->AllocSlot(slotIndex) )
         {
-            failureReason = CloseReason::BufferAllocationFailed;
+            failureReason = Rio::CloseReason::BufferAllocationFailed;
         }
         else if( !bufferPool->GetRioBuffer(slotIndex, rioBuf) )
         {
             bufferPool->FreeSlot(slotIndex);
             slotIndex = Rio::kInvalidSlotIndex;
-            failureReason = CloseReason::InternalError;
+            failureReason = Rio::CloseReason::InternalError;
         }
         else
         {
@@ -227,7 +241,7 @@ bool CRioSession::PostReceiveInternal() noexcept
             {
                 bufferPool->FreeSlot(slotIndex);
                 slotIndex = Rio::kInvalidSlotIndex;
-                failureReason = CloseReason::InternalError;
+                failureReason = Rio::CloseReason::InternalError;
             }
             else
             {
@@ -236,12 +250,27 @@ bool CRioSession::PostReceiveInternal() noexcept
                 {
                     bufferPool->FreeSlot(slotIndex);
                     slotIndex = Rio::kInvalidSlotIndex;
-                    failureReason = CloseReason::EventPoolExhausted;
+                    failureReason = Rio::CloseReason::EventPoolExhausted;
+                }
+                else
+                {
+                    // Alloc 직후 명시적 초기화 수행 (타입: Receive, 소유자: this 세션)
+                    rioEvent->Initialize(Rio::EventType::Receive, GetRioObjectPtr());
+
+                    // 이어서 버퍼 바인딩 수행
+                    if( !rioEvent->BindBufferSlot(bufferPool, slotIndex) )
+                    {
+                        eventPool->Free(rioEvent);
+                        bufferPool->FreeSlot(slotIndex);
+                        slotIndex = Rio::kInvalidSlotIndex;
+                        rioEvent = nullptr;
+                        failureReason = Rio::CloseReason::InternalError;
+                    }
                 }
             }
         }
 
-        if( failureReason != CloseReason::None )
+        if( failureReason != Rio::CloseReason::None )
         {
             // 실패 시 실제 I/O는 제출되지 않았으므로 여기서는 OutstandingIo를 증가시키지 않습니다.
         }
@@ -268,13 +297,13 @@ bool CRioSession::PostReceiveInternal() noexcept
                 // submit 실패 정리를 담당합니다.
                 DecrementIoCountNoLock();
 
-                failureReason = CloseReason::ReceivePostFailed;
+                failureReason = Rio::CloseReason::ReceivePostFailed;
             }
         }
     }
 
     // 락 외부에서 실패 사유 처리 (자기 자신 데드락 원천 방지)
-    if( failureReason != CloseReason::None )
+    if( failureReason != Rio::CloseReason::None )
     {
         Close(failureReason);
         return false;
@@ -306,14 +335,14 @@ void CRioSession::Dispatch(
     if( rioEvent == nullptr )
     {
         DecrementIoCountNoLock();
-        Close(CloseReason::InternalError);
+        Close(Rio::CloseReason::InternalError);
         return;
     }
 
     if( status != 0 )
     {
         DecrementIoCountNoLock();
-        Close(CloseReason::SocketError);
+        Close(Rio::CloseReason::SocketError);
         return;
     }
 
@@ -340,7 +369,7 @@ void CRioSession::OnReceiveCompleted(
 {
     if( rioEvent == nullptr )
     {
-        Close(CloseReason::InternalError);
+        Close(Rio::CloseReason::InternalError);
         return;
     }
 
@@ -348,7 +377,7 @@ void CRioSession::OnReceiveCompleted(
 
     if( bindings.empty() )
     {
-        Close(CloseReason::InternalError);
+        Close(Rio::CloseReason::InternalError);
         return;
     }
 
@@ -357,7 +386,7 @@ void CRioSession::OnReceiveCompleted(
 
     if( bufferPool == nullptr )
     {
-        Close(CloseReason::InternalError);
+        Close(Rio::CloseReason::InternalError);
         return;
     }
 
@@ -365,7 +394,7 @@ void CRioSession::OnReceiveCompleted(
     {
         // BufferSlot 반환 및 EventPool 반환은 CRioCore::ProcessRioResult()
         // 에서 completion 처리 후 수행합니다.
-        Close(CloseReason::RemoteClosed);
+        Close(Rio::CloseReason::RemoteClosed);
         return;
     }
 
@@ -373,7 +402,7 @@ void CRioSession::OnReceiveCompleted(
 
     if( slotDataPtr == nullptr )
     {
-        Close(CloseReason::InternalError);
+        Close(Rio::CloseReason::InternalError);
         return;
     }
 
@@ -387,7 +416,7 @@ void CRioSession::OnReceiveCompleted(
 
     if( !enqueueSuccess || enqueuedBytes != static_cast<int64>(bytesTransferred) )
     {
-        Close(CloseReason::RingBufferOverflow);
+        Close(Rio::CloseReason::RingBufferOverflow);
         return;
     }
 
@@ -415,19 +444,19 @@ void CRioSession::ProcessPackets() noexcept
 
         if( !_recvBuffer.Peek(reinterpret_cast<char*>(&header), sizeof(PacketHeader), &peekedSize, false) )
         {
-            Close(CloseReason::InternalError);
+            Close(Rio::CloseReason::InternalError);
             break;
         }
 
         if( peekedSize != static_cast<int64>(sizeof(PacketHeader)) )
         {
-            Close(CloseReason::InternalError);
+            Close(Rio::CloseReason::InternalError);
             break;
         }
 
-        if( header.size < sizeof(PacketHeader) || header.size > kMaxPacketSize )
+        if( header.size < sizeof(PacketHeader) || header.size > Rio::kMaxPacketSize )
         {
-            Close(CloseReason::InvalidPacketHeader);
+            Close(Rio::CloseReason::InvalidPacketHeader);
             break;
         }
 
@@ -435,7 +464,7 @@ void CRioSession::ProcessPackets() noexcept
 
         if( !_recvBuffer.MoveReadBuffer(sizeof(PacketHeader)) )
         {
-            Close(CloseReason::InternalError);
+            Close(Rio::CloseReason::InternalError);
             break;
         }
 
@@ -454,7 +483,7 @@ void CRioSession::ProcessPackets() noexcept
 
             if( !dequeueSuccess || dequeuedSize != static_cast<int64>(payloadSize) )
             {
-                Close(CloseReason::InternalError);
+                Close(Rio::CloseReason::InternalError);
                 break;
             }
         }
@@ -481,11 +510,11 @@ bool CRioSession::Send(const void* data, uint16_t size) noexcept
     bool enqueueFailed = false;
 
     {
-        PRWriteLockGuard lockGuard(_sendLock, "CRioSession_Send");
+        PRWriteLockGuard lockGuard(_sendLock, __FUNCTION__);
 
         // 최초 IsActive() 검사 이후 Close()가 발생했을 수 있으므로
         // 실제 queue 삽입 직전에 한 번 더 상태를 확인합니다.
-        if( _state.load(std::memory_order_acquire) != SessionState::Active ) return false;
+        if( _state.load(std::memory_order_acquire) != Rio::SessionState::Active ) return false;
 
         int64 enqueuedBytes = 0;
 
@@ -515,7 +544,7 @@ bool CRioSession::Send(const void* data, uint16_t size) noexcept
     // OnDisconnected()가 Send()를 호출하는 경우의 재진입 deadlock을 방지합니다.
     if( enqueueFailed )
     {
-        Close(CloseReason::SendBufferOverflow);
+        Close(Rio::CloseReason::SendBufferOverflow);
         return false;
     }
 
@@ -524,7 +553,7 @@ bool CRioSession::Send(const void* data, uint16_t size) noexcept
     // 락 외부에서 실제 RIO 전송 제출 수행
     if( !FlushSendInternal() )
     {
-        PRWriteLockGuard lockGuard(_sendLock, "CRioSession_Send_Fail");
+        PRWriteLockGuard lockGuard(_sendLock, __FUNCTION__);
         _isSending = false;
         return false;
     }
@@ -538,7 +567,7 @@ bool CRioSession::Send(const void* data, uint16_t size) noexcept
 //***************************************************************************
 bool CRioSession::FlushSendInternal() noexcept
 {
-    CloseReason failureReason = CloseReason::None;
+    Rio::CloseReason failureReason = Rio::CloseReason::None;
 
     CRioEvent* rioEvent = nullptr;
 
@@ -552,9 +581,9 @@ bool CRioSession::FlushSendInternal() noexcept
         // 실제 SendEx() submit까지 _ioSubmitLock을 유지합니다.
         // 이로 인해 FinalizeClose()가 submit 중간에 socket/RQ를
         // 무효화하는 race를 방지합니다.
-        PLockGuard guard(_ioSubmitLock, "CRioSession_FlushSendInternal");
+        PLockGuard guard(_ioSubmitLock, __FUNCTION__);
 
-        if( _state.load(std::memory_order_acquire) != SessionState::Active ) return false;
+        if( _state.load(std::memory_order_acquire) != Rio::SessionState::Active ) return false;
 
         core = _core;
         requestQueue = _requestQueue.load(std::memory_order_acquire);
@@ -562,13 +591,13 @@ bool CRioSession::FlushSendInternal() noexcept
         if( core == nullptr || requestQueue == RIO_INVALID_RQ ) return false;
 
         {
-            PRReadLockGuard sendReadGuard(_sendLock, "CRioSession_FlushSendInternal_SendLock");
+            PRReadLockGuard sendReadGuard(_sendLock, __FUNCTION__);
             bufferCount = _sendBuffer.GetRioSendBuffers(rioBufs, _sendBufferId);
         }
 
         if( bufferCount <= 0 )
         {
-            PRWriteLockGuard sendWriteGuard(_sendLock, "CRioSession_FlushSendInternal_ResetSending");
+            PRWriteLockGuard sendWriteGuard(_sendLock, __FUNCTION__);
             _isSending = false;
             return true;
         }
@@ -577,15 +606,23 @@ bool CRioSession::FlushSendInternal() noexcept
 
         if( eventPool == nullptr )
         {
-            failureReason = CloseReason::InternalError;
+            failureReason = Rio::CloseReason::InternalError;
         }
         else
         {
             rioEvent = eventPool->Alloc();
-            if( rioEvent == nullptr ) failureReason = CloseReason::EventPoolExhausted;
+            if( rioEvent == nullptr )
+            {
+                failureReason = Rio::CloseReason::EventPoolExhausted;
+            }
+            else
+            {
+                // Alloc 직후 명시적 초기화 수행 (타입: Send, 소유자: this 세션)
+                rioEvent->Initialize(Rio::EventType::Send, GetRioObjectPtr());
+            }
         }
 
-        if( failureReason != CloseReason::None )
+        if( failureReason != Rio::CloseReason::None )
         {
             // event/buffer가 이미 할당된 경우 여기서 정리해야 합니다.
             // eventPool::Alloc 이후 실패 경로는 현재 Alloc 성공 상태이므로
@@ -625,11 +662,11 @@ bool CRioSession::FlushSendInternal() noexcept
             // 정리를 수행하도록 책임을 유지합니다.
             DecrementIoCountNoLock();
 
-            failureReason = CloseReason::SendPostFailed;
+            failureReason = Rio::CloseReason::SendPostFailed;
         }
     }
 
-    if( failureReason != CloseReason::None )
+    if( failureReason != Rio::CloseReason::None )
     {
         Close(failureReason);
         return false;
@@ -643,13 +680,11 @@ bool CRioSession::FlushSendInternal() noexcept
 // @param rioEvent 완료된 송신 RIO 이벤트 포인터
 // @param bytesTransferred 전송된 바이트 수
 //***************************************************************************
-void CRioSession::OnSendCompleted(
-    CRioEvent* rioEvent,
-    DWORD bytesTransferred) noexcept
+void CRioSession::OnSendCompleted(CRioEvent* rioEvent, DWORD bytesTransferred) noexcept
 {
     if( rioEvent == nullptr )
     {
-        Close(CloseReason::InternalError);
+        Close(Rio::CloseReason::InternalError);
         return;
     }
 
@@ -657,7 +692,7 @@ void CRioSession::OnSendCompleted(
     bool invalidCompletion = false;
 
     {
-        PRWriteLockGuard lockGuard(_sendLock, "CRioSession_OnSendCompleted");
+        PRWriteLockGuard lockGuard(_sendLock, __FUNCTION__);
 
         const int64 currentQueuedBytes = _sendBuffer.GetSizeUsed();
 
@@ -696,13 +731,13 @@ void CRioSession::OnSendCompleted(
 
     if( invalidCompletion )
     {
-        Close(CloseReason::InternalError);
+        Close(Rio::CloseReason::InternalError);
         return;
     }
 
     if( needFlush && !FlushSendInternal() )
     {
-        PRWriteLockGuard lockGuard(_sendLock, "CRioSession_OnSendCompleted_Fail");
+        PRWriteLockGuard lockGuard(_sendLock, __FUNCTION__);
         _isSending = false;
     }
 }

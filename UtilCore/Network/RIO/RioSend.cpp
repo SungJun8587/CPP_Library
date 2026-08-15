@@ -121,7 +121,7 @@ bool CRioSend::Send(
 
     try
     {
-        ownerRef = owner->shared_from_this();
+        ownerRef = owner->GetRioObjectPtr();
     }
     catch( ... )
     {
@@ -178,7 +178,7 @@ bool CRioSend::Send(
 // @param requestQueue RIO 요청 큐 핸들
 // @param data 전송할 RIO_BUF 배열
 // @param dataBufferCount 데이터 버퍼 개수
-// @param dataBindings 각 데이터 버퍼에 대한 바인딩 정보 배열
+// @param dataBindings 각 데이터 버퍼에 대한 바인딩 정보 배열 (nullptr 허용: 사전 등록 버퍼 등)
 // @param localAddress 로컬 주소 RIO_BUF (선택 사항)
 // @param remoteAddress 원격 주소 RIO_BUF (선택 사항)
 // @param control 제어 데이터 RIO_BUF (선택 사항)
@@ -200,7 +200,7 @@ bool CRioSend::SendEx(
     CRioObject* owner,
     DWORD flags) noexcept
 {
-    if( requestQueue == RIO_INVALID_RQ || data == nullptr || dataBufferCount == 0 || dataBindings == nullptr )
+    if( requestQueue == RIO_INVALID_RQ || data == nullptr || dataBufferCount == 0 )
     {
         return false;
     }
@@ -214,7 +214,7 @@ bool CRioSend::SendEx(
 
     try
     {
-        ownerRef = owner->shared_from_this();
+        ownerRef = owner->GetRioObjectPtr();
     }
     catch( ... )
     {
@@ -233,28 +233,42 @@ bool CRioSend::SendEx(
 
     rioEvent->Initialize(Rio::EventType::Send, ownerRef);
 
-    for( ULONG i = 0; i < dataBufferCount; ++i )
+    if( dataBindings != nullptr )
     {
-        const CRioEvent::BufferBinding& binding = dataBindings[i];
-
-        if( binding.buffer == nullptr || binding.slotIndex == Rio::kInvalidSlotIndex )
+        for( ULONG i = 0; i < dataBufferCount; ++i )
         {
-            RollbackSubmission(core, rioEvent, owner);
-            return false;
+            const CRioEvent::BufferBinding& binding = dataBindings[i];
+
+            if( binding.buffer == nullptr || binding.slotIndex == Rio::kInvalidSlotIndex )
+            {
+                RollbackSubmission(core, rioEvent, owner);
+                return false;
+            }
+
+            if( data[i].BufferId == RIO_INVALID_BUFFERID || data[i].Length == 0 )
+            {
+                binding.buffer->FreeSlot(binding.slotIndex);
+                RollbackSubmission(core, rioEvent, owner);
+                return false;
+            }
+
+            if( !rioEvent->BindBufferSlot(binding.buffer, binding.slotIndex) )
+            {
+                binding.buffer->FreeSlot(binding.slotIndex);
+                RollbackSubmission(core, rioEvent, owner);
+                return false;
+            }
         }
-
-        if( data[i].BufferId == RIO_INVALID_BUFFERID || data[i].Length == 0 )
+    }
+    else
+    {
+        for( ULONG i = 0; i < dataBufferCount; ++i )
         {
-            binding.buffer->FreeSlot(binding.slotIndex);
-            RollbackSubmission(core, rioEvent, owner);
-            return false;
-        }
-
-        if( !rioEvent->BindBufferSlot(binding.buffer, binding.slotIndex) )
-        {
-            binding.buffer->FreeSlot(binding.slotIndex);
-            RollbackSubmission(core, rioEvent, owner);
-            return false;
+            if( data[i].BufferId == RIO_INVALID_BUFFERID || data[i].Length == 0 )
+            {
+                RollbackSubmission(core, rioEvent, owner);
+                return false;
+            }
         }
     }
 

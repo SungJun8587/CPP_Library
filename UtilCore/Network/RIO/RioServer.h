@@ -55,7 +55,7 @@ public:
     bool Start(uint16_t port, uint32_t maxSessions);
     void Stop();
 
-    virtual std::shared_ptr<CRioSession> CreateSession() = 0;
+    virtual CRioSessionRef CreateSession() = 0;
 
     CRioSessionManager& GetSessionManager() noexcept { return _sessionManager; }
     CRioCore& GetCore() noexcept { return _rioCore; }

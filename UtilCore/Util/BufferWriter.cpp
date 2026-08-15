@@ -38,7 +38,7 @@ CBufferWriter::~CBufferWriter()
 // @param len 기록할 바이트 크기
 // @return 성공 여부 (여유 공간이 부족하면 false)
 //***************************************************************************
-bool CBufferWriter::Write(void* src, uint32 len)
+bool CBufferWriter::Write(const void* src, uint32 len)
 {
 	if( FreeSize() < len )
 		return false;

@@ -7,12 +7,25 @@
 #ifndef __IOCPCOMMON_H__
 #define __IOCPCOMMON_H__
 
-#ifndef __BASEREDEFINEDATATYPE_H__
-#include <BaseRedefineDataType.h>
-#endif
+#pragma once
 
 namespace Iocp
 {
+    //***************************************************************************
+    // @enum EventType
+    // @brief IocpEvent가 어떤 종류의 비동기 I/O인지 식별하는 열거형.
+    // @details
+    // Session::Dispatch에서 switch문으로 분기해 적절한 Process 함수를 호출합니다.
+    //***************************************************************************
+    enum class EventType : uint8
+    {
+        Connect,        // ConnectEx 완료 (클라이언트 → 서버 연결 성공)
+        Disconnect,     // DisconnectEx 완료 (연결 종료 및 소켓 초기화 완료)
+        Accept,         // AcceptEx 완료 (서버 → 클라이언트 연결 수락)
+        Recv,           // WSARecv 완료 (데이터 수신)
+        Send,           // WSASend 완료 (데이터 전송)
+    };
+
     //***************************************************************************
     // @brief 기본 네트워크 수신 버퍼 크기 (10KB / 10,240 Byte).
     // @details
@@ -37,19 +50,19 @@ namespace Iocp
     static constexpr ULONG kBatchSize = 64;
 
     //***************************************************************************
-    // @enum EventType
-    // @brief IocpEvent가 어떤 종류의 비동기 I/O인지 식별하는 열거형.
+    // @brief 세션 매니저에서 락 경합을 최소화하기 위해 분산 처리할 클러스터 개수.
     // @details
-    // Session::Dispatch에서 switch문으로 분기해 적절한 Process 함수를 호출합니다.
+    // [클러스터 개수 최적화 가이드 및 선정 이유]
+    // - 2의 제곱수 최적화: 16은 2의 제곱수($2^4$)이므로, 내부 해시 인덱스 연산(key % kSessionClusterCnt) 시 
+    //   컴파일러가 느린 나눗셈 대신 매우 빠른 비트 연산(key & (kSessionClusterCnt - 1))으로 자동 최적화합니다.
+    // - 락 경합 대폭 완화: 단일 락 구조 대비 동시 접근 시 충돌 확률을 1/16 수준으로 줄여줍니다.
+    // - 코어 구조와의 조화: 일반적인 8~16코어(하이퍼스레딩 포함 16~32스레드) 상용 서버 환경에서 
+    //   워커 스레드들이 서로 다른 락을 참조할 확률을 높여 병목을 효과적으로 해소합니다.
+    // [예시]
+    //		- 대규모 하이엔드 서버 환경(32코어 이상, 수천 명 동접)의 경우 클러스터 개수를 32 또는 64로 늘려 부하를 분산하는 것을 권장
+    //		- 소규모 서버 또는 테스트 환경(2 ~ 4코어)의 경우 클러스터 개수를 8 또는 16
     //***************************************************************************
-    enum class EventType : uint8
-    {
-        Connect,        // ConnectEx 완료 (클라이언트 → 서버 연결 성공)
-        Disconnect,     // DisconnectEx 완료 (연결 종료 및 소켓 초기화 완료)
-        Accept,         // AcceptEx 완료 (서버 → 클라이언트 연결 수락)
-        Recv,           // WSARecv 완료 (데이터 수신)
-        Send,           // WSASend 완료 (데이터 전송)
-    };
+    static constexpr int32 kSessionClusterCnt = 16;
 }
 
 #endif // ndef __IOCPCOMMON_H__

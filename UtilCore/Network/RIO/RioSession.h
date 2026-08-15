@@ -1,4 +1,5 @@
-﻿//***************************************************************************
+﻿
+//***************************************************************************
 // RioSession.h : interface for the CRioSession class.
 //
 //***************************************************************************
@@ -49,45 +50,11 @@ struct PacketHeader
 };
 #pragma pack(pop)
 
-constexpr uint16_t kMaxPacketSize = 8192; // 최대 패킷 크기 (8KB)
-
-//***************************************************************************
-// @enum SessionState
-// @brief 세션 라이프사이클 상태 머신 열거형
-//***************************************************************************
-enum class SessionState : uint8_t
-{
-    Created,
-    Active,
-    Closing,
-    Closed
-};
-
-//***************************************************************************
-// @enum CloseReason
-// @brief 세션 종료 원인을 나타내는 열거형
-//***************************************************************************
-enum class CloseReason
-{
-    None,
-    RemoteClosed,           // 상대방 연결 정상 종료
-    SocketError,            // 소켓 네트워크 에러
-    BufferAllocationFailed, // RIO 버퍼 슬롯 할당 실패
-    EventPoolExhausted,     // RIO 이벤트 풀 고갈
-    ReceivePostFailed,      // Receive 요청 실패
-    SendPostFailed,         // Send 요청 실패
-    RingBufferOverflow,     // 수신 링버퍼 오버플로우
-    SendBufferOverflow,     // 송신 링버퍼 오버플로우
-    InvalidPacketHeader,    // 비정상 패킷 헤더
-    InternalError,          // 기타 내부 처리 에러
-    ForcedClose             // 서버 측 강제 종료
-};
-
 //***************************************************************************
 // @class CRioSession
 // @brief RIO(Registered I/O) 및 CRingBuffer 기반의 고성능 네트워크 세션 클래스
 //***************************************************************************
-class CRioSession : public CRioObject, public std::enable_shared_from_this<CRioSession>
+class CRioSession : public CSession, public CRioObject
 {
 public:
     CRioSession();
@@ -96,17 +63,26 @@ public:
     CRioSession(const CRioSession&) = delete;
     CRioSession& operator=(const CRioSession&) = delete;
 
+    // CRioObject의 순수 가상 함수 구현
+    virtual CRioObjectRef GetRioObjectPtr() override
+    {
+        // CSession의 shared_from_this()를 CRioObject* 타입의 shared_ptr로 안전하게 변환
+        return CRioObjectRef(shared_from_this(), static_cast<CRioObject*>(this));
+    }
+
 public:
     void Init(uint64_t sessionId, CRioCore* core, CRioBuffer* globalRecvBufferPool, SOCKET socket, RIO_RQ requestQueue, RIO_BUFFERID sendBufferId) noexcept;
-    void Close(CloseReason reason) noexcept;
+    void Close(Rio::CloseReason reason) noexcept;
 
     //***************************************************************************
     // @brief 강제 종료 사유로 세션을 종료합니다.
     //***************************************************************************
-    void Close() noexcept { Close(CloseReason::ForcedClose); }
+    void Close() noexcept { Close(Rio::CloseReason::ForcedClose); }
 
     bool PostInitialReceive() noexcept;
     bool Send(const void* data, uint16_t size) noexcept;
+
+    void Disconnect(const TCHAR* cause);
 
     virtual void Dispatch(CRioEvent* rioEvent, ULONG bytesTransferred, LONG status) override;
 
@@ -140,7 +116,7 @@ public:
     // @brief 세션 종료 사유를 반환합니다.
     // @return CloseReason 세션 종료 사유
     //***************************************************************************
-    CloseReason GetCloseReason() const noexcept { return _closeReason.load(std::memory_order_acquire); }
+    Rio::CloseReason GetCloseReason() const noexcept { return _closeReason.load(std::memory_order_acquire); }
 
     //***************************************************************************
     // @brief RIO Core 엔진 객체 포인터를 반환합니다.
@@ -152,23 +128,23 @@ public:
     // @brief 세션이 종료 진행 중인지 여부를 반환합니다.
     // @return bool 종료 진행 중인 경우 true, 아니면 false
     //***************************************************************************
-    bool IsClosing() const noexcept { return _state.load(std::memory_order_acquire) == SessionState::Closing; }
+    bool IsClosing() const noexcept { return _state.load(std::memory_order_acquire) == Rio::SessionState::Closing; }
 
     //***************************************************************************
     // @brief 세션이 완전히 닫혔는지 여부를 반환합니다.
     // @return bool 닫힌 상태인 경우 true, 아니면 false
     //***************************************************************************
-    bool IsClosed() const noexcept { return _state.load(std::memory_order_acquire) == SessionState::Closed; }
+    bool IsClosed() const noexcept { return _state.load(std::memory_order_acquire) == Rio::SessionState::Closed; }
 
     //***************************************************************************
     // @brief 세션이 정상적으로 활성화되어 통신 가능한 상태인지 여부를 반환합니다.
     // @return bool 활성 상태인 경우 true, 아니면 false
     //***************************************************************************
-    bool IsActive() const noexcept { return _state.load(std::memory_order_acquire) == SessionState::Active; }
+    bool IsActive() const noexcept { return _state.load(std::memory_order_acquire) == Rio::SessionState::Active; }
 
 protected:
     virtual void OnConnected() {}
-    virtual void OnDisconnected(CloseReason reason) {}
+    virtual void OnDisconnected(Rio::CloseReason reason) {}
     virtual void OnPacketReceived(const PacketHeader& header, const char* payload, uint16_t payloadSize) = 0;
 
 private:
@@ -198,16 +174,17 @@ private:
     // Active 상태에서 RIO submit을 시작한 경우 실제 submit 완료까지 유지됩니다.
     mutable PLock _ioSubmitLock;                        // I/O 제출 및 상태 전이 동기화 게이트 락
 
-    std::atomic<SessionState> _state{ SessionState::Created };      // 세션 상태 머신 변수
-    std::atomic<uint32_t> _outstandingIo{ 0 };          // 진행 중인 Outstanding I/O 카운터
-    std::atomic<CloseReason> _closeReason{ CloseReason::None };     // 세션 종료 사유
+    std::atomic<Rio::SessionState> _state{ Rio::SessionState::Created };        // 세션 상태 머신 변수
+    std::atomic<uint32_t> _outstandingIo{ 0 };                                  // 진행 중인 Outstanding I/O 카운터
+    std::atomic<Rio::CloseReason> _closeReason{ Rio::CloseReason::None };       // 세션 종료 사유
 
-    PRWLock _sendLock;                                  // 송신 동기화 RW 락
-    CRingBuffer _sendBuffer{ 65536 };                   // 64KB 송신 링버퍼
-    bool _isSending{ false };                           // 전송 진행 여부 플래그
+    PRWLock _sendLock;                                      // 송신 동기화 RW 락
+    bool _isSending{ false };                               // 전송 진행 여부 플래그
 
-    CRingBuffer _recvBuffer{ 65536 };                   // 64KB 수신 링버퍼
-    char _packetPayloadBuffer[kMaxPacketSize]{};        // 패킷 페이로드 임시 추출 버퍼
+    CRingBuffer _sendBuffer{ Rio::kSendRingBufferSize };    // 64KB 송신 링버퍼
+    CRingBuffer _recvBuffer{ Rio::kRecvRingBufferSize };    // 64KB 수신 링버퍼
+    
+    char _packetPayloadBuffer[Rio::kMaxPacketSize]{};       // 패킷 페이로드 임시 추출 버퍼
 };
 
 #endif // ndef __RIOSESSION_H__

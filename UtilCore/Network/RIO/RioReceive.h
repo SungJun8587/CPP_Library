@@ -66,7 +66,7 @@ public:
         RIO_RQ requestQueue,
         const RIO_BUF* data,
         ULONG dataBufferCount,
-        const CRioEvent::BufferBinding* dataBinding,
+        const CRioEvent::BufferBinding* dataBindings,
         const RIO_BUF* localAddress,
         const RIO_BUF* remoteAddress,
         const RIO_BUF* control,

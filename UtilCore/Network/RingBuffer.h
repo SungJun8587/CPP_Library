@@ -95,7 +95,7 @@ public:
 	{
 		if( _write >= _read )
 		{
-			return _end - _write;
+			return (_read == _begin) ? (_end - _write - 1) : (_end - _write);
 		}
 		return _read - _write - 1;
 	}
@@ -113,67 +113,15 @@ public:
 		return _end - _read;
 	}
 
-	//***************************************************************************
-	// @brief 링버퍼에 데이터를 씁니다.
-	// @param data 쓸 데이터가 위치한 버퍼 포인터
-	// @param requestSize 쓰기 요청 크기 (바이트)
-	// @param outEnqueueSize [out] 실제로 쓰여진 바이트 수가 저장될 변수 포인터
-	// @param isPartialEnqueueAvailable 부분 쓰기 허용 여부 (true인 경우 여유 공간만큼만 쓰고 성공 처리)
-	// @return true: 쓰기 성공, false: 공간 부족 및 실패
-	// @note data == nullptr 이면서 requestSize > 0 인 경우 실제로는 아무것도
-	//       쓰지 않고 outEnqueueSize에 0을 채운 채 true를 반환합니다.
-	//***************************************************************************
 	bool Enqueue(const char* data, int64 requestSize, int64* outEnqueueSize, bool isPartialEnqueueAvailable = false);
-
-	//***************************************************************************
-	// @brief 링버퍼에서 데이터를 읽고 커서를 이동합니다.
-	// @param outData 데이터를 복사받을 버퍼 포인터
-	// @param requestSize 읽기 요청 크기 (바이트)
-	// @param outDequeueSize [out] 실제로 읽혀진 바이트 수가 저장될 변수 포인터
-	// @param isPartialDequeueAvailable 부분 읽기 허용 여부
-	// @param isPeekMode 읽기 전용 모드 여부 (true인 경우 읽은 후 읽기 커서를 이동하지 않음)
-	// @return true: 읽기 성공, false: 데이터 부족 및 실패
-	//***************************************************************************
 	bool Dequeue(char* outData, int64 requestSize, int64* outDequeueSize, bool isPartialDequeueAvailable = true, bool isPeekMode = false);
 
-	//***************************************************************************
-	// @brief 링버퍼에서 데이터를 읽기 커서 이동 없이 복사합니다 (Peek).
-	// @param outData 데이터를 복사받을 버퍼 포인터
-	// @param requestSize 확인 요청 크기 (바이트)
-	// @param outPeekSize [out] 실제로 복사된 바이트 수가 저장될 변수 포인터
-	// @param isPartialPeekAvailable 부분 확인 허용 여부
-	// @return true: 성공, false: 실패
-	//***************************************************************************
 	bool Peek(char* outData, int64 requestSize, int64* outPeekSize, bool isPartialPeekAvailable = true);
 
-	//***************************************************************************
-	// @brief IOCP WSARecv를 위한 쓰기 가능 영역 WSABUF 배열을 생성합니다 (최대 2개 청크).
-	// @param outBuffers [out] 크기 2인 WSABUF 배열 (참조로 받아 컴파일 타임 크기 강제)
-	// @return 생성된 청크 개수 (0 ~ 2)
-	//***************************************************************************
 	int GetWSARecvBuffers(WSABUF(&outBuffers)[2]) const;
-
-	//***************************************************************************
-	// @brief IOCP WSASend를 위한 읽기 가능 영역 WSABUF 배열을 생성합니다 (최대 2개 청크).
-	// @param outBuffers [out] 크기 2인 WSABUF 배열 (참조로 받아 컴파일 타임 크기 강제)
-	// @return 생성된 청크 개수 (0 ~ 2)
-	//***************************************************************************
 	int GetWSASendBuffers(WSABUF(&outBuffers)[2]) const;
 
-	//***************************************************************************
-	// @brief RIO RIOSend를 위한 읽기 가능 영역 RIO_BUF 배열을 생성합니다 (최대 2개 청크).
-	// @param outBuffers [out] 크기 2인 RIO_BUF 배열 (참조로 받아 컴파일 타임 크기 강제)
-	// @param bufferId RIO 등록 버퍼 식별자 (RIORegisterBuffer로 발급받은 RIO_BUFFERID)
-	// @return 생성된 청크 개수 (0 ~ 2)
-	//***************************************************************************
 	int GetRioSendBuffers(RIO_BUF(&outBuffers)[2], RIO_BUFFERID bufferId) const;
-
-	//***************************************************************************
-	// @brief RIO RIOReceive를 위한 쓰기 가능 영역 RIO_BUF 배열을 생성합니다 (최대 2개 청크).
-	// @param outBuffers [out] 크기 2인 RIO_BUF 배열 (참조로 받아 컴파일 타임 크기 강제)
-	// @param bufferId RIO 등록 버퍼 식별자 (RIORegisterBuffer로 발급받은 RIO_BUFFERID)
-	// @return 생성된 청크 개수 (0 ~ 2)
-	//***************************************************************************
 	int GetRioRecvBuffers(RIO_BUF(&outBuffers)[2], RIO_BUFFERID bufferId) const;
 
 	//***************************************************************************
@@ -260,7 +208,7 @@ private:
 	// @param value 캐스팅할 int64 크기 값
 	// @return ULONG 타입으로 변환된 값
 	// @note 버퍼 총 용량이 int32 범위 이하로 제한되어 있으나, 방어적 코드로서
-	//       Debug 빌드에서는 assert, Release 빌드에서는 clamp 처리를 수행합니다.
+	//        Debug 빌드에서는 assert, Release 빌드에서는 clamp 처리를 수행합니다.
 	//***************************************************************************
 	static ULONG SafeCastToULong(int64 value)
 	{

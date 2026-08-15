@@ -7,6 +7,8 @@
 #ifndef __WINDOWSSERVICEBASE_H__
 #define __WINDOWSSERVICEBASE_H__
 
+#pragma once
+
 //***************************************************************************
 // @class WindowsServiceBase
 // @brief 윈도우 서비스(Windows Service) 구현을 위한 추상 베이스 클래스.

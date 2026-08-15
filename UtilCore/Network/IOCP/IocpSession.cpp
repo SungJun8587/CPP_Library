@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // IocpSession.cpp: implementation of the CIocpSession class.
 //
@@ -8,16 +8,21 @@
 #include "IocpSession.h"
 
 //***************************************************************************
-// @brief CIocpSession »ı¼ºÀÚ
-// @details ±âº» ¹öÆÛ Å©±â(10240)·Î ¼ö½Å CRingBuffer¸¦ ÃÊ±âÈ­ÇÕ´Ï´Ù.
+// @brief CIocpSession ìƒì„±ì
+// @details ê¸°ë³¸ ë²„í¼ í¬ê¸°(Iocp::BUFFER_SIZE_DEFAULT)ë¡œ ìˆ˜ì‹  CRingBufferë¥¼ ì´ˆê¸°í™”í•©ë‹ˆë‹¤.
 //***************************************************************************
 CIocpSession::CIocpSession() : _recvBuffer(Iocp::BUFFER_SIZE_DEFAULT)
 {
     _socket = CSocketUtils::CreateSocket();
+    if( _socket == INVALID_SOCKET )
+    {
+        // TODO: ë¡œê·¸ ê¸°ë¡ ë“± ì†Œì¼“ ìƒì„± ì‹¤íŒ¨ ì˜ˆì™¸ ì²˜ë¦¬
+        LOG_INFO(_T("CIocpSession::CIocpSession Failed to create socket"));
+    }
 }
 
 //***************************************************************************
-// @brief CIocpSession ¼Ò¸êÀÚ
+// @brief CIocpSession ì†Œë©¸ì
 //***************************************************************************
 CIocpSession::~CIocpSession()
 {
@@ -25,52 +30,55 @@ CIocpSession::~CIocpSession()
 }
 
 //***************************************************************************
-// @brief IOCP Dispatch ÇÔ¼ö ±¸Çö (CIocpObject)
-// @param iocpEvent ¿Ï·á ÅëÁöµÈ IOCP ÀÌº¥Æ®
-// @param numOfBytes Àü¼Û/¼ö½ÅµÈ ¹ÙÀÌÆ® ¼ö
+// @brief IOCP Dispatch í•¨ìˆ˜ êµ¬í˜„ (CIocpObject)
+// @param iocpEvent ì™„ë£Œ í†µì§€ëœ IOCP ì´ë²¤íŠ¸
+// @param numOfBytes ì „ì†¡/ìˆ˜ì‹ ëœ ë°”ì´íŠ¸ ìˆ˜
 //***************************************************************************
 void CIocpSession::Dispatch(CIocpEvent* iocpEvent, int32 numOfBytes)
 {
     switch( iocpEvent->eventType )
     {
-        case Iocp::EventType::Connect:
-            ProcessConnect();
-            break;
+    case Iocp::EventType::Connect:
+        ProcessConnect();
+        break;
 
-        case Iocp::EventType::Disconnect:
-            ProcessDisconnect();
-            break;
+    case Iocp::EventType::Disconnect:
+        ProcessDisconnect();
+        break;
 
-        case Iocp::EventType::Recv:
-            ProcessRecv(numOfBytes);
-            break;
+    case Iocp::EventType::Recv:
+        ProcessRecv(numOfBytes);
+        break;
 
-        case Iocp::EventType::Send:
-            ProcessSend(numOfBytes);
-            break;
+    case Iocp::EventType::Send:
+        ProcessSend(numOfBytes);
+        break;
 
-        default:
-            ASSERT_CRASH(false);
-            break;
+    default:
+        ASSERT_CRASH(false);
+        break;
     }
 }
 
 //***************************************************************************
-// @brief Å¬¶óÀÌ¾ğÆ® ¿¬°á ¼º°ø ÈÄ ÃÊ±âÈ­ ·ÎÁ÷
+// @brief í´ë¼ì´ì–¸íŠ¸ ì—°ê²° ì„±ê³µ í›„ ì´ˆê¸°í™” ë¡œì§
 //***************************************************************************
 void CIocpSession::ProcessConnect()
 {
     _connected.store(true);
 
-    // »óÀ§ ·¹ÀÌ¾î ÀÌº¥Æ® È£Ãâ
+    // ì„¸ì…˜ ì¬ì‚¬ìš©(AcceptEx) ì‹œ ì´ì „ ì—°ê²°ì˜ ì”ì—¬ ë°ì´í„° ì˜¤ì—¼ ë°©ì§€
+    _recvBuffer.Clear();
+
+    // ìƒìœ„ ë ˆì´ì–´ ì´ë²¤íŠ¸ í˜¸ì¶œ
     OnConnected();
 
-    // Ã¹ ºñµ¿±â ¼ö½Å(WSARecv) µî·Ï
+    // ì²« ë¹„ë™ê¸° ìˆ˜ì‹ (WSARecv) ë“±ë¡
     RegisterRecv();
 }
 
 //***************************************************************************
-// @brief ºñµ¿±â µ¥ÀÌÅÍ ¼ö½Å(WSARecv) µî·Ï (CRingBuffer Á¦·ÎÄ«ÇÇ)
+// @brief ë¹„ë™ê¸° ë°ì´í„° ìˆ˜ì‹ (WSARecv) ë“±ë¡ (CRingBuffer ì œë¡œì¹´í”¼)
 //***************************************************************************
 void CIocpSession::RegisterRecv()
 {
@@ -78,15 +86,15 @@ void CIocpSession::RegisterRecv()
         return;
 
     _recvEvent.Init();
-    _recvEvent.owner = shared_from_this(); // I/O ¿Ï·á ½Ã±îÁö ¼ö¸í º¸Àå (Ref +1)
+    _recvEvent.owner = CIocpObject::shared_from_this(); // I/O ì™„ë£Œ ì‹œê¹Œì§€ ìˆ˜ëª… ë³´ì¥ (Ref +1)
 
-    // CRingBuffer¿¡¼­ WSARecv¿¡ Àü´ŞÇÒ ¾²±â °¡´É WSABUF ÃßÃâ (ÃÖ´ë 2°³ Ã»Å©)
+    // CRingBufferì—ì„œ WSARecvì— ì „ë‹¬í•  ì“°ê¸° ê°€ëŠ¥ WSABUF ì¶”ì¶œ (ìµœëŒ€ 2ê°œ ì²­í¬)
     WSABUF wsaBufs[2];
     int32 bufferCount = _recvBuffer.GetWSARecvBuffers(wsaBufs);
 
     if( bufferCount == 0 )
     {
-        // ¸µ¹öÆÛ °ø°£ ºÎÁ· (Overflow)
+        // ë§ë²„í¼ ê³µê°„ ë¶€ì¡± (Overflow)
         _recvEvent.owner = nullptr;
         Disconnect(L"RecvBuffer Full (GetWSARecvBuffers returned 0)");
         return;
@@ -107,8 +115,11 @@ void CIocpSession::RegisterRecv()
 }
 
 //***************************************************************************
-// @brief ¼ö½Å ¿Ï·á Ã³¸® (WSARecv ¿Ï·á ÅëÁö ½Ã È£Ãâ)
-// @param numOfBytes ¼ö½ÅµÈ µ¥ÀÌÅÍ ¹ÙÀÌÆ® ¼ö (0ÀÎ °æ¿ì Á¤»ó ¿¬°á ²÷±è)
+// @brief ìˆ˜ì‹  ì™„ë£Œ ì²˜ë¦¬ (WSARecv ì™„ë£Œ í†µì§€ ì‹œ í˜¸ì¶œ)
+// @param numOfBytes ìˆ˜ì‹ ëœ ë°ì´í„° ë°”ì´íŠ¸ ìˆ˜ (0ì¸ ê²½ìš° ì •ìƒ ì—°ê²° ëŠê¹€)
+// @note ë§ë²„í¼ ê²½ê³„ ë˜í•‘(Wrap-around)ìœ¼ë¡œ ì¸í•œ ë©”ëª¨ë¦¬ ì¹¨ë²” ë°©ì§€ë¥¼ ìœ„í•´
+//       GetSizeDirectDequeueAble() í¬ê¸°ë§Œ OnRecvë¡œ ì „ë‹¬í•˜ë©°, 
+//       ëˆ„ì ëœ ëª¨ë“  íŒ¨í‚·ì„ ì†Œì§„í•  ë•Œê¹Œì§€ while ë£¨í”„ë¥¼ ìˆœíšŒí•©ë‹ˆë‹¤.
 //***************************************************************************
 void CIocpSession::ProcessRecv(int32 numOfBytes)
 {
@@ -119,7 +130,7 @@ void CIocpSession::ProcessRecv(int32 numOfBytes)
         return;
     }
 
-    // 1. ¸µ¹öÆÛ ¾²±â Ä¿¼­ ¼ö½ÅµÈ ¹ÙÀÌÆ® ¼ö¸¸Å­ ÀÌµ¿
+    // 1. ë§ë²„í¼ ì“°ê¸° ì»¤ì„œ ìˆ˜ì‹ ëœ ë°”ì´íŠ¸ ìˆ˜ë§Œí¼ ì´ë™
     if( _recvBuffer.MoveWriteBuffer(numOfBytes) == false )
     {
         _recvEvent.owner = nullptr;
@@ -127,23 +138,32 @@ void CIocpSession::ProcessRecv(int32 numOfBytes)
         return;
     }
 
-    // 2. ¼ö½ÅµÈ µ¥ÀÌÅÍ Å©±â È®ÀÎ ÈÄ ÄÜÅÙÃ÷ ·¹ÀÌ¾î·Î µ¥ÀÌÅÍ Àü´Ş
-    int64 dataSize = _recvBuffer.GetSizeUsed();
-    if( dataSize > 0 )
+    // 2. ìˆ˜ì‹  ë²„í¼ ì²˜ë¦¬ ë£¨í”„ (ëˆ„ì ëœ íŒ¨í‚· ì†Œì§„)
+    while( true )
     {
-        // ¸µ¹öÆÛ ¿¬¼Ó ¸Ş¸ğ¸® ¿µ¿ªÀÇ ÀĞ±â Æ÷ÀÎÅÍ ÃßÃâ
+        int64 dataSize = _recvBuffer.GetSizeUsed();
+        if( dataSize <= 0 )
+            break;
+
+        // ê²½ê³„ ë˜í•‘(Wrap-around) ì˜¤ë²„ëŸ° ë°©ì§€: ì—°ì† ë©”ëª¨ë¦¬ ì²­í¬ í¬ê¸° ì „ë‹¬
+        int64 directSize = _recvBuffer.GetSizeDirectDequeueAble();
         BYTE* readPos = reinterpret_cast<BYTE*>(_recvBuffer.GetReadBuffer());
 
-        // ÄÜÅÙÃ÷ ·¹ÀÌ¾î·Î µ¥ÀÌÅÍ Àü´Ş (Ã³¸®ÇÑ ÆĞÅ¶ ±æÀÌ ¹İÈ¯¹ŞÀ½)
-        int32 processLen = OnRecv(readPos, static_cast<int32>(dataSize));
-        if( processLen < 0 || dataSize < processLen )
+        // ì½˜í…ì¸  ë ˆì´ì–´ë¡œ ë°ì´í„° ì „ë‹¬
+        int32 processLen = OnRecv(readPos, static_cast<int32>(directSize));
+
+        if( processLen < 0 || directSize < processLen )
         {
             _recvEvent.owner = nullptr;
             Disconnect(L"OnRecv Process Length Error");
             return;
         }
 
-        // Ã³¸®ÇÑ ¹ÙÀÌÆ® ¼ö¸¸Å­ ÀĞ±â Ä¿¼­ ÀÌµ¿
+        // ì™„ì„±ëœ íŒ¨í‚·ì´ ì—†ì–´ì„œ ë” ì´ìƒ ì²˜ë¦¬ë¥¼ ì§„í–‰í•  ìˆ˜ ì—†ëŠ” ê²½ìš° ë£¨í”„ íƒˆì¶œ
+        if( processLen == 0 )
+            break;
+
+        // ì²˜ë¦¬í•œ ë°”ì´íŠ¸ ìˆ˜ë§Œí¼ ì½ê¸° ì»¤ì„œ ì´ë™
         if( _recvBuffer.MoveReadBuffer(processLen) == false )
         {
             _recvEvent.owner = nullptr;
@@ -152,15 +172,15 @@ void CIocpSession::ProcessRecv(int32 numOfBytes)
         }
     }
 
-    _recvEvent.owner = nullptr; // OnRecv Ã³¸® ¿Ï·á ÈÄ ¼ö¸í ÇØÁ¦
+    _recvEvent.owner = nullptr; // OnRecv ì²˜ë¦¬ ì™„ë£Œ í›„ ìˆ˜ëª… í•´ì œ
 
-    // ´ÙÀ½ µ¥ÀÌÅÍ ¼ö½Å ´ë±â
+    // ë‹¤ìŒ ë°ì´í„° ìˆ˜ì‹  ëŒ€ê¸°
     RegisterRecv();
 }
 
 //***************************************************************************
-// @brief ÆĞÅ¶ Àü¼Û ¿äÃ» (Thread-safe)
-// @param sendBuffer Àü¼ÛÇÒ ÆĞÅ¶ ¹öÆÛ
+// @brief íŒ¨í‚· ì „ì†¡ ìš”ì²­ (Thread-safe)
+// @param sendBuffer ì „ì†¡í•  íŒ¨í‚· ë²„í¼
 //***************************************************************************
 void CIocpSession::Send(CSendBufferRef sendBuffer)
 {
@@ -173,7 +193,7 @@ void CIocpSession::Send(CSendBufferRef sendBuffer)
         std::lock_guard<std::mutex> guard(_lock);
         _sendQueue.push_back(sendBuffer);
 
-        // ÇöÀç ÁøÇà ÁßÀÎ WSASend°¡ ¾ø´Ù¸é µî·Ï ¼öÇà
+        // í˜„ì¬ ì§„í–‰ ì¤‘ì¸ WSASendê°€ ì—†ë‹¤ë©´ ë“±ë¡ ìˆ˜í–‰
         if( _sendRegistered.exchange(true) == false )
         {
             registerSend = true;
@@ -187,7 +207,7 @@ void CIocpSession::Send(CSendBufferRef sendBuffer)
 }
 
 //***************************************************************************
-// @brief ºñµ¿±â µ¥ÀÌÅÍ ¼Û½Å(WSASend) µî·Ï (Scatter-Gather ÆĞÅÏ)
+// @brief ë¹„ë™ê¸° ë°ì´í„° ì†¡ì‹ (WSASend) ë“±ë¡ (Scatter-Gather íŒ¨í„´)
 //***************************************************************************
 void CIocpSession::RegisterSend()
 {
@@ -195,14 +215,12 @@ void CIocpSession::RegisterSend()
         return;
 
     _sendEvent.Init();
-    _sendEvent.owner = shared_from_this(); // Ref +1
+    _sendEvent.owner = CIocpObject::shared_from_this(); // Ref +1
 
-    // Scatter-Gather: SendQueue¿¡ ½×ÀÎ ¸ğµç ¹öÆÛ¸¦ ²¨³» 1È¸ WSASend·Î Àü¼Û
+    // Scatter-Gather: SendQueueì— ìŒ“ì¸ ëª¨ë“  ë²„í¼ë¥¼ êº¼ë‚´ 1íšŒ WSASendë¡œ ì „ì†¡
     {
         std::lock_guard<std::mutex> guard(_lock);
-
-        int32 writeSize = static_cast<int32>(_sendQueue.size());
-        _sendEvent.sendBuffers.swap(_sendQueue); // ¿øº» ref count º¸Àå¿ë ¹é¾÷
+        _sendEvent.sendBuffers.swap(_sendQueue); // ì›ë³¸ ref count ë³´ì¥ìš© ë°±ì—…
     }
 
     CVector<WSABUF> wsaBufs;
@@ -231,13 +249,13 @@ void CIocpSession::RegisterSend()
 }
 
 //***************************************************************************
-// @brief Àü¼Û ¿Ï·á Ã³¸® (WSASend ¿Ï·á ÅëÁö ½Ã È£Ãâ)
-// @param numOfBytes Àü¼Û ¿Ï·áµÈ ¹ÙÀÌÆ® ¼ö
+// @brief ì „ì†¡ ì™„ë£Œ ì²˜ë¦¬ (WSASend ì™„ë£Œ í†µì§€ ì‹œ í˜¸ì¶œ)
+// @param numOfBytes ì „ì†¡ ì™„ë£Œëœ ë°”ì´íŠ¸ ìˆ˜
 //***************************************************************************
 void CIocpSession::ProcessSend(int32 numOfBytes)
 {
     _sendEvent.owner = nullptr; // Ref -1
-    _sendEvent.sendBuffers.clear(); // Àü¼Û ³¡³­ SendBuffer ¼ö¸í ÇØÁ¦
+    _sendEvent.sendBuffers.clear(); // ì „ì†¡ ëë‚œ SendBuffer ìˆ˜ëª… í•´ì œ
 
     if( numOfBytes == 0 )
     {
@@ -247,7 +265,7 @@ void CIocpSession::ProcessSend(int32 numOfBytes)
 
     OnSend(numOfBytes);
 
-    // ´ë±â ÁßÀÎ ³²Àº Send µ¥ÀÌÅÍ È®ÀÎ ÈÄ Àçµî·Ï
+    // ëŒ€ê¸° ì¤‘ì¸ ë‚¨ì€ Send ë°ì´í„° í™•ì¸ í›„ ì¬ë“±ë¡
     bool hasPendingSend = false;
     {
         std::lock_guard<std::mutex> guard(_lock);
@@ -268,27 +286,27 @@ void CIocpSession::ProcessSend(int32 numOfBytes)
 }
 
 //***************************************************************************
-// @brief ¼¼¼Ç Á¾·á ¿äÃ»
-// @param cause Á¾·á ¿øÀÎ ·Î±× ¹®ÀÚ¿­
+// @brief ì„¸ì…˜ ì¢…ë£Œ ìš”ì²­
+// @param cause ì¢…ë£Œ ì›ì¸ ë¡œê·¸ ë¬¸ìì—´
 //***************************************************************************
-void CIocpSession::Disconnect(const WCHAR* cause)
+void CIocpSession::Disconnect(const TCHAR* cause)
 {
     if( _connected.exchange(false) == false )
         return;
 
-    // DisconnectEx È£Ãâ·Î ¼ÒÄÏ Àç»ç¿ë »óÅÂ(TF_REUSE_SOCKET) À¯µµ
+    // DisconnectEx í˜¸ì¶œë¡œ ì†Œì¼“ ì¬ì‚¬ìš© ìƒíƒœ(TF_REUSE_SOCKET) ìœ ë„
     RegisterDisconnect();
 }
 
 //***************************************************************************
-// @brief ºñµ¿±â DisconnectEx µî·Ï
+// @brief ë¹„ë™ê¸° DisconnectEx ë“±ë¡
 //***************************************************************************
 void CIocpSession::RegisterDisconnect()
 {
     _disconnectEvent.Init();
-    _disconnectEvent.owner = shared_from_this(); // Ref +1
+    _disconnectEvent.owner = CIocpObject::shared_from_this(); // Ref +1
 
-    if( CSocketUtils::DisconnectEx(_socket, static_cast<LPOVERLAPPED>(&_disconnectEvent), TF_REUSE_SOCKET, 0) == FALSE )
+    if( CSocketUtils::DisconnectEx(_socket, static_cast<LPOVERLAPPED>(&_disconnectEvent), 0, 0) == FALSE )
     {
         int32 errorCode = ::WSAGetLastError();
         if( errorCode != WSA_IO_PENDING )
@@ -300,7 +318,7 @@ void CIocpSession::RegisterDisconnect()
 }
 
 //***************************************************************************
-// @brief DisconnectEx ¿Ï·á Ã³¸®
+// @brief DisconnectEx ì™„ë£Œ ì²˜ë¦¬
 //***************************************************************************
 void CIocpSession::ProcessDisconnect()
 {

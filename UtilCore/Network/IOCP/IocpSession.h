@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // IocpSession.h : interface for the CIocpSession class.
 //
@@ -22,17 +22,20 @@
 #include <atomic>
 #include <mutex>
 
+class CIocpSession;
+using CIocpSessionRef = std::shared_ptr<CIocpSession>;
+
 //***************************************************************************
 // @class CIocpSession
-// @brief IOCP ³×Æ®¿öÅ© Åë½ÅÀÇ ÇÙ½ÉÀÎ ¿¬°á ¼¼¼Ç Ãß»ó ±â¹İ Å¬·¡½º.
+// @brief CSessionì„ ìƒì†ë°›ëŠ” IOCP ë„¤íŠ¸ì›Œí¬ í†µì‹ ì˜ í•µì‹¬ì¸ ì—°ê²° ì„¸ì…˜ ì¶”ìƒ ê¸°ë°˜ í´ë˜ìŠ¤.
 // @details
-// ¿ªÇÒ:
-//     1. ¼ÒÄÏ °ü¸®, WSARecv/WSASend/DisconnectEx È£Ãâ ¹× ¿Ï·á ÀÌº¥Æ® Ã³¸®
-//     2. Scatter-Gather Send Áö¿ø (¿©·¯ ÆĞÅ¶À» 1È¸ WSASend·Î ÀÏ°ı Àü¼Û)
-//     3. CRingBuffer¸¦ ÅëÇÑ Á¦·ÎÄ«ÇÇ ºñµ¿±â µ¥ÀÌÅÍ ¼ö½Å °ü¸® (WSARecv)
-//     4. »óÀ§ ÀÀ¿ë ·¹ÀÌ¾î(GameSession µî)·Î °¡»ó ÇÔ¼ö ÀÌº¥Æ®(OnConnected µî) Àü´Ş
+// ì—­í• :
+//     1. ì†Œì¼“ ê´€ë¦¬, WSARecv/WSASend/DisconnectEx í˜¸ì¶œ ë° ì™„ë£Œ ì´ë²¤íŠ¸ ì²˜ë¦¬
+//     2. Scatter-Gather Send ì§€ì› (ì—¬ëŸ¬ íŒ¨í‚·ì„ 1íšŒ WSASendë¡œ ì¼ê´„ ì „ì†¡)
+//     3. CRingBufferë¥¼ í†µí•œ ì œë¡œì¹´í”¼ ë¹„ë™ê¸° ë°ì´í„° ìˆ˜ì‹  ê´€ë¦¬ (WSARecv)
+//     4. ìƒìœ„ ì‘ìš© ë ˆì´ì–´(GameSession ë“±)ë¡œ ê°€ìƒ í•¨ìˆ˜ ì´ë²¤íŠ¸(OnConnected ë“±) ì „ë‹¬
 //***************************************************************************
-class CIocpSession : public CIocpObject
+class CIocpSession : public CSession, public CIocpObject
 {
     friend class CIocpListener;
 
@@ -41,30 +44,58 @@ public:
     virtual ~CIocpSession();
 
 public:
-    // CIocpObject ÀÎÅÍÆäÀÌ½º ±¸Çö
+    // CIocpObject ì¸í„°í˜ì´ìŠ¤ êµ¬í˜„
     virtual HANDLE  GetHandle() override { return reinterpret_cast<HANDLE>(_socket); }
     virtual void    Dispatch(class CIocpEvent* iocpEvent, int32 numOfBytes = 0) override;
 
 public:
     void            Send(CSendBufferRef sendBuffer);
-    void            Disconnect(const WCHAR* cause);
+    void            Disconnect(const TCHAR* cause);
 
+    //***************************************************************************
+    // @brief ì„¸ì…˜ì˜ í˜„ì¬ ì—°ê²° ìƒíƒœë¥¼ ë°˜í™˜í•©ë‹ˆë‹¤.
+    // @return bool ì—°ê²°ë˜ì–´ ìˆìœ¼ë©´ true, ì•„ë‹ˆë©´ false
+    //***************************************************************************
     bool            IsConnected() const { return _connected.load(); }
+
+    //***************************************************************************
+    // @brief ì†Œì¼“ í•¸ë“¤ì´ ìœ íš¨í•œ ìƒíƒœì¸ì§€ í™•ì¸í•©ë‹ˆë‹¤.
+    // @return bool _socketì´ INVALID_SOCKETì´ ì•„ë‹ˆë©´ true, ì•„ë‹ˆë©´ false
+    //***************************************************************************
+    bool            IsValid() const { return _socket != INVALID_SOCKET; }
+
+    //***************************************************************************
+    // @brief í†µì‹ ì— ì‚¬ìš©ë˜ëŠ” ì†Œì¼“ í•¸ë“¤ì„ ë°˜í™˜í•©ë‹ˆë‹¤.
+    // @return SOCKET ì†Œì¼“ í•¸ë“¤
+    //***************************************************************************
     SOCKET          GetSocket() const { return _socket; }
 
+    //***************************************************************************
+    // @brief ì›ê²© í´ë¼ì´ì–¸íŠ¸ì˜ ë„¤íŠ¸ì›Œí¬ ì£¼ì†Œ(IP/Port)ë¥¼ ì„¤ì •í•©ë‹ˆë‹¤.
+    // @param netAddr ì„¤ì •í•  CNetAddress ê°ì²´
+    //***************************************************************************
     void            SetNetAddress(CNetAddress netAddr) { _netAddress = netAddr; }
+
+    //***************************************************************************
+    // @brief ì›ê²© í´ë¼ì´ì–¸íŠ¸ì˜ ë„¤íŠ¸ì›Œí¬ ì£¼ì†Œ(IP/Port)ë¥¼ ë°˜í™˜í•©ë‹ˆë‹¤.
+    // @return CNetAddress ë„¤íŠ¸ì›Œí¬ ì£¼ì†Œ ê°ì²´
+    //***************************************************************************
     CNetAddress     GetNetAddress() const { return _netAddress; }
 
 public:
-    // CIocpListenerÀÇ OnAcceptCallback µî¿¡¼­ ¿¬°á ¼ö¶ô ¿Ï·á ÈÄ È£Ãâ
+    // CIocpListenerì˜ OnAcceptCallback ë“±ì—ì„œ ì—°ê²° ìˆ˜ë½ ì™„ë£Œ í›„ í˜¸ì¶œ
     void            ProcessConnect();
 
+    //-----------------------------------------------------------------------
+    // ì½œë°±(Event) ë“±ë¡ API (NetServiceì™€ì˜ ê²°í•©ë„ë¥¼ ëŠì–´ì£¼ëŠ” í•µì‹¬)
+    //-----------------------------------------------------------------------
+    void		    SetDisconnectHandler(DisconnectHandler handler) { _onDisconnected = handler; }
+
 protected:
-    // »óÀ§ ÄÜÅÙÃ÷ ·¹ÀÌ¾î(CGameSession µî)¿¡¼­ ¿À¹ö¶óÀÌµùÇÒ °¡»ó ÇÔ¼ö
+    // ìƒìœ„ ì½˜í…ì¸  ë ˆì´ì–´(CGameSession ë“±)ì—ì„œ ì˜¤ë²„ë¼ì´ë”©í•  ê°€ìƒ í•¨ìˆ˜
     virtual void    OnConnected() {}
     virtual int32   OnRecv(BYTE* buffer, int32 len) { return len; }
     virtual void    OnSend(int32 len) {}
-    virtual void    OnDisconnected() {}
 
 private:
     void            RegisterRecv();
@@ -76,18 +107,20 @@ private:
     void            ProcessDisconnect();
 
 private:
-    SOCKET                  _socket = INVALID_SOCKET;   // Åë½Å¿¡ »ç¿ëµÇ´Â WinSock ¼ÒÄÏ ÇÚµé
-    CNetAddress             _netAddress;                // ¿ø°İ Å¬¶óÀÌ¾ğÆ®ÀÇ IP ÁÖ¼Ò ¹× Æ÷Æ® Á¤º¸
-    std::atomic<bool>       _connected = false;         // ¿øÀÚÀû(Atomic) ¿¬»êÀ» º¸ÀåÇÏ´Â ¼¼¼Ç ¿¬°á/ÇØÁ¦ »óÅÂ ÇÃ·¡±×
+    SOCKET                  _socket = INVALID_SOCKET;   // í†µì‹ ì— ì‚¬ìš©ë˜ëŠ” WinSock ì†Œì¼“ í•¸ë“¤
+    CNetAddress             _netAddress;                // ì›ê²© í´ë¼ì´ì–¸íŠ¸ì˜ IP ì£¼ì†Œ ë° í¬íŠ¸ ì •ë³´
+    std::atomic<bool>       _connected = false;         // ì›ìì (Atomic) ì—°ì‚°ì„ ë³´ì¥í•˜ëŠ” ì„¸ì…˜ ì—°ê²°/í•´ì œ ìƒíƒœ í”Œë˜ê·¸
 
-    std::mutex              _lock;                      // ¼Û½Å Å¥(_sendQueue) ½º·¹µå µ¿±âÈ­¸¦ À§ÇÑ ¹ÂÅØ½º
-    CRingBuffer             _recvBuffer;                // Á¦·ÎÄ«ÇÇ ºñµ¿±â ¼ö½Å(WSARecv)À» °ü¸®ÇÏ´Â ¼ö½Å ¸µ¹öÆÛ
-    CVector<CSendBufferRef> _sendQueue;                 // Àü¼Û ´ë±â ÁßÀÎ ÆĞÅ¶ ÂüÁ¶(CSendBufferRef)µéÀ» º¸°üÇÏ´Â ¼Û½Å Å¥
-    std::atomic<bool>       _sendRegistered = false;    // WSASend ºñµ¿±â ¿äÃ» Áßº¹ È£ÃâÀ» ¹æÁöÇÏ´Â ¿øÀÚÀû µî·Ï »óÅÂ ÇÃ·¡±×
+    std::mutex              _lock;                      // ì†¡ì‹  í(_sendQueue) ìŠ¤ë ˆë“œ ë™ê¸°í™”ë¥¼ ìœ„í•œ ë®¤í…ìŠ¤
+    CRingBuffer             _recvBuffer;                // ì œë¡œì¹´í”¼ ë¹„ë™ê¸° ìˆ˜ì‹ (WSARecv)ì„ ê´€ë¦¬í•˜ëŠ” ìˆ˜ì‹  ë§ë²„í¼
+    CVector<CSendBufferRef> _sendQueue;                 // ì „ì†¡ ëŒ€ê¸° ì¤‘ì¸ íŒ¨í‚· ì°¸ì¡°(CSendBufferRef)ë“¤ì„ ë³´ê´€í•˜ëŠ” ì†¡ì‹  í
+    std::atomic<bool>       _sendRegistered = false;    // WSASend ë¹„ë™ê¸° ìš”ì²­ ì¤‘ë³µ í˜¸ì¶œì„ ë°©ì§€í•˜ëŠ” ì›ìì  ë“±ë¡ ìƒíƒœ í”Œë˜ê·¸
 
-    RecvEvent               _recvEvent;                 // ºñµ¿±â ¼ö½Å(WSARecv) ¿äÃ» ¹× ¿Ï·á Ã³¸®¸¦ À§ÇÑ OVERLAPPED ÀÌº¥Æ® °´Ã¼
-    SendEvent               _sendEvent;                 // ºñµ¿±â ¼Û½Å(WSASend) ¿äÃ» ¹× ¿Ï·á Ã³¸®¸¦ À§ÇÑ OVERLAPPED ÀÌº¥Æ® °´Ã¼
-    DisconnectEvent         _disconnectEvent;           // ºñµ¿±â ÇØÁ¦(DisconnectEx) ¿äÃ» ¹× ¿Ï·á Ã³¸®¸¦ À§ÇÑ OVERLAPPED ÀÌº¥Æ® °´Ã¼
+    RecvEvent               _recvEvent;                 // ë¹„ë™ê¸° ìˆ˜ì‹ (WSARecv) ìš”ì²­ ë° ì™„ë£Œ ì²˜ë¦¬ë¥¼ ìœ„í•œ OVERLAPPED ì´ë²¤íŠ¸ ê°ì²´
+    SendEvent               _sendEvent;                 // ë¹„ë™ê¸° ì†¡ì‹ (WSASend) ìš”ì²­ ë° ì™„ë£Œ ì²˜ë¦¬ë¥¼ ìœ„í•œ OVERLAPPED ì´ë²¤íŠ¸ ê°ì²´
+    DisconnectEvent         _disconnectEvent;           // ë¹„ë™ê¸° í•´ì œ(DisconnectEx) ìš”ì²­ ë° ì™„ë£Œ ì²˜ë¦¬ë¥¼ ìœ„í•œ OVERLAPPED ì´ë²¤íŠ¸ ê°ì²´
+
+    DisconnectHandler		_onDisconnected = nullptr;  // ëŠê¹€ ê°ì§€ ì‹œ ì‹¤í–‰í•  ì™¸ë¶€ ì½œë°±
 };
 
 #endif // ndef __IOCPSESSION_H__

@@ -11,18 +11,11 @@
 #include <Network/RIO/RioCommon.h>
 #endif
 
-#ifndef __RIOOBJECT_H__
-#include <Network/RIO/RioObject.h>
-#endif
-
 #ifndef __RIOBUFFER_H__
 #include <Network/RIO/RioBuffer.h>
 #endif
 
-class CRioObject;
 class CRioBuffer;
-
-using CRioObjectRef = std::shared_ptr<CRioObject>;
 
 //***************************************************************************
 // @class CRioEvent

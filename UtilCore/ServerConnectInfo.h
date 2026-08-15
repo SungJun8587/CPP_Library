@@ -7,6 +7,8 @@
 #ifndef __SERVERCONNECTINFO_H__
 #define __SERVERCONNECTINFO_H__
 
+#pragma once
+
 #ifndef	__COMMONUTIL_H__
 #include <CommonUtil.h>
 #endif

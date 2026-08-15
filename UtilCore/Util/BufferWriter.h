@@ -4,11 +4,11 @@
 //
 //***************************************************************************
 
-#ifndef __BUFFER_WRITER_H__
-#define __BUFFER_WRITER_H__
+#ifndef __BUFFERWRITER_H__
+#define __BUFFERWRITER_H__
 
 //***************************************************************************
-// @class BufferWriter
+// @class CBufferWriter
 // @brief 메모리 버퍼에 데이터를 순차적으로 기록(직렬화)하는 클래스입니다.
 //
 // @details
@@ -27,23 +27,23 @@ public:
 	CBufferWriter(BYTE* buffer, uint32 size, uint32 pos = 0);
 	~CBufferWriter();
 
-	BYTE*			Buffer() { return _buffer; }
+	BYTE* Buffer() { return _buffer; }
 	uint32			Size() { return _size; }
 	uint32			WriteSize() { return _pos; }
 	uint32			FreeSize() { return _size - _pos; }
 
 	template<typename T>
 	bool			Write(T* src) { return Write(src, sizeof(T)); }
-	bool			Write(void* src, uint32 len);
+	bool			Write(const void* src, uint32 len);
 
 	template<typename T>
-	T*				Reserve(uint16 count = 1);
+	T* Reserve(uint16 count = 1);
 
 	template<typename T>
-	CBufferWriter&	operator<<(T&& src);
+	CBufferWriter& operator<<(T&& src);
 
 private:
-	BYTE*			_buffer = nullptr;	// 기록 대상 메모리 버퍼 포인터
+	BYTE* _buffer = nullptr;	// 기록 대상 메모리 버퍼 포인터
 	uint32			_size = 0;			// 전체 버퍼 용량
 	uint32			_pos = 0;			// 현재 쓰기 커서 위치 (기록된 바이트 수)
 };
@@ -66,16 +66,17 @@ T* CBufferWriter::Reserve(uint16 count)
 
 //***************************************************************************
 // @brief 연산자 오버로딩을 통해 데이터를 버퍼에 연속적으로 기록합니다.
-// @param src 기록할 데이터 (Rvalue reference 지원)
-// @return BufferWriter& (연속 체이닝 가능)
+// @param src 기록할 데이터 (Rvalue/Lvalue 모두 지원)
+// @return CBufferWriter& (연속 체이닝 가능)
+// @note 메모리 경계 오버런을 방지합니다.
 //***************************************************************************
 template<typename T>
 CBufferWriter& CBufferWriter::operator<<(T&& src)
 {
-	using DataType = std::remove_reference_t<T>;
-	*reinterpret_cast<DataType*>(&_buffer[_pos]) = std::forward<DataType>(src);
-	_pos += sizeof(T);
+	using DataType = std::remove_cvref_t<T>;
+	DataType temp = std::forward<T>(src);
+	Write(&temp, sizeof(DataType));
 	return *this;
 }
 
-#endif // __BUFFER_WRITER_H__
+#endif // ndef __BUFFERWRITER_H__

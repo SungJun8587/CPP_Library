@@ -298,7 +298,6 @@
       <Filter>Util</Filter>
     </ClInclude>
     <ClInclude Include="WindowsServiceBase.h" />
-    <ClInclude Include="NetworkRedefineDataType.h" />
     <ClInclude Include="Memory\RefCountable.h">
       <Filter>Memory</Filter>
     </ClInclude>
@@ -373,6 +372,21 @@
     </ClInclude>
     <ClInclude Include="Network\RIO\RioServer.h">
       <Filter>Network\RIO</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\IOCP\IocpSessionManager.h">
+      <Filter>Network\IOCP</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\NetService.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\Session.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\IOCP\IocpService.h">
+      <Filter>Network\IOCP</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\NetworkRedefineDataType.h">
+      <Filter>Network</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -575,6 +589,15 @@
     </ClCompile>
     <ClCompile Include="Network\RIO\RioServer.cpp">
       <Filter>Network\RIO</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\IOCP\IocpSessionManager.cpp">
+      <Filter>Network\IOCP</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\NetService.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\IOCP\IocpService.cpp">
+      <Filter>Network\IOCP</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

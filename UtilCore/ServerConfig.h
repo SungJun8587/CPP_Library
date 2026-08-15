@@ -7,6 +7,8 @@
 #ifndef __SERVERCONFIG_H__
 #define __SERVERCONFIG_H__
 
+#pragma once
+
 #ifndef	__SERVERCONNECTINFO_H__
 #include <ServerConnectInfo.h>
 #endif

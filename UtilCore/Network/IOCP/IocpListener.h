@@ -30,10 +30,10 @@
 #include <functional>
 
 //***************************************************************************
-// @brief 범용 세션 생성 팩터리 함수 타입
-// @return CIocpObjectRef 생성된 세션 객체 포인터 (CSession의 기반 클래스)
+// @brief IOCP 전용 세션 생성 팩터리 함수 타입
+// @return CIocpObjectRef 생성된 IOCP 객체 포인터 (CSession과 디커플링 유지)
 //***************************************************************************
-using SessionFactory = std::function<CIocpObjectRef()>;
+using IocpSessionFactory = std::function<CIocpObjectRef()>;
 
 //***************************************************************************
 // @brief Accept 완료 후 외부 후속 처리를 담당할 콜백 함수 타입
@@ -78,7 +78,7 @@ public:
     virtual void    Dispatch(class CIocpEvent* iocpEvent, int32 numOfBytes = 0) override;
 
 public:
-    bool    StartAccept(CIocpCoreRef iocpCore, CNetAddress netAddr, SessionFactory sessionFactory, int32 acceptCount = 10, OnAcceptCallback onAccept = nullptr);
+    bool    StartAccept(CIocpCoreRef iocpCore, CNetAddress netAddr, IocpSessionFactory sessionFactory, int32 acceptCount = 10, OnAcceptCallback onAccept = nullptr);
     void    CloseSocket();
 
 private:
@@ -92,7 +92,7 @@ private:
 private:
     SOCKET                  _listenSocket = INVALID_SOCKET;     // 리스닝 소켓 핸들
     CIocpCoreRef            _iocpCore = nullptr;                // 연동할 IOCP 코어 참조
-    SessionFactory          _sessionFactory = nullptr;          // 세션 생성 팩터리
+    IocpSessionFactory      _sessionFactory = nullptr;          // 세션 생성 팩터리
     OnAcceptCallback        _onAcceptCallback = nullptr;        // Accept 완료 알림 콜백
     CVector<AcceptEvent*>   _acceptEvents;                      // 생성된 AcceptEvent 관리 벡터
 };

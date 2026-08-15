@@ -385,7 +385,7 @@ void CRioServer::AcceptLoop()
             continue;
         }
 
-        std::shared_ptr<CRioSession> session = CreateSession();
+        CRioSessionRef session = CreateSession();
 
         if( session == nullptr )
         {
@@ -408,13 +408,13 @@ void CRioServer::AcceptLoop()
         // Init() 이후 Stop()이 발생한 경우 세션을 등록하지 않고 종료합니다.
         if( _serverState.load(std::memory_order_acquire) != Rio::ServerState::Running )
         {
-            session->Close(CloseReason::ForcedClose);
+            session->Close(Rio::CloseReason::ForcedClose);
             continue;
         }
 
         if( !_sessionManager.AddSession(clientSocket, sessionId, session) )
         {
-            session->Close(CloseReason::InternalError);
+            session->Close(Rio::CloseReason::InternalError);
             continue;
         }
 

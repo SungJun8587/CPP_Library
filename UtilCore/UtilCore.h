@@ -46,7 +46,6 @@ using namespace std;
 
 #include <BaseDefine.h>
 #include <BaseRedefineDataType.h>
-#include <NetworkRedefineDataType.h>
 #include <BaseMacro.h>
 
 #include <Util/BaseFile.h>

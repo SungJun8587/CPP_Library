@@ -121,7 +121,7 @@ bool CRioReceive::Receive(
 
     try
     {
-        ownerRef = owner->shared_from_this();
+        ownerRef = owner->GetRioObjectPtr();
     }
     catch( ... )
     {
@@ -173,7 +173,7 @@ bool CRioReceive::Receive(
 // @param requestQueue RIO 요청 큐 핸들
 // @param data 수신할 RIO_BUF 포인터
 // @param dataBufferCount 데이터 버퍼 개수
-// @param dataBinding 데이터 버퍼 바인딩 정보
+// @param dataBindings 각 데이터 버퍼에 대한 바인딩 정보 배열 (nullptr 허용: 사전 등록 버퍼 등)
 // @param localAddress 로컬 주소 RIO_BUF (선택 사항)
 // @param remoteAddress 원격 주소 RIO_BUF (선택 사항)
 // @param control 제어 데이터 RIO_BUF (선택 사항)
@@ -187,7 +187,7 @@ bool CRioReceive::ReceiveEx(
     RIO_RQ requestQueue,
     const RIO_BUF* data,
     ULONG dataBufferCount,
-    const CRioEvent::BufferBinding* dataBinding,
+    const CRioEvent::BufferBinding* dataBindings,
     const RIO_BUF* localAddress,
     const RIO_BUF* remoteAddress,
     const RIO_BUF* control,
@@ -195,48 +195,21 @@ bool CRioReceive::ReceiveEx(
     CRioObject* owner,
     DWORD flags) noexcept
 {
-    if( requestQueue == RIO_INVALID_RQ || rioEvent == nullptr || owner == nullptr )
+    if( requestQueue == RIO_INVALID_RQ || data == nullptr || dataBufferCount == 0 )
     {
         return false;
     }
 
-    if( data == nullptr )
+    if( rioEvent == nullptr || owner == nullptr )
     {
-        if( dataBufferCount != 0 )
-        {
-            return false;
-        }
-
-        if( dataBinding != nullptr )
-        {
-            assert(false && "RIOReceiveEx dataBinding must be null when data is null");
-            return false;
-        }
-    }
-    else
-    {
-        if( dataBufferCount != 1 || dataBinding == nullptr )
-        {
-            return false;
-        }
-
-        if( data->BufferId == RIO_INVALID_BUFFERID || data->Length == 0 )
-        {
-            return false;
-        }
-
-        if( dataBinding->buffer == nullptr || dataBinding->slotIndex == Rio::kInvalidSlotIndex )
-        {
-            assert(false && "CRioReceive::ReceiveEx invalid data binding");
-            return false;
-        }
+        return false;
     }
 
     CRioObjectRef ownerRef;
 
     try
     {
-        ownerRef = owner->shared_from_this();
+        ownerRef = owner->GetRioObjectPtr();
     }
     catch( ... )
     {
@@ -255,13 +228,42 @@ bool CRioReceive::ReceiveEx(
 
     rioEvent->Initialize(Rio::EventType::Receive, ownerRef);
 
-    if( data != nullptr )
+    if( dataBindings != nullptr )
     {
-        if( !rioEvent->BindBufferSlot(dataBinding->buffer, dataBinding->slotIndex) )
+        for( ULONG i = 0; i < dataBufferCount; ++i )
         {
-            dataBinding->buffer->FreeSlot(dataBinding->slotIndex);
-            RollbackSubmission(core, rioEvent, owner);
-            return false;
+            const CRioEvent::BufferBinding& binding = dataBindings[i];
+
+            if( binding.buffer == nullptr || binding.slotIndex == Rio::kInvalidSlotIndex )
+            {
+                RollbackSubmission(core, rioEvent, owner);
+                return false;
+            }
+
+            if( data[i].BufferId == RIO_INVALID_BUFFERID || data[i].Length == 0 )
+            {
+                binding.buffer->FreeSlot(binding.slotIndex);
+                RollbackSubmission(core, rioEvent, owner);
+                return false;
+            }
+
+            if( !rioEvent->BindBufferSlot(binding.buffer, binding.slotIndex) )
+            {
+                binding.buffer->FreeSlot(binding.slotIndex);
+                RollbackSubmission(core, rioEvent, owner);
+                return false;
+            }
+        }
+    }
+    else
+    {
+        for( ULONG i = 0; i < dataBufferCount; ++i )
+        {
+            if( data[i].BufferId == RIO_INVALID_BUFFERID || data[i].Length == 0 )
+            {
+                RollbackSubmission(core, rioEvent, owner);
+                return false;
+            }
         }
     }
 

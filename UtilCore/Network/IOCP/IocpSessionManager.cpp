@@ -1,32 +1,33 @@
 ﻿
 //***************************************************************************
-// RioSessionManager.cpp : implementation of the CRioSessionManager class.
+// IocpSessionManager.cpp : implementation of the CIocpSessionManager class.
 //
 //***************************************************************************
 
 #include "pch.h"
-#include "RioSessionManager.h"
+#include "IocpSessionManager.h"
 
 //***************************************************************************
-// @brief CRioSessionManager 생성자
+// @brief CIocpSessionManager 생성자
 //***************************************************************************
-CRioSessionManager::CRioSessionManager()
+CIocpSessionManager::CIocpSessionManager()
     : _nextSessionId(0)
 {
 }
 
 //***************************************************************************
-// @brief CRioSessionManager 소멸자
+// @brief CIocpSessionManager 소멸자
 //***************************************************************************
-CRioSessionManager::~CRioSessionManager()
+CIocpSessionManager::~CIocpSessionManager()
 {
+    BeginCloseAllSessions();
 }
 
 //***************************************************************************
 // @brief 원자적으로 새로운 고유 SessionId를 발급합니다.
 // @return uint64_t 고유 세션 ID
 //***************************************************************************
-uint64_t CRioSessionManager::GenerateSessionId()
+uint64_t CIocpSessionManager::GenerateSessionId()
 {
     return _nextSessionId.fetch_add(1, std::memory_order_relaxed);
 }
@@ -38,11 +39,12 @@ uint64_t CRioSessionManager::GenerateSessionId()
 // @param session 세션 shared_ptr
 // @return 등록 성공 시 true, 실패 시 false
 //***************************************************************************
-bool CRioSessionManager::AddSession(SOCKET socket, uint64_t sessionId, CRioSessionRef session)
+bool CIocpSessionManager::AddSession(SOCKET socket, uint64_t sessionId, CIocpSessionRef session)
 {
-    if( socket == INVALID_SOCKET || session == nullptr ) return false;
+    if( socket == INVALID_SOCKET || session == nullptr )
+        return false;
 
-    return _sessions.InsertObject(socket, RioSessionEntry{ sessionId, session });
+    return _sessions.InsertObject(socket, IocpSessionEntry{ sessionId, session });
 }
 
 //***************************************************************************
@@ -50,16 +52,20 @@ bool CRioSessionManager::AddSession(SOCKET socket, uint64_t sessionId, CRioSessi
 // @param socket 제거할 소켓 키
 // @param sessionId 검증할 고유 세션 ID
 //***************************************************************************
-void CRioSessionManager::RemoveSession(SOCKET socket, uint64_t sessionId)
+void CIocpSessionManager::RemoveSession(SOCKET socket, uint64_t sessionId)
 {
-    if( socket == INVALID_SOCKET ) return;
+    if( socket == INVALID_SOCKET )
+        return;
 
     _sessions.WriteLock(socket, __FUNCTION__);
 
-    RioSessionEntry entry;
-    if( _sessions.FindObject(socket, entry) && entry.sessionId == sessionId )
+    IocpSessionEntry entry;
+    if( _sessions.FindObject(socket, entry) )
     {
-        _sessions.EraseObject(socket);
+        if( entry.sessionId == sessionId )
+        {
+            _sessions.EraseObject(socket);
+        }
     }
 
     _sessions.WriteUnlock(socket, __FUNCTION__);
@@ -70,7 +76,7 @@ void CRioSessionManager::RemoveSession(SOCKET socket, uint64_t sessionId)
 // @param socket 찾을 소켓 키
 // @return 세션 shared_ptr (존재하지 않을 경우 nullptr)
 //***************************************************************************
-CRioSessionRef CRioSessionManager::FindSession(SOCKET socket) const
+CIocpSessionRef CIocpSessionManager::FindSession(SOCKET socket) const
 {
     if( socket == INVALID_SOCKET ) return nullptr;
 
@@ -78,8 +84,8 @@ CRioSessionRef CRioSessionManager::FindSession(SOCKET socket) const
 
     mutableSessions.ReadLock(socket, __FUNCTION__);
 
-    RioSessionEntry entry;
-    CRioSessionRef session = nullptr;
+    IocpSessionEntry entry;
+    CIocpSessionRef session = nullptr;
     if( mutableSessions.FindObject(socket, entry) )
     {
         session = entry.session;
@@ -94,7 +100,7 @@ CRioSessionRef CRioSessionManager::FindSession(SOCKET socket) const
 // @brief 현재 관리 중인 활성 세션 총 개수를 반환합니다.
 // @return size_t 활성 세션 수량
 //***************************************************************************
-size_t CRioSessionManager::GetSessionCount() const
+size_t CIocpSessionManager::GetSessionCount() const
 {
     // decltype(_sessions) 적용으로 하드코딩 템플릿 인자 제거
     auto& mutableSessions = const_cast<decltype(_sessions)&>(_sessions);
@@ -102,68 +108,55 @@ size_t CRioSessionManager::GetSessionCount() const
 }
 
 //***************************************************************************
-// @brief 모든 활성 세션에 패킷 데이터를 브로드캐스트합니다.
-// @param data 전송할 데이터 포인터
-// @param size 전송할 데이터 크기 (바이트)
+// @brief 모든 클러스터를 순회하며 스냅샷을 수집한 뒤 락 밖에서 안전하게 전체 세션에게 패킷 전송을 브로드캐스트합니다.
+// @param sendBuffer 전송할 패킷 버퍼
 //***************************************************************************
-void CRioSessionManager::Broadcast(const void* data, uint16_t size)
+void CIocpSessionManager::Broadcast(CSendBufferRef sendBuffer)
 {
-    if( data == nullptr || size == 0 )
+    if( sendBuffer == nullptr ) return;
+
+    for( int32 i = 0; i < _sessions.GetClusterCnt(); ++i )
     {
-        return;
-    }
+        // 1. 인덱스로 직접 락 획득
+        _sessions.WriteLockByIdx(i, __FUNCTION__);
 
-    CVector<CRioSessionRef> sessionsToSend;
-
-    // 1. 모든 클러스터를 인덱스로 순회하며 활성 세션들의 스냅샷 수집
-    __int32 clusterCnt = _sessions.GetClusterCnt();
-    for( __int32 i = 0; i < clusterCnt; ++i )
-    {
-        _sessions.ReadLockByIdx(i, __FUNCTION__);
-
-        auto& map = _sessions.GetClusterMapByIdx(i);
-        for( const auto& pair : map )
+        // 2. 인덱스로 해당 클러스터의 Map 참조 가져오기
+        auto& sessionMap = _sessions.GetClusterMapByIdx(i);
+        for( auto& pair : sessionMap )
         {
-            if( pair.second.session && pair.second.session->IsActive() )
+            const auto& session = pair.second.session;
+            if( session && session->IsConnected() )
             {
-                sessionsToSend.push_back(pair.second.session);
+                session->Send(sendBuffer);
             }
         }
 
-        _sessions.ReadUnlockByIdx(i, __FUNCTION__);
-    }
-
-    // 2. 락 외부에서 각 세션의 Send 호출 (세션 내부에서 큐잉 및 Flush 진행, 데드락 방지)
-    for( const auto& session : sessionsToSend )
-    {
-        if( session && session->IsActive() )
-        {
-            session->Send(data, size);
-        }
+        // 3. 락 해제
+        _sessions.WriteUnlockByIdx(i, __FUNCTION__);
     }
 }
 
 //***************************************************************************
-// @brief 락 내부에서 스냅샷을 수집한 뒤 락 밖에서 안전하게 Close를 브로드캐스트합니다.
+// @brief 각 클러스터별로 순회하며 스냅샷을 수집한 뒤 락 밖에서 안전하게 Disconnect를 브로드캐스트합니다.
 //***************************************************************************
-void CRioSessionManager::BeginCloseAllSessions()
+void CIocpSessionManager::BeginCloseAllSessions()
 {
-    CVector<CRioSessionRef> sessionsToClose;
+    CVector<CIocpSessionRef> sessionsToClose;
+    INT32 clusterCnt = _sessions.GetClusterCnt();
 
-    __int32 clusterCnt = _sessions.GetClusterCnt();
-    for( __int32 i = 0; i < clusterCnt; ++i )
+    for( INT32 i = 0; i < clusterCnt; ++i )
     {
+        // 인덱스 기반 직접 읽기 락 및 맵 참조
         _sessions.ReadLockByIdx(i, __FUNCTION__);
+        auto& objMap = _sessions.GetClusterMapByIdx(i);
 
-        auto& map = _sessions.GetClusterMapByIdx(i);
-        for( const auto& pair : map )
+        for( auto const& pair : objMap )
         {
             if( pair.second.session )
             {
                 sessionsToClose.push_back(pair.second.session);
             }
         }
-
         _sessions.ReadUnlockByIdx(i, __FUNCTION__);
     }
 
@@ -171,34 +164,34 @@ void CRioSessionManager::BeginCloseAllSessions()
     {
         if( session )
         {
-            session->Close(Rio::CloseReason::ForcedClose);
+            session->Disconnect(L"SessionManager Clear");
         }
     }
 }
 
 //***************************************************************************
-// @brief 관리 중인 모든 세션이 완전히 Closed 되었는지 검사합니다.
-// @return bool 전부 닫혔으면 true, 아니면 false
+// @brief 관리 중인 모든 세션이 완전히 연결 종료(Disconnected) 되었는지 검사합니다.
+// @return bool 전부 끊어졌으면 true, 아니면 false
 //***************************************************************************
-bool CRioSessionManager::AreAllSessionsClosed() const
+bool CIocpSessionManager::AreAllSessionsClosed() const
 {
     auto& mutableSessions = const_cast<decltype(_sessions)&>(_sessions);
-    __int32 clusterCnt = mutableSessions.GetClusterCnt();
+    INT32 clusterCnt = mutableSessions.GetClusterCnt();
 
-    for( __int32 i = 0; i < clusterCnt; ++i )
+    for( INT32 i = 0; i < clusterCnt; ++i )
     {
+        // 인덱스 기반 직접 읽기 락 및 맵 참조
         mutableSessions.ReadLockByIdx(i, __FUNCTION__);
+        auto& objMap = mutableSessions.GetClusterMapByIdx(i);
 
-        auto& map = mutableSessions.GetClusterMapByIdx(i);
-        for( const auto& pair : map )
+        for( auto const& pair : objMap )
         {
-            if( pair.second.session && !pair.second.session->IsClosed() )
+            if( pair.second.session && pair.second.session->IsConnected() )
             {
                 mutableSessions.ReadUnlockByIdx(i, __FUNCTION__);
                 return false;
             }
         }
-
         mutableSessions.ReadUnlockByIdx(i, __FUNCTION__);
     }
 
@@ -206,31 +199,30 @@ bool CRioSessionManager::AreAllSessionsClosed() const
 }
 
 //***************************************************************************
-// @brief 맵 내부에 누적된 Closed 상태의 세션들을 안전하게 일괄 제거합니다.
+// @brief 맵 내부에 누적된 연결 해제 상태의 세션들을 클러스터별로 안전하게 일괄 제거합니다.
 //***************************************************************************
-void CRioSessionManager::RemoveClosedSessions()
+void CIocpSessionManager::RemoveClosedSessions()
 {
-    __int32 clusterCnt = _sessions.GetClusterCnt();
+    INT32 clusterCnt = _sessions.GetClusterCnt();
 
-    for( __int32 i = 0; i < clusterCnt; ++i )
+    for( INT32 i = 0; i < clusterCnt; ++i )
     {
-        // [수정] dummyKey 대신 인덱스 직접 쓰기 락 및 맵 참조
+        // 인덱스 기반 직접 쓰기 락 및 맵 참조
         _sessions.WriteLockByIdx(i, __FUNCTION__);
+        auto& objMap = _sessions.GetClusterMapByIdx(i);
 
-        auto& map = _sessions.GetClusterMapByIdx(i);
-        for( auto it = map.begin(); it != map.end(); )
+        for( auto it = objMap.begin(); it != objMap.end(); )
         {
             const auto& session = it->second.session;
-            if( !session || session->IsClosed() )
+            if( !session || !session->IsConnected() )
             {
-                it = map.erase(it);
+                it = objMap.erase(it);
             }
             else
             {
                 ++it;
             }
         }
-
         _sessions.WriteUnlockByIdx(i, __FUNCTION__);
     }
 }

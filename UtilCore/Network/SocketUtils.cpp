@@ -515,22 +515,26 @@ bool CSocketUtils::AddrToIP(const int af, const void* src, TCHAR* hostAddress, s
 	::ZeroMemory(&ss, sizeof(ss));
 	ss.ss_family = static_cast<ADDRESS_FAMILY>(af);
 
+	DWORD dwSockAddrLen = sizeof(ss);
+
 	switch( af )
 	{
 	case AF_INET:
 		reinterpret_cast<sockaddr_in*>(&ss)->sin_addr = *reinterpret_cast<const struct in_addr*>(src);
+		dwSockAddrLen = sizeof(sockaddr_in); // [수정] IPv4 정확한 구조체 크기 지정
 		break;
 	case AF_INET6:
 		reinterpret_cast<sockaddr_in6*>(&ss)->sin6_addr = *reinterpret_cast<const struct in_addr6*>(src);
+		dwSockAddrLen = sizeof(sockaddr_in6); // [수정] IPv6 정확한 구조체 크기 지정
 		break;
 	default:
-		return FALSE;
+		return false;
 	}
 
-	if( ::WSAAddressToString(reinterpret_cast<SOCKADDR*>(&ss), sizeof(ss), NULL, hostAddress, &ulSize) != 0 )
-		return FALSE;
+	if( ::WSAAddressToString(reinterpret_cast<SOCKADDR*>(&ss), dwSockAddrLen, NULL, hostAddress, &ulSize) != 0 )
+		return false;
 
-	return TRUE;
+	return true;
 }
 
 //***************************************************************************
@@ -647,25 +651,28 @@ void CSocketUtils::ReportError(const TCHAR* operationDesc, const int errorCode)
 {
 	TCHAR tszBuffer[MAX_BUFFER_SIZE];
 	const TCHAR* ptszMsgBuffer = NULL;
+	bool isAllocatedBySystem = false;
 
 #ifdef _DEBUG_KR
 	ptszMsgBuffer = GetErrMsgToWinsockErrCodeEn(errorCode);
 #elif _DEBUG_EN
 	ptszMsgBuffer = GetErrMsgToWinsockErrCodeKr(errorCode);
 #else
-	::FormatMessage(
-		FORMAT_MESSAGE_ALLOCATE_BUFFER |
-		FORMAT_MESSAGE_FROM_SYSTEM |
-		FORMAT_MESSAGE_IGNORE_INSERTS,
-		NULL,
-		errorCode,
-		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-		reinterpret_cast<LPTSTR>(&ptszMsgBuffer),
-		0, NULL);
+	DWORD flags = FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
+	if( ::FormatMessage(flags, NULL, errorCode, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+		reinterpret_cast<LPTSTR>(&ptszMsgBuffer), 0, NULL) != 0 )
+	{
+		isAllocatedBySystem = true;
+	}
 #endif
 
 	_stprintf_s(tszBuffer, _countof(tszBuffer), _T("%s: %d- %s"),
 		operationDesc, errorCode, ptszMsgBuffer);
-
 	LOG_INFO(_T("Error : %s"), tszBuffer);
+
+	// FormatMessage 시스템 할당 메모리 해제
+	if( isAllocatedBySystem && ptszMsgBuffer )
+	{
+		::LocalFree(const_cast<TCHAR*>(ptszMsgBuffer));
+	}
 }

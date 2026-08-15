@@ -13,9 +13,20 @@
 #include <BaseRedefineDataType.h>
 #endif
 
+USING_SHARED_PTR(CSession);
+USING_SHARED_PTR(CNetService);
+
 USING_SHARED_PTR(CIocpCore);
 USING_SHARED_PTR(CIocpObject);
+USING_SHARED_PTR(CIocpListener);
 USING_SHARED_PTR(CSendBuffer);
 USING_SHARED_PTR(CSendBufferChunk);
+USING_SHARED_PTR(CIocpSession)
+USING_SHARED_PTR(CIocpServerService);
+USING_SHARED_PTR(CIocpClientService);
+
+USING_SHARED_PTR(CRioObject);
+USING_SHARED_PTR(CRioSession);
+
 
 #endif // ndef __NETWORKREDEFINEDATATYPE_H__

@@ -19,15 +19,8 @@
 #include <Network/RIO/RioEventPool.h>
 #endif
 
-#ifndef __RIOOBJECT_H__
-#include <Network/RIO/RioObject.h>
-#endif
-
 class CRioEvent;
 class CRioEventPool;
-class CRioObject;
-
-using CRioObjectRef = std::shared_ptr<CRioObject>;
 
 //***************************************************************************
 // @class CRioCore

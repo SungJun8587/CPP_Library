@@ -48,11 +48,13 @@ class CRioEvent;
 //      submission/completion과 경쟁하여 lifecycle invariant를 깨뜨릴 수
 //      있습니다.
 //***************************************************************************
-class CRioObject : public std::enable_shared_from_this<CRioObject>
+class CRioObject
 {
 public:
     CRioObject() noexcept;
     virtual ~CRioObject() noexcept;
+
+    virtual CRioObjectRef GetRioObjectPtr() = 0;
 
     CRioObject(const CRioObject&) = delete;
     CRioObject& operator=(const CRioObject&) = delete;

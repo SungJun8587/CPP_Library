@@ -36,6 +36,7 @@ CRingBuffer::CRingBuffer(int bufferSize)
 
 //***************************************************************************
 // @brief 이동 생성자 구현
+// @param other 이동할 대상 CRingBuffer 객체
 //***************************************************************************
 CRingBuffer::CRingBuffer(CRingBuffer&& other) noexcept
 	: _begin(other._begin), _end(other._end)
@@ -46,13 +47,13 @@ CRingBuffer::CRingBuffer(CRingBuffer&& other) noexcept
 
 //***************************************************************************
 // @brief 이동 대입 연산자 구현
+// @param other 이동할 대상 CRingBuffer 객체
+// @return 자기 자신에 대한 참조 (CRingBuffer&)
 //***************************************************************************
 CRingBuffer& CRingBuffer::operator=(CRingBuffer&& other) noexcept
 {
 	if( this != &other )
 	{
-		// NOTE: RawAllocator::Free(nullptr)의 안전성이 Allocator.h 구현에
-		// 달려있어 확정할 수 없으므로, 방어적으로 nullptr이 아닐 때만 해제합니다.
 		if( _begin != nullptr )
 		{
 			RawAllocator::Free(_begin);
@@ -81,6 +82,13 @@ CRingBuffer::~CRingBuffer()
 
 //***************************************************************************
 // @brief 링버퍼에 데이터를 씁니다.
+// @param data 쓸 데이터가 위치한 버퍼 포인터
+// @param requestSize 쓰기 요청 크기 (바이트)
+// @param outEnqueueSize [out] 실제로 쓰여진 바이트 수가 저장될 변수 포인터
+// @param isPartialEnqueueAvailable 부분 쓰기 허용 여부 (true인 경우 여유 공간만큼만 쓰고 성공 처리)
+// @return true: 쓰기 성공, false: 공간 부족 및 실패
+// @note data == nullptr 이면서 requestSize > 0 인 경우 실제로는 아무것도
+//        쓰지 않고 outEnqueueSize에 0을 채운 채 true를 반환합니다.
 //***************************************************************************
 bool CRingBuffer::Enqueue(const char* data, int64 requestSize, int64* outEnqueueSize, bool isPartialEnqueueAvailable)
 {
@@ -124,7 +132,13 @@ bool CRingBuffer::Enqueue(const char* data, int64 requestSize, int64* outEnqueue
 }
 
 //***************************************************************************
-// @brief 링버퍼에서 데이터를 읽습니다.
+// @brief 링버퍼에서 데이터를 읽고 커서를 이동합니다.
+// @param outData 데이터를 복사받을 버퍼 포인터
+// @param requestSize 읽기 요청 크기 (바이트)
+// @param outDequeueSize [out] 실제로 읽혀진 바이트 수가 저장될 변수 포인터
+// @param isPartialDequeueAvailable 부분 읽기 허용 여부
+// @param isPeekMode 읽기 전용 모드 여부 (true인 경우 읽은 후 읽기 커서를 이동하지 않음)
+// @return true: 읽기 성공, false: 데이터 부족 및 실패
 //***************************************************************************
 bool CRingBuffer::Dequeue(char* outData, int64 requestSize, int64* outDequeueSize, bool isPartialDequeueAvailable, bool isPeekMode)
 {
@@ -168,7 +182,12 @@ bool CRingBuffer::Dequeue(char* outData, int64 requestSize, int64* outDequeueSiz
 }
 
 //***************************************************************************
-// @brief 링버퍼에서 데이터를 읽기 커서 변경 없이 복사합니다.
+// @brief 링버퍼에서 데이터를 읽기 커서 이동 없이 복사합니다 (Peek).
+// @param outData 데이터를 복사받을 버퍼 포인터
+// @param requestSize 확인 요청 크기 (바이트)
+// @param outPeekSize [out] 실제로 복사된 바이트 수가 저장될 변수 포인터
+// @param isPartialPeekAvailable 부분 확인 허용 여부
+// @return true: 성공, false: 실패
 //***************************************************************************
 bool CRingBuffer::Peek(char* outData, int64 requestSize, int64* outPeekSize, bool isPartialPeekAvailable)
 {
@@ -176,7 +195,9 @@ bool CRingBuffer::Peek(char* outData, int64 requestSize, int64* outPeekSize, boo
 }
 
 //***************************************************************************
-// @brief WSARecv를 위한 쓰기 가능 영역 WSABUF 추출
+// @brief IOCP WSARecv를 위한 쓰기 가능 영역 WSABUF 배열을 생성합니다 (최대 2개 청크).
+// @param outBuffers [out] 크기 2인 WSABUF 배열 (참조로 받아 컴파일 타임 크기 강제)
+// @return 생성된 청크 개수 (0 ~ 2)
 //***************************************************************************
 int CRingBuffer::GetWSARecvBuffers(WSABUF(&outBuffers)[2]) const
 {
@@ -222,7 +243,9 @@ int CRingBuffer::GetWSARecvBuffers(WSABUF(&outBuffers)[2]) const
 }
 
 //***************************************************************************
-// @brief WSASend를 위한 읽기 가능 영역 WSABUF 추출
+// @brief IOCP WSASend를 위한 읽기 가능 영역 WSABUF 배열을 생성합니다 (최대 2개 청크).
+// @param outBuffers [out] 크기 2인 WSABUF 배열 (참조로 받아 컴파일 타임 크기 강제)
+// @return 생성된 청크 개수 (0 ~ 2)
 //***************************************************************************
 int CRingBuffer::GetWSASendBuffers(WSABUF(&outBuffers)[2]) const
 {
