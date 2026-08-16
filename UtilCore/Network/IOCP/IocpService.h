@@ -19,6 +19,10 @@
 #include <Network/IOCP/IocpListener.h>
 #endif
 
+#ifndef __IOCPSESSIONMANAGER_H__
+#include <Network/IOCP/IocpSessionManager.h>
+#endif
+
 //***************************************************************************
 // @brief IOCP 기반의 서버 전용 서비스 클래스
 // @note CIocpListener를 내부에 두고 비동기 AcceptEx 작업을 총괄 제어합니다.

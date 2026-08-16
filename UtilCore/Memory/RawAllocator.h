@@ -95,6 +95,8 @@ namespace RawAllocator
     //*************************************************************************
     inline void Free(void* ptr)
     {
+        if( ptr == nullptr ) return;
+
 #if defined(MIMALLOC_H)
         ::mi_free(ptr);
 

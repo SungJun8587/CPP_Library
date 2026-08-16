@@ -1,5 +1,4 @@
-
-//***************************************************************************
+ï»¿//***************************************************************************
 // Session.h : interface for the CSession class.
 //
 //***************************************************************************
@@ -9,13 +8,16 @@
 
 #include <functional>
 #include <memory>
+#include <WinSock2.h>
 
+class CSession;
+using CSessionRef = std::shared_ptr<CSession>;
 using SessionFactory = std::function<CSessionRef()>;
 using DisconnectHandler = std::function<void(CSessionRef)>;
 
 //***************************************************************************
 // @class CSession
-// @brief ¸ğµç ³×Æ®¿öÅ© ¼¼¼ÇÀÇ ÃÖ»óÀ§ Ãß»ó ±â¹İ Å¬·¡½º (IOCP/RIO °øÅë)
+// @brief ëª¨ë“  ë„¤íŠ¸ì›Œí¬ ì„¸ì…˜ì˜ ìµœìƒìœ„ ì¶”ìƒ ê¸°ë°˜ í´ë˜ìŠ¤ (IOCP/RIO ê³µí†µ ì¸í„°í˜ì´ìŠ¤)
 //***************************************************************************
 class CSession : public std::enable_shared_from_this<CSession>
 {
@@ -23,19 +25,33 @@ public:
 	CSession() = default;
 	virtual ~CSession() = default;
 
-	// »óÀ§ ¼­ºñ½º ¹× ¼¼¼Ç °ü¸®¸¦ À§ÇÑ ¼ø¼ö °¡»ó ÇÔ¼ö
-	virtual void			Disconnect(const WCHAR* cause) = 0;
+	// ìƒìœ„ ì„œë¹„ìŠ¤ ë° ì„¸ì…˜ ê´€ë¦¬ë¥¼ ìœ„í•œ ìˆœìˆ˜ ê°€ìƒ í•¨ìˆ˜
+	virtual void			Disconnect(const TCHAR* cause) = 0;
 
-	// ¿¬°á ÇØÁ¦ ÀÌº¥Æ® Äİ¹é µî·Ï
+	//***************************************************************************
+	// @brief ì„¸ì…˜ì˜ í˜„ì¬ ì—°ê²° ìƒíƒœë¥¼ ë°˜í™˜í•©ë‹ˆë‹¤.
+	// @return bool ì—°ê²°ë˜ì–´ ìˆìœ¼ë©´ true, ì•„ë‹ˆë©´ false
+	//***************************************************************************
+	virtual bool			IsConnected() const = 0;
+
+	//***************************************************************************
+	// @brief í†µì‹ ì— ì‚¬ìš©ë˜ëŠ” ì†Œì¼“ í•¸ë“¤ì„ ë°˜í™˜í•©ë‹ˆë‹¤.
+	// @return SOCKET ì†Œì¼“ í•¸ë“¤
+	//***************************************************************************
+	virtual SOCKET			GetSocket() const = 0;
+
+	virtual bool			Send(const void* data, uint16_t size) noexcept = 0;
+
+	// ì—°ê²° í•´ì œ ì´ë²¤íŠ¸ ì½œë°± ë“±ë¡
 	void					SetDisconnectHandler(DisconnectHandler handler) { _onDisconnected = handler; }
 
 protected:
-	// ¿¬°á ÇØÁ¦ ¹ß»ı ½Ã ÇÏÀ§ ±¸ÇöÃ¼(CIocpSession/CRioSession)¿¡¼­ È£Ãâ
+	// ì—°ê²° í•´ì œ ë°œìƒ ì‹œ í•˜ìœ„ êµ¬í˜„ì²´(CIocpSession/CRioSession)ì—ì„œ í˜¸ì¶œ
 	void					OnDisconnected()
 	{
 		if( _onDisconnected )
 		{
-			_onDisconnected(shared_from_this()); // CSessionRef ÇüÅÂ·Î Àü´Ş
+			_onDisconnected(shared_from_this()); // CSessionRef í˜•íƒœë¡œ ì „ë‹¬
 		}
 	}
 

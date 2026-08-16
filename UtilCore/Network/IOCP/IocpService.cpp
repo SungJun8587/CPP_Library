@@ -65,6 +65,12 @@ bool CIocpServerService::Start()
 			{
 				iocpSession->SetNetAddress(netAddr);
 				service->AddSession(iocpSession);
+
+				// 글로벌 세션 매니저에도 등록(SessionId 발급 및 연동)
+				uint64_t sessionId = CIocpSessionManager::Instance().GenerateSessionId();
+				iocpSession->SetSessionId(sessionId);
+				CIocpSessionManager::Instance().AddSession(iocpSession->GetSocket(), sessionId, iocpSession);
+
 				iocpSession->ProcessConnect();
 			}
 		}
@@ -128,6 +134,25 @@ bool CIocpClientService::Start()
 		// IOCP Core에 소켓 핸들 등록
 		if( _iocpCore->Register(iocpSession) == false )
 			return false;
+
+		// 2. [추가] 클라이언트 소켓을 서버 주소(_address)로 연결 시도 (Connect)
+		SOCKET sock = iocpSession->GetSocket();
+
+		// 클라이언트는 보통 임의의 포트에 바인딩 후 connect 수행 (시스템이 자동 바인딩하게 두기도 함)
+		SOCKADDR_IN sockAddr = _address.GetSockAddr();
+		if( ::connect(sock, reinterpret_cast<SOCKADDR*>(&sockAddr), sizeof(sockAddr)) == SOCKET_ERROR )
+		{
+			int32 err = ::WSAGetLastError();
+			// WSAEWOULDBLOCK 등 비동기 연결 진행 중 상태가 아니라면 실패
+			if( err != WSAEWOULDBLOCK && err != WSA_IO_PENDING )
+			{
+				return false;
+			}
+		}
+
+		// 3. 연결 성공 처리 (또는 Connect완료 후 ProcessConnect 호출 구조에 맞게 연동)
+		iocpSession->SetNetAddress(_address);
+		iocpSession->ProcessConnect(); // 내부에서 수신(RegisterRecv) 시작
 
 		AddSession(iocpSession);
 	}

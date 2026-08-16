@@ -1,6 +1,6 @@
-
+ï»¿
 //***************************************************************************
-// ClusterSpinMap.cpp : implementation of the CClusterSpinMap class.
+// ClusterSpinMap.inl : implementation of the CClusterSpinMap class.
 //
 //***************************************************************************
 
@@ -12,7 +12,7 @@
 //***************************************************************************
 
 //***************************************************************************
-// @brief CClusterSpinMap »ı¼ºÀÚ
+// @brief CClusterSpinMap ìƒì„±ì
 //***************************************************************************
 template<typename T1, typename T2, __int32 nClusterCnt, bool bInnerLock>
 CClusterSpinMap<T1, T2, nClusterCnt, bInnerLock>::CClusterSpinMap(void)
@@ -21,7 +21,7 @@ CClusterSpinMap<T1, T2, nClusterCnt, bInnerLock>::CClusterSpinMap(void)
 }
 
 //***************************************************************************
-// @brief CClusterSpinMap ¼Ò¸êÀÚ
+// @brief CClusterSpinMap ì†Œë©¸ì
 //***************************************************************************
 template<typename T1, typename T2, __int32 nClusterCnt, bool bInnerLock>
 CClusterSpinMap<T1, T2, nClusterCnt, bInnerLock>::~CClusterSpinMap(void)
@@ -30,29 +30,29 @@ CClusterSpinMap<T1, T2, nClusterCnt, bInnerLock>::~CClusterSpinMap(void)
 }
 
 //***************************************************************************
-// @brief ¸ğµç Å¬·¯½ºÅÍÀÇ »çÀÌÁî¸¦ ÇÕ»êÇÕ´Ï´Ù.
-// @return INT32 ÀüÃ¼ µ¥ÀÌÅÍ °³¼ö
+// @brief ëª¨ë“  í´ëŸ¬ìŠ¤í„°ì˜ ì‚¬ì´ì¦ˆë¥¼ í•©ì‚°í•©ë‹ˆë‹¤.
+// @return INT32 ì „ì²´ ë°ì´í„° ê°œìˆ˜
 //***************************************************************************
 template<typename T1, typename T2, __int32 nClusterCnt, bool bInnerLock>
-INT32 CClusterSpinMap<T1, T2, nClusterCnt, bInnerLock>::getSize(void)
+size_t CClusterSpinMap<T1, T2, nClusterCnt, bInnerLock>::getSize(void)
 {
-	INT32 nSize = 0;
+	size_t size = 0;
 
 	int i = 0;
 	for( i = 0; i < nClusterCnt; ++i )
 	{
 		readLock(i, __FUNCTION__);
-		nSize += m_ObjectMaps[i].size();
+		size += m_ObjectMaps[i].size();
 		readUnlock(i, __FUNCTION__);
 	}
-	return nSize;
+	return size;
 }
 
 //***************************************************************************
-// @brief Å¬·¯½ºÅÍº° ¾²±â ¶ôÀ» ÀÌ¿ëÇÏ¿© µ¥ÀÌÅÍ »ğÀÔ
-// @param key »ğÀÔÇÒ µ¥ÀÌÅÍÀÇ Å°
-// @param object »ğÀÔÇÒ °´Ã¼ °ª
-// @return bool »ğÀÔ ¼º°ø ½Ã true, ÀÌ¹Ì Á¸ÀçÇÏ¸é false
+// @brief í´ëŸ¬ìŠ¤í„°ë³„ ì“°ê¸° ë½ì„ ì´ìš©í•˜ì—¬ ë°ì´í„° ì‚½ì…
+// @param key ì‚½ì…í•  ë°ì´í„°ì˜ í‚¤
+// @param object ì‚½ì…í•  ê°ì²´ ê°’
+// @return bool ì‚½ì… ì„±ê³µ ì‹œ true, ì´ë¯¸ ì¡´ì¬í•˜ë©´ false
 //***************************************************************************
 template<typename T1, typename T2, __int32 nClusterCnt, bool bInnerLock>
 bool CClusterSpinMap<T1, T2, nClusterCnt, bInnerLock>::InsertObject(T1 key, T2 object)
@@ -67,9 +67,9 @@ bool CClusterSpinMap<T1, T2, nClusterCnt, bInnerLock>::InsertObject(T1 key, T2 o
 }
 
 //***************************************************************************
-// @brief ´Ü°Ç ¹İÈ¯ ÇüÅÂÀÇ Á¶È¸
-// @param key °Ë»öÇÒ µ¥ÀÌÅÍÀÇ Å°
-// @return T2 Ã£Àº °´Ã¼ °ª
+// @brief ë‹¨ê±´ ë°˜í™˜ í˜•íƒœì˜ ì¡°íšŒ
+// @param key ê²€ìƒ‰í•  ë°ì´í„°ì˜ í‚¤
+// @return T2 ì°¾ì€ ê°ì²´ ê°’
 //***************************************************************************
 template<typename T1, typename T2, __int32 nClusterCnt, bool bInnerLock>
 T2 CClusterSpinMap<T1, T2, nClusterCnt, bInnerLock>::FindObject(T1 key)
@@ -87,10 +87,10 @@ T2 CClusterSpinMap<T1, T2, nClusterCnt, bInnerLock>::FindObject(T1 key)
 }
 
 //***************************************************************************
-// @brief ÂüÁ¶ÀÚ ´ëÀÔ ÇüÅÂÀÇ Á¶È¸ (¼º°ø ¿©ºÎ ¹İÈ¯)
-// @param key °Ë»öÇÒ µ¥ÀÌÅÍÀÇ Å°
-// @param object [out] °´Ã¼°¡ º¹»çµÉ ÂüÁ¶ÀÚ
-// @return bool °Ë»ö ¼º°ø ½Ã true, Á¸ÀçÇÏÁö ¾ÊÀ¸¸é false
+// @brief ì°¸ì¡°ì ëŒ€ì… í˜•íƒœì˜ ì¡°íšŒ (ì„±ê³µ ì—¬ë¶€ ë°˜í™˜)
+// @param key ê²€ìƒ‰í•  ë°ì´í„°ì˜ í‚¤
+// @param object [out] ê°ì²´ê°€ ë³µì‚¬ë  ì°¸ì¡°ì
+// @return bool ê²€ìƒ‰ ì„±ê³µ ì‹œ true, ì¡´ì¬í•˜ì§€ ì•Šìœ¼ë©´ false
 //***************************************************************************
 template<typename T1, typename T2, __int32 nClusterCnt, bool bInnerLock>
 bool CClusterSpinMap<T1, T2, nClusterCnt, bInnerLock>::FindObject(T1 key, T2& object)
@@ -110,9 +110,9 @@ bool CClusterSpinMap<T1, T2, nClusterCnt, bInnerLock>::FindObject(T1 key, T2& ob
 }
 
 //***************************************************************************
-// @brief Å¬·¯½ºÅÍº° ¾²±â ¶ôÀ» ÀÌ¿ëÇÏ¿© µ¥ÀÌÅÍ »èÁ¦
-// @param key »èÁ¦ÇÒ µ¥ÀÌÅÍÀÇ Å°
-// @return bool »èÁ¦ ¼º°ø ½Ã true, Á¸ÀçÇÏÁö ¾ÊÀ¸¸é false
+// @brief í´ëŸ¬ìŠ¤í„°ë³„ ì“°ê¸° ë½ì„ ì´ìš©í•˜ì—¬ ë°ì´í„° ì‚­ì œ
+// @param key ì‚­ì œí•  ë°ì´í„°ì˜ í‚¤
+// @return bool ì‚­ì œ ì„±ê³µ ì‹œ true, ì¡´ì¬í•˜ì§€ ì•Šìœ¼ë©´ false
 //***************************************************************************
 template<typename T1, typename T2, __int32 nClusterCnt, bool bInnerLock>
 bool CClusterSpinMap<T1, T2, nClusterCnt, bInnerLock>::EraseObject(T1 key)
@@ -132,7 +132,7 @@ bool CClusterSpinMap<T1, T2, nClusterCnt, bInnerLock>::EraseObject(T1 key)
 }
 
 //***************************************************************************
-// @brief ÀüÃ¼ Å¬·¯½ºÅÍ¸¦ ¼øÈ¸ÇÏ¸ç ¸Ê µ¥ÀÌÅÍ ºñ¿ì±â
+// @brief ì „ì²´ í´ëŸ¬ìŠ¤í„°ë¥¼ ìˆœíšŒí•˜ë©° ë§µ ë°ì´í„° ë¹„ìš°ê¸°
 //***************************************************************************
 template<typename T1, typename T2, __int32 nClusterCnt, bool bInnerLock>
 void CClusterSpinMap<T1, T2, nClusterCnt, bInnerLock>::clearObjectMap(void)

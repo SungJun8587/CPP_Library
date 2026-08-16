@@ -4,8 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __NET_SERVICE_H__
-#define __NET_SERVICE_H__
+#ifndef __NETSERVICE_H__
+#define __NETSERVICE_H__
 
 #ifndef __NETADDRESS_H__
 #include <Network/NetAddress.h>
@@ -67,6 +67,7 @@ public:
 	CSessionRef				CreateSession();
 	void					AddSession(CSessionRef session);
 	void					ReleaseSession(CSessionRef session);
+	CSessionRef				GetSession(int32 index);
 
 	//***************************************************************************
 	// @brief 서비스가 정상적으로 시작할 수 있는 상태인지 검증합니다.
@@ -81,7 +82,7 @@ protected:
 
 	std::mutex				_lock;               // 세션 컨테이너 동기화용 뮤텍스
 	int32					_maxSessionCount = 0;// 최대 허용 세션 수
-	CSet<CSessionRef>		_sessions;           // 현재 관리 중인 활성 세션 컨테이너
+	CVector<CSessionRef>	_sessions;           // 현재 관리 중인 활성 세션 컨테이너
 };
 
-#endif // ndef __NET_SERVICE_H__
+#endif // ndef __NETSERVICE_H__

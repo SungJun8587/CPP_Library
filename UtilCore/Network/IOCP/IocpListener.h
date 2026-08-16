@@ -47,22 +47,27 @@ using OnAcceptCallback = std::function<void(CIocpObjectRef session, CNetAddress 
 // @brief 특정 세션 구현체에 종속되지 않는 완전 추상화된 IOCP Accept 처리 클래스.
 //
 // @details
+// [Accept 아키텍처 및 스레드 설계]
+//      - IOCP 환경에서는 Windows 커널의 비동기 확장 함수인 `AcceptEx`를 활용합니다.
+//      - 비동기 완료 및 후속 처리는 글로벌 워커 스레드 풀이 담당하므로, RIO와 달리 리스너 내부에 
+//        별도의 전용 `_acceptThread`나 루프 제어 플래그(`_isListening`)가 필요 없습니다.
+//
 // 역할:
-//     1. Listen 소켓 생성, 바인딩(Bind) 및 리슨(Listen) 수행
-//     2. AcceptEx 비동기 수락 요청을 풀(Pool) 단위로 사전 등록
-//     3. IOCP 완료 통지 수신 시 Accept 처리 후 세션 연결 후속 작업 위임
-//     4. AcceptEx 실패/완료 후 자동 재등록으로 Accept Pool 개수 영구 유지
-// 
+//      1. Listen 소켓 생성, 바인딩(Bind) 및 리슨(Listen) 수행
+//      2. AcceptEx 비동기 수락 요청을 풀(Pool) 단위로 사전 등록
+//      3. IOCP 완료 통지 수신 시 Accept 처리 후 세션 연결 후속 작업 위임
+//      4. AcceptEx 실패/완료 후 자동 재등록으로 Accept Pool 개수 영구 유지
+//
 // 디커플링 설계:
-//     CSession 클래스를 직접 참조하지 않으며, CIocpObjectRef 인터페이스와
-//     OnAcceptCallback을 활용하여 상위 네트워크 레이어로 이벤트를 전파합니다.
+//      CSession 클래스를 직접 참조하지 않으며, CIocpObjectRef 인터페이스와
+//      OnAcceptCallback을 활용하여 상위 네트워크 레이어로 이벤트를 전파합니다.
 //
 // 재시도 정책:
-//     세션 소켓 생성 실패 / AcceptEx 즉시 실패 시 루프 기반으로 재시도합니다.
-//     연속 실패가 kMaxAcceptRetry를 넘으면 해당 AcceptEvent는 재등록을 포기합니다
-//     (워커 스레드가 무한정 블로킹되는 것을 방지).
+//      세션 소켓 생성 실패 / AcceptEx 즉시 실패 시 루프 기반으로 재시도합니다.
+//      연속 실패가 kMaxAcceptRetry를 넘으면 해당 AcceptEvent는 재등록을 포기합니다
+//      (워커 스레드가 무한정 블로킹되는 것을 방지).
 //***************************************************************************
-class CIocpListener : public CIocpObject
+class CIocpListener : public CIocpObject, public std::enable_shared_from_this<CIocpListener>
 {
 public:
     CIocpListener();
@@ -76,6 +81,12 @@ public:
     virtual HANDLE  GetHandle() override { return reinterpret_cast<HANDLE>(_listenSocket); }
 
     virtual void    Dispatch(class CIocpEvent* iocpEvent, int32 numOfBytes = 0) override;
+
+    // CIocpObject의 순수 가상 함수 구현 추가
+    virtual CIocpObjectRef GetIocpObjectPtr() override
+    {
+        return CIocpObjectRef(shared_from_this(), static_cast<CIocpObject*>(this));
+    }
 
 public:
     bool    StartAccept(CIocpCoreRef iocpCore, CNetAddress netAddr, IocpSessionFactory sessionFactory, int32 acceptCount = 10, OnAcceptCallback onAccept = nullptr);

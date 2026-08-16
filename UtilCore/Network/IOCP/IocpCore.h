@@ -15,6 +15,8 @@
 #include <Network/IOCP/IocpEvent.h>
 #endif
 
+#pragma comment(lib, "ntdll.lib")
+
 //***************************************************************************
 // @class CIocpObject
 // @brief IOCP에 등록할 수 있는 모든 객체의 추상 기반 클래스.
@@ -35,11 +37,8 @@
 //     numOfBytes = 0:
 //         정상적인 연결 끊김 또는 에러 → Disconnect 처리 유도
 //         
-// enable_shared_from_this:
-//     IocpEvent::owner에 shared_from_this()로 자신을 등록하기 위해 필요.
-//     이를 통해 I/O가 완료될 때까지 객체 수명이 보장된다.
 //***************************************************************************
-class CIocpObject : public enable_shared_from_this<CIocpObject>
+class CIocpObject
 {
 public:
     //***************************************************************************
@@ -54,6 +53,8 @@ public:
     // @param numOfBytes 전송된 바이트 수 (0인 경우 정상 연결 끊김 또는 에러)
     //***************************************************************************
     virtual void    Dispatch(class CIocpEvent* iocpEvent, int32 numOfBytes = 0) abstract;
+
+    virtual CIocpObjectRef GetIocpObjectPtr() = 0;
 };
 
 //***************************************************************************

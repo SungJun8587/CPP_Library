@@ -727,7 +727,7 @@ Rio::ShutdownResult CRioCore::Shutdown(std::chrono::milliseconds drainTimeout)
             }
 
             const auto remaining = deadline - now;
-            const auto sleepDuration = std::min(remaining, std::chrono::duration_cast<std::chrono::steady_clock::duration>(kDrainPollInterval));
+            const auto sleepDuration = (std::min)(remaining, std::chrono::duration_cast<std::chrono::steady_clock::duration>(kDrainPollInterval));
 
             if( sleepDuration > std::chrono::steady_clock::duration::zero() )
             {
@@ -937,7 +937,7 @@ bool CRioCore::IncrementIoCount() noexcept
 
     for( ;; )
     {
-        if( current == std::numeric_limits<uint32_t>::max() )
+        if( current == (std::numeric_limits<uint32_t>::max)() )
         {
             assert(false && "Outstanding I/O counter overflow");
             return false;

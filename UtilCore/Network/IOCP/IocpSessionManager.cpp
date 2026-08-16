@@ -111,9 +111,9 @@ size_t CIocpSessionManager::GetSessionCount() const
 // @brief 모든 클러스터를 순회하며 스냅샷을 수집한 뒤 락 밖에서 안전하게 전체 세션에게 패킷 전송을 브로드캐스트합니다.
 // @param sendBuffer 전송할 패킷 버퍼
 //***************************************************************************
-void CIocpSessionManager::Broadcast(CSendBufferRef sendBuffer)
+void CIocpSessionManager::Broadcast(const void* data, uint16_t size)
 {
-    if( sendBuffer == nullptr ) return;
+    if( data == nullptr || size == 0 ) return;
 
     for( int32 i = 0; i < _sessions.GetClusterCnt(); ++i )
     {
@@ -127,7 +127,7 @@ void CIocpSessionManager::Broadcast(CSendBufferRef sendBuffer)
             const auto& session = pair.second.session;
             if( session && session->IsConnected() )
             {
-                session->Send(sendBuffer);
+                session->Send(data, size);
             }
         }
 

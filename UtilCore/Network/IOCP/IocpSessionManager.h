@@ -57,7 +57,7 @@ public:
     CIocpSessionRef FindSession(SOCKET socket) const;
 
     size_t GetSessionCount() const;
-    void Broadcast(CSendBufferRef sendBuffer);
+    void Broadcast(const void* data, uint16_t size);
 
     void BeginCloseAllSessions();
     bool AreAllSessionsClosed() const;

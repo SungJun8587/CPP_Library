@@ -87,7 +87,11 @@ void CNetService::AddSession(CSessionRef session)
 		return;
 
 	std::lock_guard<std::mutex> guard(_lock);
-	_sessions.insert(session);
+
+	if( std::find(_sessions.begin(), _sessions.end(), session) == _sessions.end() )
+	{
+		_sessions.push_back(session);
+	}
 }
 
 //***************************************************************************
@@ -100,5 +104,25 @@ void CNetService::ReleaseSession(CSessionRef session)
 		return;
 
 	std::lock_guard<std::mutex> guard(_lock);
-	_sessions.erase(session);
+
+	auto it = std::find(_sessions.begin(), _sessions.end(), session);
+	if( it != _sessions.end() )
+	{
+		_sessions.erase(it);
+	}
+}
+
+//***************************************************************************
+// @brief 지정된 인덱스에 해당하는 세션 객체를 반환합니다.
+// @param index 조회할 세션의 인덱스 (0부터 _sessions.size() - 1까지)
+// @return CSessionRef 인덱스에 해당하는 세션 객체 스마트 포인터 (범위를 벗어날 경우 nullptr)
+//***************************************************************************
+CSessionRef CNetService::GetSession(int32 index)
+{
+	std::lock_guard<std::mutex> lock(_lock);
+	// index 유효성 검사 후 반환
+	if( index < 0 || index >= (int32)_sessions.size() )
+		return nullptr;
+
+	return _sessions[index];
 }

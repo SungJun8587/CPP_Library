@@ -46,6 +46,16 @@ struct RioSessionEntry
 class CRioSessionManager
 {
 public:
+    //***************************************************************************
+    // @brief 싱글톤 패턴을 적용하여 전역에서 단 하나의 CIocpSessionManager 인스턴스에 접근하도록 반환합니다.
+    // @return CIocpSessionManager& 매니저 싱글톤 인스턴스 참조
+    //***************************************************************************
+    static CRioSessionManager& Instance()
+    {
+        static CRioSessionManager instance;
+        return instance;
+    }
+
     CRioSessionManager();
     ~CRioSessionManager();
 

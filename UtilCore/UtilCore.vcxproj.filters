@@ -370,9 +370,6 @@
     <ClInclude Include="Network\RIO\RioSessionManager.h">
       <Filter>Network\RIO</Filter>
     </ClInclude>
-    <ClInclude Include="Network\RIO\RioServer.h">
-      <Filter>Network\RIO</Filter>
-    </ClInclude>
     <ClInclude Include="Network\IOCP\IocpSessionManager.h">
       <Filter>Network\IOCP</Filter>
     </ClInclude>
@@ -386,6 +383,18 @@
       <Filter>Network\IOCP</Filter>
     </ClInclude>
     <ClInclude Include="Network\NetworkRedefineDataType.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\RIO\RioSubmissionHelper.h">
+      <Filter>Network\RIO</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\RIO\RioListener.h">
+      <Filter>Network\RIO</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\RIO\RioService.h">
+      <Filter>Network\RIO</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\NetworkFactory.h">
       <Filter>Network</Filter>
     </ClInclude>
   </ItemGroup>
@@ -587,9 +596,6 @@
     <ClCompile Include="Network\RIO\RioSessionManager.cpp">
       <Filter>Network\RIO</Filter>
     </ClCompile>
-    <ClCompile Include="Network\RIO\RioServer.cpp">
-      <Filter>Network\RIO</Filter>
-    </ClCompile>
     <ClCompile Include="Network\IOCP\IocpSessionManager.cpp">
       <Filter>Network\IOCP</Filter>
     </ClCompile>
@@ -598,6 +604,18 @@
     </ClCompile>
     <ClCompile Include="Network\IOCP\IocpService.cpp">
       <Filter>Network\IOCP</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\RIO\RioSubmissionHelper.cpp">
+      <Filter>Network\RIO</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\RIO\RioListener.cpp">
+      <Filter>Network\RIO</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\RIO\RioService.cpp">
+      <Filter>Network\RIO</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\NetworkFactory.cpp">
+      <Filter>Network</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

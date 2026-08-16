@@ -69,7 +69,7 @@ bool CIocpListener::StartAccept(CIocpCoreRef iocpCore, CNetAddress netAddr, Iocp
         return false;
 
     // 5. Listen 소켓을 IOCP 코어에 등록
-    if( _iocpCore->Register(shared_from_this()) == false )
+    if( _iocpCore->Register(GetIocpObjectPtr()) == false )
         return false;
 
     // 6. 설정된 개수만큼 AcceptEvent 생성 및 AcceptEx 사전 등록 (Accept Pool)

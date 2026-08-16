@@ -27,6 +27,23 @@ namespace Iocp
     };
 
     //***************************************************************************
+    // @enum CloseReason
+    // @brief 세션 종료 원인을 나타내는 열거형
+    //***************************************************************************
+    enum class CloseReason
+    {
+        None,
+        RemoteClosed,           // 상대방 연결 정상 종료 (Recv 0 bytes)
+        SocketError,            // 소켓 네트워크 에러 (WSARecv/WSASend 실패 등)
+        ReceivePostFailed,      // 수신 요청(WSARecv) 게시 실패
+        SendPostFailed,         // 송신 요청(WSASend) 게시 실패
+        RingBufferOverflow,     // 수신 링버퍼 오버플로우
+        SendBufferOverflow,     // 송신 링버퍼 오버플로우
+        InternalError,          // 기타 내부 처리 에러
+        ForcedClose             // 서버 측 또는 관리자에 의한 강제 종료
+    };
+
+    //***************************************************************************
     // @brief 기본 네트워크 수신 버퍼 크기 (10KB / 10,240 Byte).
     // @details
     // 일반적인 IOCP 게임 서버 및 네트워크 프로그램에 최적화된 균형 잡힌 기본값입니다.

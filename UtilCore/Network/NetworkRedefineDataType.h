@@ -26,7 +26,11 @@ USING_SHARED_PTR(CIocpServerService);
 USING_SHARED_PTR(CIocpClientService);
 
 USING_SHARED_PTR(CRioObject);
+USING_SHARED_PTR(CRioCore);
+USING_SHARED_PTR(CRioListener);
+USING_SHARED_PTR(CRioBuffer);
 USING_SHARED_PTR(CRioSession);
-
+USING_SHARED_PTR(CRioServerService);
+USING_SHARED_PTR(CRioClientService);
 
 #endif // ndef __NETWORKREDEFINEDATATYPE_H__

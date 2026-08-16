@@ -40,7 +40,7 @@ public:
 	virtual	~CClusterSpinMap(void);
 
 public:
-	INT32		getSize();
+	size_t		getSize();
 	bool		InsertObject(T1 key, T2 object);
 	T2			FindObject(T1 key);
 	bool		FindObject(T1 key, T2& object);
@@ -195,5 +195,7 @@ public:
 	ObjectMap			m_ObjectMaps[nClusterCnt];    // 클러스터별로 데이터를 저장하는 해시맵 배열 (총 nClusterCnt개)
 	PRWLock				m_ObjectLocks[nClusterCnt];   // 각 클러스터의 동시성 제어를 위한 읽기/쓰기 락(RWLock) 배열
 };
+
+#include "ClusterSpinMap.inl"
 
 #endif // ndef __CLUSTERSPINMAP_H__

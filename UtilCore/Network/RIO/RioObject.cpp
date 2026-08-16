@@ -56,7 +56,7 @@ bool CRioObject::IncrementIoCount() noexcept
 
     for( ;; )
     {
-        if( current == std::numeric_limits<uint32_t>::max() )
+        if( current == (std::numeric_limits<uint32_t>::max)() )
         {
             assert(false && "CRioObject I/O counter overflow");
             return false;

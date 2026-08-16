@@ -113,7 +113,7 @@ bool CRioBuffer::ValidateBufferParameters(uint32_t slotCount, uint32_t slotSize,
     const size_t count = static_cast<size_t>(slotCount);
     const size_t size = static_cast<size_t>(slotSize);
 
-    if( count > std::numeric_limits<size_t>::max() / size ) return false;
+    if( count > (std::numeric_limits<size_t>::max)() / size ) return false;
 
     const size_t totalSize = count * size;
     if( totalSize == 0 ) return false;
@@ -192,7 +192,7 @@ bool CRioBuffer::RegisterBuffer() noexcept
         return false;
 
     // RIORegisterBuffer()의 DataLength는 DWORD입니다.
-    if( _totalSize > static_cast<size_t>(std::numeric_limits<DWORD>::max()) )
+    if( _totalSize > static_cast<size_t>((std::numeric_limits<DWORD>::max)()) )
         return false;
 
     const RIO_BUFFERID bufferId =
@@ -297,7 +297,7 @@ bool CRioBuffer::Initialize(const RIO_EXTENSION_FUNCTION_TABLE* rioTable, uint32
     //***********************************************************************
     // RIORegisterBuffer는 DWORD 길이를 사용합니다.
     //***********************************************************************
-    if( totalSize > static_cast<size_t>(std::numeric_limits<DWORD>::max()) ) return false;
+    if( totalSize > static_cast<size_t>((std::numeric_limits<DWORD>::max)()) ) return false;
 
     //***********************************************************************
     // RIO function table 연결
@@ -464,7 +464,7 @@ bool CRioBuffer::AllocSlot(uint32_t& outSlotIndex) noexcept
     //***********************************************************************
     const uint32_t previous = _allocatedCount.fetch_add(1, std::memory_order_acq_rel);
 
-    if( previous == std::numeric_limits<uint32_t>::max() )
+    if( previous == (std::numeric_limits<uint32_t>::max)() )
     {
         assert(false && "CRioBuffer allocated count overflow");
 
@@ -608,7 +608,7 @@ bool CRioBuffer::GetRioBuffer(uint32_t slotIndex, RIO_BUF& outBuffer) const noex
     const size_t slotIndexSize = static_cast<size_t>(slotIndex);
     const size_t slotSize = static_cast<size_t>(_slotSize);
 
-    if( slotIndexSize > std::numeric_limits<size_t>::max() / slotSize )
+    if( slotIndexSize > (std::numeric_limits<size_t>::max)() / slotSize )
     {
         assert(false && "RIO buffer offset overflow");
         return false;
@@ -629,13 +629,13 @@ bool CRioBuffer::GetRioBuffer(uint32_t slotIndex, RIO_BUF& outBuffer) const noex
     }
 
     // RIO_BUF.Offset / Length는 ULONG입니다.
-    if( offset > static_cast<size_t>(std::numeric_limits<ULONG>::max()) )
+    if( offset > static_cast<size_t>((std::numeric_limits<ULONG>::max)()) )
     {
         assert(false && "RIO buffer offset exceeds ULONG");
         return false;
     }
 
-    if( static_cast<size_t>(_slotSize) > static_cast<size_t>(std::numeric_limits<ULONG>::max()) )
+    if( static_cast<size_t>(_slotSize) > static_cast<size_t>((std::numeric_limits<ULONG>::max)()) )
     {
         assert(false && "RIO buffer slot size exceeds ULONG");
         return false;
@@ -668,7 +668,7 @@ void* CRioBuffer::GetSlotAddress(uint32_t slotIndex) noexcept
     const size_t index = static_cast<size_t>(slotIndex);
     const size_t size = static_cast<size_t>(_slotSize);
 
-    if( index > std::numeric_limits<size_t>::max() / size ) return nullptr;
+    if( index > (std::numeric_limits<size_t>::max)() / size ) return nullptr;
 
     const size_t offset = index * size;
     if( offset >= _totalSize || size > _totalSize - offset ) return nullptr;
@@ -693,7 +693,7 @@ const void* CRioBuffer::GetSlotAddress(uint32_t slotIndex) const noexcept
     const size_t index = static_cast<size_t>(slotIndex);
     const size_t size = static_cast<size_t>(_slotSize);
 
-    if( index > std::numeric_limits<size_t>::max() / size ) return nullptr;
+    if( index > (std::numeric_limits<size_t>::max)() / size ) return nullptr;
 
     const size_t offset = index * size;
     if( offset >= _totalSize || size > _totalSize - offset ) return nullptr;
