@@ -99,6 +99,19 @@ public:
     void JoinThreadById(std::thread::id threadId);
     size_t GetThreadCount() const;
 
+    //***************************************************************************
+    // @brief 현재 스레드 매니저가 전체 종료(Shutting Down) 절차에 진입했는지 여부를 반환합니다.
+    // 
+    // @details
+    //  - JoinThreads()가 호출되어 전체 종료 플래그(_bShuttingDown)가 true로 
+    //    설정되었는지 스레드 안전하게(atomic load) 확인합니다.
+    //  - 워커 스레드 등에서 이 함수를 주기적으로 호출하여 종료 시점을 감지하고
+    //    안전하게 루프를 탈출하는 용도로 활용할 수 있습니다.
+    // 
+    // @return 종료 절차 진입 시 true, 정상 구동 중인 경우 false
+    //***************************************************************************
+    bool IsShuttingDown() const { return _bShuttingDown.load(); }
+
 private:
     void InitTLS();
     void DestroyTLS();

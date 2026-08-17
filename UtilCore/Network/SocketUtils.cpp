@@ -323,7 +323,34 @@ bool CSocketUtils::SetUpdateConnectContext(SOCKET socket)
 		nullptr, 0) != SOCKET_ERROR;
 }
 
-// ---------- Bind / Listen / Close ----------
+// ---------- Connect / Bind / Listen / Close ----------
+
+//***************************************************************************
+// @brief 지정한 소켓을 원격 주소(CNetAddress)에 동기 방식으로 연결합니다.
+// @param socket 연결에 사용할 대상 소켓 핸들
+// @param netAddr 접속할 원격지의 네트워크 주소 정보 (CNetAddress)
+// @return bool 연결 성공 시 true, 실패 시 false 반환
+// @details
+//      - Winsock의 기본 동기 `connect()` API를 호출하여 원격 서버와의 3-Way Handshake를 수행합니다.
+//      - 연결 실패 시 내부적으로 `ReportError`를 통해 Winsock 에러 코드를 로그로 기록합니다.
+//      - RIO(Registered I/O) 환경에서 소켓 연결 완료 후 RIO_RQ를 생성하기 전 단계에 활용됩니다.
+//***************************************************************************
+bool CSocketUtils::Connect(SOCKET socket, CNetAddress netAddr)
+{
+	if( socket == INVALID_SOCKET )
+		return false;
+
+	SOCKADDR_IN serverAddr = netAddr.GetSockAddr();
+	int result = ::connect(socket, reinterpret_cast<SOCKADDR*>(&serverAddr), sizeof(serverAddr));
+
+	if( result == SOCKET_ERROR )
+	{
+		ReportError(_T("CSocketUtils::Connect"), ::WSAGetLastError());
+		return false;
+	}
+
+	return true;
+}
 
 //***************************************************************************
 // @brief 소켓에 네트워크 주소(IP 및 Port)를 바인딩합니다.

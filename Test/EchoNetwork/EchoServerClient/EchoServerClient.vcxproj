@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{3137025c-5130-4bfa-99e9-3785a753b4fb}</ProjectGuid>
+    <RootNamespace>EchoServerClient</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <OutDir>$(SolutionDir)Bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>Bin\$(Platform)\$(Configuration)\</IntDir>
+    <TargetName>$(ProjectName)64D</TargetName>
+    <IncludePath>K:\GitHub\CPP\Library\UtilCore;$(ProjectDir);$(IncludePath)</IncludePath>
+    <LibraryPath>K:\GitHub\CPP\Library\ExternalLib\Bin\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>$(SolutionDir)Bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>Bin\$(Platform)\$(Configuration)\</IntDir>
+    <TargetName>$(ProjectName)64</TargetName>
+    <IncludePath>K:\GitHub\CPP\Library\UtilCore;$(ProjectDir);$(IncludePath)</IncludePath>
+    <LibraryPath>K:\GitHub\CPP\Library\ExternalLib\Bin\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\UtilCore\BaseGlobal.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\BaseTLS.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Memory\Allocator.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Memory\Memory.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Memory\MemoryPool.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\IOCP\IocpCore.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\IOCP\IocpEvent.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\IOCP\IocpListener.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\IOCP\IocpService.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\IOCP\IocpSession.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\IOCP\IocpSessionManager.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\IOCP\RecvBuffer.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\IOCP\SendBuffer.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\NetAddress.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\NetService.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\NetworkFactory.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\RingBuffer.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioBuffer.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioCore.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioEvent.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioEventPool.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioListener.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioObject.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioReceive.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioSend.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioService.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioSession.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioSessionManager.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioSubmissionHelper.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\SocketUtils.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Thread\DeadLockProfiler.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Thread\SRWLock.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Thread\ThreadManager.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Util\Log.cpp" />
+    <ClCompile Include="IocpEchoSession.cpp" />
+    <ClCompile Include="EchoServerClient.cpp" />
+    <ClCompile Include="RioEchoSession.cpp" />
+    <ClCompile Include="pch.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\UtilCore\BaseDefine.h" />
+    <ClInclude Include="..\..\..\UtilCore\BaseGlobal.h" />
+    <ClInclude Include="..\..\..\UtilCore\BaseMacro.h" />
+    <ClInclude Include="..\..\..\UtilCore\BaseRedefineDataType.h" />
+    <ClInclude Include="..\..\..\UtilCore\BaseTLS.h" />
+    <ClInclude Include="..\..\..\UtilCore\Containers\Map\ClusterSpinMap.h" />
+    <ClInclude Include="..\..\..\UtilCore\Containers\Stack\LockFreeSlotStack.h" />
+    <ClInclude Include="..\..\..\UtilCore\Memory\Allocator.h" />
+    <ClInclude Include="..\..\..\UtilCore\Memory\Containers.h" />
+    <ClInclude Include="..\..\..\UtilCore\Memory\Memory.h" />
+    <ClInclude Include="..\..\..\UtilCore\Memory\MemoryPool.h" />
+    <ClInclude Include="..\..\..\UtilCore\Memory\ObjectPool.h" />
+    <ClInclude Include="..\..\..\UtilCore\Memory\RawAllocator.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\IocpCommon.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\IocpCore.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\IocpEvent.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\IocpListener.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\IocpService.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\IocpSession.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\IocpSessionManager.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\RecvBuffer.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\SendBuffer.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\NetAddress.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\NetService.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\NetworkCommon.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\NetworkFactory.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\NetworkRedefineDataType.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\RingBuffer.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioBuffer.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioCommon.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioCore.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioEvent.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioEventPool.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioListener.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioObject.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioReceive.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioSend.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioService.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioSession.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioSessionManager.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioSubmissionHelper.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\Session.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\SocketUtils.h" />
+    <ClInclude Include="..\..\..\UtilCore\Thread\DeadLockProfiler.h" />
+    <ClInclude Include="..\..\..\UtilCore\Thread\PlatformLock.h" />
+    <ClInclude Include="..\..\..\UtilCore\Thread\SpinLock.h" />
+    <ClInclude Include="..\..\..\UtilCore\Thread\SRWLock.h" />
+    <ClInclude Include="..\..\..\UtilCore\Thread\ThreadManager.h" />
+    <ClInclude Include="..\..\..\UtilCore\Util\Log.h" />
+    <ClInclude Include="IocpEchoSession.h" />
+    <ClInclude Include="RioEchoSession.h" />
+    <ClInclude Include="pch.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\UtilCore\Containers\Map\ClusterSpinMap.inl" />
+    <None Include="..\..\..\UtilCore\Thread\SpinLock.inl" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

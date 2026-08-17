@@ -25,7 +25,7 @@
 
 //***************************************************************************
 // @brief IOCP 기반의 서버 전용 서비스 클래스
-// @note CIocpListener를 내부에 두고 비동기 AcceptEx 작업을 총괄 제어합니다.
+// @note CIocpListener를 내부에 두고 비동기 AcceptEx 작업을 총괄 제어하며, CIocpSessionManager를 직접 소유합니다.
 //***************************************************************************
 class CIocpServerService : public CNetService
 {
@@ -61,9 +61,16 @@ public:
 	//***************************************************************************
 	CIocpCoreRef	GetIocpCore() const { return _iocpCore; }
 
+	//***************************************************************************
+	// @brief 소속된 세션 매니저 참조를 반환합니다.
+	// @return CIocpSessionManager& 세션 매니저 객체
+	//***************************************************************************
+	CIocpSessionManager& GetSessionManager() { return _sessionManager; }
+
 private:
-	CIocpCoreRef	_iocpCore = nullptr;
-	CIocpListenerRef _listener = nullptr;
+	CIocpCoreRef			_iocpCore = nullptr;
+	CIocpListenerRef		_listener = nullptr;
+	CIocpSessionManager		_sessionManager; // 서버 서비스가 직접 소유하는 세션 매니저
 };
 
 //***************************************************************************

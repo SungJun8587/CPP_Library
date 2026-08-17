@@ -34,66 +34,42 @@ uint64_t CIocpSessionManager::GenerateSessionId()
 
 //***************************************************************************
 // @brief 세션을 매니저에 등록합니다.
-// @param socket 소켓 키
-// @param sessionId 고유 세션 ID
+// @param sessionId 고유 세션 ID (Key)
 // @param session 세션 shared_ptr
 // @return 등록 성공 시 true, 실패 시 false
 //***************************************************************************
-bool CIocpSessionManager::AddSession(SOCKET socket, uint64_t sessionId, CIocpSessionRef session)
+bool CIocpSessionManager::AddSession(uint64_t sessionId, CIocpSessionRef session)
 {
-    if( socket == INVALID_SOCKET || session == nullptr )
+    if( sessionId == 0 || session == nullptr )
         return false;
 
-    return _sessions.InsertObject(socket, IocpSessionEntry{ sessionId, session });
+    return _sessions.InsertObject(sessionId, session);
 }
 
 //***************************************************************************
-// @brief 소켓 재사용 레이스 방지를 위해 세션 ID를 함께 검증하여 매니저에서 제거합니다.
-// @param socket 제거할 소켓 키
-// @param sessionId 검증할 고유 세션 ID
+// @brief SessionId를 기반으로 매니저에서 세션을 제거합니다.
+// @param sessionId 제거할 고유 세션 ID (Key)
 //***************************************************************************
-void CIocpSessionManager::RemoveSession(SOCKET socket, uint64_t sessionId)
+void CIocpSessionManager::RemoveSession(uint64_t sessionId)
 {
-    if( socket == INVALID_SOCKET )
+    if( sessionId == 0 )
         return;
 
-    _sessions.WriteLock(socket, __FUNCTION__);
-
-    IocpSessionEntry entry;
-    if( _sessions.FindObject(socket, entry) )
-    {
-        if( entry.sessionId == sessionId )
-        {
-            _sessions.EraseObject(socket);
-        }
-    }
-
-    _sessions.WriteUnlock(socket, __FUNCTION__);
+    _sessions.EraseObject(sessionId);
 }
 
 //***************************************************************************
-// @brief 소켓 키 기반으로 유효한 세션을 검색합니다.
-// @param socket 찾을 소켓 키
+// @brief SessionId 기반으로 유효한 세션을 검색합니다.
+// @param sessionId 찾을 고유 세션 ID (Key)
 // @return 세션 shared_ptr (존재하지 않을 경우 nullptr)
 //***************************************************************************
-CIocpSessionRef CIocpSessionManager::FindSession(SOCKET socket) const
+CIocpSessionRef CIocpSessionManager::FindSession(uint64_t sessionId) const
 {
-    if( socket == INVALID_SOCKET ) return nullptr;
+    if( sessionId == 0 )
+        return nullptr;
 
     auto& mutableSessions = const_cast<decltype(_sessions)&>(_sessions);
-
-    mutableSessions.ReadLock(socket, __FUNCTION__);
-
-    IocpSessionEntry entry;
-    CIocpSessionRef session = nullptr;
-    if( mutableSessions.FindObject(socket, entry) )
-    {
-        session = entry.session;
-    }
-
-    mutableSessions.ReadUnlock(socket, __FUNCTION__);
-
-    return session;
+    return mutableSessions.FindObject(sessionId);
 }
 
 //***************************************************************************
@@ -102,36 +78,34 @@ CIocpSessionRef CIocpSessionManager::FindSession(SOCKET socket) const
 //***************************************************************************
 size_t CIocpSessionManager::GetSessionCount() const
 {
-    // decltype(_sessions) 적용으로 하드코딩 템플릿 인자 제거
     auto& mutableSessions = const_cast<decltype(_sessions)&>(_sessions);
     return static_cast<size_t>(mutableSessions.getSize());
 }
 
 //***************************************************************************
 // @brief 모든 클러스터를 순회하며 스냅샷을 수집한 뒤 락 밖에서 안전하게 전체 세션에게 패킷 전송을 브로드캐스트합니다.
-// @param sendBuffer 전송할 패킷 버퍼
+// @param data 전송할 데이터 포인터
+// @param size 전송할 데이터 크기
 //***************************************************************************
 void CIocpSessionManager::Broadcast(const void* data, uint16_t size)
 {
-    if( data == nullptr || size == 0 ) return;
+    if( data == nullptr || size == 0 )
+        return;
 
     for( int32 i = 0; i < _sessions.GetClusterCnt(); ++i )
     {
-        // 1. 인덱스로 직접 락 획득
         _sessions.WriteLockByIdx(i, __FUNCTION__);
 
-        // 2. 인덱스로 해당 클러스터의 Map 참조 가져오기
         auto& sessionMap = _sessions.GetClusterMapByIdx(i);
         for( auto& pair : sessionMap )
         {
-            const auto& session = pair.second.session;
+            const auto& session = pair.second;
             if( session && session->IsConnected() )
             {
                 session->Send(data, size);
             }
         }
 
-        // 3. 락 해제
         _sessions.WriteUnlockByIdx(i, __FUNCTION__);
     }
 }
@@ -146,15 +120,14 @@ void CIocpSessionManager::BeginCloseAllSessions()
 
     for( INT32 i = 0; i < clusterCnt; ++i )
     {
-        // 인덱스 기반 직접 읽기 락 및 맵 참조
         _sessions.ReadLockByIdx(i, __FUNCTION__);
         auto& objMap = _sessions.GetClusterMapByIdx(i);
 
         for( auto const& pair : objMap )
         {
-            if( pair.second.session )
+            if( pair.second )
             {
-                sessionsToClose.push_back(pair.second.session);
+                sessionsToClose.push_back(pair.second);
             }
         }
         _sessions.ReadUnlockByIdx(i, __FUNCTION__);
@@ -180,13 +153,12 @@ bool CIocpSessionManager::AreAllSessionsClosed() const
 
     for( INT32 i = 0; i < clusterCnt; ++i )
     {
-        // 인덱스 기반 직접 읽기 락 및 맵 참조
         mutableSessions.ReadLockByIdx(i, __FUNCTION__);
         auto& objMap = mutableSessions.GetClusterMapByIdx(i);
 
         for( auto const& pair : objMap )
         {
-            if( pair.second.session && pair.second.session->IsConnected() )
+            if( pair.second && pair.second->IsConnected() )
             {
                 mutableSessions.ReadUnlockByIdx(i, __FUNCTION__);
                 return false;
@@ -207,13 +179,12 @@ void CIocpSessionManager::RemoveClosedSessions()
 
     for( INT32 i = 0; i < clusterCnt; ++i )
     {
-        // 인덱스 기반 직접 쓰기 락 및 맵 참조
         _sessions.WriteLockByIdx(i, __FUNCTION__);
         auto& objMap = _sessions.GetClusterMapByIdx(i);
 
         for( auto it = objMap.begin(); it != objMap.end(); )
         {
-            const auto& session = it->second.session;
+            const auto& session = it->second;
             if( !session || !session->IsConnected() )
             {
                 it = objMap.erase(it);

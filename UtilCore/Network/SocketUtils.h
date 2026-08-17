@@ -75,6 +75,7 @@ public:
 	static bool     SetUpdateConnectContext(SOCKET socket);
 
 	// ---------- Bind / Listen / Close ----------
+	static bool     Connect(SOCKET socket, CNetAddress netAddr);
 	static bool     Bind(SOCKET socket, CNetAddress netAddr);
 	static bool     Listen(SOCKET socket, int32 backlog = SOMAXCONN);
 	static void     Close(SOCKET socket);

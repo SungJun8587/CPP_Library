@@ -1,112 +1,112 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="EchoNetwork.cpp" />
-    <ClCompile Include="..\..\UtilCore\BaseTLS.cpp">
+    <ClCompile Include="EchoServer.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\BaseTLS.cpp">
       <Filter>UtilCore</Filter>
     </ClCompile>
     <ClCompile Include="pch.cpp" />
-    <ClCompile Include="..\..\UtilCore\Memory\Memory.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Memory\Memory.cpp">
       <Filter>UtilCore\Memory</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Memory\MemoryPool.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Memory\MemoryPool.cpp">
       <Filter>UtilCore\Memory</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Memory\Allocator.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Memory\Allocator.cpp">
       <Filter>UtilCore\Memory</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Network\IOCP\IocpCore.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Network\IOCP\IocpCore.cpp">
       <Filter>UtilCore\Network\IOCP</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Network\IOCP\IocpEvent.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Network\IOCP\IocpEvent.cpp">
       <Filter>UtilCore\Network\IOCP</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Network\IOCP\IocpListener.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Network\IOCP\IocpListener.cpp">
       <Filter>UtilCore\Network\IOCP</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Network\IOCP\IocpService.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Network\IOCP\IocpService.cpp">
       <Filter>UtilCore\Network\IOCP</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Network\IOCP\IocpSession.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Network\IOCP\IocpSession.cpp">
       <Filter>UtilCore\Network\IOCP</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Network\IOCP\IocpSessionManager.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Network\IOCP\IocpSessionManager.cpp">
       <Filter>UtilCore\Network\IOCP</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Network\RIO\RioBuffer.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioBuffer.cpp">
       <Filter>UtilCore\Network\RIO</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Network\RIO\RioCore.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioCore.cpp">
       <Filter>UtilCore\Network\RIO</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Network\RIO\RioEvent.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioEvent.cpp">
       <Filter>UtilCore\Network\RIO</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Network\RIO\RioEventPool.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioEventPool.cpp">
       <Filter>UtilCore\Network\RIO</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Network\RIO\RioListener.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioListener.cpp">
       <Filter>UtilCore\Network\RIO</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Network\RIO\RioObject.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioObject.cpp">
       <Filter>UtilCore\Network\RIO</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Network\RIO\RioReceive.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioReceive.cpp">
       <Filter>UtilCore\Network\RIO</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Network\RIO\RioSend.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioSend.cpp">
       <Filter>UtilCore\Network\RIO</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Network\RIO\RioService.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioService.cpp">
       <Filter>UtilCore\Network\RIO</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Network\RIO\RioSession.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioSession.cpp">
       <Filter>UtilCore\Network\RIO</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Network\RIO\RioSessionManager.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioSessionManager.cpp">
       <Filter>UtilCore\Network\RIO</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Network\RIO\RioSubmissionHelper.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioSubmissionHelper.cpp">
       <Filter>UtilCore\Network\RIO</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Network\NetAddress.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Network\NetAddress.cpp">
       <Filter>UtilCore\Network</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Network\NetService.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Network\NetService.cpp">
       <Filter>UtilCore\Network</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Network\NetworkFactory.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Network\NetworkFactory.cpp">
       <Filter>UtilCore\Network</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Util\Log.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Util\Log.cpp">
       <Filter>UtilCore\Util</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Thread\DeadLockProfiler.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Thread\DeadLockProfiler.cpp">
       <Filter>UtilCore\Thread</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Thread\SRWLock.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Thread\SRWLock.cpp">
       <Filter>UtilCore\Thread</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Thread\ThreadManager.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Thread\ThreadManager.cpp">
       <Filter>UtilCore\Thread</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Network\SocketUtils.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Network\SocketUtils.cpp">
       <Filter>UtilCore\Network</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Network\RingBuffer.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Network\RingBuffer.cpp">
       <Filter>UtilCore\Network</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Network\IOCP\RecvBuffer.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Network\IOCP\RecvBuffer.cpp">
       <Filter>UtilCore\Network\IOCP</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\Network\IOCP\SendBuffer.cpp">
+    <ClCompile Include="..\..\..\UtilCore\Network\IOCP\SendBuffer.cpp">
       <Filter>UtilCore\Network\IOCP</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UtilCore\BaseGlobal.cpp">
+    <ClCompile Include="..\..\..\UtilCore\BaseGlobal.cpp">
       <Filter>UtilCore</Filter>
     </ClCompile>
-    <ClCompile Include="IocpEchoSession.cpp" />
-    <ClCompile Include="RioEchoSession.cpp" />
+    <ClCompile Include="IocpEchoServerSession.cpp" />
+    <ClCompile Include="RioEchoServerSession.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="UtilCore">
@@ -141,162 +141,162 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\UtilCore\BaseDefine.h">
+    <ClInclude Include="..\..\..\UtilCore\BaseDefine.h">
       <Filter>UtilCore</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\BaseMacro.h">
+    <ClInclude Include="..\..\..\UtilCore\BaseMacro.h">
       <Filter>UtilCore</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\BaseRedefineDataType.h">
+    <ClInclude Include="..\..\..\UtilCore\BaseRedefineDataType.h">
       <Filter>UtilCore</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\BaseTLS.h">
+    <ClInclude Include="..\..\..\UtilCore\BaseTLS.h">
       <Filter>UtilCore</Filter>
     </ClInclude>
     <ClInclude Include="pch.h" />
-    <ClInclude Include="..\..\UtilCore\Memory\MemoryPool.h">
+    <ClInclude Include="..\..\..\UtilCore\Memory\MemoryPool.h">
       <Filter>UtilCore\Memory</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Memory\Memory.h">
+    <ClInclude Include="..\..\..\UtilCore\Memory\Memory.h">
       <Filter>UtilCore\Memory</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Memory\Allocator.h">
+    <ClInclude Include="..\..\..\UtilCore\Memory\Allocator.h">
       <Filter>UtilCore\Memory</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Memory\RawAllocator.h">
+    <ClInclude Include="..\..\..\UtilCore\Memory\RawAllocator.h">
       <Filter>UtilCore\Memory</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\IOCP\IocpCommon.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\IocpCommon.h">
       <Filter>UtilCore\Network\IOCP</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\IOCP\IocpCore.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\IocpCore.h">
       <Filter>UtilCore\Network\IOCP</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\IOCP\IocpEvent.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\IocpEvent.h">
       <Filter>UtilCore\Network\IOCP</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\IOCP\IocpListener.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\IocpListener.h">
       <Filter>UtilCore\Network\IOCP</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\IOCP\IocpService.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\IocpService.h">
       <Filter>UtilCore\Network\IOCP</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\IOCP\IocpSession.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\IocpSession.h">
       <Filter>UtilCore\Network\IOCP</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\IOCP\IocpSessionManager.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\IocpSessionManager.h">
       <Filter>UtilCore\Network\IOCP</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\RIO\RioBuffer.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioBuffer.h">
       <Filter>UtilCore\Network\RIO</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\RIO\RioCommon.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioCommon.h">
       <Filter>UtilCore\Network\RIO</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\RIO\RioCore.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioCore.h">
       <Filter>UtilCore\Network\RIO</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\RIO\RioEvent.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioEvent.h">
       <Filter>UtilCore\Network\RIO</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\RIO\RioEventPool.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioEventPool.h">
       <Filter>UtilCore\Network\RIO</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\RIO\RioListener.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioListener.h">
       <Filter>UtilCore\Network\RIO</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\RIO\RioObject.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioObject.h">
       <Filter>UtilCore\Network\RIO</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\RIO\RioReceive.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioReceive.h">
       <Filter>UtilCore\Network\RIO</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\RIO\RioSend.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioSend.h">
       <Filter>UtilCore\Network\RIO</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\RIO\RioService.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioService.h">
       <Filter>UtilCore\Network\RIO</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\RIO\RioSession.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioSession.h">
       <Filter>UtilCore\Network\RIO</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\RIO\RioSessionManager.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioSessionManager.h">
       <Filter>UtilCore\Network\RIO</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\RIO\RioSubmissionHelper.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioSubmissionHelper.h">
       <Filter>UtilCore\Network\RIO</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\NetAddress.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\NetAddress.h">
       <Filter>UtilCore\Network</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\NetService.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\NetService.h">
       <Filter>UtilCore\Network</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\NetworkCommon.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\NetworkCommon.h">
       <Filter>UtilCore\Network</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\NetworkFactory.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\NetworkFactory.h">
       <Filter>UtilCore\Network</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\NetworkRedefineDataType.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\NetworkRedefineDataType.h">
       <Filter>UtilCore\Network</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Memory\ObjectPool.h">
+    <ClInclude Include="..\..\..\UtilCore\Memory\ObjectPool.h">
       <Filter>UtilCore\Memory</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Util\Log.h">
+    <ClInclude Include="..\..\..\UtilCore\Util\Log.h">
       <Filter>UtilCore\Util</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Containers\Map\ClusterSpinMap.h">
+    <ClInclude Include="..\..\..\UtilCore\Containers\Map\ClusterSpinMap.h">
       <Filter>UtilCore\Containers\Map</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Memory\Containers.h">
+    <ClInclude Include="..\..\..\UtilCore\Memory\Containers.h">
       <Filter>UtilCore\Memory</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Containers\Stack\LockFreeSlotStack.h">
+    <ClInclude Include="..\..\..\UtilCore\Containers\Stack\LockFreeSlotStack.h">
       <Filter>UtilCore\Containers\Stack</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Thread\DeadLockProfiler.h">
+    <ClInclude Include="..\..\..\UtilCore\Thread\DeadLockProfiler.h">
       <Filter>UtilCore\Thread</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Thread\SpinLock.h">
+    <ClInclude Include="..\..\..\UtilCore\Thread\SpinLock.h">
       <Filter>UtilCore\Thread</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Thread\SRWLock.h">
+    <ClInclude Include="..\..\..\UtilCore\Thread\SRWLock.h">
       <Filter>UtilCore\Thread</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Thread\ThreadManager.h">
+    <ClInclude Include="..\..\..\UtilCore\Thread\ThreadManager.h">
       <Filter>UtilCore\Thread</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\SocketUtils.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\SocketUtils.h">
       <Filter>UtilCore\Network</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\Session.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\Session.h">
       <Filter>UtilCore\Network</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\RingBuffer.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\RingBuffer.h">
       <Filter>UtilCore\Network</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Thread\PlatformLock.h">
+    <ClInclude Include="..\..\..\UtilCore\Thread\PlatformLock.h">
       <Filter>UtilCore\Thread</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\IOCP\RecvBuffer.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\RecvBuffer.h">
       <Filter>UtilCore\Network\IOCP</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\Network\IOCP\SendBuffer.h">
+    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\SendBuffer.h">
       <Filter>UtilCore\Network\IOCP</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UtilCore\BaseGlobal.h">
+    <ClInclude Include="..\..\..\UtilCore\BaseGlobal.h">
       <Filter>UtilCore</Filter>
     </ClInclude>
-    <ClInclude Include="IocpEchoSession.h" />
-    <ClInclude Include="RioEchoSession.h" />
+    <ClInclude Include="IocpEchoServerSession.h" />
+    <ClInclude Include="RioEchoServerSession.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\UtilCore\Containers\Map\ClusterSpinMap.inl">
+    <None Include="..\..\..\UtilCore\Containers\Map\ClusterSpinMap.inl">
       <Filter>UtilCore\Containers\Map</Filter>
     </None>
-    <None Include="..\..\UtilCore\Thread\SpinLock.inl">
+    <None Include="..\..\..\UtilCore\Thread\SpinLock.inl">
       <Filter>UtilCore\Thread</Filter>
     </None>
   </ItemGroup>

@@ -1,0 +1,43 @@
+﻿
+//***************************************************************************
+// RioEchoServerSession.h : interface for the CRioEchoServerSession class.
+//
+//***************************************************************************
+
+#ifndef __RIOECHOSERVERSESSION_H__
+#define __RIOECHOSERVERSESSION_H__
+
+#ifndef __RIOSESSION_H__
+#include <Network/RIO/RioSession.h>
+#endif
+
+//***************************************************************************
+// @class CRioEchoServerSession
+// @brief 서버용 RIO 에코 세션 클래스
+// @details RIO 세션 이벤트(연결, 해제, 데이터 수신)를 처리하고 에코 기능을 수행합니다.
+//***************************************************************************
+class CRioEchoServerSession : public CRioSession
+{
+public:
+	CRioEchoServerSession();
+	virtual ~CRioEchoServerSession();
+
+	//***************************************************************************
+	// @brief 클라이언트 연결 성공 시 호출되는 오버라이드 함수입니다.
+	//***************************************************************************
+	virtual void OnConnected() override;
+
+	//***************************************************************************
+	// @brief 클라이언트 연결 종료 시 호출되는 오버라이드 함수입니다.
+	// @param reason 세션 종료 사유
+	//***************************************************************************
+	virtual void OnDisconnected(Rio::CloseReason reason) override;
+
+	//***************************************************************************
+	// @brief 수신 링버퍼에 데이터가 쌓였을 때 호출되는 순수 가상 오버라이드 함수입니다.
+	// @details 링버퍼에서 데이터를 읽어 출력하고, 그대로 클라이언트에게 에코백(Send)합니다.
+	//***************************************************************************
+	virtual void OnDataReceived() override;
+};
+
+#endif // __RIOECHOSERVERSESSION_H__

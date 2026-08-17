@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // IocpService.cpp: implementation of the CIocpService classes.
 //
@@ -12,11 +12,11 @@
 //***************************************************************************
 
 //***************************************************************************
-// @brief CIocpServerService »ı¼ºÀÚ ±¸Çö
-// @param address ¼­¹ö ¹ÙÀÎµù ÁÖ¼Ò
-// @param iocpCore IOCP ÄÚ¾î ÂüÁ¶
-// @param factory ¼¼¼Ç »ı¼º ÆÑÅä¸®
-// @param maxSessionCount ÃÖ´ë ¼¼¼Ç ¼ö
+// @brief CIocpServerService ìƒì„±ì êµ¬í˜„
+// @param address ì„œë²„ ë°”ì¸ë”© ì£¼ì†Œ
+// @param iocpCore IOCP ì½”ì–´ ê°ì²´
+// @param factory ì„¸ì…˜ ìƒì„± íŒ©í† ë¦¬
+// @param maxSessionCount ìµœëŒ€ ì„¸ì…˜ ìˆ˜
 //***************************************************************************
 CIocpServerService::CIocpServerService(CNetAddress address, CIocpCoreRef iocpCore, SessionFactory factory, int32 maxSessionCount)
 	: CNetService(NetServiceType::Server, address, factory, maxSessionCount), _iocpCore(iocpCore)
@@ -24,9 +24,9 @@ CIocpServerService::CIocpServerService(CNetAddress address, CIocpCoreRef iocpCor
 }
 
 //***************************************************************************
-// @brief ¼­¹ö ±¸µ¿ ¹× Listener ÃÊ±âÈ­
-// @return bool ¼­¹ö °¡µ¿ ¼º°ø ¿©ºÎ
-// @note IocpSessionFactory¿Í OnAcceptCallback ¶÷´Ù¸¦ ÀÛ¼ºÇÒ ¶§ ½º¸¶Æ® Æ÷ÀÎÅÍ ¾÷/´Ù¿î Ä³½ºÆÃÀ» ¼öÇàÇÕ´Ï´Ù.
+// @brief ì„œë²„ ì‹œì‘ ë° Listener ì´ˆê¸°í™”
+// @return bool ì„±ê³µ ì—¬ë¶€ ì„±ê³µ ì—¬ë¶€ ë°˜í™˜
+// @note ëŒë‹¤ ìº¡ì²˜ ì‹œ ìˆœí™˜ ì°¸ì¡°ë¥¼ ë°©ì§€í•˜ê¸° ìœ„í•´ weak_ptrì„ í™œìš©í•©ë‹ˆë‹¤.
 //***************************************************************************
 bool CIocpServerService::Start()
 {
@@ -37,39 +37,48 @@ bool CIocpServerService::Start()
 	if( _listener == nullptr )
 		return false;
 
-	CIocpServerServiceRef service = std::static_pointer_cast<CIocpServerService>(shared_from_this());
+	// ìˆœí™˜ ì°¸ì¡° ë°©ì§€ë¥¼ ìœ„í•´ shared_from_this()ë¥¼ weak_ptrë¡œ ì „í™˜
+	std::weak_ptr<CIocpServerService> serviceWeak = std::static_pointer_cast<CIocpServerService>(shared_from_this());
 
-	// Listener ±¸µ¿ ½ÃÀÛ
+	// Listener ì‹œì‘ ì„¤ì •
 	bool result = _listener->StartAccept(
 		_iocpCore,
 		_address,
 		//***************************************************************************
-		// @brief IocpSessionFactory ¶÷´Ù ±¸Çö
-		// @return CIocpObjectRef »ı¼ºµÈ ¼¼¼ÇÀÇ CIocpObject ¾÷Ä³½ºÆÃ °´Ã¼
+		// @brief IocpSessionFactory ëŒë‹¤ ì„¤ì •
+		// @return CIocpObjectRef ìƒì„±ëœ ì„¸ì…˜ì„ CIocpObject ìºìŠ¤íŒ…í•œ ê°ì²´
 		//***************************************************************************
-		[service]() -> CIocpObjectRef
+		[serviceWeak]() -> CIocpObjectRef
 		{
+			auto service = serviceWeak.lock();
+			if( service == nullptr )
+				return nullptr;
+
 			CSessionRef session = service->CreateSession();
 			return std::static_pointer_cast<CIocpSession>(session);
 		},
-		10, // AcceptEx »çÀü ¹ßÁÖ °³¼ö
+		10, // AcceptEx ë™ì‹œ ëŒ€ê¸° ê°¯ìˆ˜
 		//***************************************************************************
-		// @brief OnAcceptCallback ¶÷´Ù ±¸Çö
-		// @param session Accept ¿Ï·á ÅëÁöµÈ CIocpObject °´Ã¼
-		// @param netAddr Å¬¶óÀÌ¾ğÆ® ¿ø°İ ³×Æ®¿öÅ© ÁÖ¼Ò
+		// @brief OnAcceptCallback ëŒë‹¤ ì„¤ì •
+		// @param session Accept ì™„ë£Œëœ CIocpObject ê°ì²´
+		// @param netAddr í´ë¼ì´ì–¸íŠ¸ ì ‘ì† ë„¤íŠ¸ì›Œí¬ ì£¼ì†Œ
 		//***************************************************************************
-		[service](CIocpObjectRef session, CNetAddress netAddr)
+		[serviceWeak](CIocpObjectRef session, CNetAddress netAddr)
 		{
+			auto service = serviceWeak.lock();
+			if( service == nullptr )
+				return;
+
 			CIocpSessionRef iocpSession = std::static_pointer_cast<CIocpSession>(session);
 			if( iocpSession )
 			{
 				iocpSession->SetNetAddress(netAddr);
 				service->AddSession(iocpSession);
 
-				// ±Û·Î¹ú ¼¼¼Ç ¸Å´ÏÀú¿¡µµ µî·Ï(SessionId ¹ß±Ş ¹× ¿¬µ¿)
-				uint64_t sessionId = CIocpSessionManager::Instance().GenerateSessionId();
+				// ì„œë¹„ìŠ¤ê°€ ì†Œìœ í•œ SessionManagerì— SessionId ë°œê¸‰ ë° ë“±ë¡
+				uint64_t sessionId = service->GetSessionManager().GenerateSessionId();
 				iocpSession->SetSessionId(sessionId);
-				CIocpSessionManager::Instance().AddSession(iocpSession->GetSocket(), sessionId, iocpSession);
+				service->GetSessionManager().AddSession(sessionId, iocpSession);
 
 				iocpSession->ProcessConnect();
 			}
@@ -80,11 +89,14 @@ bool CIocpServerService::Start()
 }
 
 //***************************************************************************
-// @brief ¼­¹ö Á¾·á Ã³¸®
-// @note Listener ¼ÒÄÏÀ» ¸ÕÀú ´İ¾Æ ½Å±Ô ¿¬°á ¼ö½ÅÀ» Áß´ÜÇÏ°í ºÎ¸ğ Close¸¦ È£ÃâÇÕ´Ï´Ù.
+// @brief ì„œë²„ ì¢…ë£Œ ì²˜ë¦¬
+// @note ì†Œì†ëœ ì„¸ì…˜ ë§¤ë‹ˆì €ì˜ ëª¨ë“  ì„¸ì…˜ì„ ì¼ê´„ ì¢…ë£Œí•˜ê³  Listener ì†Œì¼“ì„ ë‹«ìŠµë‹ˆë‹¤.
 //***************************************************************************
 void CIocpServerService::Close()
 {
+	// ì†Œì†ëœ ì„¸ì…˜ ë§¤ë‹ˆì €ì˜ ëª¨ë“  ì„¸ì…˜ ì—°ê²° í•´ì œ
+	_sessionManager.BeginCloseAllSessions();
+
 	if( _listener )
 	{
 		_listener->CloseSocket();
@@ -100,11 +112,11 @@ void CIocpServerService::Close()
 //***************************************************************************
 
 //***************************************************************************
-// @brief CIocpClientService »ı¼ºÀÚ ±¸Çö
-// @param address Á¢¼Ó ´ë»ó ÁÖ¼Ò
-// @param iocpCore IOCP ÄÚ¾î ÂüÁ¶
-// @param factory ¼¼¼Ç »ı¼º ÆÑÅä¸®
-// @param maxSessionCount »ı¼ºÇÒ ¼¼¼Ç °³¼ö
+// @brief CIocpClientService ìƒì„±ì êµ¬í˜„
+// @param address ì ‘ì†í•  ì„œë²„ ì£¼ì†Œ
+// @param iocpCore IOCP ì½”ì–´ ê°ì²´
+// @param factory ì„¸ì…˜ ìƒì„± íŒ©í† ë¦¬
+// @param maxSessionCount ìƒì„±í•  ì„¸ì…˜ ê°œìˆ˜
 //***************************************************************************
 CIocpClientService::CIocpClientService(CNetAddress address, CIocpCoreRef iocpCore, SessionFactory factory, int32 maxSessionCount)
 	: CNetService(NetServiceType::Client, address, factory, maxSessionCount), _iocpCore(iocpCore)
@@ -112,9 +124,9 @@ CIocpClientService::CIocpClientService(CNetAddress address, CIocpCoreRef iocpCor
 }
 
 //***************************************************************************
-// @brief Å¬¶óÀÌ¾ğÆ® ±¸µ¿ ¹× ¼¼¼Ç IOCP µî·Ï
-// @return bool ½ÃÀÛ ¼º°ø ¿©ºÎ
-// @note _maxSessionCount ¼ö¸¸Å­ ¼¼¼ÇÀ» ÇÒ´ç ÈÄ IOCP Core¿¡ Register ÇÕ´Ï´Ù.
+// @brief í´ë¼ì´ì–¸íŠ¸ êµ¬ë™ ë° ì„¸ì…˜ IOCP ë“±ë¡
+// @return bool ì„±ê³µ ì—¬ë¶€ ì„±ê³µ
+// @note _maxSessionCount ë§Œí¼ ì„¸ì…˜ì„ í• ë‹¹ í›„ IOCP Coreì— Register í•©ë‹ˆë‹¤.
 //***************************************************************************
 bool CIocpClientService::Start()
 {
@@ -131,28 +143,26 @@ bool CIocpClientService::Start()
 		if( iocpSession == nullptr )
 			return false;
 
-		// IOCP Core¿¡ ¼ÒÄÏ ÇÚµé µî·Ï
+		// IOCP Coreì— ì„¸ì…˜ ê°•ì œ ë“±ë¡
 		if( _iocpCore->Register(iocpSession) == false )
 			return false;
 
-		// 2. [Ãß°¡] Å¬¶óÀÌ¾ğÆ® ¼ÒÄÏÀ» ¼­¹ö ÁÖ¼Ò(_address)·Î ¿¬°á ½Ãµµ (Connect)
+		// í´ë¼ì´ì–¸íŠ¸ ì†Œì¼“ì— ëŒ€ìƒ ì£¼ì†Œ(_address)ë¡œ ì ‘ì† ì‹œë„ (Connect)
 		SOCKET sock = iocpSession->GetSocket();
 
-		// Å¬¶óÀÌ¾ğÆ®´Â º¸Åë ÀÓÀÇÀÇ Æ÷Æ®¿¡ ¹ÙÀÎµù ÈÄ connect ¼öÇà (½Ã½ºÅÛÀÌ ÀÚµ¿ ¹ÙÀÎµùÇÏ°Ô µÎ±âµµ ÇÔ)
 		SOCKADDR_IN sockAddr = _address.GetSockAddr();
 		if( ::connect(sock, reinterpret_cast<SOCKADDR*>(&sockAddr), sizeof(sockAddr)) == SOCKET_ERROR )
 		{
 			int32 err = ::WSAGetLastError();
-			// WSAEWOULDBLOCK µî ºñµ¿±â ¿¬°á ÁøÇà Áß »óÅÂ°¡ ¾Æ´Ï¶ó¸é ½ÇÆĞ
 			if( err != WSAEWOULDBLOCK && err != WSA_IO_PENDING )
 			{
 				return false;
 			}
 		}
 
-		// 3. ¿¬°á ¼º°ø Ã³¸® (¶Ç´Â Connect¿Ï·á ÈÄ ProcessConnect È£Ãâ ±¸Á¶¿¡ ¸Â°Ô ¿¬µ¿)
+		// ì—°ê²° ì„¤ì • ì™„ë£Œ ì²˜ë¦¬
 		iocpSession->SetNetAddress(_address);
-		iocpSession->ProcessConnect(); // ³»ºÎ¿¡¼­ ¼ö½Å(RegisterRecv) ½ÃÀÛ
+		iocpSession->ProcessConnect();
 
 		AddSession(iocpSession);
 	}

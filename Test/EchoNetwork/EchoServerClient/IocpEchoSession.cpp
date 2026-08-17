@@ -6,7 +6,6 @@
 
 #include "pch.h"
 #include "IocpEchoSession.h"
-#include <iostream>
 
 //***************************************************************************
 // @brief CIocpEchoSession 객체를 생성합니다.
@@ -29,7 +28,7 @@ CIocpEchoSession::~CIocpEchoSession()
 void CIocpEchoSession::OnConnected()
 {
 	CIocpSession::OnConnected();
-	std::cout << "[IOCP Session] Connected!\n";
+	LOG_INFO(_T("[IOCP Session] Connected!"));
 }
 
 //***************************************************************************
@@ -38,13 +37,13 @@ void CIocpEchoSession::OnConnected()
 //***************************************************************************
 void CIocpEchoSession::OnDisconnect()
 {
-	CIocpSession::OnDisconnected();
-	std::cout << "[IOCP Session] Disconnected!\n";
+	CIocpSession::OnDisconnect();
+	LOG_INFO(_T("[IOCP Session] Disconnected!"));
 }
 
 //***************************************************************************
 // @brief 클라이언트로부터 패킷을 수신했을 때 호출되는 오버라이드 함수입니다.
-// @details 수신된 데이터를 문자열 형태로 콘솔에 출력하고, 받은 데이터를 그대로 
+// @details 수신된 데이터를 문자열 형태로 로그에 출력하고, 받은 데이터를 그대로 
 //          다시 클라이언트에게 전송(Echo)합니다.
 // @param buffer 수신된 데이터가 담긴 바이트 버퍼 포인터
 // @param len 수신된 데이터의 길이 (바이트 단위)
@@ -52,13 +51,20 @@ void CIocpEchoSession::OnDisconnect()
 //***************************************************************************
 int32 CIocpEchoSession::OnRecv(BYTE* buffer, int32 len)
 {
-	// 수신된 데이터를 화면에 출력
-	std::cout << "[IOCP Session Received] " << reinterpret_cast<char*>(buffer) << " (Len: " << len << ")\n";
+    // 1. UTF-8 바이트를 유니코드(UTF-16 / std::wstring)로 올바르게 변환
+    int wlen = MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<char*>(buffer), len, nullptr, 0);
+    _tstring receivedStr;
+    if( wlen > 0 )
+    {
+        receivedStr.resize(wlen);
+        MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<char*>(buffer), len, &receivedStr[0], wlen);
+    }
+    LOG_DEBUG(_T("[IOCP Session Received] %s (Len: %d)"), receivedStr.c_str(), len);
 
-	// 받은 데이터를 그대로 클라이언트에게 전송 (Echo)
-	Send(buffer, static_cast<uint16_t>(len));
+    // 받은 데이터를 그대로 클라이언트에게 전송 (Echo)
+    Send(buffer, static_cast<uint16_t>(len));
 
-	return len;
+    return len;
 }
 
 //***************************************************************************
@@ -76,7 +82,7 @@ void CIocpEchoSession::OnSend(int32 len)
 void CIocpClientEchoSession::OnConnected()
 {
 	CIocpSession::OnConnected();
-	std::cout << "[Client] Connected to Server!\n";
+	LOG_INFO(_T("[Client] Connected to Server!"));
 }
 
 //***************************************************************************
@@ -87,7 +93,17 @@ void CIocpClientEchoSession::OnConnected()
 //***************************************************************************
 int32 CIocpClientEchoSession::OnRecv(BYTE* buffer, int32 len)
 {
-	std::string message(reinterpret_cast<char*>(buffer), len);
-	std::cout << "[Client Received] " << message << "\n";
-	return len;
+    // 1. UTF-8 바이트를 유니코드(UTF-16 / std::wstring)로 올바르게 변환
+    int wlen = MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<char*>(buffer), len, nullptr, 0);
+    _tstring message;
+    if( wlen > 0 )
+    {
+        message.resize(wlen);
+        MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<char*>(buffer), len, &message[0], wlen);
+    }
+    LOG_DEBUG(_T("[Client Received] %s"), message.c_str());
+
+    return len;
 }
+
+

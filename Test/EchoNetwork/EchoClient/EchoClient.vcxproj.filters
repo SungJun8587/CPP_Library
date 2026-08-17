@@ -1,0 +1,303 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="EchoClient.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\BaseTLS.cpp">
+      <Filter>UtilCore</Filter>
+    </ClCompile>
+    <ClCompile Include="pch.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Memory\Memory.cpp">
+      <Filter>UtilCore\Memory</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Memory\MemoryPool.cpp">
+      <Filter>UtilCore\Memory</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Memory\Allocator.cpp">
+      <Filter>UtilCore\Memory</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Network\IOCP\IocpCore.cpp">
+      <Filter>UtilCore\Network\IOCP</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Network\IOCP\IocpEvent.cpp">
+      <Filter>UtilCore\Network\IOCP</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Network\IOCP\IocpListener.cpp">
+      <Filter>UtilCore\Network\IOCP</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Network\IOCP\IocpService.cpp">
+      <Filter>UtilCore\Network\IOCP</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Network\IOCP\IocpSession.cpp">
+      <Filter>UtilCore\Network\IOCP</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Network\IOCP\IocpSessionManager.cpp">
+      <Filter>UtilCore\Network\IOCP</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioBuffer.cpp">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioCore.cpp">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioEvent.cpp">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioEventPool.cpp">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioListener.cpp">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioObject.cpp">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioReceive.cpp">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioSend.cpp">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioService.cpp">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioSession.cpp">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioSessionManager.cpp">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioSubmissionHelper.cpp">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Network\NetAddress.cpp">
+      <Filter>UtilCore\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Network\NetService.cpp">
+      <Filter>UtilCore\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Network\NetworkFactory.cpp">
+      <Filter>UtilCore\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Util\Log.cpp">
+      <Filter>UtilCore\Util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Thread\DeadLockProfiler.cpp">
+      <Filter>UtilCore\Thread</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Thread\SRWLock.cpp">
+      <Filter>UtilCore\Thread</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Thread\ThreadManager.cpp">
+      <Filter>UtilCore\Thread</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Network\SocketUtils.cpp">
+      <Filter>UtilCore\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Network\RingBuffer.cpp">
+      <Filter>UtilCore\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Network\IOCP\RecvBuffer.cpp">
+      <Filter>UtilCore\Network\IOCP</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\Network\IOCP\SendBuffer.cpp">
+      <Filter>UtilCore\Network\IOCP</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\UtilCore\BaseGlobal.cpp">
+      <Filter>UtilCore</Filter>
+    </ClCompile>
+    <ClCompile Include="IocpEchoClientSession.cpp" />
+    <ClCompile Include="RioEchoClientSession.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="UtilCore">
+      <UniqueIdentifier>{9d2908fe-777b-464a-af5d-853ee9237391}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UtilCore\Memory">
+      <UniqueIdentifier>{b6ebc666-d1b1-48d3-a34c-085dcb5f17ff}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UtilCore\Network">
+      <UniqueIdentifier>{23970f69-6734-4441-9c7c-5192faa2085c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UtilCore\Network\IOCP">
+      <UniqueIdentifier>{e685351a-e1d7-42e4-bdc4-9ff19c0af3d8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UtilCore\Network\RIO">
+      <UniqueIdentifier>{bf5e17a0-8410-42f4-9d25-f8e7db317848}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UtilCore\Util">
+      <UniqueIdentifier>{0687ea60-f613-4be7-b1ab-19ea78fac4f4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UtilCore\Thread">
+      <UniqueIdentifier>{9b6d7d6e-d97b-465f-b070-fe2d37461436}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UtilCore\Containers">
+      <UniqueIdentifier>{5a547495-74e6-41bd-af73-4d5326863ebb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UtilCore\Containers\Map">
+      <UniqueIdentifier>{53f6d9fc-50d6-4679-8632-96a36cb58daa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UtilCore\Containers\Stack">
+      <UniqueIdentifier>{8a76f4f8-bceb-49b0-8e3c-8fc2e7e70e53}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\UtilCore\BaseDefine.h">
+      <Filter>UtilCore</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\BaseMacro.h">
+      <Filter>UtilCore</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\BaseRedefineDataType.h">
+      <Filter>UtilCore</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\BaseTLS.h">
+      <Filter>UtilCore</Filter>
+    </ClInclude>
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="..\..\..\UtilCore\Memory\MemoryPool.h">
+      <Filter>UtilCore\Memory</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Memory\Memory.h">
+      <Filter>UtilCore\Memory</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Memory\Allocator.h">
+      <Filter>UtilCore\Memory</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Memory\RawAllocator.h">
+      <Filter>UtilCore\Memory</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\IocpCommon.h">
+      <Filter>UtilCore\Network\IOCP</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\IocpCore.h">
+      <Filter>UtilCore\Network\IOCP</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\IocpEvent.h">
+      <Filter>UtilCore\Network\IOCP</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\IocpListener.h">
+      <Filter>UtilCore\Network\IOCP</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\IocpService.h">
+      <Filter>UtilCore\Network\IOCP</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\IocpSession.h">
+      <Filter>UtilCore\Network\IOCP</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\IocpSessionManager.h">
+      <Filter>UtilCore\Network\IOCP</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioBuffer.h">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioCommon.h">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioCore.h">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioEvent.h">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioEventPool.h">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioListener.h">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioObject.h">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioReceive.h">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioSend.h">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioService.h">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioSession.h">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioSessionManager.h">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioSubmissionHelper.h">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\NetAddress.h">
+      <Filter>UtilCore\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\NetService.h">
+      <Filter>UtilCore\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\NetworkCommon.h">
+      <Filter>UtilCore\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\NetworkFactory.h">
+      <Filter>UtilCore\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\NetworkRedefineDataType.h">
+      <Filter>UtilCore\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Memory\ObjectPool.h">
+      <Filter>UtilCore\Memory</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Util\Log.h">
+      <Filter>UtilCore\Util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Containers\Map\ClusterSpinMap.h">
+      <Filter>UtilCore\Containers\Map</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Memory\Containers.h">
+      <Filter>UtilCore\Memory</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Containers\Stack\LockFreeSlotStack.h">
+      <Filter>UtilCore\Containers\Stack</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Thread\DeadLockProfiler.h">
+      <Filter>UtilCore\Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Thread\SpinLock.h">
+      <Filter>UtilCore\Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Thread\SRWLock.h">
+      <Filter>UtilCore\Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Thread\ThreadManager.h">
+      <Filter>UtilCore\Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\SocketUtils.h">
+      <Filter>UtilCore\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\Session.h">
+      <Filter>UtilCore\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\RingBuffer.h">
+      <Filter>UtilCore\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Thread\PlatformLock.h">
+      <Filter>UtilCore\Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\RecvBuffer.h">
+      <Filter>UtilCore\Network\IOCP</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\SendBuffer.h">
+      <Filter>UtilCore\Network\IOCP</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\BaseGlobal.h">
+      <Filter>UtilCore</Filter>
+    </ClInclude>
+    <ClInclude Include="IocpEchoClientSession.h" />
+    <ClInclude Include="RioEchoClientSession.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\UtilCore\Containers\Map\ClusterSpinMap.inl">
+      <Filter>UtilCore\Containers\Map</Filter>
+    </None>
+    <None Include="..\..\..\UtilCore\Thread\SpinLock.inl">
+      <Filter>UtilCore\Thread</Filter>
+    </None>
+  </ItemGroup>
+</Project>

@@ -1,4 +1,5 @@
-﻿//***************************************************************************
+﻿
+//***************************************************************************
 // RioSession.h : interface for the CRioSession class.
 //
 //***************************************************************************
@@ -40,6 +41,18 @@ class CRioBuffer;
 //***************************************************************************
 // @class CRioSession
 // @brief RIO(Registered I/O) 및 CRingBuffer 기반의 고성능 네트워크 세션 클래스 (순수 I/O 전용)
+//
+// @details
+//      [송신 버퍼(_sendBuffer)와 RIO 등록의 관계]
+//          _sendBuffer는 세션마다 독자적으로 할당되는 메모리(CRingBuffer 생성자에서
+//          RawAllocator::Alloc())입니다. RIO는 "등록된(registered) 버퍼" 내의 오프셋만
+//          참조할 수 있으므로, _sendBuffer를 RIO_BUF로 넘기려면 이 세션의 _sendBuffer
+//          메모리 자체를 RIORegisterBuffer()로 등록해서 얻은 RIO_BUFFERID를 써야 합니다.
+//          서버/클라이언트 전역 공용 송신 버퍼(RioService.cpp)에서 발급받은
+//          RIO_BUFFERID를 그대로 쓰면 BufferId가 가리키는 영역과 Offset 계산 기준이
+//          서로 다른 메모리가 되어 RIOSendEx()가 실패합니다(과거에 실제로 겪은 문제).
+//          그래서 Init()에서 이 세션 자신이 _sendBuffer를 등록하고, FinalizeClose()/
+//          소멸자에서 해제합니다.
 //***************************************************************************
 class CRioSession : public CSession, public CRioObject
 {
@@ -67,7 +80,14 @@ public:
 	virtual bool	IsConnected() const override { return IsActive(); }
 	virtual SOCKET	GetSocket() const noexcept override { return _socket.load(std::memory_order_acquire); }
 
-	void Init(uint64_t sessionId, CRioCore* core, CRioBuffer* globalRecvBufferPool, SOCKET socket, RIO_RQ requestQueue, RIO_BUFFERID sendBufferId) noexcept;
+	//***************************************************************************
+	// @brief 세션을 초기화하고 이 세션 소유의 송신 버퍼를 RIO에 등록합니다.
+	// @return bool 초기화(및 송신 버퍼 등록) 성공 시 true.
+	//         false를 반환하면 세션은 Active로 전이하지 않으며, 호출자가
+	//         clientSocket/requestQueue를 직접 정리해야 합니다(세션이 아직
+	//         Active가 아니므로 Close()로 자기 자신을 정리시킬 수 없음).
+	//***************************************************************************
+	bool Init(uint64_t sessionId, CRioCore* core, CRioBuffer* globalRecvBufferPool, SOCKET socket, RIO_RQ requestQueue) noexcept;
 	void Close(Rio::CloseReason reason) noexcept;
 
 	//***************************************************************************
@@ -181,6 +201,21 @@ private:
 	void ShutdownSocketInternal() noexcept;
 	void CloseSocketInternal() noexcept;
 
+	//***************************************************************************
+	// @brief 이 세션 소유의 _sendBuffer 메모리를 RIORegisterBuffer()로 등록합니다.
+	// @details Init() 1회 호출에서만 실질적으로 등록이 일어납니다(세션은 재사용되지
+	//          않으므로 _sendBufferId가 이미 유효하면 그대로 true 반환).
+	// @return 이미 등록됐거나 새로 등록 성공 시 true, 실패 시 false
+	//***************************************************************************
+	bool RegisterSendBufferIfNeeded() noexcept;
+
+	//***************************************************************************
+	// @brief 등록했던 _sendBuffer의 RIO 버퍼 ID를 RIODeregisterBuffer()로 해제합니다.
+	// @details 여러 번 호출해도 안전합니다(idempotent) — _sendBufferId를
+	//          RIO_INVALID_BUFFERID로 되돌리므로 두 번째 호출은 즉시 반환됩니다.
+	//***************************************************************************
+	void UnregisterSendBuffer() noexcept;
+
 	void OnReceiveCompleted(CRioEvent* rioEvent, DWORD bytesTransferred) noexcept;
 	void OnSendCompleted(CRioEvent* rioEvent, DWORD bytesTransferred) noexcept;
 
@@ -194,7 +229,11 @@ private:
 	std::atomic<SOCKET> _socket{ INVALID_SOCKET };      // 세션 바인딩 소켓
 	std::atomic<RIO_RQ> _requestQueue{ RIO_INVALID_RQ }; // RIO Request Queue 핸들
 
-	RIO_BUFFERID _sendBufferId{ RIO_INVALID_BUFFERID }; // 송신 버퍼 RIO ID
+	// _sendBuffer(아래) 메모리를 RIORegisterBuffer()로 등록한 결과 ID.
+	// Init()에서 등록, FinalizeClose()/소멸자에서 해제. 외부(RioService 등)에서
+	// 주입받지 않고 이 세션이 직접 소유/관리합니다 — 서버 전역 공용 버퍼 ID를
+	// 쓰면 _sendBuffer의 실제 메모리 영역과 불일치해 RIOSendEx()가 실패합니다.
+	RIO_BUFFERID _sendBufferId{ RIO_INVALID_BUFFERID };
 
 	CNetAddress _netAddress;                            // 원격 클라이언트 네트워크 주소 (IP/Port)
 
@@ -207,7 +246,7 @@ private:
 	PRWLock _sendLock;                                  // 송신 동기화 RW 락
 	bool _isSending{ false };                           // 전송 진행 여부 플래그
 
-	CRingBuffer _sendBuffer{ Rio::kSendRingBufferSize };    // 64KB 송신 링버퍼
+	CRingBuffer _sendBuffer{ Rio::kSendRingBufferSize };    // 64KB 송신 링버퍼 (세션 독자 소유 메모리)
 	CRingBuffer _recvBuffer{ Rio::kRecvRingBufferSize };    // 64KB 수신 링버퍼
 };
 

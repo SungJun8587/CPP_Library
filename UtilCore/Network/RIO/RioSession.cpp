@@ -17,9 +17,14 @@ CRioSession::CRioSession() = default;
 
 //***************************************************************************
 // @brief CRioSession 소멸자
+// @note 정상 라이프사이클에서는 FinalizeClose()가 이미 소켓/송신버퍼를 정리했어야
+//       합니다. 여기서는 비정상 경로(Init() 실패 후 소멸 등)에 대비한 방어적 정리만
+//       수행합니다. UnregisterSendBuffer()/CloseSocketInternal() 둘 다 idempotent라
+//       중복 호출해도 안전합니다.
 //***************************************************************************
 CRioSession::~CRioSession() noexcept
 {
+    UnregisterSendBuffer();
     CloseSocketInternal();
 }
 
@@ -30,15 +35,10 @@ CRioSession::~CRioSession() noexcept
 // @param globalRecvBufferPool 전역 수신 버퍼 풀 포인터
 // @param socket 클라이언트 소켓 핸들
 // @param requestQueue RIO Request Queue 핸들
-// @param sendBufferId 송신 버퍼 ID
+// @return bool 성공 시 true. false면 이 세션은 Active로 전이하지 않으므로
+//         호출자가 socket/requestQueue를 직접 정리해야 합니다.
 //***************************************************************************
-void CRioSession::Init(
-    uint64_t sessionId,
-    CRioCore* core,
-    CRioBuffer* globalRecvBufferPool,
-    SOCKET socket,
-    RIO_RQ requestQueue,
-    RIO_BUFFERID sendBufferId) noexcept
+bool CRioSession::Init(uint64_t sessionId, CRioCore* core, CRioBuffer* globalRecvBufferPool, SOCKET socket, RIO_RQ requestQueue) noexcept
 {
     assert(_state.load(std::memory_order_acquire) == Rio::SessionState::Created);
 
@@ -52,7 +52,6 @@ void CRioSession::Init(
     _globalRecvBufferPool = globalRecvBufferPool;
     _socket.store(socket, std::memory_order_release);
     _requestQueue.store(requestQueue, std::memory_order_release);
-    _sendBufferId = sendBufferId;
 
     _closeReason.store(Rio::CloseReason::None, std::memory_order_release);
 
@@ -64,9 +63,68 @@ void CRioSession::Init(
         _recvBuffer.Clear();
     }
 
+    // 이 세션 소유의 _sendBuffer 메모리를 RIO에 등록합니다. FlushSendInternal()의
+    // GetRioSendBuffers()가 이 등록된 영역 기준으로 Offset을 계산하므로, 반드시
+    // Active로 전이하기 전에(=첫 Send() 호출보다 먼저) 등록이 끝나 있어야 합니다.
+    if( !RegisterSendBufferIfNeeded() )
+    {
+        assert(false && "CRioSession::Init send buffer registration failed");
+        return false;
+    }
+
     _state.store(Rio::SessionState::Active, std::memory_order_release);
 
     OnConnected();
+    return true;
+}
+
+//***************************************************************************
+// @brief 이 세션 소유의 _sendBuffer 메모리를 RIORegisterBuffer()로 등록합니다.
+// @return 이미 등록됐거나 새로 등록 성공 시 true, 실패 시 false
+//***************************************************************************
+bool CRioSession::RegisterSendBufferIfNeeded() noexcept
+{
+    // 이미 등록되어 있다면(예: 방어적 재호출) 그대로 성공 처리
+    if( _sendBufferId != RIO_INVALID_BUFFERID ) return true;
+
+    if( _core == nullptr ) return false;
+
+    const RIO_EXTENSION_FUNCTION_TABLE& rioTable = _core->GetRioTable();
+    if( rioTable.RIORegisterBuffer == nullptr ) return false;
+
+    char* bufferBegin = _sendBuffer.GetBufferBegin();
+    char* bufferEnd = _sendBuffer.GetBufferEnd();
+
+    if( bufferBegin == nullptr || bufferEnd <= bufferBegin ) return false;
+
+    const size_t totalSize = static_cast<size_t>(bufferEnd - bufferBegin);
+
+    // RIORegisterBuffer()의 DataLength 파라미터는 DWORD입니다.
+    if( totalSize > static_cast<size_t>((std::numeric_limits<DWORD>::max)()) ) return false;
+
+    const RIO_BUFFERID bufferId = rioTable.RIORegisterBuffer(bufferBegin, static_cast<DWORD>(totalSize));
+    if( bufferId == RIO_INVALID_BUFFERID ) return false;
+
+    _sendBufferId = bufferId;
+    return true;
+}
+
+//***************************************************************************
+// @brief 등록했던 _sendBuffer의 RIO 버퍼 ID를 해제합니다.
+//***************************************************************************
+void CRioSession::UnregisterSendBuffer() noexcept
+{
+    if( _sendBufferId == RIO_INVALID_BUFFERID ) return;
+
+    if( _core != nullptr )
+    {
+        const RIO_EXTENSION_FUNCTION_TABLE& rioTable = _core->GetRioTable();
+
+        if( rioTable.RIODeregisterBuffer != nullptr )
+            rioTable.RIODeregisterBuffer(_sendBufferId);
+    }
+
+    _sendBufferId = RIO_INVALID_BUFFERID;
 }
 
 //***************************************************************************
@@ -81,6 +139,15 @@ void CRioSession::Disconnect(const TCHAR* cause)
 //***************************************************************************
 // @brief 지정된 사유로 세션 종료를 요청합니다 (락 내부에서 상태 전이 후 락 밖에서 실행).
 // @param reason 세션 종료 사유
+// @note [알려진 트레이드오프] 여기서는 outstanding I/O(진행 중인 RIO 요청)를 기다리지
+//       않고 즉시 FinalizeClose()로 넘어가 소켓을 닫습니다. 진행 중인 receive/send가
+//       남아 있는 상태에서 closesocket()이 호출될 수 있다는 뜻입니다. 서버 전체
+//       종료 시퀀스(CRioServer::Stop())는 그와 별개로 CRioCore::Shutdown() 자체의
+//       outstanding I/O drain을 거친 뒤에만 전역 버퍼풀/이벤트풀을 해제하므로
+//       UAF로는 이어지지 않는다는 것은 확인했으나, RIO가 이런 식으로 도중에 닫힌
+//       RQ의 미완료 요청에 대해 항상 에러 completion을 정상적으로 돌려주는지는
+//       별도로 확인이 필요합니다(확인 전까지는 낮은 확률로 이벤트/버퍼 슬롯이
+//       완료 통지 없이 방치될 수 있음).
 //***************************************************************************
 void CRioSession::Close(Rio::CloseReason reason) noexcept
 {
@@ -105,7 +172,8 @@ void CRioSession::Close(Rio::CloseReason reason) noexcept
 }
 
 //***************************************************************************
-// @brief 세션의 모든 리소스(RIO_RQ, 소켓 등)를 안전하게 해제하고 연결 해제 콜백을 호출합니다.
+// @brief 세션의 모든 리소스(RIO_RQ, 소켓, 송신 버퍼 등록 등)를 안전하게 해제하고
+//        연결 해제 콜백을 호출합니다.
 //***************************************************************************
 void CRioSession::FinalizeClose() noexcept
 {
@@ -128,9 +196,15 @@ void CRioSession::FinalizeClose() noexcept
 
         // 2. 소켓 핸들 완전 정리
         CloseSocketInternal();
+
+        // 3. 이 세션이 등록했던 송신 버퍼 해제. Microsoft 문서상 outstanding
+        //    send/receive가 남아있는 동안 deregister하지 말라는 권고가 있으나,
+        //    바로 위 CloseSocketInternal()과 같은 이유로 여기서는 즉시 처리합니다
+        //    (Close() 주석 참고 — 아직 확인이 필요한 부분).
+        UnregisterSendBuffer();
     }
 
-    // 3. 외부 락 범위 밖에서 안전하게 사용자 콜백 호출
+    // 4. 외부 락 범위 밖에서 안전하게 사용자 콜백 호출
     OnDisconnected(closeReason);
 
     // CSession에 정의된 상위 통지 함수 호출 -> CNetService의 ReleaseSession 자동 연동!
@@ -152,20 +226,16 @@ bool CRioSession::PostInitialReceive() noexcept
 //***************************************************************************
 bool CRioSession::PostReceiveInternal() noexcept
 {
-    // 실패 원인을 기록하기 위한 변수 선언 (초기값: 없음)
     Rio::CloseReason failureReason = Rio::CloseReason::None;
 
-    // 수신 버퍼 슬롯 인덱스와 RIO 이벤트 객체 포인터 초기화
     uint32_t slotIndex = Rio::kInvalidSlotIndex;
     CRioEvent* rioEvent = nullptr;
 
-    // RIO 전송/수신에 필요한 변수들 선언
     RIO_BUF rioBuf{};
     CRioCore* core = nullptr;
     CRioBuffer* bufferPool = nullptr;
     RIO_RQ requestQueue = RIO_INVALID_RQ;
 
-    // 임계 구역(Critical Section) 시작: I/O 제출 락 가드 설정
     {
         PLockGuard guard(_ioSubmitLock, __FUNCTION__);
 
@@ -188,7 +258,6 @@ bool CRioSession::PostReceiveInternal() noexcept
         // 5. 할당받은 슬롯의 실제 RIO 버퍼 정보(RIO_BUF) 획득 시도
         else if( !bufferPool->GetRioBuffer(slotIndex, rioBuf) )
         {
-            // 정보 획득 실패 시, 앞서 할당받았던 슬롯을 곧바로 반납하고 상태 초기화
             bufferPool->FreeSlot(slotIndex);
             slotIndex = Rio::kInvalidSlotIndex;
             failureReason = Rio::CloseReason::InternalError;
@@ -200,7 +269,6 @@ bool CRioSession::PostReceiveInternal() noexcept
 
             if( eventPool == nullptr )
             {
-                // 이벤트 풀이 존재하지 않으면, 슬롯 반납 및 내부 에러 처리
                 bufferPool->FreeSlot(slotIndex);
                 slotIndex = Rio::kInvalidSlotIndex;
                 failureReason = Rio::CloseReason::InternalError;
@@ -211,7 +279,6 @@ bool CRioSession::PostReceiveInternal() noexcept
                 rioEvent = eventPool->Alloc();
                 if( rioEvent == nullptr )
                 {
-                    // 이벤트 할당 실패(풀 고갈) 시, 슬롯 반납 및 사유 기록
                     bufferPool->FreeSlot(slotIndex);
                     slotIndex = Rio::kInvalidSlotIndex;
                     failureReason = Rio::CloseReason::EventPoolExhausted;
@@ -219,7 +286,9 @@ bool CRioSession::PostReceiveInternal() noexcept
             }
         }
 
-        // 8. 사전 자원 할당 및 준비 과정에 문제가 없다면 실제 수신(Receive) 요청 수행
+        // 8. 사전 자원 할당 및 준비 과정에 문제가 없다면 실제 수신(Receive) 요청 수행.
+        //    Initialize()/BindBufferSlot()은 여기서 직접 하지 않습니다 —
+        //    CRioReceive::Receive() 내부가 전적으로 책임집니다.
         if( failureReason == Rio::CloseReason::None )
         {
             const bool success = CRioReceive::Receive(
@@ -232,22 +301,22 @@ bool CRioSession::PostReceiveInternal() noexcept
                 this,
                 0);
 
-            // 9. RIO Receive 요청 제출 실패 시 실패 사유 기록
+            // 9. RIO Receive 요청 제출 실패 시 실패 사유 기록.
+            //    실패했다면 CRioReceive::Receive() 내부에서 이미 slot/event/IoCount
+            //    롤백까지 전부 처리했으므로 여기서 추가로 정리할 것은 없습니다.
             if( !success )
             {
                 failureReason = Rio::CloseReason::ReceivePostFailed;
             }
         }
-    } // 임계 구역(Critical Section) 종료 (락 해제)
+    }
 
-    // 10. 과정 중 발생한 실패 사유가 존재한다면 세션을 지정된 사유로 종료하고 false 반환
     if( failureReason != Rio::CloseReason::None )
     {
         Close(failureReason);
         return false;
     }
 
-    // 11. 모든 수신 포스트 과정 성공
     return true;
 }
 
@@ -259,7 +328,10 @@ bool CRioSession::PostReceiveInternal() noexcept
 //***************************************************************************
 void CRioSession::Dispatch(CRioEvent* rioEvent, ULONG bytesTransferred, LONG status)
 {
-    // 세션이 활성 상태가 아니라면(이미 닫혔거나 종료 진행 중이라면) 뒤늦게 도착한 완료 이벤트를 안전하게 차단
+    // 세션이 활성 상태가 아니라면(이미 닫혔거나 종료 진행 중이라면) 뒤늦게 도착한
+    // 완료 이벤트를 안전하게 차단합니다. IoCount 자체는 CRioCore::ProcessRioResult()의
+    // ObjectIoCountGuard가 이 함수 반환 이후 자동으로 감소시키므로 여기서 별도로
+    // 손댈 필요가 없습니다.
     if( !IsActive() )
     {
         return;
@@ -277,6 +349,8 @@ void CRioSession::Dispatch(CRioEvent* rioEvent, ULONG bytesTransferred, LONG sta
         return;
     }
 
+    // BufferBinding이 있으면 Receive(슬롯 풀에서 받아온 버퍼 바인딩이 존재),
+    // 없으면 Send(사전 등록된 _sendBuffer를 그대로 참조하므로 별도 바인딩이 없음)로 간주합니다.
     if( !rioEvent->GetBufferBindings().empty() )
     {
         OnReceiveCompleted(rioEvent, bytesTransferred);
@@ -319,6 +393,8 @@ void CRioSession::OnReceiveCompleted(CRioEvent* rioEvent, DWORD bytesTransferred
 
     if( bytesTransferred == 0 )
     {
+        // 상대방이 정상 종료(FIN)했을 때. BufferSlot/EventPool 반환은
+        // CRioCore::ProcessRioResult()가 completion 처리 후 수행합니다.
         Close(Rio::CloseReason::RemoteClosed);
         return;
     }
@@ -349,6 +425,7 @@ void CRioSession::OnReceiveCompleted(CRioEvent* rioEvent, DWORD bytesTransferred
 
     if( IsActive() && !PostReceiveInternal() )
     {
+        // PostReceiveInternal() 실패 시 내부에서 이미 Close()가 호출됩니다.
         return;
     }
 }
@@ -361,71 +438,58 @@ void CRioSession::OnReceiveCompleted(CRioEvent* rioEvent, DWORD bytesTransferred
 //***************************************************************************
 bool CRioSession::Send(const void* data, uint16_t size) noexcept
 {
-    // 1. 입력된 데이터 포인터가 유효하지 않거나 크기가 0인 경우 즉시 실패 반환
     if( data == nullptr || size == 0 ) return false;
-
-    // 2. 현재 세션이 활성(Active) 상태가 아니라면 전송 요청을 거부하고 실패 반환
     if( !IsActive() ) return false;
 
-    // 3. 실제 비동기 전송 시작이 필요한지 여부와 큐 적재 실패 여부를 나타내는 플래그 초기화
     bool needStartSend = false;
     bool enqueueFailed = false;
 
-    // 4. 송신 전용 쓰기 락(Write Lock) 구간 시작 (멀티스레드 환경에서 송신 버퍼 동기화 보호)
     {
         PRWriteLockGuard lockGuard(_sendLock, __FUNCTION__);
 
-        // 5. 락 획득 직후 세션 상태를 재확인하여 Active 상태가 아니면 실패 반환
+        // 락 획득 직후 세션 상태를 재확인 (IsActive() 체크와의 사이에 Close()가 끼어들 수 있음)
         if( _state.load(std::memory_order_acquire) != Rio::SessionState::Active ) return false;
 
         int64 enqueuedBytes = 0;
 
-        // 6. 내부 송신 버퍼(`_sendBuffer`)에 보낼 데이터를 큐 형태로 적재(Enqueue) 시도
         const bool enqueueSuccess = _sendBuffer.Enqueue(
             static_cast<const char*>(data),
             static_cast<int64>(size),
             &enqueuedBytes,
             false);
 
-        // 7. 큐 적재가 실패했거나 요청한 크기만큼 완전히 적재되지 못한 경우 버퍼 오버플로우로 처리
         if( !enqueueSuccess || enqueuedBytes != static_cast<int64>(size) )
         {
             enqueueFailed = true;
         }
-        // 8. 이미 다른 작업에 의해 전송이 진행 중(`_isSending == true`)인 경우, 큐에 쌓기만 하고 성공 반환
         else if( _isSending )
         {
-            return true;
+            return true; // 이미 전송 루프 진행 중이므로 큐잉만 완료
         }
-        // 9. 현재 전송 중이 아니라면, 이번 전송을 주도하기 위해 송신 상태로 전환하고 플래그 설정
         else
         {
             _isSending = true;
             needStartSend = true;
         }
-    } // 송신 락 구간 종료
+    }
 
-    // 10. 큐 적재 실패 플래그가 켜져 있다면 SendBufferOverflow 사유로 세션 종료 후 실패 반환
+    // 중요: _sendLock을 보유한 상태에서 Close()를 호출하지 않습니다.
+    // OnDisconnected()가 Send()를 호출하는 재진입 deadlock을 방지합니다.
     if( enqueueFailed )
     {
         Close(Rio::CloseReason::SendBufferOverflow);
         return false;
     }
 
-    // 11. 이번 호출에서 전송을 직접 시작할 필요가 없다면 그대로 성공 반환
     if( !needStartSend ) return true;
 
-    // 12. 실제 송신 플러시(`FlushSendInternal`)를 호출하여 RIO 전송 요청 게시 수행
     if( !FlushSendInternal() )
     {
-        // 13. 전송 게시 실패 시 다시 송신 락을 획득하여 전송 중 상태(`_isSending`)를 원상 복구(`false`) 후 실패 반환
-        //  - 전송 실패 시 _isSending 상태를 안전하게 복구하여, 다른 스레드가 전송 중인 것으로 오인해 데이터 전송이 누락되는 경합(Race Condition) 방지
         PRWriteLockGuard lockGuard(_sendLock, __FUNCTION__);
         _isSending = false;
         return false;
     }
 
-    // 14. 모든 송신 요청 및 적재 과정 성공
     return true;
 }
 
@@ -435,41 +499,43 @@ bool CRioSession::Send(const void* data, uint16_t size) noexcept
 //***************************************************************************
 bool CRioSession::FlushSendInternal() noexcept
 {
-    // 실패 원인을 기록하기 위한 변수 선언 (초기값: 없음)
     Rio::CloseReason failureReason = Rio::CloseReason::None;
 
-    // RIO 비동기 전송에 사용할 이벤트 객체 포인터 초기화
     CRioEvent* rioEvent = nullptr;
 
-    // 링 버퍼 등에서 가져올 RIO 전송용 버퍼 배열(최대 2개, Scatter/Gather 대응)과 개수 초기화
+    // 링버퍼가 wrap되면 최대 2개 세그먼트가 나올 수 있습니다.
     RIO_BUF rioBufs[2]{};
     int bufferCount = 0;
 
-    // RIO 코어와 요청 큐 핸들을 저장할 변수 초기화
     CRioCore* core = nullptr;
     RIO_RQ requestQueue = RIO_INVALID_RQ;
 
-    // 임계 구역(Critical Section) 시작: I/O 제출 락 가드 설정 (동시에 여러 I/O 제출 방지)
     {
         PLockGuard guard(_ioSubmitLock, __FUNCTION__);
 
-        // 1. 세션 상태 확인: 현재 세션이 Active 상태가 아니라면 전송을 중단하고 실패 반환
         if( _state.load(std::memory_order_acquire) != Rio::SessionState::Active ) return false;
 
-        // 2. 핵심 세션 멤버 변수 캐싱 (Core, 요청 큐 핸들)
         core = _core;
         requestQueue = _requestQueue.load(std::memory_order_acquire);
 
-        // 3. 필수 리소스 포인터 및 큐 유효성 검사
         if( core == nullptr || requestQueue == RIO_INVALID_RQ ) return false;
 
-        // 4. 송신 읽기 락(Read Lock) 구간: 송신 버퍼로부터 전송할 RIO 버퍼 정보(시그니처 및 데이터) 안전하게 획득
         {
             PRReadLockGuard sendReadGuard(_sendLock, __FUNCTION__);
             bufferCount = _sendBuffer.GetRioSendBuffers(rioBufs, _sendBufferId);
         }
 
-        // 5. 보낼 데이터가 없는 경우(bufferCount <= 0): 더 이상 보낼 내용이 없으므로 전송 중 상태(`_isSending`)를 해제하고 종료
+        if( bufferCount > 0 )
+        {
+            LOG_DEBUG(_T("[RIO Session FlushSend] BufferCount: %d | _sendBufferId: %p | rioBufs[0].BufferId: %p | Offset: %lu | Length: %lu | Match: %s"),
+                bufferCount,
+                static_cast<void*>(_sendBufferId),
+                static_cast<void*>(rioBufs[0].BufferId),
+                rioBufs[0].Offset,
+                rioBufs[0].Length,
+                (_sendBufferId == rioBufs[0].BufferId) ? _T("TRUE") : _T("FALSE"));
+        }
+
         if( bufferCount <= 0 )
         {
             PRWriteLockGuard sendWriteGuard(_sendLock, __FUNCTION__);
@@ -477,7 +543,6 @@ bool CRioSession::FlushSendInternal() noexcept
             return true;
         }
 
-        // 6. 코어 객체로부터 RIO 이벤트 풀(Event Pool) 가져오기
         CRioEventPool* eventPool = core->GetEventPool();
 
         if( eventPool == nullptr )
@@ -486,59 +551,50 @@ bool CRioSession::FlushSendInternal() noexcept
         }
         else
         {
-            // 7. 이벤트 풀에서 비동기 I/O 처리를 위한 이벤트 객체 할당 받기
             rioEvent = eventPool->Alloc();
             if( rioEvent == nullptr )
             {
-                // 이벤트 할당 실패(풀 고갈) 시 사유 기록
                 failureReason = Rio::CloseReason::EventPoolExhausted;
             }
         }
 
-        // 8. 사전 자원 할당 및 버퍼 조회에 문제가 없다면 실제 확장 송신(SendEx) 요청 수행
         if( failureReason == Rio::CloseReason::None )
         {
+            // 중요: RIOSend/RIOSendEx/RIOReceive/RIOReceiveEx는 데이터 버퍼 쪽
+            // scatter-gather를 지원하지 않습니다(MS 문서: DataBufferCount는
+            // pData가 NULL이 아니면 반드시 1). 링버퍼 wrap으로 bufferCount==2가
+            // 나오더라도 이번 호출에서는 첫 세그먼트(rioBufs[0])만 1개로 보냅니다.
+            // 두 번째 세그먼트는 이 completion 이후 OnSendCompleted()가
+            // FlushSendInternal()을 다시 부를 때(그 시점엔 read 커서가 이동해
+            // 있어 wrap이 풀린 상태) 자연스럽게 처리됩니다.
+            const ULONG sendBufferCount = 1;
+
             const bool success = CRioSend::SendEx(
                 *core,
                 requestQueue,
-                rioBufs,
-                static_cast<ULONG>(bufferCount),
-                nullptr,
+                &rioBufs[0],
+                sendBufferCount,
+                nullptr,   // dataBindings: 사전등록 버퍼라 slot ownership 이전 불필요
                 nullptr,
                 nullptr,
                 nullptr,
                 rioEvent,
                 this,
                 0);
-                /*
 
-            const bool success = CRioSend::Send(
-                *core,
-                requestQueue,
-                rioBufs[0],          // 👈 단일 RIO_BUF 전달
-                nullptr,             // bufferOwner (필요시 전달)
-                Rio::kInvalidSlotIndex, // slotIndex
-                rioEvent,
-                this,
-                0);
-            */
-
-            // 9. RIO SendEx 요청 제출 실패 시 실패 사유 기록
             if( !success )
             {
                 failureReason = Rio::CloseReason::SendPostFailed;
             }
         }
-    } // 임계 구역(Critical Section) 종료 (락 해제)
+    }
 
-    // 10. 과정 중 발생한 실패 사유가 존재한다면 세션을 지정된 사유로 종료하고 false 반환
     if( failureReason != Rio::CloseReason::None )
     {
         Close(failureReason);
         return false;
     }
 
-    // 11. 송신 플러시(전송 게시) 과정 성공
     return true;
 }
 
@@ -581,6 +637,8 @@ void CRioSession::OnSendCompleted(CRioEvent* rioEvent, DWORD bytesTransferred) n
 
         if( !invalidCompletion )
         {
+            // 이번 호출은 항상 1세그먼트만 보냈으므로, 남은 데이터(wrap의 나머지
+            // 세그먼트 포함)가 있으면 다시 FlushSendInternal()을 호출해 이어서 보냅니다.
             if( IsActive() && _sendBuffer.GetSizeUsed() > 0 )
             {
                 needFlush = true;

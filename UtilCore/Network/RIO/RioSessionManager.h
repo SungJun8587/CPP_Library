@@ -27,58 +27,40 @@
 class CRioSession;
 
 //***************************************************************************
-// @struct RioSessionEntry
-// @brief 세션 관리 맵에 저장될 엔트리 구조체
-// @details
-//      - 소켓 재사용 레이스 컨디션을 방지하기 위한 고유 세션 ID(`sessionId`)와
-//        실제 세션 객체를 가리키는 `CRioSessionRef`을 함께 보관합니다.
-//***************************************************************************
-struct RioSessionEntry
-{
-    uint64_t sessionId{ 0 };                 // 세션 고유 식별자 (소켓 재사용 레이스 방지용)
-    CRioSessionRef session;    // 세션 객체 스마트 포인터
-};
-
-//***************************************************************************
 // @class CRioSessionManager
-// @brief 네트워크 세션 생성, 관리, 검색 및 전체 종료를 총괄하는 매니저 클래스
+// @brief CClusterSpinMap을 활용하여 락 경합을 최소화한 RIO 세션 매니저 클래스
+// @details 소켓 재사용 시 발생할 수 있는 레이스 컨디션을 방지하기 위해 SOCKET 
+//			대신 SessionId를 키로 관리합니다.
 //***************************************************************************
 class CRioSessionManager
 {
 public:
-    //***************************************************************************
-    // @brief 싱글톤 패턴을 적용하여 전역에서 단 하나의 CIocpSessionManager 인스턴스에 접근하도록 반환합니다.
-    // @return CIocpSessionManager& 매니저 싱글톤 인스턴스 참조
-    //***************************************************************************
-    static CRioSessionManager& Instance()
-    {
-        static CRioSessionManager instance;
-        return instance;
-    }
+	CRioSessionManager();
+	~CRioSessionManager();
 
-    CRioSessionManager();
-    ~CRioSessionManager();
+	CRioSessionManager(const CRioSessionManager&) = delete;
+	CRioSessionManager& operator=(const CRioSessionManager&) = delete;
 
-    CRioSessionManager(const CRioSessionManager&) = delete;
-    CRioSessionManager& operator=(const CRioSessionManager&) = delete;
+	CRioSessionManager(CRioSessionManager&&) noexcept = default;
+	CRioSessionManager& operator=(CRioSessionManager&&) noexcept = default;
 
 public:
-    uint64_t GenerateSessionId();
+	uint64_t GenerateSessionId();
 
-    bool AddSession(SOCKET socket, uint64_t sessionId, CRioSessionRef session);
-    void RemoveSession(SOCKET socket, uint64_t sessionId);
-    CRioSessionRef FindSession(SOCKET socket) const;
+	bool AddSession(uint64_t sessionId, CRioSessionRef session);
+	void RemoveSession(uint64_t sessionId);
+	CRioSessionRef FindSession(uint64_t sessionId) const;
 
-    size_t GetSessionCount() const;
-    void Broadcast(const void* data, uint16_t size);
+	size_t GetSessionCount() const;
+	void Broadcast(const void* data, uint16_t size);
 
-    void BeginCloseAllSessions();
-    bool AreAllSessionsClosed() const;
-    void RemoveClosedSessions();
+	void BeginCloseAllSessions();
+	bool AreAllSessionsClosed() const;
+	void RemoveClosedSessions();
 
 private:
-    CClusterSpinMap<SOCKET, RioSessionEntry, Rio::kSessionClusterCnt, true> _sessions; // 클러스터 맵 기반 활성 세션 저장소 (Socket 키 기준)
-    std::atomic<uint64_t> _nextSessionId{ 0 };                 // 세션 ID 자동 증가 카운터
+	CClusterSpinMap<uint64_t, CRioSessionRef, Rio::kSessionClusterCnt, true> _sessions; // SessionId를 키로 하고, 클러스터별로 분산 처리하여 락 경합을 최소화하는 고성능 해시맵
+	std::atomic<uint64_t> _nextSessionId{ 0 };                                          // 세션 ID 자동 증가 카운터
 };
 
 #endif // ndef __RIOSESSIONMANAGER_H__

@@ -112,6 +112,8 @@ bool CRioSend::SendEx(
                         std::cout << "[Error] RIOSendEx failed with WSA Error Code: " << err << "\n";
                         return false;
                     }
+
+                    return true;
                 });
         });
 }

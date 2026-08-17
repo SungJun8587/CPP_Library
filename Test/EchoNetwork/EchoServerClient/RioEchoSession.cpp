@@ -6,8 +6,6 @@
 
 #include "pch.h"
 #include "RioEchoSession.h"
-#include <iostream>
-#include <vector>
 
 //***************************************************************************
 // @brief CRioEchoSession 객체를 생성합니다.
@@ -29,7 +27,7 @@ CRioEchoSession::~CRioEchoSession()
 void CRioEchoSession::OnConnected()
 {
 	CRioSession::OnConnected();
-	std::cout << "[RIO Session] Connected!\n";
+	LOG_INFO(_T("[RIO Session] Connected!"));
 }
 
 //***************************************************************************
@@ -39,7 +37,7 @@ void CRioEchoSession::OnConnected()
 void CRioEchoSession::OnDisconnected(Rio::CloseReason reason)
 {
 	CRioSession::OnDisconnected(reason);
-	std::cout << "[RIO Session] Disconnected! (Reason: " << static_cast<int>(reason) << ")\n";
+	LOG_INFO(_T("[RIO Session] Disconnected! (Reason: %d)"), static_cast<int>(reason));
 }
 
 //***************************************************************************
@@ -61,7 +59,7 @@ void CRioEchoSession::OnDataReceived()
 	{
 		if( outDequeueSize > 0 )
 		{
-			std::cout << "[RIO Session Received] " << tempBuffer.data() << " (Len: " << outDequeueSize << ")\n";
+			LOG_DEBUG(_T("[RIO Session Received] %s (Len: %lld)"), tempBuffer.data(), outDequeueSize);
 
 			// 받은 데이터를 그대로 클라이언트에게 전송 (Echo)
 			Send(tempBuffer.data(), static_cast<uint16_t>(outDequeueSize));
@@ -75,7 +73,7 @@ void CRioEchoSession::OnDataReceived()
 void CRioClientEchoSession::OnConnected()
 {
 	CRioSession::OnConnected();
-	std::cout << "[RIO Client] Connected to Server!\n";
+	LOG_INFO(_T("[RIO Client] Connected to Server!"));
 }
 
 //***************************************************************************
@@ -85,7 +83,7 @@ void CRioClientEchoSession::OnConnected()
 void CRioClientEchoSession::OnDisconnected(Rio::CloseReason reason)
 {
 	CRioSession::OnDisconnected(reason);
-	std::cout << "[RIO Client] Disconnected from Server! (Reason: " << static_cast<int>(reason) << ")\n";
+	LOG_INFO(_T("[RIO Client] Disconnected from Server! (Reason: %d)"), static_cast<int>(reason));
 }
 
 //***************************************************************************
@@ -107,7 +105,7 @@ void CRioClientEchoSession::OnDataReceived()
 		if( outDequeueSize > 0 )
 		{
 			std::string message(tempBuffer.data(), static_cast<size_t>(outDequeueSize));
-			std::cout << "[RIO Client Received] " << message << "\n";
+			LOG_DEBUG(_T("[RIO Client Received] %s"), message.c_str());
 		}
 	}
 }
