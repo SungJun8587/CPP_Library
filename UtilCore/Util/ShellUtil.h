@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // ShellUtil.h : interface for the ShellUtil Functions.
 //
@@ -24,33 +24,33 @@
 #endif
 
 //***************************************************************************
-// @brief ÆÄÀÏ º¹»ç/ÀÌµ¿ ½Ã ÇÊÅÍ¸µ Á¶°ÇÀ» °ü¸®ÇÏ´Â ±¸Á¶Ã¼
+// @brief íŒŒì¼ ë³µì‚¬/ì´ë™ ì‹œ í•„í„°ë§ ì¡°ê±´ì„ ê´€ë¦¬í•˜ëŠ” êµ¬ì¡°ì²´
 //***************************************************************************
 typedef struct _SH_APPLY_FILEINFO
 {
-	int			m_nFilterMode;						// ÇÊÅÍ ¸ðµå (0: ÇÊÅÍ¸µ ¾øÀ½, 1: È­ÀÌÆ®¸®½ºÆ®/Çã¿ë, 2: ºí·¢¸®½ºÆ®/Á¦¿Ü)
-	TCHAR		m_tszApplyExt[MAX_BUFFER_SIZE];		// ÇÊÅÍ¸µÇÒ È®ÀåÀÚ ¸ñ·Ï (¿¹: "txt" ¶Ç´Â "txt;log;csv")
-	TCHAR		m_tszModifyStDate[DATE_STRLEN];		// ÆÄÀÏ ¼öÁ¤ÀÏ ±âÁØ ½ÃÀÛÀÏ (YYYYMMDD Çü½Ä, ¿¹: "20260101")
-	TCHAR		m_tszModifyEdDate[DATE_STRLEN];		// ÆÄÀÏ ¼öÁ¤ÀÏ ±âÁØ Á¾·áÀÏ (YYYYMMDD Çü½Ä, ¿¹: "20260807")
+	int			m_nFilterMode;						// í•„í„° ëª¨ë“œ (0: í•„í„°ë§ ì—†ìŒ, 1: í™”ì´íŠ¸ë¦¬ìŠ¤íŠ¸/í—ˆìš©, 2: ë¸”ëž™ë¦¬ìŠ¤íŠ¸/ì œì™¸)
+	TCHAR		m_tszApplyExt[MAX_BUFFER_SIZE];		// í•„í„°ë§í•  í™•ìž¥ìž ëª©ë¡ (ì˜ˆ: "txt" ë˜ëŠ” "txt;log;csv")
+	TCHAR		m_tszModifyStDate[DATE_STRLEN];		// íŒŒì¼ ìˆ˜ì •ì¼ ê¸°ì¤€ ì‹œìž‘ì¼ (YYYYMMDD í˜•ì‹, ì˜ˆ: "20260101")
+	TCHAR		m_tszModifyEdDate[DATE_STRLEN];		// íŒŒì¼ ìˆ˜ì •ì¼ ê¸°ì¤€ ì¢…ë£Œì¼ (YYYYMMDD í˜•ì‹, ì˜ˆ: "20260807")
 } SH_APPLY_FILEINFO, * PSH_APPLY_FILEINFO;
 
 //***************************************************************************
-// @brief ÆÄÀÏ ½Ã½ºÅÛ(°æ·Î, Æú´õ, ÆÄÀÏ¸í) Á¤º¸¸¦ °ü¸®ÇÏ´Â ±¸Á¶Ã¼
+// @brief íŒŒì¼ ì‹œìŠ¤í…œ(ê²½ë¡œ, í´ë”, íŒŒì¼ëª…) ì •ë³´ë¥¼ ê´€ë¦¬í•˜ëŠ” êµ¬ì¡°ì²´
 //***************************************************************************
 typedef struct _SH_FILESYSTEM_INFO
 {
-	TCHAR		m_tszFullPath[FULLPATH_STRLEN];       // ÆÄÀÏÀÇ ÀüÃ¼ °æ·Î (µå¶óÀÌºê+Æú´õ+ÆÄÀÏ¸í+È®ÀåÀÚ)
-	TCHAR		m_tszFolder[DIRECTORY_STRLEN];        // ÆÄÀÏÀÌ ¼ÓÇÑ µð·ºÅä¸®(Æú´õ) °æ·Î
-	TCHAR		m_tszFileNameExt[FILENAMEEXT_STRLEN]; // ÆÄÀÏÀÇ ÀÌ¸§°ú È®ÀåÀÚ (¿¹: "document.txt")
+	TCHAR		m_tszFullPath[FULLPATH_STRLEN];       // íŒŒì¼ì˜ ì „ì²´ ê²½ë¡œ (ë“œë¼ì´ë¸Œ+í´ë”+íŒŒì¼ëª…+í™•ìž¥ìž)
+	TCHAR		m_tszFolder[DIRECTORY_STRLEN];        // íŒŒì¼ì´ ì†í•œ ë””ë ‰í† ë¦¬(í´ë”) ê²½ë¡œ
+	TCHAR		m_tszFileNameExt[FILENAMEEXT_STRLEN]; // íŒŒì¼ì˜ ì´ë¦„ê³¼ í™•ìž¥ìž (ì˜ˆ: "document.txt")
 
 } SH_FILESYSTEM_INFO, * PSH_FILESYSTEM_INFO;
 
 //***************************************************************************
-// @brief À©µµ¿ì ·¹Áö½ºÆ®¸® Å° ¹× °ª Á¤º¸¸¦ °ü¸®ÇÏ´Â ±¸Á¶Ã¼
+// @brief ìœˆë„ìš° ë ˆì§€ìŠ¤íŠ¸ë¦¬ í‚¤ ë° ê°’ ì •ë³´ë¥¼ ê´€ë¦¬í•˜ëŠ” êµ¬ì¡°ì²´
 //***************************************************************************
 typedef struct _SH_REGISTRY_INFO
 {
-	// »ý¼ºÀÚ: ¸â¹ö º¯¼ö ÃÊ±âÈ­
+	// ìƒì„±ìž: ë©¤ë²„ ë³€ìˆ˜ ì´ˆê¸°í™”
 	_SH_REGISTRY_INFO() {
 		memset(m_tszFullPathKey, 0, sizeof(m_tszFullPathKey));
 		memset(m_tszSubPathKey, 0, sizeof(m_tszSubPathKey));
@@ -62,7 +62,7 @@ typedef struct _SH_REGISTRY_INFO
 		m_dwValueLen = 0;
 	}
 
-	// ¼Ò¼öÁ¡/µ¿Àû ¸Þ¸ð¸® ÇØÁ¦ ¼Ò¸êÀÚ: ÇÒ´çµÈ ·¹Áö½ºÆ®¸® °ª ¹öÆÛ Á¤¸®
+	// ì†Œìˆ˜ì /ë™ì  ë©”ëª¨ë¦¬ í•´ì œ ì†Œë©¸ìž: í• ë‹¹ëœ ë ˆì§€ìŠ¤íŠ¸ë¦¬ ê°’ ë²„í¼ ì •ë¦¬
 	~_SH_REGISTRY_INFO() {
 		if( m_pbValue )
 		{
@@ -71,14 +71,14 @@ typedef struct _SH_REGISTRY_INFO
 		}
 	}
 
-	TCHAR	m_tszFullPathKey[REGISTRY_KEY_STRLEN];	// ·¹Áö½ºÆ®¸® Å°ÀÇ ÀüÃ¼ °æ·Î
-	TCHAR	m_tszSubPathKey[REGISTRY_KEY_STRLEN];   // ÇÏÀ§ ·¹Áö½ºÆ®¸® °æ·Î
-	TCHAR	m_tszName[REGISTRY_NAME_STRLEN];		// ·¹Áö½ºÆ®¸® °ª(Value)ÀÇ ÀÌ¸§
-	BYTE* m_pbValue;								// ·¹Áö½ºÆ®¸® °ªÀÇ ½ÇÁ¦ µ¥ÀÌÅÍ°¡ ÀúÀåµÉ µ¿Àû ¹öÆÛ Æ÷ÀÎÅÍ
+	TCHAR	m_tszFullPathKey[REGISTRY_KEY_STRLEN];	// ë ˆì§€ìŠ¤íŠ¸ë¦¬ í‚¤ì˜ ì „ì²´ ê²½ë¡œ
+	TCHAR	m_tszSubPathKey[REGISTRY_KEY_STRLEN];   // í•˜ìœ„ ë ˆì§€ìŠ¤íŠ¸ë¦¬ ê²½ë¡œ
+	TCHAR	m_tszName[REGISTRY_NAME_STRLEN];		// ë ˆì§€ìŠ¤íŠ¸ë¦¬ ê°’(Value)ì˜ ì´ë¦„
+	BYTE* m_pbValue;								// ë ˆì§€ìŠ¤íŠ¸ë¦¬ ê°’ì˜ ì‹¤ì œ ë°ì´í„°ê°€ ì €ìž¥ë  ë™ì  ë²„í¼ í¬ì¸í„°
 
-	DWORD	m_dwType;								// ·¹Áö½ºÆ®¸® µ¥ÀÌÅÍ Å¸ÀÔ (REG_SZ, REG_DWORD µî)
-	DWORD	m_dwNameLen;							// ·¹Áö½ºÆ®¸® ÀÌ¸§ÀÇ ±æÀÌ
-	DWORD	m_dwValueLen;							// ·¹Áö½ºÆ®¸® °ª µ¥ÀÌÅÍÀÇ ¹ÙÀÌÆ® Å©±â
+	DWORD	m_dwType;								// ë ˆì§€ìŠ¤íŠ¸ë¦¬ ë°ì´í„° íƒ€ìž… (REG_SZ, REG_DWORD ë“±)
+	DWORD	m_dwNameLen;							// ë ˆì§€ìŠ¤íŠ¸ë¦¬ ì´ë¦„ì˜ ê¸¸ì´
+	DWORD	m_dwValueLen;							// ë ˆì§€ìŠ¤íŠ¸ë¦¬ ê°’ ë°ì´í„°ì˜ ë°”ì´íŠ¸ í¬ê¸°
 } SH_REGISTRY_INFO, * PSH_REGISTRY_INFO;
 
 bool	IsMatchedExtension(const TCHAR* ptszFilePath, const TCHAR* pExtFilter, int nFilterMode);

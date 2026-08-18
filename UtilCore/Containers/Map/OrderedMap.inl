@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // OrderedMap.inl : implementation of the COrderedMap class.
 //
@@ -17,8 +17,8 @@ COrderedMap<T1, T2>::~COrderedMap(void)
 }
 
 //***************************************************************************
-// GetSize : ÀĞ±â ¶ôÀ» »ç¿ëÇÏ¿© ¸Ê Å©±â ¹İÈ¯
-// @return int32 µ¥ÀÌÅÍ °³¼ö
+// GetSize : ì½ê¸° ë½ì„ ì‚¬ìš©í•˜ì—¬ ë§µ í¬ê¸° ë°˜í™˜
+// @return int32 ë°ì´í„° ê°œìˆ˜
 //***************************************************************************
 template<typename T1, typename T2>
 int32 COrderedMap<T1, T2>::GetSize()
@@ -28,8 +28,8 @@ int32 COrderedMap<T1, T2>::GetSize()
 }
 
 //***************************************************************************
-// IsEmpty : ÀĞ±â ¶ôÀ» »ç¿ëÇÏ¿© ¸ÊÀÌ ºñ¾îÀÖ´ÂÁö È®ÀÎ
-// @return bool ºñ¾îÀÖÀ¸¸é true
+// IsEmpty : ì½ê¸° ë½ì„ ì‚¬ìš©í•˜ì—¬ ë§µì´ ë¹„ì–´ìˆëŠ”ì§€ í™•ì¸
+// @return bool ë¹„ì–´ìˆìœ¼ë©´ true
 //***************************************************************************
 template<typename T1, typename T2>
 bool COrderedMap<T1, T2>::IsEmpty()
@@ -39,10 +39,10 @@ bool COrderedMap<T1, T2>::IsEmpty()
 }
 
 //***************************************************************************
-// InsertObject : ¾²±â ¶ôÀ» »ç¿ëÇÏ¿© µ¥ÀÌÅÍ »ğÀÔ
-// @param key »ğÀÔÇÒ µ¥ÀÌÅÍÀÇ Å°
-// @param object »ğÀÔÇÒ °´Ã¼ °ª
-// @return bool »ğÀÔ ¼º°ø ½Ã true, ÀÌ¹Ì Á¸ÀçÇÏ¸é false
+// InsertObject : ì“°ê¸° ë½ì„ ì‚¬ìš©í•˜ì—¬ ë°ì´í„° ì‚½ì…
+// @param key ì‚½ì…í•  ë°ì´í„°ì˜ í‚¤
+// @param object ì‚½ì…í•  ê°ì²´ ê°’
+// @return bool ì‚½ì… ì„±ê³µ ì‹œ true, ì´ë¯¸ ì¡´ì¬í•˜ë©´ false
 //***************************************************************************
 template<typename T1, typename T2>
 bool COrderedMap<T1, T2>::InsertObject(const T1& key, const T2& object)
@@ -53,10 +53,10 @@ bool COrderedMap<T1, T2>::InsertObject(const T1& key, const T2& object)
 }
 
 //***************************************************************************
-// InsertAndUpdateObject : ¾²±â ¶ôÀ» »ç¿ëÇÏ¿© Å°°¡ ¾øÀ¸¸é »ğÀÔ, ÀÖÀ¸¸é °»½Å
-// @param key ´ë»ó Å°
-// @param object °»½ÅÇÏ°Å³ª »ğÀÔÇÒ °´Ã¼ °ª
-// @return bool ¼º°ø ½Ã true
+// InsertAndUpdateObject : ì“°ê¸° ë½ì„ ì‚¬ìš©í•˜ì—¬ í‚¤ê°€ ì—†ìœ¼ë©´ ì‚½ì…, ìˆìœ¼ë©´ ê°±ì‹ 
+// @param key ëŒ€ìƒ í‚¤
+// @param object ê°±ì‹ í•˜ê±°ë‚˜ ì‚½ì…í•  ê°ì²´ ê°’
+// @return bool ì„±ê³µ ì‹œ true
 //***************************************************************************
 template<typename T1, typename T2>
 bool COrderedMap<T1, T2>::InsertAndUpdateObject(const T1& key, const T2& object)
@@ -74,10 +74,10 @@ bool COrderedMap<T1, T2>::InsertAndUpdateObject(const T1& key, const T2& object)
 }
 
 //***************************************************************************
-// FindObject : ÀĞ±â ¶ôÀ» »ç¿ëÇÏ¿© µ¥ÀÌÅÍ °Ë»ö
-// @param key °Ë»öÇÒ µ¥ÀÌÅÍÀÇ Å°
-// @param outObject [out] °á°ú¸¦ ´ãÀ» ÂüÁ¶ÀÚ
-// @return bool °Ë»ö ¼º°ø ½Ã true, Á¸ÀçÇÏÁö ¾ÊÀ¸¸é false
+// FindObject : ì½ê¸° ë½ì„ ì‚¬ìš©í•˜ì—¬ ë°ì´í„° ê²€ìƒ‰
+// @param key ê²€ìƒ‰í•  ë°ì´í„°ì˜ í‚¤
+// @param outObject [out] ê²°ê³¼ë¥¼ ë‹´ì„ ì°¸ì¡°ì
+// @return bool ê²€ìƒ‰ ì„±ê³µ ì‹œ true, ì¡´ì¬í•˜ì§€ ì•Šìœ¼ë©´ false
 //***************************************************************************
 template<typename T1, typename T2>
 bool COrderedMap<T1, T2>::FindObject(const T1& key, T2& outObject)
@@ -92,9 +92,9 @@ bool COrderedMap<T1, T2>::FindObject(const T1& key, T2& outObject)
 }
 
 //***************************************************************************
-// EraseObject : ¾²±â ¶ôÀ» »ç¿ëÇÏ¿© µ¥ÀÌÅÍ »èÁ¦
-// @param key »èÁ¦ÇÒ µ¥ÀÌÅÍÀÇ Å°
-// @return bool »èÁ¦ ¼º°ø ½Ã true, Á¸ÀçÇÏÁö ¾ÊÀ¸¸é false
+// EraseObject : ì“°ê¸° ë½ì„ ì‚¬ìš©í•˜ì—¬ ë°ì´í„° ì‚­ì œ
+// @param key ì‚­ì œí•  ë°ì´í„°ì˜ í‚¤
+// @return bool ì‚­ì œ ì„±ê³µ ì‹œ true, ì¡´ì¬í•˜ì§€ ì•Šìœ¼ë©´ false
 //***************************************************************************
 template<typename T1, typename T2>
 bool COrderedMap<T1, T2>::EraseObject(const T1& key)
@@ -109,7 +109,7 @@ bool COrderedMap<T1, T2>::EraseObject(const T1& key)
 }
 
 //***************************************************************************
-// clearObjectMap : ¾²±â ¶ôÀ» »ç¿ëÇÏ¿© ³»ºÎ ¸Ê ºñ¿ì±â
+// clearObjectMap : ì“°ê¸° ë½ì„ ì‚¬ìš©í•˜ì—¬ ë‚´ë¶€ ë§µ ë¹„ìš°ê¸°
 //***************************************************************************
 template<typename T1, typename T2>
 void COrderedMap<T1, T2>::clearObjectMap(void)

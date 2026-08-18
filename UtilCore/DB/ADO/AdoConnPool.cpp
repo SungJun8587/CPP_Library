@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // AdoConnPool.cpp : implementation of the CAdoConnPool class.
 //
@@ -8,14 +8,14 @@
 #include "AdoConnPool.h"
 #include <random>
 
-constexpr int32 WAIT_TIMEOUT_MS = 100;              // Ä¿³Ø¼Ç ½º¿Ò ½Ã ±âÁ¸ °´Ã¼ ÂüÁ¶ ÇØÁ¦ ´ë±â Å¸ÀÓ¾Æ¿ô (¹Ğ¸®ÃÊ)
-constexpr int64 LOG_ALERT_INTERVAL_MS = 300000;     // °İ¸® Å¥ ÀÜ·ù Áö¼Ó °æ°í ·Î±× Ãâ·Â ÁÖ¹Ì (5ºĞ)
-constexpr int64 FORCE_CLEANUP_TIMEOUT_MS = 600000;  // °İ¸® Å¥ °­Á¦ Á¤¸® ´ë±â ½Ã°£ »óÇÑ¼± (10ºĞ)
+constexpr int32 WAIT_TIMEOUT_MS = 100;              // ì»¤ë„¥ì…˜ ìŠ¤ì™‘ ì‹œ ê¸°ì¡´ ê°ì²´ ì°¸ì¡° í•´ì œ ëŒ€ê¸° íƒ€ì„ì•„ì›ƒ (ë°€ë¦¬ì´ˆ)
+constexpr int64 LOG_ALERT_INTERVAL_MS = 300000;     // ê²©ë¦¬ í ì”ë¥˜ ì§€ì† ê²½ê³  ë¡œê·¸ ì¶œë ¥ ì£¼ë¯¸ (5ë¶„)
+constexpr int64 FORCE_CLEANUP_TIMEOUT_MS = 600000;  // ê²©ë¦¬ í ê°•ì œ ì •ë¦¬ ëŒ€ê¸° ì‹œê°„ ìƒí•œì„  (10ë¶„)
 
 //***************************************************************************
 // CAdoConnPool::CAdoConnPool
-// @brief CAdoConnPool Å¬·¡½ºÀÇ »ı¼ºÀÚÀÔ´Ï´Ù. ÁöÁ¤µÈ ÃÖ´ë Ç® Å©±â·Î °ü¸® ¹è¿­µéÀ» ÃÊ±âÈ­ÇÕ´Ï´Ù.
-// @param nMaxPoolSize »ı¼ºÇÒ Ä¿³Ø¼Ç Ç®ÀÇ ÃÖ´ë ½½·Ô Å©±â
+// @brief CAdoConnPool í´ë˜ìŠ¤ì˜ ìƒì„±ìì…ë‹ˆë‹¤. ì§€ì •ëœ ìµœëŒ€ í’€ í¬ê¸°ë¡œ ê´€ë¦¬ ë°°ì—´ë“¤ì„ ì´ˆê¸°í™”í•©ë‹ˆë‹¤.
+// @param nMaxPoolSize ìƒì„±í•  ì»¤ë„¥ì…˜ í’€ì˜ ìµœëŒ€ ìŠ¬ë¡¯ í¬ê¸°
 //***************************************************************************
 CAdoConnPool::CAdoConnPool(int32 nMaxPoolSize)
 	: _dbClass(EDBClass::NONE)
@@ -32,7 +32,7 @@ CAdoConnPool::CAdoConnPool(int32 nMaxPoolSize)
 	, _nCurrentWorkerCount(0)
 	, _nDesiredWorkerCount(0)
 {
-	// Ç® Å©±â¿¡ ¸ÂÃç °¢ °ü¸® ¹è¿­À» µ¿Àû ÇÒ´ç
+	// í’€ í¬ê¸°ì— ë§ì¶° ê° ê´€ë¦¬ ë°°ì—´ì„ ë™ì  í• ë‹¹
 	_pAdoConns = std::make_unique<CachePaddedAtomic<CAdoDB*>[]>(_nMaxPoolSize);
 	_pRefCount = std::make_unique<CachePaddedAtomic<int32>[]>(_nMaxPoolSize);
 	_slotLocks = std::make_unique<PLock[]>(_nMaxPoolSize);
@@ -40,7 +40,7 @@ CAdoConnPool::CAdoConnPool(int32 nMaxPoolSize)
 	_pReconnecting = std::make_unique<CachePaddedAtomic<bool>[]>(_nMaxPoolSize);
 	_pRetryFailCount = std::make_unique<CachePaddedAtomic<int32>[]>(_nMaxPoolSize);
 
-	// ¸ğµç ½½·ÔÀÇ »óÅÂ ÃÊ±âÈ­
+	// ëª¨ë“  ìŠ¬ë¡¯ì˜ ìƒíƒœ ì´ˆê¸°í™”
 	for( int32 i = 0; i < _nMaxPoolSize; i++ )
 	{
 		_pAdoConns[i].value.store(nullptr, std::memory_order_relaxed);
@@ -53,11 +53,11 @@ CAdoConnPool::CAdoConnPool(int32 nMaxPoolSize)
 
 //***************************************************************************
 // CAdoConnPool::~CAdoConnPool
-// @brief CAdoConnPool Å¬·¡½ºÀÇ ¼Ò¸êÀÚÀÔ´Ï´Ù. ¹é±×¶ó¿îµå ½º·¹µå¸¦ ÁßÁöÇÏ°í ÀÚ¿øÀ» ÇØÁ¦ÇÕ´Ï´Ù.
+// @brief CAdoConnPool í´ë˜ìŠ¤ì˜ ì†Œë©¸ìì…ë‹ˆë‹¤. ë°±ê·¸ë¼ìš´ë“œ ìŠ¤ë ˆë“œë¥¼ ì¤‘ì§€í•˜ê³  ìì›ì„ í•´ì œí•©ë‹ˆë‹¤.
 //***************************************************************************
 CAdoConnPool::~CAdoConnPool(void)
 {
-	// ¹é±×¶ó¿îµå ½º·¹µåµéÀ» ¾ÈÀüÇÏ°Ô ÁßÁö½ÃÅ² µÚ Ç® ÀÚ¿ø ÇØÁ¦
+	// ë°±ê·¸ë¼ìš´ë“œ ìŠ¤ë ˆë“œë“¤ì„ ì•ˆì „í•˜ê²Œ ì¤‘ì§€ì‹œí‚¨ ë’¤ í’€ ìì› í•´ì œ
 	StopHealthCheckThread();
 	StopDelayedTaskThread();
 	StopReconnectWorkers();
@@ -66,9 +66,9 @@ CAdoConnPool::~CAdoConnPool(void)
 
 //***************************************************************************
 // CAdoConnPool::ValidateReconnectConfig
-// @brief ÀçÁ¢¼Ó ¹× ¹é¿ÀÇÁ ¼³Á¤°ªÀÇ À¯È¿¼ºÀ» °ËÁõÇÕ´Ï´Ù.
-// @param cfg °ËÁõÇÒ ÀçÁ¢¼Ó ¹× ¹é¿ÀÇÁ ¼³Á¤ ±¸Á¶Ã¼
-// @return ¼³Á¤°ªÀÌ À¯È¿ÇÏ¸é true, À¯È¿ÇÏÁö ¾ÊÀ¸¸é false
+// @brief ì¬ì ‘ì† ë° ë°±ì˜¤í”„ ì„¤ì •ê°’ì˜ ìœ íš¨ì„±ì„ ê²€ì¦í•©ë‹ˆë‹¤.
+// @param cfg ê²€ì¦í•  ì¬ì ‘ì† ë° ë°±ì˜¤í”„ ì„¤ì • êµ¬ì¡°ì²´
+// @return ì„¤ì •ê°’ì´ ìœ íš¨í•˜ë©´ true, ìœ íš¨í•˜ì§€ ì•Šìœ¼ë©´ false
 //***************************************************************************
 bool CAdoConnPool::ValidateReconnectConfig(const TReconnectConfig& cfg)
 {
@@ -82,17 +82,17 @@ bool CAdoConnPool::ValidateReconnectConfig(const TReconnectConfig& cfg)
 
 //***************************************************************************
 // CAdoConnPool::Init
-// @brief Ä¿³Ø¼Ç Ç®À» ÃÊ±âÈ­ÇÏ°í, ÁöÁ¤µÈ ¼³Á¤À¸·Î ÃÊ±â Ä¿³Ø¼ÇÀ» ¹Ì¸® »ı¼ºÇÏ¿© ¿¬°áÇÕ´Ï´Ù.
-// @param dbClass µ¥ÀÌÅÍº£ÀÌ½º Á¾·ù ½Äº°ÀÚ
-// @param ptszConnStr µ¥ÀÌÅÍº£ÀÌ½º Á¢¼Ó ¹®ÀÚ¿­ (Connection String) Æ÷ÀÎÅÍ
-// @param nTimeOut Á¢¼Ó ¹× Äõ¸® Å¸ÀÓ¾Æ¿ô Á¦ÇÑ ½Ã°£ (ÃÊ)
-// @param reconnectConfig ÃÊ±â Àç¿¬°á ¹× ¹é¿ÀÇÁ Á¤Ã¥ ¼³Á¤ ±¸Á¶Ã¼
-// @return ÃÊ±âÈ­ ¹× ÀüÃ¼ ¿¬°á ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief ì»¤ë„¥ì…˜ í’€ì„ ì´ˆê¸°í™”í•˜ê³ , ì§€ì •ëœ ì„¤ì •ìœ¼ë¡œ ì´ˆê¸° ì»¤ë„¥ì…˜ì„ ë¯¸ë¦¬ ìƒì„±í•˜ì—¬ ì—°ê²°í•©ë‹ˆë‹¤.
+// @param dbClass ë°ì´í„°ë² ì´ìŠ¤ ì¢…ë¥˜ ì‹ë³„ì
+// @param ptszConnStr ë°ì´í„°ë² ì´ìŠ¤ ì ‘ì† ë¬¸ìì—´ (Connection String) í¬ì¸í„°
+// @param nTimeOut ì ‘ì† ë° ì¿¼ë¦¬ íƒ€ì„ì•„ì›ƒ ì œí•œ ì‹œê°„ (ì´ˆ)
+// @param reconnectConfig ì´ˆê¸° ì¬ì—°ê²° ë° ë°±ì˜¤í”„ ì •ì±… ì„¤ì • êµ¬ì¡°ì²´
+// @return ì´ˆê¸°í™” ë° ì „ì²´ ì—°ê²° ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool CAdoConnPool::Init(const EDBClass dbClass, const TCHAR* ptszConnStr, const int nTimeOut,
 	const TReconnectConfig& reconnectConfig)
 {
-	// ±âÁ¸¿¡ ±¸µ¿ ÁßÀÎ ½º·¹µå¿Í ÀÚ¿øÀ» ¿ì¼± Á¤¸®
+	// ê¸°ì¡´ì— êµ¬ë™ ì¤‘ì¸ ìŠ¤ë ˆë“œì™€ ìì›ì„ ìš°ì„  ì •ë¦¬
 	StopHealthCheckThread();
 	StopDelayedTaskThread();
 	StopReconnectWorkers();
@@ -109,13 +109,13 @@ bool CAdoConnPool::Init(const EDBClass dbClass, const TCHAR* ptszConnStr, const 
 		cfgToApply = TReconnectConfig{};
 	}
 
-	// ¹é¿ÀÇÁ ¼³Á¤°ª ¹İ¿µ
+	// ë°±ì˜¤í”„ ì„¤ì •ê°’ ë°˜ì˜
 	_nBackoffBaseMs.store(cfgToApply.nBackoffBaseMs, std::memory_order_relaxed);
 	_nBackoffMaxMs.store(cfgToApply.nBackoffMaxMs, std::memory_order_relaxed);
 	_nBackoffMaxShift.store(cfgToApply.nBackoffMaxShift, std::memory_order_relaxed);
 	_nBackoffJitterMs.store(cfgToApply.nBackoffJitterMs, std::memory_order_relaxed);
 
-	// ÃÊ±â ¼³Á¤µÈ ÃÖ´ë Ç® Å©±â¸¸Å­ Ä¿³Ø¼ÇÀ» »ı¼º ¹× DB Á¢¼Ó ¼öÇà
+	// ì´ˆê¸° ì„¤ì •ëœ ìµœëŒ€ í’€ í¬ê¸°ë§Œí¼ ì»¤ë„¥ì…˜ì„ ìƒì„± ë° DB ì ‘ì† ìˆ˜í–‰
 	for( int32 i = 0; i < _nMaxPoolSize; i++ )
 	{
 		CAdoDB* pConn = xnew<CAdoDB>();
@@ -136,7 +136,7 @@ bool CAdoConnPool::Init(const EDBClass dbClass, const TCHAR* ptszConnStr, const 
 		_pAdoConns[i].value.store(pConn, std::memory_order_release);
 	}
 
-	// ¹é±×¶ó¿îµå °ü¸® ½º·¹µå ¹× ¿öÄ¿ ±¸µ¿
+	// ë°±ê·¸ë¼ìš´ë“œ ê´€ë¦¬ ìŠ¤ë ˆë“œ ë° ì›Œì»¤ êµ¬ë™
 	StartDelayedTaskThread();
 	StartHealthCheckThread();
 	StartReconnectWorkers(cfgToApply.nWorkerCount);
@@ -145,9 +145,9 @@ bool CAdoConnPool::Init(const EDBClass dbClass, const TCHAR* ptszConnStr, const 
 
 //***************************************************************************
 // CAdoConnPool::TryReconnect
-// @brief ÁöÁ¤µÈ ½½·Ô ÀÎµ¦½º¿¡ ´ëÇØ »õ·Î¿î ADO Ä¿³Ø¼Ç °´Ã¼¸¦ »ı¼ºÇÏ°í DB ÀçÁ¢¼ÓÀ» ½ÃµµÇÕ´Ï´Ù.
-// @param nType ÀçÁ¢¼ÓÀ» ½ÃµµÇÒ Ç® ½½·Ô ÀÎµ¦½º
-// @return ÀçÁ¢¼Ó¿¡ ¼º°øÇÑ CAdoDB °´Ã¼ Æ÷ÀÎÅÍ, ½ÇÆĞ ½Ã nullptr
+// @brief ì§€ì •ëœ ìŠ¬ë¡¯ ì¸ë±ìŠ¤ì— ëŒ€í•´ ìƒˆë¡œìš´ ADO ì»¤ë„¥ì…˜ ê°ì²´ë¥¼ ìƒì„±í•˜ê³  DB ì¬ì ‘ì†ì„ ì‹œë„í•©ë‹ˆë‹¤.
+// @param nType ì¬ì ‘ì†ì„ ì‹œë„í•  í’€ ìŠ¬ë¡¯ ì¸ë±ìŠ¤
+// @return ì¬ì ‘ì†ì— ì„±ê³µí•œ CAdoDB ê°ì²´ í¬ì¸í„°, ì‹¤íŒ¨ ì‹œ nullptr
 //***************************************************************************
 CAdoDB* CAdoConnPool::TryReconnect(int32 nType)
 {
@@ -158,7 +158,7 @@ CAdoDB* CAdoConnPool::TryReconnect(int32 nType)
 		return nullptr;
 	}
 
-	// »õ·Î¿î Ä¿³Ø¼Ç °´Ã¼·Î DB Á¢¼Ó ½Ãµµ
+	// ìƒˆë¡œìš´ ì»¤ë„¥ì…˜ ê°ì²´ë¡œ DB ì ‘ì† ì‹œë„
 	if( pNewConn->Connect(_dbClass, _tszConnStr, _nTimeOut) < 0 )
 	{
 		xdelete(pNewConn);
@@ -170,9 +170,9 @@ CAdoDB* CAdoConnPool::TryReconnect(int32 nType)
 
 //***************************************************************************
 // CAdoConnPool::GetAdoConn
-// @brief Æ¯Á¤ Ç® ½½·Ô ÀÎµ¦½ºÀÇ ADO Ä¿³Ø¼ÇÀ» ´ë¿©ÇÕ´Ï´Ù (ÂüÁ¶ Ä«¿îÆ® Áõ°¡).
-// @param nType ´ë¿©ÇÏ°íÀÚ ÇÏ´Â Æ¯Á¤ Ç® ½½·Ô ÀÎµ¦½º
-// @return À¯È¿ÇÑ CAdoDB °´Ã¼ Æ÷ÀÎÅÍ, ÁØºñµÇÁö ¾Ê¾Ò°Å³ª ½ÇÆĞ ½Ã nullptr
+// @brief íŠ¹ì • í’€ ìŠ¬ë¡¯ ì¸ë±ìŠ¤ì˜ ADO ì»¤ë„¥ì…˜ì„ ëŒ€ì—¬í•©ë‹ˆë‹¤ (ì°¸ì¡° ì¹´ìš´íŠ¸ ì¦ê°€).
+// @param nType ëŒ€ì—¬í•˜ê³ ì í•˜ëŠ” íŠ¹ì • í’€ ìŠ¬ë¡¯ ì¸ë±ìŠ¤
+// @return ìœ íš¨í•œ CAdoDB ê°ì²´ í¬ì¸í„°, ì¤€ë¹„ë˜ì§€ ì•Šì•˜ê±°ë‚˜ ì‹¤íŒ¨ ì‹œ nullptr
 //***************************************************************************
 CAdoDB* CAdoConnPool::GetAdoConn(int32 nType)
 {
@@ -182,11 +182,11 @@ CAdoDB* CAdoConnPool::GetAdoConn(int32 nType)
 		return nullptr;
 	}
 
-	// »ç¿ëÀ» À§ÇØ ÂüÁ¶ Ä«¿îÆ® ¼±Á¦ Áõ°¡
+	// ì‚¬ìš©ì„ ìœ„í•´ ì°¸ì¡° ì¹´ìš´íŠ¸ ì„ ì œ ì¦ê°€
 	_pRefCount[nType].value.fetch_add(1, std::memory_order_relaxed);
 	CAdoDB* pAdoConn = _pAdoConns[nType].value.load(std::memory_order_acquire);
 
-	// Ä¿³Ø¼ÇÀÌ ºñÁ¤»óÀÌ°Å³ª ÁØºñµÇÁö ¾ÊÀº °æ¿ì ÂüÁ¶ Ä«¿îÆ® º¹¿ø ÈÄ ½ÇÆĞ Ã³¸®
+	// ì»¤ë„¥ì…˜ì´ ë¹„ì •ìƒì´ê±°ë‚˜ ì¤€ë¹„ë˜ì§€ ì•Šì€ ê²½ìš° ì°¸ì¡° ì¹´ìš´íŠ¸ ë³µì› í›„ ì‹¤íŒ¨ ì²˜ë¦¬
 	if( pAdoConn == nullptr || !pAdoConn->GetDBCon() )
 	{
 		_pRefCount[nType].value.fetch_sub(1, std::memory_order_release);
@@ -199,9 +199,9 @@ CAdoDB* CAdoConnPool::GetAdoConn(int32 nType)
 
 //***************************************************************************
 // CAdoConnPool::GetPooledConnUnsafe
-// @brief ¶ôÀÌ³ª ÂüÁ¶ Ä«¿îÆ® Á¶Àı ¾øÀÌ Æ¯Á¤ ½½·ÔÀÇ Ç®¸µµÈ Ä¿³Ø¼Ç Æ÷ÀÎÅÍ¸¦ Á÷Á¢ Á¶È¸ÇÕ´Ï´Ù.
-// @param nType Á¶È¸ÇÒ Ç® ½½·Ô ÀÎµ¦½º
-// @return CAdoDB °´Ã¼ Æ÷ÀÎÅÍ, ÀÎµ¦½º°¡ À¯È¿ÇÏÁö ¾ÊÀ¸¸é nullptr
+// @brief ë½ì´ë‚˜ ì°¸ì¡° ì¹´ìš´íŠ¸ ì¡°ì ˆ ì—†ì´ íŠ¹ì • ìŠ¬ë¡¯ì˜ í’€ë§ëœ ì»¤ë„¥ì…˜ í¬ì¸í„°ë¥¼ ì§ì ‘ ì¡°íšŒí•©ë‹ˆë‹¤.
+// @param nType ì¡°íšŒí•  í’€ ìŠ¬ë¡¯ ì¸ë±ìŠ¤
+// @return CAdoDB ê°ì²´ í¬ì¸í„°, ì¸ë±ìŠ¤ê°€ ìœ íš¨í•˜ì§€ ì•Šìœ¼ë©´ nullptr
 //***************************************************************************
 CAdoDB* CAdoConnPool::GetPooledConnUnsafe(int32 nType) const
 {
@@ -211,25 +211,25 @@ CAdoDB* CAdoConnPool::GetPooledConnUnsafe(int32 nType) const
 
 //***************************************************************************
 // CAdoConnPool::ReleaseAdoConn
-// @brief »ç¿ëÀ» ¿Ï·áÇÑ Ä¿³Ø¼Ç ½½·ÔÀÇ ÂüÁ¶ Ä«¿îÆ®¸¦ °¨¼Ò½ÃÅµ´Ï´Ù.
-// @param nType »ç¿ëÀ» ¿Ï·áÇÑ Ä¿³Ø¼Ç ½½·Ô ÀÎµ¦½º
+// @brief ì‚¬ìš©ì„ ì™„ë£Œí•œ ì»¤ë„¥ì…˜ ìŠ¬ë¡¯ì˜ ì°¸ì¡° ì¹´ìš´íŠ¸ë¥¼ ê°ì†Œì‹œí‚µë‹ˆë‹¤.
+// @param nType ì‚¬ìš©ì„ ì™„ë£Œí•œ ì»¤ë„¥ì…˜ ìŠ¬ë¡¯ ì¸ë±ìŠ¤
 //***************************************************************************
 void CAdoConnPool::ReleaseAdoConn(int32 nType)
 {
 	if( !IsValidIndex(nType) ) return;
-	// »ç¿ë ¿Ï·á¿¡ µû¸¥ ÂüÁ¶ Ä«¿îÆ® °¨¼Ò
+	// ì‚¬ìš© ì™„ë£Œì— ë”°ë¥¸ ì°¸ì¡° ì¹´ìš´íŠ¸ ê°ì†Œ
 	_pRefCount[nType].value.fetch_sub(1, std::memory_order_release);
 }
 
 //***************************************************************************
 // CAdoConnPool::PopFreeSlotIndex
-// @brief ¶ó¿îµå ·Îºó ¹æ½ÄÀ¸·Î »ç¿ë °¡´ÉÇÏ°í Áï½Ã ´ë¿©ÇÒ ¼ö ÀÖ´Â ÇÁ¸® ½½·ÔÀÇ ÀÎµ¦½º¸¦ Å½»öÇÏ¿© ¹İÈ¯ÇÕ´Ï´Ù.
-// @return »ç¿ë °¡´ÉÇÑ ½½·Ô ÀÎµ¦½º, ¾ø°Å³ª ½ÇÆĞ ½Ã -1
+// @brief ë¼ìš´ë“œ ë¡œë¹ˆ ë°©ì‹ìœ¼ë¡œ ì‚¬ìš© ê°€ëŠ¥í•˜ê³  ì¦‰ì‹œ ëŒ€ì—¬í•  ìˆ˜ ìˆëŠ” í”„ë¦¬ ìŠ¬ë¡¯ì˜ ì¸ë±ìŠ¤ë¥¼ íƒìƒ‰í•˜ì—¬ ë°˜í™˜í•©ë‹ˆë‹¤.
+// @return ì‚¬ìš© ê°€ëŠ¥í•œ ìŠ¬ë¡¯ ì¸ë±ìŠ¤, ì—†ê±°ë‚˜ ì‹¤íŒ¨ ì‹œ -1
 //***************************************************************************
 int32 CAdoConnPool::PopFreeSlotIndex(void) {
 	uint32 nStart = _nNextSlotHint.fetch_add(1, std::memory_order_relaxed);
 
-	// ¶ó¿îµå ·Îºó ¹æ½ÄÀ¸·Î »ç¿ë °¡´ÉÇÑ ÇÁ¸® ½½·Ô Å½»ö
+	// ë¼ìš´ë“œ ë¡œë¹ˆ ë°©ì‹ìœ¼ë¡œ ì‚¬ìš© ê°€ëŠ¥í•œ í”„ë¦¬ ìŠ¬ë¡¯ íƒìƒ‰
 	for( int32 k = 0; k < _nMaxPoolSize; ++k ) {
 		int32 i = static_cast<int32>((nStart + k) % _nMaxPoolSize);
 
@@ -246,13 +246,13 @@ int32 CAdoConnPool::PopFreeSlotIndex(void) {
 
 //***************************************************************************
 // CAdoConnPool::ApplyReconnectedConn
-// @brief ÀçÁ¢¼ÓµÈ »õ·Î¿î Ä¿³Ø¼ÇÀ» ÇØ´ç ½½·Ô¿¡ ¹İ¿µÇÏ°í ±âÁ¸ Ä¿³Ø¼ÇÀ» ¾ÈÀüÇÏ°Ô ±³Ã¼ ¶Ç´Â °İ¸®ÇÕ´Ï´Ù.
-// @param nType »õ·Î ¿¬°áµÈ Ä¿³Ø¼ÇÀ» ¹İ¿µÇÒ ½½·Ô ÀÎµ¦½º
-// @param pNewConn »õ·Î »ı¼º ¹× Á¢¼Ó ¿Ï·áµÈ ADO Ä¿³Ø¼Ç °´Ã¼ Æ÷ÀÎÅÍ
+// @brief ì¬ì ‘ì†ëœ ìƒˆë¡œìš´ ì»¤ë„¥ì…˜ì„ í•´ë‹¹ ìŠ¬ë¡¯ì— ë°˜ì˜í•˜ê³  ê¸°ì¡´ ì»¤ë„¥ì…˜ì„ ì•ˆì „í•˜ê²Œ êµì²´ ë˜ëŠ” ê²©ë¦¬í•©ë‹ˆë‹¤.
+// @param nType ìƒˆë¡œ ì—°ê²°ëœ ì»¤ë„¥ì…˜ì„ ë°˜ì˜í•  ìŠ¬ë¡¯ ì¸ë±ìŠ¤
+// @param pNewConn ìƒˆë¡œ ìƒì„± ë° ì ‘ì† ì™„ë£Œëœ ADO ì»¤ë„¥ì…˜ ê°ì²´ í¬ì¸í„°
 //***************************************************************************
 void CAdoConnPool::ApplyReconnectedConn(int32 nType, CAdoDB* pNewConn)
 {
-	// Àç¿¬°áÀ» ¿Ï·áÇÏ´Â µ¿¾È ½½·ÔÀÌ ´Ù½Ã ´ë¿© »óÅÂ°¡ µÇ¾ú´Ù¸é »õ·Î ¸¸µç Ä¿³Ø¼ÇÀ» Æó±â
+	// ì¬ì—°ê²°ì„ ì™„ë£Œí•˜ëŠ” ë™ì•ˆ ìŠ¬ë¡¯ì´ ë‹¤ì‹œ ëŒ€ì—¬ ìƒíƒœê°€ ë˜ì—ˆë‹¤ë©´ ìƒˆë¡œ ë§Œë“  ì»¤ë„¥ì…˜ì„ íê¸°
 	if( _pRefCount[nType].value.load(std::memory_order_acquire) > 0 )
 	{
 		xdelete(pNewConn);
@@ -272,7 +272,7 @@ void CAdoConnPool::ApplyReconnectedConn(int32 nType, CAdoDB* pNewConn)
 	bool bTimeout = false;
 	int spinCount = 0;
 
-	// ±âÁ¸ Ä¿³Ø¼ÇÀ» ÂüÁ¶ ÁßÀÎ ½º·¹µåµéÀÌ ¸ğµÎ ºüÁ®³ª°¥ ¶§±îÁö ´ë±â
+	// ê¸°ì¡´ ì»¤ë„¥ì…˜ì„ ì°¸ì¡° ì¤‘ì¸ ìŠ¤ë ˆë“œë“¤ì´ ëª¨ë‘ ë¹ ì ¸ë‚˜ê°ˆ ë•Œê¹Œì§€ ëŒ€ê¸°
 	while( _pRefCount[nType].value.load(std::memory_order_acquire) > 0 )
 	{
 		auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -294,7 +294,7 @@ void CAdoConnPool::ApplyReconnectedConn(int32 nType, CAdoDB* pNewConn)
 		}
 	}
 
-	// Å¸ÀÓ¾Æ¿ô ¹ß»ı ½Ã Áï½Ã ÇØÁ¦ÇÏÁö ¸øÇÏ¹Ç·Î ¾ÈÀüÇÏ°Ô °İ¸®(Quarantine) Å¥·Î ÀÌ°ü
+	// íƒ€ì„ì•„ì›ƒ ë°œìƒ ì‹œ ì¦‰ì‹œ í•´ì œí•˜ì§€ ëª»í•˜ë¯€ë¡œ ì•ˆì „í•˜ê²Œ ê²©ë¦¬(Quarantine) íë¡œ ì´ê´€
 	if( bTimeout )
 	{
 		LOG_ERROR(_T("ReconnectWorker (ADO): Slot(%d) refcount high during swap. Moving to quarantine."), nType);
@@ -311,12 +311,12 @@ void CAdoConnPool::ApplyReconnectedConn(int32 nType, CAdoDB* pNewConn)
 
 //***************************************************************************
 // CAdoConnPool::ScheduleRetry
-// @brief ÀçÁ¢¼Ó ½ÇÆĞ ½Ã Áö¼ö ¹é¿ÀÇÁ(Exponential Backoff) ¹× ÁöÅÍ(Jitter)¸¦ °è»êÇÏ¿© Àç½Ãµµ ÀÛ¾÷À» ¿¹¾àÇÕ´Ï´Ù.
-// @param nType Àç½Ãµµ¸¦ ¿¹¾àÇÒ ½½·Ô ÀÎµ¦½º
+// @brief ì¬ì ‘ì† ì‹¤íŒ¨ ì‹œ ì§€ìˆ˜ ë°±ì˜¤í”„(Exponential Backoff) ë° ì§€í„°(Jitter)ë¥¼ ê³„ì‚°í•˜ì—¬ ì¬ì‹œë„ ì‘ì—…ì„ ì˜ˆì•½í•©ë‹ˆë‹¤.
+// @param nType ì¬ì‹œë„ë¥¼ ì˜ˆì•½í•  ìŠ¬ë¡¯ ì¸ë±ìŠ¤
 //***************************************************************************
 void CAdoConnPool::ScheduleRetry(int32 nType)
 {
-	// ½ÇÆĞ È½¼ö Áõ°¡ ¹× Áö¼ö ¹é¿ÀÇÁ ´ë±â ½Ã°£ °è»ê
+	// ì‹¤íŒ¨ íšŸìˆ˜ ì¦ê°€ ë° ì§€ìˆ˜ ë°±ì˜¤í”„ ëŒ€ê¸° ì‹œê°„ ê³„ì‚°
 	int32 nFailCount = _pRetryFailCount[nType].value.fetch_add(1, std::memory_order_acq_rel) + 1;
 
 	int32 nMaxShift = _nBackoffMaxShift.load(std::memory_order_relaxed);
@@ -328,7 +328,7 @@ void CAdoConnPool::ScheduleRetry(int32 nType)
 	int64 nDelayMs = nBaseMs << nShift;
 	nDelayMs = std::min<int64>(nDelayMs, nMaxMs);
 
-	// Jitter(¹«ÀÛÀ§ Áö¿¬) Ãß°¡
+	// Jitter(ë¬´ì‘ìœ„ ì§€ì—°) ì¶”ê°€
 	thread_local std::mt19937 rng(std::random_device{}());
 	int32 nJitterMax = _nBackoffJitterMs.load(std::memory_order_relaxed);
 	std::uniform_int_distribution<int32> jitterDist(0, std::max(nJitterMax, 0));
@@ -337,7 +337,7 @@ void CAdoConnPool::ScheduleRetry(int32 nType)
 	LOG_DEBUG(_T("ScheduleRetry (ADO): slot(%d) failCount(%d), retrying in %lldms"),
 		nType, nFailCount, static_cast<long long>(nDelayMs));
 
-	// Áö¿¬ ÀÛ¾÷ Å¥¿¡ Àç½Ãµµ ÀÛ¾÷ µî·Ï
+	// ì§€ì—° ì‘ì—… íì— ì¬ì‹œë„ ì‘ì—… ë“±ë¡
 	_delayedTaskQueue.Reserve(static_cast<int>(nDelayMs), [this, nType]() {
 		CAdoDB* pCur = _pAdoConns[nType].value.load(std::memory_order_acquire);
 		if( _pRefCount[nType].value.load(std::memory_order_acquire) == 0 &&
@@ -354,8 +354,8 @@ void CAdoConnPool::ScheduleRetry(int32 nType)
 
 //***************************************************************************
 // CAdoConnPool::OnReconnectFailed
-// @brief ÀçÁ¢¼Ó ½Ãµµ°¡ ½ÇÆĞÇßÀ» ¶§ È£ÃâµÇ¾î ÈÄ¼Ó Àç½Ãµµ ½ºÄÉÁÙ¸µÀ» Æ®¸®°ÅÇÕ´Ï´Ù.
-// @param nType ÀçÁ¢¼Ó ½Ãµµ°¡ ½ÇÆĞÇÑ ½½·Ô ÀÎµ¦½º
+// @brief ì¬ì ‘ì† ì‹œë„ê°€ ì‹¤íŒ¨í–ˆì„ ë•Œ í˜¸ì¶œë˜ì–´ í›„ì† ì¬ì‹œë„ ìŠ¤ì¼€ì¤„ë§ì„ íŠ¸ë¦¬ê±°í•©ë‹ˆë‹¤.
+// @param nType ì¬ì ‘ì† ì‹œë„ê°€ ì‹¤íŒ¨í•œ ìŠ¬ë¡¯ ì¸ë±ìŠ¤
 //***************************************************************************
 void CAdoConnPool::OnReconnectFailed(int32 nType)
 {
@@ -364,18 +364,18 @@ void CAdoConnPool::OnReconnectFailed(int32 nType)
 
 //***************************************************************************
 // CAdoConnPool::OnReconnectSucceeded
-// @brief ÀçÁ¢¼Ó ½Ãµµ°¡ ¼º°øÇßÀ» ¶§ È£ÃâµÇ¾î ½½·ÔÀÇ Àç½Ãµµ ½ÇÆĞ Ä«¿îÆ®¸¦ ÃÊ±âÈ­ÇÕ´Ï´Ù.
-// @param nType ÀçÁ¢¼Ó ½Ãµµ°¡ ¼º°øÇÑ ½½·Ô ÀÎµ¦½º
+// @brief ì¬ì ‘ì† ì‹œë„ê°€ ì„±ê³µí–ˆì„ ë•Œ í˜¸ì¶œë˜ì–´ ìŠ¬ë¡¯ì˜ ì¬ì‹œë„ ì‹¤íŒ¨ ì¹´ìš´íŠ¸ë¥¼ ì´ˆê¸°í™”í•©ë‹ˆë‹¤.
+// @param nType ì¬ì ‘ì† ì‹œë„ê°€ ì„±ê³µí•œ ìŠ¬ë¡¯ ì¸ë±ìŠ¤
 //***************************************************************************
 void CAdoConnPool::OnReconnectSucceeded(int32 nType)
 {
-	// Àç¿¬°á ¼º°ø ½Ã ½ÇÆĞ Ä«¿îÆ® ÃÊ±âÈ­
+	// ì¬ì—°ê²° ì„±ê³µ ì‹œ ì‹¤íŒ¨ ì¹´ìš´íŠ¸ ì´ˆê¸°í™”
 	_pRetryFailCount[nType].value.store(0, std::memory_order_relaxed);
 }
 
 //***************************************************************************
 // CAdoConnPool::HealthCheckLoop
-// @brief Çï½ºÃ¼Å© ¹é±×¶ó¿îµå ½º·¹µåÀÇ ¸ŞÀÎ ·çÇÁÀÔ´Ï´Ù. °İ¸® Å¥ Á¤¸® ¹× ²÷¾îÁø Ä¿³Ø¼Ç °¨Áö ÈÄ ÀçÁ¢¼ÓÀ» À¯µµÇÕ´Ï´Ù.
+// @brief í—¬ìŠ¤ì²´í¬ ë°±ê·¸ë¼ìš´ë“œ ìŠ¤ë ˆë“œì˜ ë©”ì¸ ë£¨í”„ì…ë‹ˆë‹¤. ê²©ë¦¬ í ì •ë¦¬ ë° ëŠì–´ì§„ ì»¤ë„¥ì…˜ ê°ì§€ í›„ ì¬ì ‘ì†ì„ ìœ ë„í•©ë‹ˆë‹¤.
 //***************************************************************************
 void CAdoConnPool::HealthCheckLoop(void)
 {
@@ -385,7 +385,7 @@ void CAdoConnPool::HealthCheckLoop(void)
 	{
 		vDeletes.clear();
 
-		// °İ¸® Å¥¿¡ ÀÖ´Â Á»ºñ Ä¿³Ø¼ÇµéÀÇ ÂüÁ¶°¡ Ç®·È°Å³ª ¸¸·áµÇ¾ú´ÂÁö °Ë»ç
+		// ê²©ë¦¬ íì— ìˆëŠ” ì¢€ë¹„ ì»¤ë„¥ì…˜ë“¤ì˜ ì°¸ì¡°ê°€ í’€ë ¸ê±°ë‚˜ ë§Œë£Œë˜ì—ˆëŠ”ì§€ ê²€ì‚¬
 		{
 			PLockGuard qGuard(_globalQuarantineLock);
 			size_t qSize = _quarantineQueue.size();
@@ -426,14 +426,14 @@ void CAdoConnPool::HealthCheckLoop(void)
 			}
 		}
 
-		// ¶ô ¿ÜºÎ¿¡¼­ ¾ÈÀüÇÏ°Ô ÀÚ¿ø ÇØÁ¦
+		// ë½ ì™¸ë¶€ì—ì„œ ì•ˆì „í•˜ê²Œ ìì› í•´ì œ
 		for( int32 i = 0; i < vDeletes.size(); ++i )
 		{
 			xdelete(vDeletes[i]);
 			LOG_DEBUG(_T("Quarantine (ADO): Safely deleted stalled connection outside the lock."));
 		}
 
-		// ÀüÃ¼ ½½·ÔÀ» ¼øÈ¸ÇÏ¸ç ²÷¾îÁø Ä¿³Ø¼Ç °¨Áö ¹× ÀçÁ¢¼Ó Æ®¸®°Å
+		// ì „ì²´ ìŠ¬ë¡¯ì„ ìˆœíšŒí•˜ë©° ëŠì–´ì§„ ì»¤ë„¥ì…˜ ê°ì§€ ë° ì¬ì ‘ì† íŠ¸ë¦¬ê±°
 		for( int32 i = 0; i < _nMaxPoolSize && !_bStopHealthCheck.load(std::memory_order_relaxed); i++ )
 		{
 			if( _pRefCount[i].value.load(std::memory_order_acquire) > 0 ) continue;
@@ -461,7 +461,7 @@ void CAdoConnPool::HealthCheckLoop(void)
 
 //***************************************************************************
 // CAdoConnPool::StartHealthCheckThread
-// @brief Çï½ºÃ¼Å© ¹é±×¶ó¿îµå ½º·¹µå¸¦ »ı¼ºÇÏ°í ±¸µ¿ÇÕ´Ï´Ù.
+// @brief í—¬ìŠ¤ì²´í¬ ë°±ê·¸ë¼ìš´ë“œ ìŠ¤ë ˆë“œë¥¼ ìƒì„±í•˜ê³  êµ¬ë™í•©ë‹ˆë‹¤.
 //***************************************************************************
 void CAdoConnPool::StartHealthCheckThread(void)
 {
@@ -471,7 +471,7 @@ void CAdoConnPool::StartHealthCheckThread(void)
 
 //***************************************************************************
 // CAdoConnPool::StopHealthCheckThread
-// @brief Çï½ºÃ¼Å© ¹é±×¶ó¿îµå ½º·¹µå¸¦ ÁßÁö½ÃÅ°°í Á¾·á¸¦ ´ë±âÇÕ´Ï´Ù.
+// @brief í—¬ìŠ¤ì²´í¬ ë°±ê·¸ë¼ìš´ë“œ ìŠ¤ë ˆë“œë¥¼ ì¤‘ì§€ì‹œí‚¤ê³  ì¢…ë£Œë¥¼ ëŒ€ê¸°í•©ë‹ˆë‹¤.
 //***************************************************************************
 void CAdoConnPool::StopHealthCheckThread(void)
 {
@@ -481,7 +481,7 @@ void CAdoConnPool::StopHealthCheckThread(void)
 
 //***************************************************************************
 // CAdoConnPool::DelayedTaskLoop
-// @brief Áö¿¬ ÀÛ¾÷ Ã³¸® ½º·¹µåÀÇ ¸ŞÀÎ ·çÇÁÀÔ´Ï´Ù. ¸¸·áµÈ ¿¹¾à ÀÛ¾÷À» Ã³¸®ÇÕ´Ï´Ù.
+// @brief ì§€ì—° ì‘ì—… ì²˜ë¦¬ ìŠ¤ë ˆë“œì˜ ë©”ì¸ ë£¨í”„ì…ë‹ˆë‹¤. ë§Œë£Œëœ ì˜ˆì•½ ì‘ì—…ì„ ì²˜ë¦¬í•©ë‹ˆë‹¤.
 //***************************************************************************
 void CAdoConnPool::DelayedTaskLoop(void)
 {
@@ -490,7 +490,7 @@ void CAdoConnPool::DelayedTaskLoop(void)
 
 //***************************************************************************
 // CAdoConnPool::StartDelayedTaskThread
-// @brief Áö¿¬ ÀÛ¾÷ Ã³¸® ½º·¹µå¸¦ »ı¼ºÇÏ°í ±¸µ¿ÇÕ´Ï´Ù.
+// @brief ì§€ì—° ì‘ì—… ì²˜ë¦¬ ìŠ¤ë ˆë“œë¥¼ ìƒì„±í•˜ê³  êµ¬ë™í•©ë‹ˆë‹¤.
 //***************************************************************************
 void CAdoConnPool::StartDelayedTaskThread(void)
 {
@@ -499,7 +499,7 @@ void CAdoConnPool::StartDelayedTaskThread(void)
 
 //***************************************************************************
 // CAdoConnPool::StopDelayedTaskThread
-// @brief Áö¿¬ ÀÛ¾÷ Ã³¸® ½º·¹µå¸¦ ÁßÁö½ÃÅ°°í Á¾·á¸¦ ´ë±âÇÕ´Ï´Ù.
+// @brief ì§€ì—° ì‘ì—… ì²˜ë¦¬ ìŠ¤ë ˆë“œë¥¼ ì¤‘ì§€ì‹œí‚¤ê³  ì¢…ë£Œë¥¼ ëŒ€ê¸°í•©ë‹ˆë‹¤.
 //***************************************************************************
 void CAdoConnPool::StopDelayedTaskThread(void)
 {
@@ -509,8 +509,8 @@ void CAdoConnPool::StopDelayedTaskThread(void)
 
 //***************************************************************************
 // CAdoConnPool::EnqueueReconnect
-// @brief ÀçÁ¢¼ÓÀÌ ÇÊ¿äÇÑ ½½·Ô ÀÎµ¦½º¸¦ ÀçÁ¢¼Ó ´ë±â Å¥¿¡ µî·ÏÇÏ°í ¿öÄ¿ ½º·¹µå¿¡ ¾Ë¸³´Ï´Ù.
-// @param nType ÀçÁ¢¼Ó ´ë±â¿­¿¡ µî·ÏÇÒ ½½·Ô ÀÎµ¦½º
+// @brief ì¬ì ‘ì†ì´ í•„ìš”í•œ ìŠ¬ë¡¯ ì¸ë±ìŠ¤ë¥¼ ì¬ì ‘ì† ëŒ€ê¸° íì— ë“±ë¡í•˜ê³  ì›Œì»¤ ìŠ¤ë ˆë“œì— ì•Œë¦½ë‹ˆë‹¤.
+// @param nType ì¬ì ‘ì† ëŒ€ê¸°ì—´ì— ë“±ë¡í•  ìŠ¬ë¡¯ ì¸ë±ìŠ¤
 //***************************************************************************
 void CAdoConnPool::EnqueueReconnect(int32 nType)
 {
@@ -523,8 +523,8 @@ void CAdoConnPool::EnqueueReconnect(int32 nType)
 
 //***************************************************************************
 // CAdoConnPool::TryExitIfExcess
-// @brief ÃÊ°úµÈ ¿öÄ¿ ½º·¹µåÀÏ °æ¿ì ½º½º·Î Á¾·á Ã³¸®¸¦ ¼öÇàÇÕ´Ï´Ù.
-// @return ÃÊ°ú ¿öÄ¿¿©¼­ Á¾·áÇÏ´Â °æ¿ì true, ¾Æ´Ï¸é false
+// @brief ì´ˆê³¼ëœ ì›Œì»¤ ìŠ¤ë ˆë“œì¼ ê²½ìš° ìŠ¤ìŠ¤ë¡œ ì¢…ë£Œ ì²˜ë¦¬ë¥¼ ìˆ˜í–‰í•©ë‹ˆë‹¤.
+// @return ì´ˆê³¼ ì›Œì»¤ì—¬ì„œ ì¢…ë£Œí•˜ëŠ” ê²½ìš° true, ì•„ë‹ˆë©´ false
 //***************************************************************************
 bool CAdoConnPool::TryExitIfExcess(void)
 {
@@ -542,7 +542,7 @@ bool CAdoConnPool::TryExitIfExcess(void)
 
 //***************************************************************************
 // CAdoConnPool::ReconnectWorkerLoop
-// @brief ÀçÁ¢¼Ó Àü¿ë ¹é±×¶ó¿îµå ¿öÄ¿ ½º·¹µåÀÇ ¸ŞÀÎ ·çÇÁÀÔ´Ï´Ù. Å¥¿¡¼­ ½½·ÔÀ» ²¨³» ÀçÁ¢¼ÓÀ» ¼öÇàÇÕ´Ï´Ù.
+// @brief ì¬ì ‘ì† ì „ìš© ë°±ê·¸ë¼ìš´ë“œ ì›Œì»¤ ìŠ¤ë ˆë“œì˜ ë©”ì¸ ë£¨í”„ì…ë‹ˆë‹¤. íì—ì„œ ìŠ¬ë¡¯ì„ êº¼ë‚´ ì¬ì ‘ì†ì„ ìˆ˜í–‰í•©ë‹ˆë‹¤.
 //***************************************************************************
 void CAdoConnPool::ReconnectWorkerLoop(void)
 {
@@ -574,7 +574,7 @@ void CAdoConnPool::ReconnectWorkerLoop(void)
 			continue;
 		}
 
-		// ÀçÁ¢¼Ó ½Ãµµ
+		// ì¬ì ‘ì† ì‹œë„
 		CAdoDB* pNewConn = TryReconnect(nType);
 		if( pNewConn == nullptr )
 		{
@@ -583,7 +583,7 @@ void CAdoConnPool::ReconnectWorkerLoop(void)
 			continue;
 		}
 
-		// ÀçÁ¢¼Ó ¼º°ø ½Ã ½½·Ô ±³Ã¼ ¹× »óÅÂ ÃÊ±âÈ­
+		// ì¬ì ‘ì† ì„±ê³µ ì‹œ ìŠ¬ë¡¯ êµì²´ ë° ìƒíƒœ ì´ˆê¸°í™”
 		ApplyReconnectedConn(nType, pNewConn);
 		OnReconnectSucceeded(nType);
 		_pReconnecting[nType].value.store(false, std::memory_order_release);
@@ -592,8 +592,8 @@ void CAdoConnPool::ReconnectWorkerLoop(void)
 
 //***************************************************************************
 // CAdoConnPool::StartReconnectWorkers
-// @brief ÁöÁ¤µÈ °³¼ö¸¸Å­ ÀçÁ¢¼Ó ¿öÄ¿ ½º·¹µå¸¦ »ı¼ºÇÏ°í ±¸µ¿ÇÕ´Ï´Ù.
-// @param nWorkerCount ±¸µ¿ÇÒ ¹é±×¶ó¿îµå ÀçÁ¢¼Ó ¿öÄ¿ ½º·¹µå ¼ö
+// @brief ì§€ì •ëœ ê°œìˆ˜ë§Œí¼ ì¬ì ‘ì† ì›Œì»¤ ìŠ¤ë ˆë“œë¥¼ ìƒì„±í•˜ê³  êµ¬ë™í•©ë‹ˆë‹¤.
+// @param nWorkerCount êµ¬ë™í•  ë°±ê·¸ë¼ìš´ë“œ ì¬ì ‘ì† ì›Œì»¤ ìŠ¤ë ˆë“œ ìˆ˜
 //***************************************************************************
 void CAdoConnPool::StartReconnectWorkers(int32 nWorkerCount)
 {
@@ -611,7 +611,7 @@ void CAdoConnPool::StartReconnectWorkers(int32 nWorkerCount)
 
 //***************************************************************************
 // CAdoConnPool::StopReconnectWorkers
-// @brief ÀçÁ¢¼Ó ¿öÄ¿ ½º·¹µåµéÀ» ÁßÁö½ÃÅ°°í Á¾·á¸¦ ´ë±âÇÕ´Ï´Ù.
+// @brief ì¬ì ‘ì† ì›Œì»¤ ìŠ¤ë ˆë“œë“¤ì„ ì¤‘ì§€ì‹œí‚¤ê³  ì¢…ë£Œë¥¼ ëŒ€ê¸°í•©ë‹ˆë‹¤.
 //***************************************************************************
 void CAdoConnPool::StopReconnectWorkers(void)
 {
@@ -624,8 +624,8 @@ void CAdoConnPool::StopReconnectWorkers(void)
 
 //***************************************************************************
 // CAdoConnPool::SetWorkerCount
-// @brief ÀçÁ¢¼Ó ¿öÄ¿ ½º·¹µåÀÇ ¸ñÇ¥ °³¼ö¸¦ µ¿ÀûÀ¸·Î º¯°æÇÕ´Ï´Ù.
-// @param nNewCount º¯°æÇÒ ¸ñÇ¥ ¿öÄ¿ ½º·¹µå ¼ö
+// @brief ì¬ì ‘ì† ì›Œì»¤ ìŠ¤ë ˆë“œì˜ ëª©í‘œ ê°œìˆ˜ë¥¼ ë™ì ìœ¼ë¡œ ë³€ê²½í•©ë‹ˆë‹¤.
+// @param nNewCount ë³€ê²½í•  ëª©í‘œ ì›Œì»¤ ìŠ¤ë ˆë“œ ìˆ˜
 //***************************************************************************
 void CAdoConnPool::SetWorkerCount(int32 nNewCount)
 {
@@ -659,9 +659,9 @@ void CAdoConnPool::SetWorkerCount(int32 nNewCount)
 
 //***************************************************************************
 // CAdoConnPool::SetReconnectConfig
-// @brief ÀçÁ¢¼Ó ¹× ¹é¿ÀÇÁ Á¤Ã¥ ¼³Á¤°ªÀ» µ¿ÀûÀ¸·Î º¯°æÇÕ´Ï´Ù.
-// @param reconnectConfig »õ·Î Àû¿ëÇÒ ÀçÁ¢¼Ó ¹× ¹é¿ÀÇÁ ¼³Á¤ ±¸Á¶Ã¼
-// @return ¼³Á¤ °ËÁõ ¹× Àû¿ë ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief ì¬ì ‘ì† ë° ë°±ì˜¤í”„ ì •ì±… ì„¤ì •ê°’ì„ ë™ì ìœ¼ë¡œ ë³€ê²½í•©ë‹ˆë‹¤.
+// @param reconnectConfig ìƒˆë¡œ ì ìš©í•  ì¬ì ‘ì† ë° ë°±ì˜¤í”„ ì„¤ì • êµ¬ì¡°ì²´
+// @return ì„¤ì • ê²€ì¦ ë° ì ìš© ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool CAdoConnPool::SetReconnectConfig(const TReconnectConfig& reconnectConfig)
 {
@@ -678,8 +678,8 @@ bool CAdoConnPool::SetReconnectConfig(const TReconnectConfig& reconnectConfig)
 
 //***************************************************************************
 // CAdoConnPool::GetReconnectConfig
-// @brief ÇöÀç Àû¿ëµÇ¾î ÀÖ´Â ÀçÁ¢¼Ó ¹× ¹é¿ÀÇÁ Á¤Ã¥ ¼³Á¤À» Á¶È¸ÇÕ´Ï´Ù.
-// @return ÇöÀç ¼³Á¤ÀÌ ´ã±ä TReconnectConfig ±¸Á¶Ã¼
+// @brief í˜„ì¬ ì ìš©ë˜ì–´ ìˆëŠ” ì¬ì ‘ì† ë° ë°±ì˜¤í”„ ì •ì±… ì„¤ì •ì„ ì¡°íšŒí•©ë‹ˆë‹¤.
+// @return í˜„ì¬ ì„¤ì •ì´ ë‹´ê¸´ TReconnectConfig êµ¬ì¡°ì²´
 //***************************************************************************
 CAdoConnPool::TReconnectConfig CAdoConnPool::GetReconnectConfig(void) const
 {
@@ -694,14 +694,14 @@ CAdoConnPool::TReconnectConfig CAdoConnPool::GetReconnectConfig(void) const
 
 //***************************************************************************
 // CAdoConnPool::Clear
-// @brief Ä¿³Ø¼Ç Ç®¿¡ º¸À¯ ÁßÀÎ ¸ğµç Ä¿³Ø¼Ç ÀÚ¿øÀ» ÇØÁ¦ÇÏ°í Ç®À» ÃÊ±âÈ­ »óÅÂ·Î µÇµ¹¸³´Ï´Ù.
+// @brief ì»¤ë„¥ì…˜ í’€ì— ë³´ìœ  ì¤‘ì¸ ëª¨ë“  ì»¤ë„¥ì…˜ ìì›ì„ í•´ì œí•˜ê³  í’€ì„ ì´ˆê¸°í™” ìƒíƒœë¡œ ë˜ëŒë¦½ë‹ˆë‹¤.
 //***************************************************************************
 void CAdoConnPool::Clear(void)
 {
 	auto now = std::chrono::steady_clock::now();
 	CVector<CAdoDB*> vShutdownDeletes;
 
-	// Ç® ³»ºÎÀÇ ¸ğµç Ä¿³Ø¼Ç Á¤¸® ¹× ÇØÁ¦
+	// í’€ ë‚´ë¶€ì˜ ëª¨ë“  ì»¤ë„¥ì…˜ ì •ë¦¬ ë° í•´ì œ
 	for( int32 i = 0; i < _nMaxPoolSize; i++ )
 	{
 		CAdoDB* pConn = _pAdoConns[i].value.load(std::memory_order_acquire);
@@ -746,7 +746,7 @@ void CAdoConnPool::Clear(void)
 		_pAdoConns[i].value.store(nullptr, std::memory_order_relaxed);
 	}
 
-	// Á¾·á ½ÃÁ¡¿¡ °İ¸® Å¥¿¡ ³²¾ÆÀÖ´Â ÀÚ¿ø Á¤¸®
+	// ì¢…ë£Œ ì‹œì ì— ê²©ë¦¬ íì— ë‚¨ì•„ìˆëŠ” ìì› ì •ë¦¬
 	{
 		PLockGuard qGuard(_globalQuarantineLock);
 		while( !_quarantineQueue.empty() )

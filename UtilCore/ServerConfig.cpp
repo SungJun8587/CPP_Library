@@ -1,4 +1,4 @@
-
+﻿
 //***************************************************************************
 // ServerConfig.cpp: implementation of the CServerConfig class.
 //

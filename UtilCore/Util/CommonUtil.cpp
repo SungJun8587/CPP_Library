@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // CommonUtil.cpp : implementation of the CommonUtil Functions.
 //
@@ -8,15 +8,15 @@
 #include "CommonUtil.h"
 
 //***************************************************************************
-// @brief µ¥ÀÌÅÍº£ÀÌ½º Á¾·ù¿¡ µû¸¥ ODBC DSN ¿¬°á ¹®ÀÚ¿­À» »ı¼ºÇÕ´Ï´Ù.
-// @param ptszDSN »ı¼ºµÈ DSN ¹®ÀÚ¿­ÀÌ ÀúÀåµÉ ¹öÆÛ
-// @param dbClass µ¥ÀÌÅÍº£ÀÌ½º Á¾·ù (MSSQL, MYSQL, ORACLE µî)
-// @param ptszDSNDriver ODBC µå¶óÀÌ¹ö ÀÌ¸§
-// @param ptszDBHost µ¥ÀÌÅÍº£ÀÌ½º È£½ºÆ® ÁÖ¼Ò
-// @param nPort µ¥ÀÌÅÍº£ÀÌ½º Æ÷Æ® ¹øÈ£
-// @param ptszDBUserId µ¥ÀÌÅÍº£ÀÌ½º »ç¿ëÀÚ ID
-// @param ptszDBPasswd µ¥ÀÌÅÍº£ÀÌ½º ºñ¹Ğ¹øÈ£
-// @param ptszDBName µ¥ÀÌÅÍº£ÀÌ½º ÀÌ¸§
+// @brief ë°ì´í„°ë² ì´ìŠ¤ ì¢…ë¥˜ì— ë”°ë¥¸ ODBC DSN ì—°ê²° ë¬¸ìì—´ì„ ìƒì„±í•©ë‹ˆë‹¤.
+// @param ptszDSN ìƒì„±ëœ DSN ë¬¸ìì—´ì´ ì €ì¥ë  ë²„í¼
+// @param dbClass ë°ì´í„°ë² ì´ìŠ¤ ì¢…ë¥˜ (MSSQL, MYSQL, ORACLE ë“±)
+// @param ptszDSNDriver ODBC ë“œë¼ì´ë²„ ì´ë¦„
+// @param ptszDBHost ë°ì´í„°ë² ì´ìŠ¤ í˜¸ìŠ¤íŠ¸ ì£¼ì†Œ
+// @param nPort ë°ì´í„°ë² ì´ìŠ¤ í¬íŠ¸ ë²ˆí˜¸
+// @param ptszDBUserId ë°ì´í„°ë² ì´ìŠ¤ ì‚¬ìš©ì ID
+// @param ptszDBPasswd ë°ì´í„°ë² ì´ìŠ¤ ë¹„ë°€ë²ˆí˜¸
+// @param ptszDBName ë°ì´í„°ë² ì´ìŠ¤ ì´ë¦„
 //***************************************************************************
 void GetDBDSNString(TCHAR* ptszDSN, const EDBClass dbClass, const TCHAR* ptszDSNDriver, const TCHAR* ptszDBHost, const unsigned int nPort, const TCHAR* ptszDBUserId, const TCHAR* ptszDBPasswd, const TCHAR* ptszDBName)
 {
@@ -26,8 +26,8 @@ void GetDBDSNString(TCHAR* ptszDSN, const EDBClass dbClass, const TCHAR* ptszDSN
 	{
 		case EDBClass::MSSQL:
 			// {SQL Server}
-			// {ODBC Driver 18 for SQL Server} ¼³Ä¡ ÈÄ "½Å·ÚÇÒ ¼ö ¾ø´Â ±â°ü¿¡¼­ ÀÎÁõ¼­ Ã¼ÀÎÀ» ¹ß±ŞÇß½À´Ï´Ù" ¿À·ù ¹ß»ı(Encrypt=Optional; Ãß°¡)
-			// Âü°í »çÇ× : {ODBC Driver 18 for SQL Server} ODBC µå¶óÀÌ¹ö ÀÌ¿ëÇØ Á¢¼ÓÇÏ¸é ¸Ş¸ğ¸¯ ¸¯ 16¹ÙÀÌÆ® ¹ß»ı
+			// {ODBC Driver 18 for SQL Server} ì„¤ì¹˜ í›„ "ì‹ ë¢°í•  ìˆ˜ ì—†ëŠ” ê¸°ê´€ì—ì„œ ì¸ì¦ì„œ ì²´ì¸ì„ ë°œê¸‰í–ˆìŠµë‹ˆë‹¤" ì˜¤ë¥˜ ë°œìƒ(Encrypt=Optional; ì¶”ê°€)
+			// ì°¸ê³  ì‚¬í•­ : {ODBC Driver 18 for SQL Server} ODBC ë“œë¼ì´ë²„ ì´ìš©í•´ ì ‘ì†í•˜ë©´ ë©”ëª¨ë¦­ ë¦­ 16ë°”ì´íŠ¸ ë°œìƒ
 			//	_sntprintf_s(ptszDSN, DATABASE_DSN_STRLEN, _TRUNCATE, _T("DRIVER=%s;SERVER=%s,%u;Database=%s;UID=%s;PWD=%s;Encrypt=no;TrustServerCertificate=yes;"),
 			//		ptszDSNDriver, ptszDBHost, nPort, ptszDBName, ptszDBUserId, ptszDBPasswd);
 			portToUse = (nPort == 0) ? 1433 : nPort;
@@ -52,14 +52,14 @@ void GetDBDSNString(TCHAR* ptszDSN, const EDBClass dbClass, const TCHAR* ptszDSN
 }
 
 //***************************************************************************
-// @brief µ¥ÀÌÅÍº£ÀÌ½º Á¾·ù¿¡ µû¸¥ ADO Connection StringÀ» »ı¼ºÇÕ´Ï´Ù.
-// @param ptszConnStr »ı¼ºµÈ ¿¬°á ¹®ÀÚ¿­ÀÌ ÀúÀåµÉ ¹öÆÛ
-// @param dbClass µ¥ÀÌÅÍº£ÀÌ½º Á¾·ù (MSSQL, MYSQL, ORACLE µî)
-// @param ptszDBHost µ¥ÀÌÅÍº£ÀÌ½º È£½ºÆ® ÁÖ¼Ò
-// @param nPort µ¥ÀÌÅÍº£ÀÌ½º Æ÷Æ® ¹øÈ£
-// @param ptszDBUserId µ¥ÀÌÅÍº£ÀÌ½º »ç¿ëÀÚ ID
-// @param ptszDBPasswd µ¥ÀÌÅÍº£ÀÌ½º ºñ¹Ğ¹øÈ£
-// @param ptszDBName µ¥ÀÌÅÍº£ÀÌ½º ÀÌ¸§
+// @brief ë°ì´í„°ë² ì´ìŠ¤ ì¢…ë¥˜ì— ë”°ë¥¸ ADO Connection Stringì„ ìƒì„±í•©ë‹ˆë‹¤.
+// @param ptszConnStr ìƒì„±ëœ ì—°ê²° ë¬¸ìì—´ì´ ì €ì¥ë  ë²„í¼
+// @param dbClass ë°ì´í„°ë² ì´ìŠ¤ ì¢…ë¥˜ (MSSQL, MYSQL, ORACLE ë“±)
+// @param ptszDBHost ë°ì´í„°ë² ì´ìŠ¤ í˜¸ìŠ¤íŠ¸ ì£¼ì†Œ
+// @param nPort ë°ì´í„°ë² ì´ìŠ¤ í¬íŠ¸ ë²ˆí˜¸
+// @param ptszDBUserId ë°ì´í„°ë² ì´ìŠ¤ ì‚¬ìš©ì ID
+// @param ptszDBPasswd ë°ì´í„°ë² ì´ìŠ¤ ë¹„ë°€ë²ˆí˜¸
+// @param ptszDBName ë°ì´í„°ë² ì´ìŠ¤ ì´ë¦„
 //***************************************************************************
 void GetADOConnectionString(TCHAR* ptszConnStr, const EDBClass dbClass, const TCHAR* ptszDBHost, const unsigned int nPort, const TCHAR* ptszDBUserId, const TCHAR* ptszDBPasswd, const TCHAR* ptszDBName)
 {
@@ -68,7 +68,7 @@ void GetADOConnectionString(TCHAR* ptszConnStr, const EDBClass dbClass, const TC
 	switch( dbClass )
 	{
 		case EDBClass::MSSQL:
-			// SQL Server OLE DB Provider »ç¿ë
+			// SQL Server OLE DB Provider ì‚¬ìš©
 			portToUse = (nPort == 0) ? 1433 : nPort;
 
 			_sntprintf_s(ptszConnStr, DATABASE_DSN_STRLEN, _TRUNCATE,
@@ -77,7 +77,7 @@ void GetADOConnectionString(TCHAR* ptszConnStr, const EDBClass dbClass, const TC
 			break;
 
 		case EDBClass::MYSQL:
-			// MySQL OLE DB Provider (MyOLEDB) »ç¿ë
+			// MySQL OLE DB Provider (MyOLEDB) ì‚¬ìš©
 			portToUse = (nPort == 0) ? 3306 : nPort;
 
 			_sntprintf_s(ptszConnStr, DATABASE_DSN_STRLEN, _TRUNCATE,
@@ -86,8 +86,8 @@ void GetADOConnectionString(TCHAR* ptszConnStr, const EDBClass dbClass, const TC
 			break;
 
 		case EDBClass::ORACLE:
-			// Oracle OLE DB Provider »ç¿ë
-			// Data Source´Â TNS ¸íÄª ¶Ç´Â [È£½ºÆ®]:[Æ÷Æ®]/[¼­ºñ½º¸í] Çü½Ä
+			// Oracle OLE DB Provider ì‚¬ìš©
+			// Data SourceëŠ” TNS ëª…ì¹­ ë˜ëŠ” [í˜¸ìŠ¤íŠ¸]:[í¬íŠ¸]/[ì„œë¹„ìŠ¤ëª…] í˜•ì‹
 			portToUse = (nPort == 0) ? 1521 : nPort;
 
 			_sntprintf_s(ptszConnStr, DATABASE_DSN_STRLEN, _TRUNCATE,
@@ -102,9 +102,9 @@ void GetADOConnectionString(TCHAR* ptszConnStr, const EDBClass dbClass, const TC
 }
 
 //***************************************************************************
-// @brief 1¹ÙÀÌÆ® ¼ıÀÚ ÄÚµå¸¦ µ¥ÀÌÅÍº£ÀÌ½º Á¾·ù ¿­°ÅÇü(EDBClass)À¸·Î º¯È¯ÇÕ´Ï´Ù.
-// @param num µ¥ÀÌÅÍº£ÀÌ½º ºĞ·ù ¹øÈ£ (1: MSSQL, 2: MYSQL, 3: ORACLE)
-// @return º¯È¯µÈ EDBClass °ª
+// @brief 1ë°”ì´íŠ¸ ìˆ«ì ì½”ë“œë¥¼ ë°ì´í„°ë² ì´ìŠ¤ ì¢…ë¥˜ ì—´ê±°í˜•(EDBClass)ìœ¼ë¡œ ë³€í™˜í•©ë‹ˆë‹¤.
+// @param num ë°ì´í„°ë² ì´ìŠ¤ ë¶„ë¥˜ ë²ˆí˜¸ (1: MSSQL, 2: MYSQL, 3: ORACLE)
+// @return ë³€í™˜ëœ EDBClass ê°’
 //***************************************************************************
 EDBClass GetInt8ToDBClass(uint8 num)
 {
@@ -126,9 +126,9 @@ EDBClass GetInt8ToDBClass(uint8 num)
 }
 
 //***************************************************************************
-// @brief ANSI ¹®ÀÚ¿­À» 32ºñÆ® ºÎÈ£ ¾ø´Â Á¤¼ö·Î º¯È¯ÇÕ´Ï´Ù.
-// @param pszText º¯È¯ÇÒ ¹®ÀÚ¿­ Æ÷ÀÎÅÍ (ANSI)
-// @return º¯È¯µÈ uint32 °ª (½ÇÆĞ ½Ã 0)
+// @brief ANSI ë¬¸ìì—´ì„ 32ë¹„íŠ¸ ë¶€í˜¸ ì—†ëŠ” ì •ìˆ˜ë¡œ ë³€í™˜í•©ë‹ˆë‹¤.
+// @param pszText ë³€í™˜í•  ë¬¸ìì—´ í¬ì¸í„° (ANSI)
+// @return ë³€í™˜ëœ uint32 ê°’ (ì‹¤íŒ¨ ì‹œ 0)
 //***************************************************************************
 uint32 GetUInt32(const char* pszText)
 {
@@ -138,9 +138,9 @@ uint32 GetUInt32(const char* pszText)
 }
 
 //***************************************************************************
-// @brief ANSI ¹®ÀÚ¿­À» 64ºñÆ® ºÎÈ£ ¾ø´Â Á¤¼ö·Î º¯È¯ÇÕ´Ï´Ù.
-// @param pszText º¯È¯ÇÒ ¹®ÀÚ¿­ Æ÷ÀÎÅÍ (ANSI)
-// @return º¯È¯µÈ uint64 °ª (½ÇÆĞ ½Ã 0)
+// @brief ANSI ë¬¸ìì—´ì„ 64ë¹„íŠ¸ ë¶€í˜¸ ì—†ëŠ” ì •ìˆ˜ë¡œ ë³€í™˜í•©ë‹ˆë‹¤.
+// @param pszText ë³€í™˜í•  ë¬¸ìì—´ í¬ì¸í„° (ANSI)
+// @return ë³€í™˜ëœ uint64 ê°’ (ì‹¤íŒ¨ ì‹œ 0)
 //***************************************************************************
 uint64 GetUInt64(const char* pszText)
 {
@@ -154,9 +154,9 @@ uint64 GetUInt64(const char* pszText)
 }
 
 //***************************************************************************
-// @brief À¯´ÏÄÚµå ¿ÍÀÌµå ¹®ÀÚ¿­À» 32ºñÆ® ºÎÈ£ ¾ø´Â Á¤¼ö·Î º¯È¯ÇÕ´Ï´Ù.
-// @param pwszText º¯È¯ÇÒ ¿ÍÀÌµå ¹®ÀÚ¿­ Æ÷ÀÎÅÍ (Unicode)
-// @return º¯È¯µÈ uint32 °ª (½ÇÆĞ ½Ã 0)
+// @brief ìœ ë‹ˆì½”ë“œ ì™€ì´ë“œ ë¬¸ìì—´ì„ 32ë¹„íŠ¸ ë¶€í˜¸ ì—†ëŠ” ì •ìˆ˜ë¡œ ë³€í™˜í•©ë‹ˆë‹¤.
+// @param pwszText ë³€í™˜í•  ì™€ì´ë“œ ë¬¸ìì—´ í¬ì¸í„° (Unicode)
+// @return ë³€í™˜ëœ uint32 ê°’ (ì‹¤íŒ¨ ì‹œ 0)
 //***************************************************************************
 uint32 GetUInt32(const wchar_t* pwszText)
 {
@@ -166,9 +166,9 @@ uint32 GetUInt32(const wchar_t* pwszText)
 }
 
 //***************************************************************************
-// @brief À¯´ÏÄÚµå ¿ÍÀÌµå ¹®ÀÚ¿­À» 64ºñÆ® ºÎÈ£ ¾ø´Â Á¤¼ö·Î º¯È¯ÇÕ´Ï´Ù.
-// @param pwszText º¯È¯ÇÒ ¿ÍÀÌµå ¹®ÀÚ¿­ Æ÷ÀÎÅÍ (Unicode)
-// @return º¯È¯µÈ uint64 °ª (½ÇÆĞ ½Ã 0)
+// @brief ìœ ë‹ˆì½”ë“œ ì™€ì´ë“œ ë¬¸ìì—´ì„ 64ë¹„íŠ¸ ë¶€í˜¸ ì—†ëŠ” ì •ìˆ˜ë¡œ ë³€í™˜í•©ë‹ˆë‹¤.
+// @param pwszText ë³€í™˜í•  ì™€ì´ë“œ ë¬¸ìì—´ í¬ì¸í„° (Unicode)
+// @return ë³€í™˜ëœ uint64 ê°’ (ì‹¤íŒ¨ ì‹œ 0)
 //***************************************************************************
 uint64 GetUInt64(const wchar_t* pwszText)
 {

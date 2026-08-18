@@ -1,4 +1,4 @@
-
+﻿
 //***************************************************************************
 // EventLog.cpp : implementation of the CEventLog class.
 //

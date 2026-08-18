@@ -1,4 +1,4 @@
-
+﻿
 //***************************************************************************
 // DBCommon.h : This file defines a file related to db processing.
 //

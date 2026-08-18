@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // DBMSSQLQuery.h : implementation for the System SQL.
 //
@@ -177,7 +177,7 @@ inline const TCHAR* ToString(EMSSQLRenameObjectType v)
 
 
 //***************************************************************************
-// MSSQL ÀÎµ¦½ºÅ¸ÀÔ : sys.indexes Å×ÀÌºí type_desc(nvarchar(60)) ÄÃ·³
+// MSSQL ì¸ë±ìŠ¤íƒ€ìž… : sys.indexes í…Œì´ë¸” type_desc(nvarchar(60)) ì»¬ëŸ¼
 enum EMSSQLIndexType
 {
 	HEAP = 0,
@@ -229,50 +229,50 @@ inline const EMSSQLIndexType StringToMSSQLIndexType(const TCHAR* ptszIndexType)
 }
 
 //***************************************************************************
-// MSSQL È®Àå ¼Ó¼º Ã³¸® ÆÄ¶ó¹ÌÅÍ
+// MSSQL í™•ìž¥ ì†ì„± ì²˜ë¦¬ íŒŒë¼ë¯¸í„°
 class MSSQL_ExtendedProperty
 {
 public:
-	_tstring _propertyName;			// ¼Ó¼ºÀÇ ÀÌ¸§
-	_tstring _propertyValue;		// ¼Ó¼º°ú ¿¬°áÇÒ °ª
-	_tstring _level0_object_type;	// ¼öÁØ 0 °³Ã¼ÀÇ À¯Çü
-	_tstring _level0_object_name;	// ¼öÁØ 0 °³Ã¼ Çü½ÄÀÇ ÀÌ¸§
-	_tstring _level1_object_type;	// ¼öÁØ 1 °³Ã¼ÀÇ À¯Çü
-	_tstring _level1_object_name;	// ¼öÁØ 1 °³Ã¼ Çü½ÄÀÇ ÀÌ¸§
-	_tstring _level2_object_type;	// ¼öÁØ 2 °³Ã¼ÀÇ À¯Çü
-	_tstring _level2_object_name;	// ¼öÁØ 2 °³Ã¼ Çü½ÄÀÇ ÀÌ¸§
+	_tstring _propertyName;			// ì†ì„±ì˜ ì´ë¦„
+	_tstring _propertyValue;		// ì†ì„±ê³¼ ì—°ê²°í•  ê°’
+	_tstring _level0_object_type;	// ìˆ˜ì¤€ 0 ê°œì²´ì˜ ìœ í˜•
+	_tstring _level0_object_name;	// ìˆ˜ì¤€ 0 ê°œì²´ í˜•ì‹ì˜ ì´ë¦„
+	_tstring _level1_object_type;	// ìˆ˜ì¤€ 1 ê°œì²´ì˜ ìœ í˜•
+	_tstring _level1_object_name;	// ìˆ˜ì¤€ 1 ê°œì²´ í˜•ì‹ì˜ ì´ë¦„
+	_tstring _level2_object_type;	// ìˆ˜ì¤€ 2 ê°œì²´ì˜ ìœ í˜•
+	_tstring _level2_object_name;	// ìˆ˜ì¤€ 2 ê°œì²´ í˜•ì‹ì˜ ì´ë¦„
 };
 
 //***************************************************************************
-// MSSQL ÀÎµ¦½º Á¶°¢È­ Á¤º¸
+// MSSQL ì¸ë±ìŠ¤ ì¡°ê°í™” ì •ë³´
 class MSSQL_INDEX_FRAGMENTATION
 {
 public:
 public:
-	int32	ObjectId;														// MSSQL Å×ÀÌºí °íÀ¯¹øÈ£
-	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN] = { 0, };			// MSSQL ½ºÅ°¸¶ ¸í
-	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN] = { 0, };				// Å×ÀÌºí ¸í
-	int32	IndexId;														// ÀÎµ¦½º °íÀ¯¹øÈ£
-	TCHAR   tszIndexName[DATABASE_OBJECT_NAME_STRLEN] = { 0, };				// ÀÎµ¦½º ¸í
-	TCHAR   tszIndexType[DATABASE_OBJECT_TYPE_DESC_STRLEN] = { 0, };		// ÀÎµ¦½º Å¸ÀÔ
-	int32   PartitionNum;													// °³Ã¼ÀÇ ÆÄÆ¼¼Ç ¹øÈ£
+	int32	ObjectId;														// MSSQL í…Œì´ë¸” ê³ ìœ ë²ˆí˜¸
+	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN] = { 0, };			// MSSQL ìŠ¤í‚¤ë§ˆ ëª…
+	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN] = { 0, };				// í…Œì´ë¸” ëª…
+	int32	IndexId;														// ì¸ë±ìŠ¤ ê³ ìœ ë²ˆí˜¸
+	TCHAR   tszIndexName[DATABASE_OBJECT_NAME_STRLEN] = { 0, };				// ì¸ë±ìŠ¤ ëª…
+	TCHAR   tszIndexType[DATABASE_OBJECT_TYPE_DESC_STRLEN] = { 0, };		// ì¸ë±ìŠ¤ íƒ€ìž…
+	int32   PartitionNum;													// ê°œì²´ì˜ íŒŒí‹°ì…˜ ë²ˆí˜¸
 
-	// ³í¸®Àû Á¶°¢È­(ÀÎµ¦½º¿¡¼­ ¼ø¼­°¡ Àß¸øµÈ ÆäÀÌÁö) ¼öÄ¡
-	// - ÀÎµ¦½º¿¡ ´ëÇÑ ³í¸®Àû Á¶°¢È­ ¶Ç´Â ÇÒ´ç ´ÜÀ§ÀÇ Èü¿¡ IN_ROW_DATA ´ëÇÑ ÀÍ½ºÅÙÆ® Á¶°¢È­
-	// - avg_fragmentation_in_percent(Á¶°¢È­ ¼öÄ¡)°¡ 30ÀÌ»óÀÌ¸é ¸®ºôµå(Rebuild) 30¹Ì¸¸ÀÌ¸é ¸®¿À±×³ªÀÌÁî(Reorganize) ½ÇÇà
+	// ë…¼ë¦¬ì  ì¡°ê°í™”(ì¸ë±ìŠ¤ì—ì„œ ìˆœì„œê°€ ìž˜ëª»ëœ íŽ˜ì´ì§€) ìˆ˜ì¹˜
+	// - ì¸ë±ìŠ¤ì— ëŒ€í•œ ë…¼ë¦¬ì  ì¡°ê°í™” ë˜ëŠ” í• ë‹¹ ë‹¨ìœ„ì˜ íž™ì— IN_ROW_DATA ëŒ€í•œ ìµìŠ¤í…íŠ¸ ì¡°ê°í™”
+	// - avg_fragmentation_in_percent(ì¡°ê°í™” ìˆ˜ì¹˜)ê°€ 30ì´ìƒì´ë©´ ë¦¬ë¹Œë“œ(Rebuild) 30ë¯¸ë§Œì´ë©´ ë¦¬ì˜¤ê·¸ë‚˜ì´ì¦ˆ(Reorganize) ì‹¤í–‰
 	float	AvgFragmentationInPercent;
 
-	// Æò±Õ ÆäÀÌÁö ¹Ðµµ(¸ðµç ÆäÀÌÁö¿¡¼­ »ç¿ëµÇ´Â »ç¿ë °¡´ÉÇÑ µ¥ÀÌÅÍ ½ºÅä¸®Áö °ø°£ÀÇ Æò±Õ ¹éºÐÀ²)
+	// í‰ê·  íŽ˜ì´ì§€ ë°€ë„(ëª¨ë“  íŽ˜ì´ì§€ì—ì„œ ì‚¬ìš©ë˜ëŠ” ì‚¬ìš© ê°€ëŠ¥í•œ ë°ì´í„° ìŠ¤í† ë¦¬ì§€ ê³µê°„ì˜ í‰ê·  ë°±ë¶„ìœ¨)
 	float	AvgPageSpaceUsedInPercent;
 
-	// ÃÑ ÀÎµ¦½º ¶Ç´Â µ¥ÀÌÅÍ ÆäÀÌÁö ¼ö
-	// - ÀÎµ¦½ºÀÇ °æ¿ì ÇÒ´ç ´ÜÀ§¿¡¼­ B-Æ®¸®ÀÇ ÇöÀç ¼öÁØ¿¡ ÀÖ´Â IN_ROW_DATA ÃÑ ÀÎµ¦½º ÆäÀÌÁö ¼ö
-	// - ÈüÀÇ °æ¿ì ÇÒ´ç ´ÜÀ§ÀÇ ÃÑ µ¥ÀÌÅÍ ÆäÀÌÁö IN_ROW_DATA ¼ö(ÇÒ´ç ´ÜÀ§ÀÇ ROW_OVERFLOW_DATA °æ¿ì LOB_DATA ÇÒ´ç ´ÜÀ§ÀÇ ÃÑ ÆäÀÌÁö ¼ö)
+	// ì´ ì¸ë±ìŠ¤ ë˜ëŠ” ë°ì´í„° íŽ˜ì´ì§€ ìˆ˜
+	// - ì¸ë±ìŠ¤ì˜ ê²½ìš° í• ë‹¹ ë‹¨ìœ„ì—ì„œ B-íŠ¸ë¦¬ì˜ í˜„ìž¬ ìˆ˜ì¤€ì— ìžˆëŠ” IN_ROW_DATA ì´ ì¸ë±ìŠ¤ íŽ˜ì´ì§€ ìˆ˜
+	// - íž™ì˜ ê²½ìš° í• ë‹¹ ë‹¨ìœ„ì˜ ì´ ë°ì´í„° íŽ˜ì´ì§€ IN_ROW_DATA ìˆ˜(í• ë‹¹ ë‹¨ìœ„ì˜ ROW_OVERFLOW_DATA ê²½ìš° LOB_DATA í• ë‹¹ ë‹¨ìœ„ì˜ ì´ íŽ˜ì´ì§€ ìˆ˜)
 	int32	PageCount;
 
-	// ÇÒ´ç ´ÜÀ§ À¯Çü¿¡ ´ëÇÑ ¼³¸í
-	// - LOB_DATA : text, ntext, image, varchar(max), nvarchar(max), varbinary(max) ¹× xml Çü½ÄÀÇ ¿­¿¡ ÀúÀåµÈ µ¥ÀÌÅÍ°¡ Æ÷ÇÔ
-	// - ROW_OVERFLOW_DATA : varchar(n), nvarchar(n), varbinary(n) ¹× Çà¿¡¼­ Çª½ÃµÈ sql_variant Çü½ÄÀÇ ¿­¿¡ ÀúÀåµÈ µ¥ÀÌÅÍ°¡ Æ÷ÇÔ
+	// í• ë‹¹ ë‹¨ìœ„ ìœ í˜•ì— ëŒ€í•œ ì„¤ëª…
+	// - LOB_DATA : text, ntext, image, varchar(max), nvarchar(max), varbinary(max) ë° xml í˜•ì‹ì˜ ì—´ì— ì €ìž¥ëœ ë°ì´í„°ê°€ í¬í•¨
+	// - ROW_OVERFLOW_DATA : varchar(n), nvarchar(n), varbinary(n) ë° í–‰ì—ì„œ í‘¸ì‹œëœ sql_variant í˜•ì‹ì˜ ì—´ì— ì €ìž¥ëœ ë°ì´í„°ê°€ í¬í•¨
 	TCHAR	tszAllocUnitTypeDesc[DATABASE_WVARCHAR_MAX] = { 0, };
 };
 
@@ -281,151 +281,151 @@ public:
 class MSSQL_INDEX_OPTION_INFO
 {
 public:
-	int32	ObjectId;															// MSSQL Å×ÀÌºí °íÀ¯¹øÈ£
-	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];							// MSSQL ½ºÅ°¸¶ ¸í
-	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN];							// Å×ÀÌºí ¸í
-	TCHAR   tszIndexName[DATABASE_OBJECT_NAME_STRLEN];							// ÀÎµ¦½º ¸í
-	int32	IndexId;															// ÀÎµ¦½º °íÀ¯¹øÈ£
-	bool    IsPrimaryKey;														// ±âº»Å° ¿©ºÎ(true/false : À¯/¹«)
-	bool    IsUnique;															// À¯´ÏÅ© ¿©ºÎ(true/false : À¯/¹«)
+	int32	ObjectId;															// MSSQL í…Œì´ë¸” ê³ ìœ ë²ˆí˜¸
+	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];							// MSSQL ìŠ¤í‚¤ë§ˆ ëª…
+	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN];							// í…Œì´ë¸” ëª…
+	TCHAR   tszIndexName[DATABASE_OBJECT_NAME_STRLEN];							// ì¸ë±ìŠ¤ ëª…
+	int32	IndexId;															// ì¸ë±ìŠ¤ ê³ ìœ ë²ˆí˜¸
+	bool    IsPrimaryKey;														// ê¸°ë³¸í‚¤ ì—¬ë¶€(true/false : ìœ /ë¬´)
+	bool    IsUnique;															// ìœ ë‹ˆí¬ ì—¬ë¶€(true/false : ìœ /ë¬´)
 
-	/// <summary>ÀÎµ¦½º ºñÈ°¼ºÈ­ ¿©ºÎ(0/1 : È°¼ºÈ­/ºñÈ°¼ºÈ­)</summary>
+	/// <summary>ì¸ë±ìŠ¤ ë¹„í™œì„±í™” ì—¬ë¶€(0/1 : í™œì„±í™”/ë¹„í™œì„±í™”)</summary>
 	bool	IsDisabled;
 
 	/// <summary>PAD_INDEX = { ON | OFF }
-	/// - ÀÎµ¦½º ÆÐµùÀ» ÁöÁ¤. ±âº»°ªÀº OFF
-	/// - Å¬·¯½ºÅÍÇü columnstore ÀÎµ¦½ºÀÇ °æ¿ì Ç×»ó 0
+	/// - ì¸ë±ìŠ¤ íŒ¨ë”©ì„ ì§€ì •. ê¸°ë³¸ê°’ì€ OFF
+	/// - í´ëŸ¬ìŠ¤í„°í˜• columnstore ì¸ë±ìŠ¤ì˜ ê²½ìš° í•­ìƒ 0
 	/// </summary>
 	bool	IsPadded;
 
-	/// <summary>FILLFACTOR = <fillfactor °ª>
-	/// - °¢ ÀÎµ¦½º ÆäÀÌÁöÀÇ ¸®ÇÁ ¼öÁØÀ» ¾î´À Á¤µµ Ã¤¿ïÁö ³ªÅ¸³»´Â ºñÀ²À» ÁöÁ¤
-	/// - Å¬·¯½ºÅÍÇü columnstore ÀÎµ¦½ºÀÇ °æ¿ì Ç×»ó 0
+	/// <summary>FILLFACTOR = <fillfactor ê°’>
+	/// - ê° ì¸ë±ìŠ¤ íŽ˜ì´ì§€ì˜ ë¦¬í”„ ìˆ˜ì¤€ì„ ì–´ëŠ ì •ë„ ì±„ìš¸ì§€ ë‚˜íƒ€ë‚´ëŠ” ë¹„ìœ¨ì„ ì§€ì •
+	/// - í´ëŸ¬ìŠ¤í„°í˜• columnstore ì¸ë±ìŠ¤ì˜ ê²½ìš° í•­ìƒ 0
 	/// </summary>
 	int8	FillFactor;
 
 	/// <summary>IGNORE_DUP_KEY = { ON | OFF }
-	/// - »ðÀÔ ÀÛ¾÷¿¡¼­ °íÀ¯ ÀÎµ¦½º¿¡ Áßº¹µÈ Å° °ªÀ» »ðÀÔÇÏ·Á°í ÇÒ ¶§ ÀÀ´ä À¯ÇüÀ» ÁöÁ¤
-	/// - ONÀÌ¸é Áßº¹µÈ Å° °ªÀÌ °íÀ¯ ÀÎµ¦½º¿¡ »ðÀÔµÇ´Â °æ¿ì °æ°í ¸Þ½ÃÁö°¡ ³ªÅ¸³ª°í °íÀ¯¼º Á¦¾à Á¶°ÇÀ» À§¹ÝÇÏ´Â Çà¸¸ ½ÇÆÐ
-	/// - OFFÀÌ¸é Áßº¹µÈ Å° °ªÀÌ °íÀ¯ ÀÎµ¦½º¿¡ »ðÀÔµÇ´Â °æ¿ì ¿À·ù ¸Þ½ÃÁö°¡ ³ªÅ¸³ª°í ÀüÃ¼ INSERT ÀÛ¾÷ÀÌ ·Ñ¹é
-	/// - ºä, ºñ°íÀ¯ ÀÎµ¦½º, XML ÀÎµ¦½º, °ø°£ ÀÎµ¦½º ¹× ÇÊÅÍ¸µµÈ ÀÎµ¦½º¿¡ »ý¼ºµÈ ÀÎµ¦½ºÀÇ °æ¿ì IGNORE_DUP_KEY¸¦ ONÀ¸·Î ¼³Á¤ÇÒ ¼ö ¾øÀ½
+	/// - ì‚½ìž… ìž‘ì—…ì—ì„œ ê³ ìœ  ì¸ë±ìŠ¤ì— ì¤‘ë³µëœ í‚¤ ê°’ì„ ì‚½ìž…í•˜ë ¤ê³  í•  ë•Œ ì‘ë‹µ ìœ í˜•ì„ ì§€ì •
+	/// - ONì´ë©´ ì¤‘ë³µëœ í‚¤ ê°’ì´ ê³ ìœ  ì¸ë±ìŠ¤ì— ì‚½ìž…ë˜ëŠ” ê²½ìš° ê²½ê³  ë©”ì‹œì§€ê°€ ë‚˜íƒ€ë‚˜ê³  ê³ ìœ ì„± ì œì•½ ì¡°ê±´ì„ ìœ„ë°˜í•˜ëŠ” í–‰ë§Œ ì‹¤íŒ¨
+	/// - OFFì´ë©´ ì¤‘ë³µëœ í‚¤ ê°’ì´ ê³ ìœ  ì¸ë±ìŠ¤ì— ì‚½ìž…ë˜ëŠ” ê²½ìš° ì˜¤ë¥˜ ë©”ì‹œì§€ê°€ ë‚˜íƒ€ë‚˜ê³  ì „ì²´ INSERT ìž‘ì—…ì´ ë¡¤ë°±
+	/// - ë·°, ë¹„ê³ ìœ  ì¸ë±ìŠ¤, XML ì¸ë±ìŠ¤, ê³µê°„ ì¸ë±ìŠ¤ ë° í•„í„°ë§ëœ ì¸ë±ìŠ¤ì— ìƒì„±ëœ ì¸ë±ìŠ¤ì˜ ê²½ìš° IGNORE_DUP_KEYë¥¼ ONìœ¼ë¡œ ì„¤ì •í•  ìˆ˜ ì—†ìŒ
 	/// </summary>
 	bool	IgnoreDupKey;
 
 	/// <summary>ALLOW_ROW_LOCKS = { ON | OFF }
-	/// - ÀÎµ¦½º¿¡¼­ Çà Àá±Ý Çã¿ë ¿©ºÎ(0/1 : ºñÇã¿ë/Çã¿ë)
-	/// - Å¬·¯½ºÅÍÇü columnstore ÀÎµ¦½ºÀÇ °æ¿ì Ç×»ó 0
+	/// - ì¸ë±ìŠ¤ì—ì„œ í–‰ ìž ê¸ˆ í—ˆìš© ì—¬ë¶€(0/1 : ë¹„í—ˆìš©/í—ˆìš©)
+	/// - í´ëŸ¬ìŠ¤í„°í˜• columnstore ì¸ë±ìŠ¤ì˜ ê²½ìš° í•­ìƒ 0
 	/// </summary>
 	bool	AllowRowLocks;
 
 	/// <summary>ALLOW_PAGE_LOCKS = { ON | OFF }
-	/// - ÀÎµ¦½º¿¡¼­ ÆäÀÌÁö Àá±Ý Çã¿ë ¿©ºÎ(0/1 : ºñÇã¿ë/Çã¿ë)
-	/// - Å¬·¯½ºÅÍÇü columnstore ÀÎµ¦½ºÀÇ °æ¿ì Ç×»ó 0
+	/// - ì¸ë±ìŠ¤ì—ì„œ íŽ˜ì´ì§€ ìž ê¸ˆ í—ˆìš© ì—¬ë¶€(0/1 : ë¹„í—ˆìš©/í—ˆìš©)
+	/// - í´ëŸ¬ìŠ¤í„°í˜• columnstore ì¸ë±ìŠ¤ì˜ ê²½ìš° í•­ìƒ 0
 	/// </summary>    	
 	bool	AllowPageLocks;
 
-	/// <summary>ÀÎµ¦½º ÇÊÅÍ Á¸Àç ¿©ºÎ(0/1 : ¹«/À¯)</summary>
+	/// <summary>ì¸ë±ìŠ¤ í•„í„° ì¡´ìž¬ ì—¬ë¶€(0/1 : ë¬´/ìœ )</summary>
 	bool	HasFilter;
 
-	/// <summary>ÇÊÅÍ¸µµÈ ÀÎµ¦½º¿¡ Æ÷ÇÔµÈ ÇàÀÇ ÇÏÀ§ ÁýÇÕ¿¡ ´ëÇÑ ½Ä
-	/// - Èü, ÇÊÅÍ¸µµÇÁö ¾ÊÀº ÀÎµ¦½º ¶Ç´Â Å×ÀÌºí¿¡ ´ëÇÑ ±ÇÇÑÀÌ ºÎÁ·ÇÑ °æ¿ì NULL
+	/// <summary>í•„í„°ë§ëœ ì¸ë±ìŠ¤ì— í¬í•¨ëœ í–‰ì˜ í•˜ìœ„ ì§‘í•©ì— ëŒ€í•œ ì‹
+	/// - íž™, í•„í„°ë§ë˜ì§€ ì•Šì€ ì¸ë±ìŠ¤ ë˜ëŠ” í…Œì´ë¸”ì— ëŒ€í•œ ê¶Œí•œì´ ë¶€ì¡±í•œ ê²½ìš° NULL
 	/// </summary>
 	TCHAR   tszFilterDefinition[DATABASE_WVARCHAR_MAX];
 
 	/// <summary>COMPRESSION_DELAY = { 0 | duration [Minutes] }
-	/// - SQL Server 2016(13.x) ¹öÀü ÀÌ»ó
-	/// - µð½ºÅ© ±â¹Ý Å×ÀÌºíÀÇ °æ¿ì delayÀº CLOSED »óÅÂÀÇ µ¨Å¸ rowgroupÀÌ µ¨Å¸ rowgroup¿¡ ³²¾Æ ÀÖ¾î¾ß ÇÏ´Â ÃÖ¼Ò ½Ã°£(ºÐ)À» ÁöÁ¤. ±âº»°ªÀº 0ºÐ
-	/// - > 0ÀÌ¸é Columnstore ÀÎµ¦½º ¾ÐÃà Áö¿¬ ½Ã°£(ºÐ)
-	/// - NULLÀÌ¸é Columnstore ÀÎµ¦½º Çà ±×·ì ¾ÐÃà Áö¿¬ÀÌ ÀÚµ¿À¸·Î °ü¸®
+	/// - SQL Server 2016(13.x) ë²„ì „ ì´ìƒ
+	/// - ë””ìŠ¤í¬ ê¸°ë°˜ í…Œì´ë¸”ì˜ ê²½ìš° delayì€ CLOSED ìƒíƒœì˜ ë¸íƒ€ rowgroupì´ ë¸íƒ€ rowgroupì— ë‚¨ì•„ ìžˆì–´ì•¼ í•˜ëŠ” ìµœì†Œ ì‹œê°„(ë¶„)ì„ ì§€ì •. ê¸°ë³¸ê°’ì€ 0ë¶„
+	/// - > 0ì´ë©´ Columnstore ì¸ë±ìŠ¤ ì••ì¶• ì§€ì—° ì‹œê°„(ë¶„)
+	/// - NULLì´ë©´ Columnstore ì¸ë±ìŠ¤ í–‰ ê·¸ë£¹ ì••ì¶• ì§€ì—°ì´ ìžë™ìœ¼ë¡œ ê´€ë¦¬
 	/// </summary>	
 	int32	CompressionDelay;
 
 	/// <summary>OPTIMIZE_FOR_SEQUENTIAL_KEY = { ON | OFF }
-	/// - SQL Server 2019(15.x) ¹öÀü ÀÌ»ó ¹× Azure SQL Database
-	/// - ¸¶Áö¸· ÆäÀÌÁö »ðÀÔ °æÇÕ¿¡ ÃÖÀûÈ­ÇÒÁö ¿©ºÎ¸¦ ÁöÁ¤. ±âº»°ªÀº OFF
-	/// - ONÀÌ¸é ÀÎµ¦½º°¡ ¸¶Áö¸· ÆäÀÌÁö »ðÀÔ ÃÖÀûÈ­¸¦ »ç¿ëÇÏµµ·Ï ¼³Á¤
-	/// - OFFÀÌ¸é ÀÎµ¦½º°¡ ¸¶Áö¸· ÆäÀÌÁö »ðÀÔ ÃÖÀûÈ­¸¦ »ç¿ëÇÏÁö ¾Êµµ·Ï ¼³Á¤
+	/// - SQL Server 2019(15.x) ë²„ì „ ì´ìƒ ë° Azure SQL Database
+	/// - ë§ˆì§€ë§‰ íŽ˜ì´ì§€ ì‚½ìž… ê²½í•©ì— ìµœì í™”í• ì§€ ì—¬ë¶€ë¥¼ ì§€ì •. ê¸°ë³¸ê°’ì€ OFF
+	/// - ONì´ë©´ ì¸ë±ìŠ¤ê°€ ë§ˆì§€ë§‰ íŽ˜ì´ì§€ ì‚½ìž… ìµœì í™”ë¥¼ ì‚¬ìš©í•˜ë„ë¡ ì„¤ì •
+	/// - OFFì´ë©´ ì¸ë±ìŠ¤ê°€ ë§ˆì§€ë§‰ íŽ˜ì´ì§€ ì‚½ìž… ìµœì í™”ë¥¼ ì‚¬ìš©í•˜ì§€ ì•Šë„ë¡ ì„¤ì •
 	/// </summary>
 	bool	OptimizeForSequentialKey;
 
 	/// <summary>STATISTICS_NORECOMPUTE = { ON | OFF }
-	/// - sys.stats Å×ÀÌºí ÂüÁ¶
-	/// - Åë°è¸¦ ´Ù½Ã °è»êÇÒÁö ¿©ºÎ¸¦ ÁöÁ¤. ±âº»°ªÀº OFF
-	/// - ONÀÌ¸é ¿É¼ÇÀ» »ç¿ëÇÏ¿© Åë°è°¡ »ý¼ºµÊ
-	/// - OFFÀÌ¸é ¿É¼ÇÀ» »ç¿ëÇÏ¿© Åë°è°¡ »ý¼ºµÇÁö ¾ÊÀ½
+	/// - sys.stats í…Œì´ë¸” ì°¸ì¡°
+	/// - í†µê³„ë¥¼ ë‹¤ì‹œ ê³„ì‚°í• ì§€ ì—¬ë¶€ë¥¼ ì§€ì •. ê¸°ë³¸ê°’ì€ OFF
+	/// - ONì´ë©´ ì˜µì…˜ì„ ì‚¬ìš©í•˜ì—¬ í†µê³„ê°€ ìƒì„±ë¨
+	/// - OFFì´ë©´ ì˜µì…˜ì„ ì‚¬ìš©í•˜ì—¬ í†µê³„ê°€ ìƒì„±ë˜ì§€ ì•ŠìŒ
 	/// </summary>	
 	bool	StatisticsNoRecompute;
 
 	/// <summary>STATISTICS_INCREMENTAL = { ON | OFF }
-	/// - SQL Server 2014(12.x) ¹öÀü ÀÌ»ó ¹× Azure SQL Database
-	/// - sys.stats Å×ÀÌºí ÂüÁ¶
-	/// - Åë°è¸¦ ÁõºÐ Åë°è·Î »ý¼ºÇÒÁö ¿©ºÎ. ±âº»°ªÀº OFF
-	/// - ONÀÌ¸é Åë°è°¡ ÁõºÐµÊ
-	/// - OFFÀÌ¸é Åë°è°¡ ÁõºÐµÇÁö ¾ÊÀ½
+	/// - SQL Server 2014(12.x) ë²„ì „ ì´ìƒ ë° Azure SQL Database
+	/// - sys.stats í…Œì´ë¸” ì°¸ì¡°
+	/// - í†µê³„ë¥¼ ì¦ë¶„ í†µê³„ë¡œ ìƒì„±í• ì§€ ì—¬ë¶€. ê¸°ë³¸ê°’ì€ OFF
+	/// - ONì´ë©´ í†µê³„ê°€ ì¦ë¶„ë¨
+	/// - OFFì´ë©´ í†µê³„ê°€ ì¦ë¶„ë˜ì§€ ì•ŠìŒ
 	/// </summary>	
 	bool	StatisticsIncremental;
 
 	/// <summary>DATA_COMPRESSION = { NONE | ROW | PAGE | COLUMNSTORE | COLUMNSTORE_ARCHIVE }
-	/// - °¢ ÆÄÆ¼¼Ç¿¡ ´ëÇÑ ¾ÐÃà »óÅÂ(0/1/2/3/4 : NONE/ROW/PAGE/COLUMNSTORE/COLUMNSTORE_ARCHIVE)
-	/// - SQL Server 2014(12.x) ¹öÀü ÀÌ»ó ¹× Azure SQL Database
-	/// - sys.partitions Å×ÀÌºí ÂüÁ¶
+	/// - ê° íŒŒí‹°ì…˜ì— ëŒ€í•œ ì••ì¶• ìƒíƒœ(0/1/2/3/4 : NONE/ROW/PAGE/COLUMNSTORE/COLUMNSTORE_ARCHIVE)
+	/// - SQL Server 2014(12.x) ë²„ì „ ì´ìƒ ë° Azure SQL Database
+	/// - sys.partitions í…Œì´ë¸” ì°¸ì¡°
 	/// </summary>
 	int8	DataCompression;
 
-	/// <summary>°¢ ÆÄÆ¼¼Ç¿¡ ´ëÇÑ ¾ÐÃà »óÅÂ ¼³¸í ¹®ÀÚ¿­(NONE/ROW/PAGE/COLUMNSTORE/COLUMNSTORE_ARCHIVE)
-	/// - SQL Server 2014(12.x) ¹öÀü ÀÌ»ó ¹× Azure SQL Database
-	/// - sys.partitions Å×ÀÌºí ÂüÁ¶
+	/// <summary>ê° íŒŒí‹°ì…˜ì— ëŒ€í•œ ì••ì¶• ìƒíƒœ ì„¤ëª… ë¬¸ìžì—´(NONE/ROW/PAGE/COLUMNSTORE/COLUMNSTORE_ARCHIVE)
+	/// - SQL Server 2014(12.x) ë²„ì „ ì´ìƒ ë° Azure SQL Database
+	/// - sys.partitions í…Œì´ë¸” ì°¸ì¡°
 	/// </summary>
 	TCHAR   tszDataCompressionDesc[DATABASE_BASE_STRLEN];
 
 	/// <summary>XML_COMPRESSION = { ON | OFF }
-	/// - °¢ ÆÄÆ¼¼Ç¿¡ ´ëÇÑ XML ¾ÐÃà »óÅÂ
-	/// - SQL Server 2022(16.x) ¹öÀü ÀÌ»ó ¹× Azure SQL Database
-	/// - sys.partitions Å×ÀÌºí ÂüÁ¶
+	/// - ê° íŒŒí‹°ì…˜ì— ëŒ€í•œ XML ì••ì¶• ìƒíƒœ
+	/// - SQL Server 2022(16.x) ë²„ì „ ì´ìƒ ë° Azure SQL Database
+	/// - sys.partitions í…Œì´ë¸” ì°¸ì¡°
 	/// </summary>	
 	bool	XmlCompression;
 
-	/// <summary>°¢ ÆÄÆ¼¼Ç¿¡ ´ëÇÑ XML ¾ÐÃà »óÅÂ ¼³¸í ¹®ÀÚ¿­(OFF/ON)
-	/// - SQL Server 2022(16.x) ¹öÀü ÀÌ»ó ¹× Azure SQL Database
-	/// - sys.partitions Å×ÀÌºí ÂüÁ¶
+	/// <summary>ê° íŒŒí‹°ì…˜ì— ëŒ€í•œ XML ì••ì¶• ìƒíƒœ ì„¤ëª… ë¬¸ìžì—´(OFF/ON)
+	/// - SQL Server 2022(16.x) ë²„ì „ ì´ìƒ ë° Azure SQL Database
+	/// - sys.partitions í…Œì´ë¸” ì°¸ì¡°
 	/// </summary>
 	TCHAR   tszXmlCompressionDesc[DATABASE_BASE_STRLEN];
 
-	/// <summary>µ¥ÀÌÅÍº£ÀÌ½º ³»¿¡¼­ °íÀ¯ÇÑ µ¥ÀÌÅÍ °ø°£ÀÇ ÀÌ¸§
-	/// - sys.data_spaces Å×ÀÌºí ÂüÁ¶
+	/// <summary>ë°ì´í„°ë² ì´ìŠ¤ ë‚´ì—ì„œ ê³ ìœ í•œ ë°ì´í„° ê³µê°„ì˜ ì´ë¦„
+	/// - sys.data_spaces í…Œì´ë¸” ì°¸ì¡°
 	/// </summary>
 	TCHAR   tszFileGroupOrPartitionScheme[DATABASE_OBJECT_TYPE_DESC_STRLEN];
 
-	/// <summary>µ¥ÀÌÅÍ °ø°£ À¯Çü¿¡ ´ëÇÑ ¼³¸í
-	/// - sys.data_spaces Å×ÀÌºí ÂüÁ¶
+	/// <summary>ë°ì´í„° ê³µê°„ ìœ í˜•ì— ëŒ€í•œ ì„¤ëª…
+	/// - sys.data_spaces í…Œì´ë¸” ì°¸ì¡°
 	/// </summary>
 	TCHAR   tszFileGroupOrPartitionSchemeName[DATABASE_OBJECT_NAME_STRLEN];
 
 	/// <summary>SORT_IN_TEMPDB = { ON | OFF }
-	/// - tempdb¿¡ Á¤·Ä °á°ú¸¦ ÀúÀåÇÒÁö ¿©ºÎ¸¦ ÁöÁ¤. Azure SQL Database ÇÏÀÌÆÛ½ºÄÉÀÏÀ» Á¦¿ÜÇÏ°í ±âº»°ªÀº OFF
-	/// - Á¤·Ä ÀÛ¾÷ÀÌ ÇÊ¿äÇÏÁö ¾Ê°Å³ª ¸Þ¸ð¸®¿¡¼­ Á¤·ÄÀ» ¼öÇàÇÒ ¼ö ÀÖÀ¸¸é SORT_IN_TEMPDB ¿É¼ÇÀÌ ¹«½Ã
-	/// - ONÀÌ¸é ÀÎµ¦½º ÀÛ¼º¿¡ »ç¿ëµÈ Áß°£ Á¤·Ä °á°ú°¡ tempdb¿¡ ÀúÀå(tempdb°¡ »ç¿ëÀÚ µ¥ÀÌÅÍº£ÀÌ½º¿Í´Â ´Ù¸¥ µð½ºÅ© ÁýÇÕ¿¡ Á¸Àç)
-	/// - ONÀÌ¸é ÀÎµ¦½º¸¦ ¸¸µå´Â µ¥ ÇÊ¿äÇÑ ½Ã°£ÀÌ ÁÙ¾îµé ¼ö ÀÖ½À´Ï´Ù. ±×·¯³ª ÀÎµ¦½º ÀÛ¼º Áß¿¡ »ç¿ëµÇ´Â µð½ºÅ© °ø°£ÀÇ Å©±â´Â Ä¿Áý´Ï´Ù.
-	/// - OFFÀÌ¸é Áß°£ Á¤·Ä °á°ú°¡ ÀÎµ¦½º¿Í °°Àº µ¥ÀÌÅÍº£ÀÌ½º¿¡ ÀúÀå
+	/// - tempdbì— ì •ë ¬ ê²°ê³¼ë¥¼ ì €ìž¥í• ì§€ ì—¬ë¶€ë¥¼ ì§€ì •. Azure SQL Database í•˜ì´í¼ìŠ¤ì¼€ì¼ì„ ì œì™¸í•˜ê³  ê¸°ë³¸ê°’ì€ OFF
+	/// - ì •ë ¬ ìž‘ì—…ì´ í•„ìš”í•˜ì§€ ì•Šê±°ë‚˜ ë©”ëª¨ë¦¬ì—ì„œ ì •ë ¬ì„ ìˆ˜í–‰í•  ìˆ˜ ìžˆìœ¼ë©´ SORT_IN_TEMPDB ì˜µì…˜ì´ ë¬´ì‹œ
+	/// - ONì´ë©´ ì¸ë±ìŠ¤ ìž‘ì„±ì— ì‚¬ìš©ëœ ì¤‘ê°„ ì •ë ¬ ê²°ê³¼ê°€ tempdbì— ì €ìž¥(tempdbê°€ ì‚¬ìš©ìž ë°ì´í„°ë² ì´ìŠ¤ì™€ëŠ” ë‹¤ë¥¸ ë””ìŠ¤í¬ ì§‘í•©ì— ì¡´ìž¬)
+	/// - ONì´ë©´ ì¸ë±ìŠ¤ë¥¼ ë§Œë“œëŠ” ë° í•„ìš”í•œ ì‹œê°„ì´ ì¤„ì–´ë“¤ ìˆ˜ ìžˆìŠµë‹ˆë‹¤. ê·¸ëŸ¬ë‚˜ ì¸ë±ìŠ¤ ìž‘ì„± ì¤‘ì— ì‚¬ìš©ë˜ëŠ” ë””ìŠ¤í¬ ê³µê°„ì˜ í¬ê¸°ëŠ” ì»¤ì§‘ë‹ˆë‹¤.
+	/// - OFFì´ë©´ ì¤‘ê°„ ì •ë ¬ ê²°ê³¼ê°€ ì¸ë±ìŠ¤ì™€ ê°™ì€ ë°ì´í„°ë² ì´ìŠ¤ì— ì €ìž¥
 	/// </summary>
 	bool SortInTempDB;
 
 	/// <summary>ONLINE = { ON | OFF }
-	/// - SQL Server 2008(10.0.x) ¹öÀü ÀÌ»ó. ¿Â¶óÀÎ ÀÎµ¦½º ÀÛ¾÷Àº SQL Server Enterprise Edition ¶Ç´Â Azure SQL Edge¿¡¼­¸¸ ¼öÇà
-	/// - ÀÎµ¦½º ÀÛ¾÷ Áß Äõ¸® ¹× µ¥ÀÌÅÍ ¼öÁ¤¿¡ ±âº» Å×ÀÌºí°ú °ü·Ã ÀÎµ¦½º¸¦ »ç¿ëÇÒ ¼ö ÀÖ´ÂÁö ¿©ºÎ¸¦ ÁöÁ¤. ±âº»°ªÀº OFF
-	/// - rebuild_index_option¿¡ Àû¿ë
-	/// - ONÀÌ¸é ÀÎµ¦½º ÀÛ¾÷ Áß¿¡ Àå±â Å×ÀÌºí Àá±ÝÀÌ À¯ÁöµÇÁö ¾ÊÀ½
-	/// - OFFÀÌ¸é ÀÎµ¦½º ÀÛ¾÷ Áß¿¡ Å×ÀÌºí Àá±ÝÀÌ Àû¿ë
+	/// - SQL Server 2008(10.0.x) ë²„ì „ ì´ìƒ. ì˜¨ë¼ì¸ ì¸ë±ìŠ¤ ìž‘ì—…ì€ SQL Server Enterprise Edition ë˜ëŠ” Azure SQL Edgeì—ì„œë§Œ ìˆ˜í–‰
+	/// - ì¸ë±ìŠ¤ ìž‘ì—… ì¤‘ ì¿¼ë¦¬ ë° ë°ì´í„° ìˆ˜ì •ì— ê¸°ë³¸ í…Œì´ë¸”ê³¼ ê´€ë ¨ ì¸ë±ìŠ¤ë¥¼ ì‚¬ìš©í•  ìˆ˜ ìžˆëŠ”ì§€ ì—¬ë¶€ë¥¼ ì§€ì •. ê¸°ë³¸ê°’ì€ OFF
+	/// - rebuild_index_optionì— ì ìš©
+	/// - ONì´ë©´ ì¸ë±ìŠ¤ ìž‘ì—… ì¤‘ì— ìž¥ê¸° í…Œì´ë¸” ìž ê¸ˆì´ ìœ ì§€ë˜ì§€ ì•ŠìŒ
+	/// - OFFì´ë©´ ì¸ë±ìŠ¤ ìž‘ì—… ì¤‘ì— í…Œì´ë¸” ìž ê¸ˆì´ ì ìš©
 	/// </summary>
 	bool Online;
 
 	/// <summary>MAXDOP = max_degree_of_parallelism
-	/// - ÀÎµ¦½º ÀÛ¾÷ µ¿¾È max degree of parallelism ±¸¼º ¿É¼ÇÀ» ÀçÁ¤ÀÇ 
-	///     1 : º´·Ä °èÈ¹ÀÌ »ý¼ºµÇÁö ¾Ê½À´Ï´Ù.
-	///     > 1 : º´·Ä ÀÎµ¦½º ÀÛ¾÷¿¡ »ç¿ëµÇ´Â ÃÖ´ë ÇÁ·Î¼¼¼­ ¼ö¸¦ ÁöÁ¤µÈ °ªÀ¸·Î Á¦ÇÑÇÕ´Ï´Ù.
-	///     0(±âº»°ª) : ÇöÀç ½Ã½ºÅÛ ÀÛ¾÷¿¡ µû¶ó ½ÇÁ¦ ÇÁ·Î¼¼¼­ ¼ö ÀÌÇÏÀÇ ÇÁ·Î¼¼¼­¸¦ »ç¿ëÇÕ´Ï´Ù.
-	/// - MAXDOP ¿É¼ÇÀº ¸ðµç XML ÀÎµ¦½º¿¡ ´ëÇØ ±¸¹®ÀÌ Áö¿øµÇÁö¸¸ °ø°£ ÀÎµ¦½º ¶Ç´Â ±âº» XML ÀÎµ¦½ºÀÇ °æ¿ì ALTER INDEX´Â ÇöÀç ´ÜÀÏ ÇÁ·Î¼¼¼­¸¸ »ç¿ëÇÕ´Ï´Ù.
-	/// - SQL Server ÀÎ½ºÅÏ½ºÀÇ ±¸¼º ¼³Á¤ Áß ÇÏ³ª
+	/// - ì¸ë±ìŠ¤ ìž‘ì—… ë™ì•ˆ max degree of parallelism êµ¬ì„± ì˜µì…˜ì„ ìž¬ì •ì˜ 
+	///     1 : ë³‘ë ¬ ê³„íšì´ ìƒì„±ë˜ì§€ ì•ŠìŠµë‹ˆë‹¤.
+	///     > 1 : ë³‘ë ¬ ì¸ë±ìŠ¤ ìž‘ì—…ì— ì‚¬ìš©ë˜ëŠ” ìµœëŒ€ í”„ë¡œì„¸ì„œ ìˆ˜ë¥¼ ì§€ì •ëœ ê°’ìœ¼ë¡œ ì œí•œí•©ë‹ˆë‹¤.
+	///     0(ê¸°ë³¸ê°’) : í˜„ìž¬ ì‹œìŠ¤í…œ ìž‘ì—…ì— ë”°ë¼ ì‹¤ì œ í”„ë¡œì„¸ì„œ ìˆ˜ ì´í•˜ì˜ í”„ë¡œì„¸ì„œë¥¼ ì‚¬ìš©í•©ë‹ˆë‹¤.
+	/// - MAXDOP ì˜µì…˜ì€ ëª¨ë“  XML ì¸ë±ìŠ¤ì— ëŒ€í•´ êµ¬ë¬¸ì´ ì§€ì›ë˜ì§€ë§Œ ê³µê°„ ì¸ë±ìŠ¤ ë˜ëŠ” ê¸°ë³¸ XML ì¸ë±ìŠ¤ì˜ ê²½ìš° ALTER INDEXëŠ” í˜„ìž¬ ë‹¨ì¼ í”„ë¡œì„¸ì„œë§Œ ì‚¬ìš©í•©ë‹ˆë‹¤.
+	/// - SQL Server ì¸ìŠ¤í„´ìŠ¤ì˜ êµ¬ì„± ì„¤ì • ì¤‘ í•˜ë‚˜
 	///     SELECT value 
 	///     FROM sys.configurations 
 	///     WHERE name = 'max degree of parallelism';
@@ -433,14 +433,14 @@ public:
 	uint8 MaxDop;
 
 	/// <summary>RESUMABLE = { ON | OFF }
-	/// SQL Server 2017(14.x) ¹öÀü ÀÌ»ó ¹× Azure SQL Database
-	/// - ALTER TABLE ADD CONSTRAINT ÀÛ¾÷ÀÌ ´Ù½Ã ½ÃÀÛµÉ ¼ö ÀÖ´ÂÁö ¿©ºÎ¸¦ ÁöÁ¤. ±âº»°ªÀº OFF
-	/// - ONÀÌ¸é Å×ÀÌºí Á¦¾à Á¶°Ç Ãß°¡ ÀÛ¾÷ ´Ù½Ã ½ÃÀÛ °¡´É
-	/// - OFFÀÌ¸é Å×ÀÌºí Á¦¾à Á¶°Ç Ãß°¡ ÀÛ¾÷ ´Ù½Ã ½ÃÀÛ ºÒ°¡´É
-	/// - RESUMABLE ¿É¼ÇÀÌ ONÀ¸·Î ¼³Á¤µÇ¸é ONLINE = ON ¿É¼ÇÀÌ ÇÊ¿ä
-	/// - RESUMABLE ¿É¼ÇÀÌ ONÀ¸·Î ¼³Á¤µÇ¾î ÀÖÁö ¾ÊÀ¸¸é MAX_DURATION(= time [MINUTES]) ¿É¼ÇÀÌ Çã¿ëµÇÁö ¾ÊÀ½
-	/// - MAX_DURATIONÀº RESUMABLE ÀÛ¾÷ÀÇ ÃÖ´ë Áö¼Ó ½Ã°£À» ¼³Á¤ÇÏ´Â µ¥ »ç¿ëµÉ ¼ö ÀÖÀ½
-	/// - SQL Server ¿¡ÀÌÀüÆ® ÀÛ¾÷ ¼³Á¤¿¡¼­ ÁöÁ¤
+	/// SQL Server 2017(14.x) ë²„ì „ ì´ìƒ ë° Azure SQL Database
+	/// - ALTER TABLE ADD CONSTRAINT ìž‘ì—…ì´ ë‹¤ì‹œ ì‹œìž‘ë  ìˆ˜ ìžˆëŠ”ì§€ ì—¬ë¶€ë¥¼ ì§€ì •. ê¸°ë³¸ê°’ì€ OFF
+	/// - ONì´ë©´ í…Œì´ë¸” ì œì•½ ì¡°ê±´ ì¶”ê°€ ìž‘ì—… ë‹¤ì‹œ ì‹œìž‘ ê°€ëŠ¥
+	/// - OFFì´ë©´ í…Œì´ë¸” ì œì•½ ì¡°ê±´ ì¶”ê°€ ìž‘ì—… ë‹¤ì‹œ ì‹œìž‘ ë¶ˆê°€ëŠ¥
+	/// - RESUMABLE ì˜µì…˜ì´ ONìœ¼ë¡œ ì„¤ì •ë˜ë©´ ONLINE = ON ì˜µì…˜ì´ í•„ìš”
+	/// - RESUMABLE ì˜µì…˜ì´ ONìœ¼ë¡œ ì„¤ì •ë˜ì–´ ìžˆì§€ ì•Šìœ¼ë©´ MAX_DURATION(= time [MINUTES]) ì˜µì…˜ì´ í—ˆìš©ë˜ì§€ ì•ŠìŒ
+	/// - MAX_DURATIONì€ RESUMABLE ìž‘ì—…ì˜ ìµœëŒ€ ì§€ì† ì‹œê°„ì„ ì„¤ì •í•˜ëŠ” ë° ì‚¬ìš©ë  ìˆ˜ ìžˆìŒ
+	/// - SQL Server ì—ì´ì „íŠ¸ ìž‘ì—… ì„¤ì •ì—ì„œ ì§€ì •
 	///     SELECT s.name, s.command
 	///     FROM msdb.dbo.sysjobs AS j
 	///     INNER JOIN msdb.dbo.sysjobsteps AS s 
@@ -450,10 +450,10 @@ public:
 	bool Resumable;
 
 	/// <summary>MAX_DURATION = time [MINUTES] 
-	/// - SQL Server 2017(14.x) ¹öÀü ÀÌ»ó
-	/// - ÀÎµ¦½º Àç±¸¼º ÀÛ¾÷ÀÇ ÃÖ´ë Áö¼Ó ½Ã°£
-	/// - ´Ù½Ã ½ÃÀÛÇÒ ¼ö ÀÖ´Â ¿Â¶óÀÎ ÀÎµ¦½º ÀÛ¾÷ÀÌ ÀÏ½Ã ÁßÁöÇÏ±â Àü¿¡ ½ÇÇàµÈ ½Ã°£À» ³ªÅ¸³¿(ºÐ ´ÜÀ§·Î ÁöÁ¤µÈ Á¤¼ö °ª)
-	/// - SQL Server ¿¡ÀÌÀüÆ® ÀÛ¾÷ ¼³Á¤¿¡¼­ ÁöÁ¤
+	/// - SQL Server 2017(14.x) ë²„ì „ ì´ìƒ
+	/// - ì¸ë±ìŠ¤ ìž¬êµ¬ì„± ìž‘ì—…ì˜ ìµœëŒ€ ì§€ì† ì‹œê°„
+	/// - ë‹¤ì‹œ ì‹œìž‘í•  ìˆ˜ ìžˆëŠ” ì˜¨ë¼ì¸ ì¸ë±ìŠ¤ ìž‘ì—…ì´ ì¼ì‹œ ì¤‘ì§€í•˜ê¸° ì „ì— ì‹¤í–‰ëœ ì‹œê°„ì„ ë‚˜íƒ€ëƒ„(ë¶„ ë‹¨ìœ„ë¡œ ì§€ì •ëœ ì •ìˆ˜ ê°’)
+	/// - SQL Server ì—ì´ì „íŠ¸ ìž‘ì—… ì„¤ì •ì—ì„œ ì§€ì •
 	///     SELECT s.name, s.command
 	///     FROM msdb.dbo.sysjobs AS j
 	///     INNER JOIN msdb.dbo.sysjobsteps AS s 
@@ -463,29 +463,29 @@ public:
 	int32 MaxDuration;
 
 	/// <summary>ABORT_AFTER_WAIT = [ NONE | SELF | BLOCKERS ]
-	/// - MAX_DURATION ½Ã°£ µ¿¾È Â÷´ÜµÇ¸é ÁöÁ¤ÇÑ ABORT_AFTER_WAIT ÀÛ¾÷ÀÌ ½ÇÇà
-	/// - NONE : º¸Åë(ÀÏ¹Ý) ¿ì¼± ¼øÀ§·Î Àá±ÝÀ» °è¼Ó ´ë±âÇÕ´Ï´Ù.
-	/// - SELF : ¾î¶² µ¿ÀÛµµ ¼öÇàÇÏÁö ¾Ê°í ÇöÀç ½ÇÇà ÁßÀÎ ¿Â¶óÀÎ ÀÎµ¦½º ´Ù½Ã ÀÛ¼º DDL ÀÛ¾÷À» Á¾·á. MAX_DURATIONÀÌ 0ÀÌ¸é SELF ¿É¼ÇÀ» »ç¿ëÇÒ ¼ö ¾øÀ½.
-	/// - BLOCKERS : ÀÛ¾÷À» °è¼ÓÇÒ ¼ö ÀÖµµ·Ï ¿Â¶óÀÎ ÀÎµ¦½º ´Ù½Ã ÀÛ¼º DDL ÀÛ¾÷À» Â÷´ÜÇÏ´Â ¸ðµç »ç¿ëÀÚ Æ®·£Àè¼ÇÀ» Á¾·á. BLOCKERS ¿É¼ÇÀ» »ç¿ëÇÏ·Á¸é ·Î±×ÀÎ¿¡ ALTER ANY CONNECTION ±ÇÇÑÀÌ ÀÖ¾î¾ß ÇÔ.
+	/// - MAX_DURATION ì‹œê°„ ë™ì•ˆ ì°¨ë‹¨ë˜ë©´ ì§€ì •í•œ ABORT_AFTER_WAIT ìž‘ì—…ì´ ì‹¤í–‰
+	/// - NONE : ë³´í†µ(ì¼ë°˜) ìš°ì„  ìˆœìœ„ë¡œ ìž ê¸ˆì„ ê³„ì† ëŒ€ê¸°í•©ë‹ˆë‹¤.
+	/// - SELF : ì–´ë–¤ ë™ìž‘ë„ ìˆ˜í–‰í•˜ì§€ ì•Šê³  í˜„ìž¬ ì‹¤í–‰ ì¤‘ì¸ ì˜¨ë¼ì¸ ì¸ë±ìŠ¤ ë‹¤ì‹œ ìž‘ì„± DDL ìž‘ì—…ì„ ì¢…ë£Œ. MAX_DURATIONì´ 0ì´ë©´ SELF ì˜µì…˜ì„ ì‚¬ìš©í•  ìˆ˜ ì—†ìŒ.
+	/// - BLOCKERS : ìž‘ì—…ì„ ê³„ì†í•  ìˆ˜ ìžˆë„ë¡ ì˜¨ë¼ì¸ ì¸ë±ìŠ¤ ë‹¤ì‹œ ìž‘ì„± DDL ìž‘ì—…ì„ ì°¨ë‹¨í•˜ëŠ” ëª¨ë“  ì‚¬ìš©ìž íŠ¸ëžœìž­ì…˜ì„ ì¢…ë£Œ. BLOCKERS ì˜µì…˜ì„ ì‚¬ìš©í•˜ë ¤ë©´ ë¡œê·¸ì¸ì— ALTER ANY CONNECTION ê¶Œí•œì´ ìžˆì–´ì•¼ í•¨.
 	/// </summary>
 	int8 AbortAfterWait;
 
 	/// <summary>LOB_COMPACTION = { ON | OFF }
-	/// - rowstore ÀÎµ¦½º¿¡ Àû¿ë
-	/// - image, text, ntext, varchar(max), nvarchar(max), varbinary(max), xml°ú °°Àº Å« °³Ã¼(LOB) µ¥ÀÌÅÍ Çü½ÄÀÇ µ¥ÀÌÅÍ¸¦ Æ÷ÇÔÇÏ´Â ¸ðµç ÆäÀÌÁö¸¦ ¾ÐÃàÇÏµµ·Ï ÁöÁ¤
-	/// - reorganize_option¿¡ Àû¿ë
-	/// - ONÀÌ¸é Å¬·¯½ºÅÍÇü ÀÎµ¦½ºÀÇ °æ¿ì Å×ÀÌºí¿¡ Æ÷ÇÔµÈ ¸ðµç LOB ¿­ÀÌ ¾ÐÃà, ºñÅ¬·¯½ºÅÍÇü ÀÎµ¦½ºÀÇ °æ¿ì ÀÎµ¦½º¿¡¼­ Å°°¡ ¾Æ´Ñ(Æ÷°ý) ¿­ÀÎ LOB ¿­ÀÌ ¸ðµÎ ¾ÐÃà
-	/// - OFFÀÌ¸é Å« °³Ã¼ µ¥ÀÌÅÍ°¡ Æ÷ÇÔµÈ ÆäÀÌÁö°¡ ¾ÐÃàµÇÁö ¾ÊÀ¸¸ç, Èü¿¡´Â ¾Æ¹« ¿µÇâÀÌ ¾øÀ½ 
+	/// - rowstore ì¸ë±ìŠ¤ì— ì ìš©
+	/// - image, text, ntext, varchar(max), nvarchar(max), varbinary(max), xmlê³¼ ê°™ì€ í° ê°œì²´(LOB) ë°ì´í„° í˜•ì‹ì˜ ë°ì´í„°ë¥¼ í¬í•¨í•˜ëŠ” ëª¨ë“  íŽ˜ì´ì§€ë¥¼ ì••ì¶•í•˜ë„ë¡ ì§€ì •
+	/// - reorganize_optionì— ì ìš©
+	/// - ONì´ë©´ í´ëŸ¬ìŠ¤í„°í˜• ì¸ë±ìŠ¤ì˜ ê²½ìš° í…Œì´ë¸”ì— í¬í•¨ëœ ëª¨ë“  LOB ì—´ì´ ì••ì¶•, ë¹„í´ëŸ¬ìŠ¤í„°í˜• ì¸ë±ìŠ¤ì˜ ê²½ìš° ì¸ë±ìŠ¤ì—ì„œ í‚¤ê°€ ì•„ë‹Œ(í¬ê´„) ì—´ì¸ LOB ì—´ì´ ëª¨ë‘ ì••ì¶•
+	/// - OFFì´ë©´ í° ê°œì²´ ë°ì´í„°ê°€ í¬í•¨ëœ íŽ˜ì´ì§€ê°€ ì••ì¶•ë˜ì§€ ì•Šìœ¼ë©°, íž™ì—ëŠ” ì•„ë¬´ ì˜í–¥ì´ ì—†ìŒ 
 	/// </summary>
 	bool LobCompaction;
 
 	/// <summary>COMPRESS_ALL_ROW_GROUPS = { ON | OFF }
-	/// - SQL Server 2016(13.x) ¹öÀü ÀÌ»ó ¹× Azure SQL Database
-	/// - columnstore ÀÎµ¦½º¿¡ Àû¿ë
-	/// - ¿­¸°(OPEN) ¶Ç´Â ´ÝÈù(CLOSED) µ¨Å¸ rowgroupÀ» columnstore·Î °­Á¦ Àû¿ëÇÏ´Â ¹æ¹ýÀ» Á¦°ø
-	/// - reorganize_option¿¡ Àû¿ë
-	/// - ONÀº Å©±â ¹× »óÅÂ(CLOSED ¶Ç´Â OPEN)¿Í »ó°ü¾øÀÌ ¸ðµç rowgroupÀ» columnstore¿¡ °­Á¦ Àû¿ë
-	/// - OFF´Â ¸ðµç ´ÝÈù(CLOSED) rowgroupÀ» columnstore¿¡ °­Á¦ Àû¿ë
+	/// - SQL Server 2016(13.x) ë²„ì „ ì´ìƒ ë° Azure SQL Database
+	/// - columnstore ì¸ë±ìŠ¤ì— ì ìš©
+	/// - ì—´ë¦°(OPEN) ë˜ëŠ” ë‹«ížŒ(CLOSED) ë¸íƒ€ rowgroupì„ columnstoreë¡œ ê°•ì œ ì ìš©í•˜ëŠ” ë°©ë²•ì„ ì œê³µ
+	/// - reorganize_optionì— ì ìš©
+	/// - ONì€ í¬ê¸° ë° ìƒíƒœ(CLOSED ë˜ëŠ” OPEN)ì™€ ìƒê´€ì—†ì´ ëª¨ë“  rowgroupì„ columnstoreì— ê°•ì œ ì ìš©
+	/// - OFFëŠ” ëª¨ë“  ë‹«ížŒ(CLOSED) rowgroupì„ columnstoreì— ê°•ì œ ì ìš©
 	/// </summary>
 	bool CompressAllRowGroups;
 };
@@ -495,13 +495,13 @@ public:
 class MSSQL_DEFAULT_CONSTRAINT_INFO
 {
 public:
-	int32	ObjectId;												// MSSQL Å×ÀÌºí °íÀ¯¹øÈ£
-	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];				// MSSQL ½ºÅ°¸¶ ¸í
-	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN];				// Å×ÀÌºí ¸í
-	TCHAR   tszDefaultConstName[DATABASE_OBJECT_NAME_STRLEN];		// ±âº»°ª Á¦¾àÁ¶°Ç ¸í
-	TCHAR	tszColumnName[DATABASE_COLUMN_NAME_STRLEN];				// ÄÃ·³ ¸í
-	TCHAR   tszDefaultValue[DATABASE_WVARCHAR_MAX];					// ÄÃ·³ Á¦¾àÁ¶°Ç Á¤ÀÇ°ª
-	bool	IsSystemNamed;											// ½Ã½ºÅÛÀÌ ÀÎµ¦½º¸íÀ» ÇÒ´çÇß´ÂÁö ¿©ºÎ(true/false : À¯/¹«)
+	int32	ObjectId;												// MSSQL í…Œì´ë¸” ê³ ìœ ë²ˆí˜¸
+	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];				// MSSQL ìŠ¤í‚¤ë§ˆ ëª…
+	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN];				// í…Œì´ë¸” ëª…
+	TCHAR   tszDefaultConstName[DATABASE_OBJECT_NAME_STRLEN];		// ê¸°ë³¸ê°’ ì œì•½ì¡°ê±´ ëª…
+	TCHAR	tszColumnName[DATABASE_COLUMN_NAME_STRLEN];				// ì»¬ëŸ¼ ëª…
+	TCHAR   tszDefaultValue[DATABASE_WVARCHAR_MAX];					// ì»¬ëŸ¼ ì œì•½ì¡°ê±´ ì •ì˜ê°’
+	bool	IsSystemNamed;											// ì‹œìŠ¤í…œì´ ì¸ë±ìŠ¤ëª…ì„ í• ë‹¹í–ˆëŠ”ì§€ ì—¬ë¶€(true/false : ìœ /ë¬´)
 };
 
 //***************************************************************************
@@ -510,15 +510,15 @@ inline _tstring MSSQLGetTableColumnOption(_tstring dataTypeDesc, bool isNullable
 {
 	_tstring columnOption = _T("");
 
-	// <ÄÃ·³¼Ó¼º> : COLLATE, {NULL|NOT NULL}, IDENTITY(½Ãµå°ª, ÁõºÐ°ª) ¼³Á¤ÀÌ Æ÷ÇÔµÊ
-	//  - ¸¸¾à ÄÃ·³ ¼Ó¼º¿¡ Æ÷ÇÔµÈ ¼³Á¤ °ªÀ» º¯°æÇÒ °æ¿ì ¾Æ·¡¿Í °°Àº ¼ø¼­·Î ³ª¿­ÇØ¼­ º¯°æÇÏ¸é µÊ
-	//  - ¸¸¾à µ¥ÀÌÅÍÁ¤·Ä °ªÀÌ ÇØ´ç µ¥ÀÌÅÍº£ÀÌ½º¿¡ ¼³Á¤µÈ µ¥ÀÌÅÍÁ¤·Ä °ª°ú µ¿ÀÏÇÑ °æ¿ì µû·Î ¸í½ÃÇÏÁö ¾Ê¾Æµµ µÊ
-	//  - COLLATE µ¥ÀÌÅÍÁ¤·Ä {NULL|NOT NULL} IDENTITY(½Ãµå°ª, ÁõºÐ°ª)
+	// <ì»¬ëŸ¼ì†ì„±> : COLLATE, {NULL|NOT NULL}, IDENTITY(ì‹œë“œê°’, ì¦ë¶„ê°’) ì„¤ì •ì´ í¬í•¨ë¨
+	//  - ë§Œì•½ ì»¬ëŸ¼ ì†ì„±ì— í¬í•¨ëœ ì„¤ì • ê°’ì„ ë³€ê²½í•  ê²½ìš° ì•„ëž˜ì™€ ê°™ì€ ìˆœì„œë¡œ ë‚˜ì—´í•´ì„œ ë³€ê²½í•˜ë©´ ë¨
+	//  - ë§Œì•½ ë°ì´í„°ì •ë ¬ ê°’ì´ í•´ë‹¹ ë°ì´í„°ë² ì´ìŠ¤ì— ì„¤ì •ëœ ë°ì´í„°ì •ë ¬ ê°’ê³¼ ë™ì¼í•œ ê²½ìš° ë”°ë¡œ ëª…ì‹œí•˜ì§€ ì•Šì•„ë„ ë¨
+	//  - COLLATE ë°ì´í„°ì •ë ¬ {NULL|NOT NULL} IDENTITY(ì‹œë“œê°’, ì¦ë¶„ê°’)
 	//
-	// [ÄÃ·³¸í] µ¥ÀÌÅÍÅ¸ÀÔ <ÄÃ·³¼Ó¼º>
-	//  - [ÄÃ·³¸í] µ¥ÀÌÅÍÅ¸ÀÔ NOT NULL IDENTITY(½Ãµå°ª, ÁõºÐ°ª)
-	//  - [ÄÃ·³¸í] µ¥ÀÌÅÍÅ¸ÀÔ {NULL|NOT NULL}
-	//  - [ÄÃ·³¸í] µ¥ÀÌÅÍÅ¸ÀÔ COLLATE µ¥ÀÌÅÍÁ¤·Ä {NULL|NOT NULL}
+	// [ì»¬ëŸ¼ëª…] ë°ì´í„°íƒ€ìž… <ì»¬ëŸ¼ì†ì„±>
+	//  - [ì»¬ëŸ¼ëª…] ë°ì´í„°íƒ€ìž… NOT NULL IDENTITY(ì‹œë“œê°’, ì¦ë¶„ê°’)
+	//  - [ì»¬ëŸ¼ëª…] ë°ì´í„°íƒ€ìž… {NULL|NOT NULL}
+	//  - [ì»¬ëŸ¼ëª…] ë°ì´í„°íƒ€ìž… COLLATE ë°ì´í„°ì •ë ¬ {NULL|NOT NULL}
 	columnOption = dataTypeDesc;
 	if( collation != "" )
 		columnOption = columnOption + " COLLATE " + collation;
@@ -536,7 +536,7 @@ inline _tstring MSSQLGetDropConstraintQuery(_tstring schemaName, _tstring tableN
 
 	if( constType == "PK" || constType == "UQ" || constType == "F" || constType == "D" || constType == "C" )
 	{
-		// ALTER TABLE [Å×ÀÌºí¸í] DROP CONSTRAINT [Á¦¾àÁ¶°Ç¸í]
+		// ALTER TABLE [í…Œì´ë¸”ëª…] DROP CONSTRAINT [ì œì•½ì¡°ê±´ëª…]
 		query = tstring_tcformat(_T("ALTER TABLE [%s].[%s] DROP CONSTRAINT [%s]"), schemaName.c_str(), tableName.c_str(), constName.c_str());
 	}
 	return query;
@@ -626,16 +626,16 @@ inline _tstring MSSQLGetDatabaseRestoreQuery(_tstring databaseName, _tstring res
 inline _tstring MSSQLGetRowStoreIndexFragmentationCheckQuery(_tstring tableName = _T(""))
 {
 	// - https://learn.microsoft.com/ko-kr/sql/relational-databases/indexes/reorganize-and-rebuild-indexes?view=sql-server-ver16
-	// rowstore ÀÎµ¦½ºÀÇ Á¶°¢È­ ¹× ÆäÀÌÁö ¹Ðµµ È®ÀÎ
-	// avg_fragmentation_in_percent(Á¶°¢È­ ¼öÄ¡)°¡ 30ÀÌ»óÀÌ¸é ¸®ºôµå(Rebuild) 30¹Ì¸¸ÀÌ¸é ¸®¿À±×³ªÀÌÁî(Reorganize) ½ÇÇà
+	// rowstore ì¸ë±ìŠ¤ì˜ ì¡°ê°í™” ë° íŽ˜ì´ì§€ ë°€ë„ í™•ì¸
+	// avg_fragmentation_in_percent(ì¡°ê°í™” ìˆ˜ì¹˜)ê°€ 30ì´ìƒì´ë©´ ë¦¬ë¹Œë“œ(Rebuild) 30ë¯¸ë§Œì´ë©´ ë¦¬ì˜¤ê·¸ë‚˜ì´ì¦ˆ(Reorganize) ì‹¤í–‰
 	// sys.dm_db_index_physical_stats([database_id], [object_id], [index_id], [partition_number], [mode]) 
-	//  [database_id] | NULL | 0 | ±âº» : µ¥ÀÌÅÍº£ÀÌ½ºÀÇ ID
-	//  [object_id] | NULL | 0 | ±âº» : ÀÎµ¦½º°¡ ÀÖ´Â Å×ÀÌºí ¶Ç´Â ºäÀÇ °³Ã¼ ID
-	//  [index_id] | 0 | NULL | -1 | ±âº» : ÀÎµ¦½ºÀÇ ID
-	//  [partition_number] | NULL | 0 | ±âº» : °³Ã¼ÀÇ ÆÄÆ¼¼Ç ¹øÈ£
-	//  [mode] | NULL | ±âº» : modeÀÇ ÀÌ¸§. mode´Â Åë°è¸¦ °¡Á®¿À´Â µ¥ »ç¿ëµÇ´Â °Ë»ç ¼öÁØÀ» ÁöÁ¤
-	//  - DEFAULT/NULL/LIMITED/SAMPLED/DETAILED. ±âº»°ª(NULL)Àº LIMITED
-	//  - DETAILEDÀÏ °æ¿ì ¸ðµç ÀÎµ¦½º ÆäÀÌÁö¸¦ °Ë»çÇØ¾ß ÇÏ¸ç ½Ã°£ÀÌ ¿À·¡ °É¸± ¼ö ÀÖ½À´Ï´Ù
+	//  [database_id] | NULL | 0 | ê¸°ë³¸ : ë°ì´í„°ë² ì´ìŠ¤ì˜ ID
+	//  [object_id] | NULL | 0 | ê¸°ë³¸ : ì¸ë±ìŠ¤ê°€ ìžˆëŠ” í…Œì´ë¸” ë˜ëŠ” ë·°ì˜ ê°œì²´ ID
+	//  [index_id] | 0 | NULL | -1 | ê¸°ë³¸ : ì¸ë±ìŠ¤ì˜ ID
+	//  [partition_number] | NULL | 0 | ê¸°ë³¸ : ê°œì²´ì˜ íŒŒí‹°ì…˜ ë²ˆí˜¸
+	//  [mode] | NULL | ê¸°ë³¸ : modeì˜ ì´ë¦„. modeëŠ” í†µê³„ë¥¼ ê°€ì ¸ì˜¤ëŠ” ë° ì‚¬ìš©ë˜ëŠ” ê²€ì‚¬ ìˆ˜ì¤€ì„ ì§€ì •
+	//  - DEFAULT/NULL/LIMITED/SAMPLED/DETAILED. ê¸°ë³¸ê°’(NULL)ì€ LIMITED
+	//  - DETAILEDì¼ ê²½ìš° ëª¨ë“  ì¸ë±ìŠ¤ íŽ˜ì´ì§€ë¥¼ ê²€ì‚¬í•´ì•¼ í•˜ë©° ì‹œê°„ì´ ì˜¤ëž˜ ê±¸ë¦´ ìˆ˜ ìžˆìŠµë‹ˆë‹¤
 	_tstring query = _T("");
 
 	query = query + "SELECT ips.object_id AS object_id, OBJECT_SCHEMA_NAME(ips.object_id) AS schema_name, OBJECT_NAME(ips.object_id) AS table_name, ips.index_id AS index_id, ISNULL(i.name, '') AS index_name, i.type_desc AS index_type, ips.partition_number AS partitionnum, ips.avg_fragmentation_in_percent, ips.avg_page_space_used_in_percent, ips.page_count, ips.alloc_unit_type_desc";
@@ -654,7 +654,7 @@ inline _tstring MSSQLGetRowStoreIndexFragmentationCheckQuery(_tstring tableName 
 inline _tstring MSSQLGetColumnStoreIndexFragmentationCheckQuery(_tstring tableName = _T(""))
 {
 	// - https://learn.microsoft.com/ko-kr/sql/relational-databases/indexes/reorganize-and-rebuild-indexes?view=sql-server-ver16
-	// columnstore ÀÎµ¦½ºÀÇ Á¶°¢È­ È®ÀÎ
+	// columnstore ì¸ë±ìŠ¤ì˜ ì¡°ê°í™” í™•ì¸
 	_tstring query = _T("");
 
 	query = query + "SELECT i.object_id AS object_id, OBJECT_SCHEMA_NAME(i.object_id) AS schema_name, OBJECT_NAME(i.object_id) AS table_name, i.index_id AS index_id, ISNULL(i.name, '') AS index_name, i.type_desc AS index_type, 100.0 * (ISNULL(SUM(rgs.deleted_rows), 0)) / NULLIF(SUM(rgs.total_rows), 0) AS avg_fragmentation_in_percent";
@@ -794,28 +794,28 @@ inline _tstring MSSQLIndexOptionSetQuery(_tstring schemaName, _tstring tableName
 }
 
 //***************************************************************************
-// ÀÎµ¦½º Reorganization(Àç±¸¼º)
-//  - ±âÁ¸¿¡ »ç¿ëµÇ´ø Page Á¤º¸¸¦ ¼ø¼­´ë·Î ´Ù½Ã ±¸¼ºÇÏ´Â ÀÛ¾÷
-//  - Rebuilding º¸´Ù ¸®¼Ò½º°¡ ´ú »ç¿ëµÇ¹Ç·Î, ÀÌ ¹æ¹ýÀ» ±âº» ÀÎµ¦½º À¯Áö °ü¸® ¹æ¹ýÀ¸·Î »ç¿ëÇÏ´Â °Ô ¹Ù¶÷Á÷ÇÔ
-//  - ÀÎµ¦½º Á¶°¢È­°¡ ºñ±³Àû ÀûÀº °æ¿ì¿¡ »ç¿ëÇÏ´Â °ÍÀÌ ÁÁÀ½(¾à 30% ¹Ì¸¸ÀÇ Á¶°¢È­°¡ ¹ß»ýÇÑ °æ¿ì)
-//  - ¿Â¶óÀÎ ÀÛ¾÷ÀÌ±â ¶§¹®¿¡, Àå±â°£ÀÇ object-level locks°¡ ¹ß»ýÇÏÁö ¾ÊÀ¸¸ç Reorganization ÀÛ¾÷Áß¿¡ ±âº» Å×ÀÌºí¿¡ ´ëÇÑ Äõ¸®³ª ¾÷µ¥ÀÌÆ® ÀÛ¾÷À» °è¼Ó ÁøÇàÇÒ ¼ö ÀÖ´Ù
-// ÀÎµ¦½º Rebuilding(Àç»ý¼º)
-//  - ±âÁ¸ÀÇ ÀÎµ¦½º¸¦ »èÁ¦ÇÏ°í Àç»ý¼ºÇÏ´Â ¹æ¹ý
-//  - ÀÎµ¦½ºÀÇ ¸ðµç Row°¡ °Ë»çµÇ¸ç, Åë°èµµ ¾÷µ¥ÀÌÆ®(Full-Scan) µÇ¾î ÃÖ½Å »óÅÂ°¡ µÇ¹Ç·Î, ±âº» »ùÇÃ¸µµÈ Åë°è ¾÷µ¥ÀÌÆ®¿¡ ºñÇØ DBÀÇ ¼º´ÉÀÌ Çâ»óµÇ´Â °æ¿ìµµ ÀÖ´Ù
-//  - ÀÎµ¦½º Á¶°¢È­°¡ ½ÉÇÑ °æ¿ì »ç¿ëÇÏ´Â °ÍÀÌ ÁÁÀ½(¾à 30% ÀÌ»óÀÇ Á¶°¢È­°¡ ¹ß»ýÇÑ °æ¿ì)
-//  - ÀÎµ¦½º À¯Çü ¹× DB ¿£Áø¿¡ µû¶ó ¿Â¶óÀÎ/¿ÀÇÁ¶óÀÎÀ¸·Î ³ª´µ¸ç, ¿ÀÇÁ¶óÀÎ ÀÎµ¦½º ¸®ºôµùÀº ¿Â¶óÀÎ ¹æ½Ä¿¡ ºñÇØ ½Ã°£Àº ´ú °É¸®Áö¸¸, ¸®ºôµù ÀÛ¾÷ Áß¿¡ object-levelÀÇ LockÀ» À¯¹ßÇÔ
-// ÀÎµ¦½º Disable(ºñÈ°¼ºÈ­)
+// ì¸ë±ìŠ¤ Reorganization(ìž¬êµ¬ì„±)
+//  - ê¸°ì¡´ì— ì‚¬ìš©ë˜ë˜ Page ì •ë³´ë¥¼ ìˆœì„œëŒ€ë¡œ ë‹¤ì‹œ êµ¬ì„±í•˜ëŠ” ìž‘ì—…
+//  - Rebuilding ë³´ë‹¤ ë¦¬ì†ŒìŠ¤ê°€ ëœ ì‚¬ìš©ë˜ë¯€ë¡œ, ì´ ë°©ë²•ì„ ê¸°ë³¸ ì¸ë±ìŠ¤ ìœ ì§€ ê´€ë¦¬ ë°©ë²•ìœ¼ë¡œ ì‚¬ìš©í•˜ëŠ” ê²Œ ë°”ëžŒì§í•¨
+//  - ì¸ë±ìŠ¤ ì¡°ê°í™”ê°€ ë¹„êµì  ì ì€ ê²½ìš°ì— ì‚¬ìš©í•˜ëŠ” ê²ƒì´ ì¢‹ìŒ(ì•½ 30% ë¯¸ë§Œì˜ ì¡°ê°í™”ê°€ ë°œìƒí•œ ê²½ìš°)
+//  - ì˜¨ë¼ì¸ ìž‘ì—…ì´ê¸° ë•Œë¬¸ì—, ìž¥ê¸°ê°„ì˜ object-level locksê°€ ë°œìƒí•˜ì§€ ì•Šìœ¼ë©° Reorganization ìž‘ì—…ì¤‘ì— ê¸°ë³¸ í…Œì´ë¸”ì— ëŒ€í•œ ì¿¼ë¦¬ë‚˜ ì—…ë°ì´íŠ¸ ìž‘ì—…ì„ ê³„ì† ì§„í–‰í•  ìˆ˜ ìžˆë‹¤
+// ì¸ë±ìŠ¤ Rebuilding(ìž¬ìƒì„±)
+//  - ê¸°ì¡´ì˜ ì¸ë±ìŠ¤ë¥¼ ì‚­ì œí•˜ê³  ìž¬ìƒì„±í•˜ëŠ” ë°©ë²•
+//  - ì¸ë±ìŠ¤ì˜ ëª¨ë“  Rowê°€ ê²€ì‚¬ë˜ë©°, í†µê³„ë„ ì—…ë°ì´íŠ¸(Full-Scan) ë˜ì–´ ìµœì‹  ìƒíƒœê°€ ë˜ë¯€ë¡œ, ê¸°ë³¸ ìƒ˜í”Œë§ëœ í†µê³„ ì—…ë°ì´íŠ¸ì— ë¹„í•´ DBì˜ ì„±ëŠ¥ì´ í–¥ìƒë˜ëŠ” ê²½ìš°ë„ ìžˆë‹¤
+//  - ì¸ë±ìŠ¤ ì¡°ê°í™”ê°€ ì‹¬í•œ ê²½ìš° ì‚¬ìš©í•˜ëŠ” ê²ƒì´ ì¢‹ìŒ(ì•½ 30% ì´ìƒì˜ ì¡°ê°í™”ê°€ ë°œìƒí•œ ê²½ìš°)
+//  - ì¸ë±ìŠ¤ ìœ í˜• ë° DB ì—”ì§„ì— ë”°ë¼ ì˜¨ë¼ì¸/ì˜¤í”„ë¼ì¸ìœ¼ë¡œ ë‚˜ë‰˜ë©°, ì˜¤í”„ë¼ì¸ ì¸ë±ìŠ¤ ë¦¬ë¹Œë”©ì€ ì˜¨ë¼ì¸ ë°©ì‹ì— ë¹„í•´ ì‹œê°„ì€ ëœ ê±¸ë¦¬ì§€ë§Œ, ë¦¬ë¹Œë”© ìž‘ì—… ì¤‘ì— object-levelì˜ Lockì„ ìœ ë°œí•¨
+// ì¸ë±ìŠ¤ Disable(ë¹„í™œì„±í™”)
 inline _tstring MSSQLAlterIndexFragmentationNonOptionQuery(_tstring schemaName, _tstring tableName, _tstring indexName, EMSSQLIndexFragmentation eMSSQLIndexFragmentation)
 {
 	_tstring query = _T("");
 
-	// avg_fragmentation_in_percent(Á¶°¢È­ ¼öÄ¡)°¡ 30ÀÌ»óÀÌ¸é ¸®ºôµå(Rebuild) 30¹Ì¸¸ÀÌ¸é ¸®¿À±×³ªÀÌÁî(Reorganize) ½ÇÇà
-	// - ÀÎµ¦½º ´Ù½Ã ±¸¼º : ALTER INDEX [ÀÎµ¦½º¸í] ON [Å×ÀÌºí¸í] REORGANIZE;
-	// - Å×ÀÌºíÀÇ ¸ðµç ÀÎµ¦½º ´Ù½Ã ±¸¼º : ALTER INDEX ALL ON [Å×ÀÌºí¸í] REORGANIZE;
-	// - ÀÎµ¦½º ´Ù½Ã ÀÛ¼º : ALTER INDEX [ÀÎµ¦½º¸í] ON [Å×ÀÌºí¸í] REBUILD;
-	// - Å×ÀÌºíÀÇ ¸ðµç ÀÎµ¦½º ´Ù½Ã ÀÛ¼º : ALTER INDEX ALL ON [Å×ÀÌºí¸í] REBUILD;
-	// - ÀÎµ¦½º¸¦ ºñÈ°¼ºÈ­ : ALTER INDEX [ÀÎµ¦½º¸í] ON [Å×ÀÌºí¸í] DISABLE;
-	// - Å×ÀÌºíÀÇ ¸ðµç ÀÎµ¦½º¸¦ »ç¿ëÇÏÁö ¾Êµµ·Ï ¼³Á¤ : ALTER INDEX ALL ON [Å×ÀÌºí¸í] DISABLE;
+	// avg_fragmentation_in_percent(ì¡°ê°í™” ìˆ˜ì¹˜)ê°€ 30ì´ìƒì´ë©´ ë¦¬ë¹Œë“œ(Rebuild) 30ë¯¸ë§Œì´ë©´ ë¦¬ì˜¤ê·¸ë‚˜ì´ì¦ˆ(Reorganize) ì‹¤í–‰
+	// - ì¸ë±ìŠ¤ ë‹¤ì‹œ êµ¬ì„± : ALTER INDEX [ì¸ë±ìŠ¤ëª…] ON [í…Œì´ë¸”ëª…] REORGANIZE;
+	// - í…Œì´ë¸”ì˜ ëª¨ë“  ì¸ë±ìŠ¤ ë‹¤ì‹œ êµ¬ì„± : ALTER INDEX ALL ON [í…Œì´ë¸”ëª…] REORGANIZE;
+	// - ì¸ë±ìŠ¤ ë‹¤ì‹œ ìž‘ì„± : ALTER INDEX [ì¸ë±ìŠ¤ëª…] ON [í…Œì´ë¸”ëª…] REBUILD;
+	// - í…Œì´ë¸”ì˜ ëª¨ë“  ì¸ë±ìŠ¤ ë‹¤ì‹œ ìž‘ì„± : ALTER INDEX ALL ON [í…Œì´ë¸”ëª…] REBUILD;
+	// - ì¸ë±ìŠ¤ë¥¼ ë¹„í™œì„±í™” : ALTER INDEX [ì¸ë±ìŠ¤ëª…] ON [í…Œì´ë¸”ëª…] DISABLE;
+	// - í…Œì´ë¸”ì˜ ëª¨ë“  ì¸ë±ìŠ¤ë¥¼ ì‚¬ìš©í•˜ì§€ ì•Šë„ë¡ ì„¤ì • : ALTER INDEX ALL ON [í…Œì´ë¸”ëª…] DISABLE;
 	if( indexName != "" )
 		query = tstring_tcformat(_T("ALTER INDEX [%s] ON [%s].[%s] %s"), indexName.c_str(), schemaName.c_str(), tableName.c_str(), ToString(eMSSQLIndexFragmentation));
 	else query = tstring_tcformat(_T("ALTER INDEX %s ON [%s].[%s] %s"), _T("ALL"), schemaName.c_str(), tableName.c_str(), ToString(eMSSQLIndexFragmentation));
@@ -855,8 +855,8 @@ inline _tstring MSSQLAlterIndexFragmentationOptionQuery(_tstring schemaName, _ts
 	//     | COMPRESS_ALL_ROW_GROUPS =  { ON | OFF}
 	// }  
 	//
-	// ¿©·¯ ÆÄÆ¼¼Ç¿¡ ´ëÇØ ¼­·Î ´Ù¸¥ µ¥ÀÌÅÍ ¾ÐÃà À¯ÇüÀ» ¼³Á¤ÇÏ·Á¸é DATA_COMPRESSION ¿É¼ÇÀ» µÎ ¹ø ÀÌ»ó ÁöÁ¤
-	// ALTER INDEX [ÀÎµ¦½º¸í] ON [½ºÅ°¸¶¸í].[Å×ÀÌºí¸í]
+	// ì—¬ëŸ¬ íŒŒí‹°ì…˜ì— ëŒ€í•´ ì„œë¡œ ë‹¤ë¥¸ ë°ì´í„° ì••ì¶• ìœ í˜•ì„ ì„¤ì •í•˜ë ¤ë©´ DATA_COMPRESSION ì˜µì…˜ì„ ë‘ ë²ˆ ì´ìƒ ì§€ì •
+	// ALTER INDEX [ì¸ë±ìŠ¤ëª…] ON [ìŠ¤í‚¤ë§ˆëª…].[í…Œì´ë¸”ëª…]
 	// REBUILD WITH (
 	//     DATA_COMPRESSION = NONE ON PARTITIONS (1),
 	//     DATA_COMPRESSION = ROW ON PARTITIONS (2, 4, 6 TO 8),

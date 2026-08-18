@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // UnOrderedMap.h : interface for the CUnOrderedMap class.
 //
@@ -44,8 +44,8 @@ protected:
 	void				clearObjectMap(void);
 
 protected:
-	ObjectMap			_objectMap;    // Å°-°ª µ¥ÀÌÅÍ¸¦ ¼ø¼­ ¾øÀÌ ÀúÀåÇÏ´Â ³»ºÎ ÇØ½Ã¸Ê °´Ã¼ (CUnorderedMap)
-	std::shared_mutex	_mutex;        // ½º·¹µå ¾ÈÀüÇÑ Á¢±ÙÀ» º¸ÀåÇÏ±â À§ÇÑ °øÀ¯ ¹ÂÅØ½º (ÀĞ±â/¾²±â ¶ô Áö¿ø)
+	ObjectMap			_objectMap;    // í‚¤-ê°’ ë°ì´í„°ë¥¼ ìˆœì„œ ì—†ì´ ì €ì¥í•˜ëŠ” ë‚´ë¶€ í•´ì‹œë§µ ê°ì²´ (CUnorderedMap)
+	std::shared_mutex	_mutex;        // ìŠ¤ë ˆë“œ ì•ˆì „í•œ ì ‘ê·¼ì„ ë³´ì¥í•˜ê¸° ìœ„í•œ ê³µìœ  ë®¤í…ìŠ¤ (ì½ê¸°/ì“°ê¸° ë½ ì§€ì›)
 };
 
 #include "UnOrderedMap.inl"

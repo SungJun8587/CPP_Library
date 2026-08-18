@@ -1,4 +1,4 @@
-
+﻿
 //***************************************************************************
 // WinCharsetConv.h : interface for the WinCharsetConv Functions.
 //

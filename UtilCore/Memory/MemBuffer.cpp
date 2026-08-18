@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // MemBuffer.cpp : implementation of the Memory Buffer Alloc/Realloc Function.
 //
@@ -26,7 +26,7 @@ void MemBufferGrow(MEMORY_BYTE_BUFFER* pMemBuffer)
 	size_t nSize = (size_t)(pMemBuffer->m_pbPosition - pMemBuffer->m_pbBuffer);
 	size_t nNewSize = pMemBuffer->m_nSize * 2;
 
-	// BaseAllocator´Â reallocÀ» Á÷Á¢ Áö¿øÇÏÁö ¾ÊÀ¸¹Ç·Î »õ Å©±â·Î ÇÒ´ç ÈÄ º¹»ç/ÇØÁ¦
+	// BaseAllocatorëŠ” reallocì„ ì§ì ‘ ì§€ì›í•˜ì§€ ì•Šìœ¼ë¯€ë¡œ ìƒˆ í¬ê¸°ë¡œ í• ë‹¹ í›„ ë³µì‚¬/í•´ì œ
 	unsigned char* pbNewBuffer = static_cast<unsigned char*>(BaseAllocator::Alloc(static_cast<int32>(nNewSize)));
 	if( pbNewBuffer != nullptr )
 	{

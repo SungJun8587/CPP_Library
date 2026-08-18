@@ -1,4 +1,4 @@
-
+﻿
 //***************************************************************************
 // Regular.cpp: implementation of the Regular Expression Functions.
 //

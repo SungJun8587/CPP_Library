@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // ShellUtil.cpp : implementation of the ShellUtil Functions.
 //
@@ -8,10 +8,10 @@
 #include "ShellUtil.h"
 
 //***************************************************************************
-// @brief ÆÄÀÏ È®ÀåÀÚ°¡ ÇÊÅÍ Á¶°Ç(¸ÖÆ¼ È®ÀåÀÚ Æ÷ÇÔ)¿¡ ÀÏÄ¡ÇÏ´ÂÁö È®ÀÎÇÏ´Â ÇÔ¼ö
-// @param ptszFilePath °Ë»çÇÒ ÆÄÀÏÀÇ ÀüÃ¼ °æ·Î ¶Ç´Â È®ÀåÀÚ ¹®ÀÚ¿­
-// @param pExtFilter   ±¸ºĞÀÚ(;)·Î ºĞ¸®µÈ È®ÀåÀÚ ÇÊÅÍ ¹®ÀÚ¿­ (¿¹: "txt;log;csv")
-// @return ÇÊÅÍ ¸ñ·Ï¿¡ Á¸ÀçÇÏ¸é true, ¾øÀ¸¸é false
+// @brief íŒŒì¼ í™•ì¥ìê°€ í•„í„° ì¡°ê±´(ë©€í‹° í™•ì¥ì í¬í•¨)ì— ì¼ì¹˜í•˜ëŠ”ì§€ í™•ì¸í•˜ëŠ” í•¨ìˆ˜
+// @param ptszFilePath ê²€ì‚¬í•  íŒŒì¼ì˜ ì „ì²´ ê²½ë¡œ ë˜ëŠ” í™•ì¥ì ë¬¸ìì—´
+// @param pExtFilter   êµ¬ë¶„ì(;)ë¡œ ë¶„ë¦¬ëœ í™•ì¥ì í•„í„° ë¬¸ìì—´ (ì˜ˆ: "txt;log;csv")
+// @return í•„í„° ëª©ë¡ì— ì¡´ì¬í•˜ë©´ true, ì—†ìœ¼ë©´ false
 //***************************************************************************
 bool IsMatchedExtension(const TCHAR* ptszFilePath, const TCHAR* pExtFilter)
 {
@@ -20,13 +20,13 @@ bool IsMatchedExtension(const TCHAR* ptszFilePath, const TCHAR* pExtFilter)
 		return false;
 	}
 
-	// ÀüÃ¼ Çã¿ë ¿ÍÀÏµåÄ«µå Ã³¸®
+	// ì „ì²´ í—ˆìš© ì™€ì¼ë“œì¹´ë“œ ì²˜ë¦¬
 	if( _tcsicmp(pExtFilter, _T("*")) == 0 || _tcsicmp(pExtFilter, _T("*.*")) == 0 )
 	{
 		return true;
 	}
 
-	// ÆÄÀÏ °æ·Î¿¡¼­ È®ÀåÀÚ ÃßÃâ
+	// íŒŒì¼ ê²½ë¡œì—ì„œ í™•ì¥ì ì¶”ì¶œ
 	TCHAR szExt[64] = { 0, };
 	const TCHAR* pDot = _tcsrchr(ptszFilePath, _T('.'));
 	if( pDot != nullptr )
@@ -38,7 +38,7 @@ bool IsMatchedExtension(const TCHAR* ptszFilePath, const TCHAR* pExtFilter)
 		_tcscpy_s(szExt, _countof(szExt), _T(""));
 	}
 
-	// ¼¼¹ÌÄİ·Ğ(;)À¸·Î ±¸ºĞµÈ È®ÀåÀÚ ¸ñ·Ï ºñ±³
+	// ì„¸ë¯¸ì½œë¡ (;)ìœ¼ë¡œ êµ¬ë¶„ëœ í™•ì¥ì ëª©ë¡ ë¹„êµ
 	_tstring strFilter(pExtFilter);
 	std::basic_stringstream<_TCHAR> ss(strFilter);
 	_tstring item;
@@ -55,40 +55,40 @@ bool IsMatchedExtension(const TCHAR* ptszFilePath, const TCHAR* pExtFilter)
 
 		if( _tcsicmp(item.c_str(), szExt) == 0 )
 		{
-			return true; // ÀÏÄ¡ÇÔ ¹ß°ß
+			return true; // ì¼ì¹˜í•¨ ë°œê²¬
 		}
 	}
 
-	return false; // ÀÏÄ¡ÇÔ ¾øÀ½
+	return false; // ì¼ì¹˜í•¨ ì—†ìŒ
 }
 
 //***************************************************************************
-// @brief ÆÄÀÏÀÌ ÇÊÅÍ Á¤Ã¥(È­ÀÌÆ®¸®½ºÆ®/ºí·¢¸®½ºÆ®)¿¡ ÀûÇÕÇÑÁö ÃÖÁ¾ ÆÇÁ¤ÇÏ´Â ÇÔ¼ö
-// @param ptszFilePath °Ë»çÇÒ ÆÄÀÏÀÇ ÀüÃ¼ °æ·Î
-// @param ShApplyFileInfo ÆÄÀÏ ÇÊÅÍ¸µ ¿É¼Ç ±¸Á¶Ã¼
-//                        * m_nFilterMode ÀÇ¹Ì:
-//                          - 0 : ÇÊÅÍ¸µ ¾øÀ½ (ÀüÃ¼ Çã¿ë)
-//                          - 1 : È­ÀÌÆ®¸®½ºÆ® (ÁöÁ¤ÇÑ È®ÀåÀÚ¸¸ Çã¿ë)
-//                          - 2 : ºí·¢¸®½ºÆ® (ÁöÁ¤ÇÑ È®ÀåÀÚ´Â ºñÇã¿ë/Á¦¿Ü)
-// @return Çã¿ë ´ë»óÀÌ¸é true, Á¦¿Ü ´ë»óÀÌ¸é false
+// @brief íŒŒì¼ì´ í•„í„° ì •ì±…(í™”ì´íŠ¸ë¦¬ìŠ¤íŠ¸/ë¸”ë™ë¦¬ìŠ¤íŠ¸)ì— ì í•©í•œì§€ ìµœì¢… íŒì •í•˜ëŠ” í•¨ìˆ˜
+// @param ptszFilePath ê²€ì‚¬í•  íŒŒì¼ì˜ ì „ì²´ ê²½ë¡œ
+// @param ShApplyFileInfo íŒŒì¼ í•„í„°ë§ ì˜µì…˜ êµ¬ì¡°ì²´
+//                        * m_nFilterMode ì˜ë¯¸:
+//                          - 0 : í•„í„°ë§ ì—†ìŒ (ì „ì²´ í—ˆìš©)
+//                          - 1 : í™”ì´íŠ¸ë¦¬ìŠ¤íŠ¸ (ì§€ì •í•œ í™•ì¥ìë§Œ í—ˆìš©)
+//                          - 2 : ë¸”ë™ë¦¬ìŠ¤íŠ¸ (ì§€ì •í•œ í™•ì¥ìëŠ” ë¹„í—ˆìš©/ì œì™¸)
+// @return í—ˆìš© ëŒ€ìƒì´ë©´ true, ì œì™¸ ëŒ€ìƒì´ë©´ false
 //***************************************************************************
 bool IsAbleFile(const TCHAR* ptszFilePath, const SH_APPLY_FILEINFO& ShApplyFileInfo)
 {
-	// 0¹ø ¸ğµå: ÇÊÅÍ¸µ ¾øÀ½ (ÀüÃ¼ Çã¿ë)
+	// 0ë²ˆ ëª¨ë“œ: í•„í„°ë§ ì—†ìŒ (ì „ì²´ í—ˆìš©)
 	if( ShApplyFileInfo.m_nFilterMode == 0 )
 		return true;
 
-	// È®ÀåÀÚ°¡ ÇÊÅÍ ¸ñ·Ï¿¡ Æ÷ÇÔµÇ¾î ÀÖ´ÂÁö ¿©ºÎ È®ÀÎ
+	// í™•ì¥ìê°€ í•„í„° ëª©ë¡ì— í¬í•¨ë˜ì–´ ìˆëŠ”ì§€ ì—¬ë¶€ í™•ì¸
 	bool bIsMatched = IsMatchedExtension(ptszFilePath, ShApplyFileInfo.m_tszApplyExt);
 
 	if( ShApplyFileInfo.m_nFilterMode == 1 )
 	{
-		// 1¹ø ¸ğµå (È­ÀÌÆ®¸®½ºÆ®): ¸ñ·Ï¿¡ "ÀÖ¾î¾ß¸¸" Çã¿ë (Æ÷ÇÔµÇ¾î¾ß true)
+		// 1ë²ˆ ëª¨ë“œ (í™”ì´íŠ¸ë¦¬ìŠ¤íŠ¸): ëª©ë¡ì— "ìˆì–´ì•¼ë§Œ" í—ˆìš© (í¬í•¨ë˜ì–´ì•¼ true)
 		return bIsMatched;
 	}
 	else if( ShApplyFileInfo.m_nFilterMode == 2 )
 	{
-		// 2¹ø ¸ğµå (ºí·¢¸®½ºÆ®): ¸ñ·Ï¿¡ "ÀÖÀ¸¸é" Â÷´Ü (Æ÷ÇÔµÇ¾î ÀÖÀ¸¸é false, ¾ø¾î¾ß true)
+		// 2ë²ˆ ëª¨ë“œ (ë¸”ë™ë¦¬ìŠ¤íŠ¸): ëª©ë¡ì— "ìˆìœ¼ë©´" ì°¨ë‹¨ (í¬í•¨ë˜ì–´ ìˆìœ¼ë©´ false, ì—†ì–´ì•¼ true)
 		return !bIsMatched;
 	}
 
@@ -96,9 +96,9 @@ bool IsAbleFile(const TCHAR* ptszFilePath, const SH_APPLY_FILEINFO& ShApplyFileI
 }
 
 //***************************************************************************
-// @brief ÁöÁ¤ÇÑ Æú´õ °æ·Î¸¦ ÇÏÀ§ Æú´õ±îÁö Àç±ÍÀûÀ¸·Î »ı¼ºÇÏ´Â ÇÔ¼ö
-// @param ptszFolder »ı¼ºÇÒ ÀüÃ¼ Æú´õ °æ·Î
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief ì§€ì •í•œ í´ë” ê²½ë¡œë¥¼ í•˜ìœ„ í´ë”ê¹Œì§€ ì¬ê·€ì ìœ¼ë¡œ ìƒì„±í•˜ëŠ” í•¨ìˆ˜
+// @param ptszFolder ìƒì„±í•  ì „ì²´ í´ë” ê²½ë¡œ
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool CreateDirectoryRecursive(const TCHAR* ptszFolder)
 {
@@ -113,7 +113,7 @@ bool CreateDirectoryRecursive(const TCHAR* ptszFolder)
 	int iLength = static_cast<int>(_tcslen(ptszFolder));
 	if( ptszFolder == nullptr || iLength == 0 ) return false;
 
-	// °æ·Î ¹®ÀÚ¿­ µÚ¿¡¼­ºÎÅÍ ¿ª½½·¡½Ã³ª ½½·¡½Ã À§Ä¡¸¦ Ã£À½
+	// ê²½ë¡œ ë¬¸ìì—´ ë’¤ì—ì„œë¶€í„° ì—­ìŠ¬ë˜ì‹œë‚˜ ìŠ¬ë˜ì‹œ ìœ„ì¹˜ë¥¼ ì°¾ìŒ
 	for( ptszSourceLoc = (TCHAR*)(ptszFolder + iLength - 1); iCount < iLength; ptszSourceLoc-- )
 	{
 		if( *ptszSourceLoc == '/' || *ptszSourceLoc == '\\' )
@@ -127,7 +127,7 @@ bool CreateDirectoryRecursive(const TCHAR* ptszFolder)
 	_tcsncpy_s(tszSourceFolder, _countof(tszSourceFolder), ptszFolder, iLength - iCount);
 	_sntprintf_s(tszActiveFolder, _countof(tszActiveFolder), _TRUNCATE, _T("%s\\*.*"), tszSourceFolder);
 
-	// »óÀ§ Æú´õ°¡ Á¸ÀçÇÏÁö ¾Ê´Â °æ¿ì Àç±ÍÀûÀ¸·Î »óÀ§ Æú´õ ¸ÕÀú »ı¼º
+	// ìƒìœ„ í´ë”ê°€ ì¡´ì¬í•˜ì§€ ì•ŠëŠ” ê²½ìš° ì¬ê·€ì ìœ¼ë¡œ ìƒìœ„ í´ë” ë¨¼ì € ìƒì„±
 	if( (hFindFile = FindFirstFile(tszActiveFolder, &FindData)) == INVALID_HANDLE_VALUE )
 	{
 		if( !CreateDirectoryRecursive(tszSourceFolder) )
@@ -143,10 +143,10 @@ bool CreateDirectoryRecursive(const TCHAR* ptszFolder)
 }
 
 //***************************************************************************
-// @brief ÁöÁ¤ÇÑ µğ·ºÅä¸®¿Í ±× ÇÏÀ§ÀÇ ¸ğµç ÆÄÀÏ ¹× Æú´õ¸¦ Àç±ÍÀûÀ¸·Î »èÁ¦ÇÏ´Â ÇÔ¼ö
-// @param ptszFolder »èÁ¦ÇÒ ´ë»ó Æú´õ °æ·Î
-// @param bSelfDel ÃÖ»óÀ§ Æú´õ ÀÚÃ¼±îÁö »èÁ¦ÇÒ °ÍÀÎÁö ¿©ºÎ
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief ì§€ì •í•œ ë””ë ‰í† ë¦¬ì™€ ê·¸ í•˜ìœ„ì˜ ëª¨ë“  íŒŒì¼ ë° í´ë”ë¥¼ ì¬ê·€ì ìœ¼ë¡œ ì‚­ì œí•˜ëŠ” í•¨ìˆ˜
+// @param ptszFolder ì‚­ì œí•  ëŒ€ìƒ í´ë” ê²½ë¡œ
+// @param bSelfDel ìµœìƒìœ„ í´ë” ìì²´ê¹Œì§€ ì‚­ì œí•  ê²ƒì¸ì§€ ì—¬ë¶€
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool RemoveDirectoryRecursive(const TCHAR* ptszFolder, const bool bSelfDel)
 {
@@ -163,7 +163,7 @@ bool RemoveDirectoryRecursive(const TCHAR* ptszFolder, const bool bSelfDel)
 	int iLength = static_cast<int>(_tcslen(ptszFolder));
 	if( ptszFolder == nullptr || iLength == 0 ) return false;
 
-	// °æ·Î ³¡¿¡ ½½·¡½Ã(\ ¶Ç´Â /)°¡ ¾øÀ¸¸é Ãß°¡ÇÏ¿© °Ë»ö ÆĞÅÏ Á¤±ÔÈ­
+	// ê²½ë¡œ ëì— ìŠ¬ë˜ì‹œ(\ ë˜ëŠ” /)ê°€ ì—†ìœ¼ë©´ ì¶”ê°€í•˜ì—¬ ê²€ìƒ‰ íŒ¨í„´ ì •ê·œí™”
 	if( ptszFolder[_tcslen(ptszFolder) - 1] != '/' && ptszFolder[_tcslen(ptszFolder) - 1] != '\\' )
 	{
 		_sntprintf_s(tszSourceFolder, _countof(tszSourceFolder), _TRUNCATE, _T("%s\\"), ptszFolder);
@@ -179,14 +179,14 @@ bool RemoveDirectoryRecursive(const TCHAR* ptszFolder, const bool bSelfDel)
 
 	hFindFile = FindFirstFile(tszActiveFolder, &FindData);
 
-	// ÇÏÀ§ ÆÄÀÏ ¹× Æú´õ Å½»ö ¹× »èÁ¦ ¼öÇà
+	// í•˜ìœ„ íŒŒì¼ ë° í´ë” íƒìƒ‰ ë° ì‚­ì œ ìˆ˜í–‰
 	if( INVALID_HANDLE_VALUE != hFindFile )
 	{
 		while( bResult )
 		{
 			if( FindData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY )
 			{
-				// ÇöÀç µğ·ºÅä¸®(.)¿Í »óÀ§ µğ·ºÅä¸®(..)´Â °Ç³Ê¶Ü
+				// í˜„ì¬ ë””ë ‰í† ë¦¬(.)ì™€ ìƒìœ„ ë””ë ‰í† ë¦¬(..)ëŠ” ê±´ë„ˆëœ€
 				if( _tcscmp(FindData.cFileName, _T(".")) != 0 && _tcscmp(FindData.cFileName, _T("..")) != 0 )
 				{
 					_sntprintf_s(tszActiveFullPath, _countof(tszActiveFullPath), _TRUNCATE, _T("%s%s\\"), tszSourceFolder, FindData.cFileName);
@@ -199,7 +199,7 @@ bool RemoveDirectoryRecursive(const TCHAR* ptszFolder, const bool bSelfDel)
 			}
 			else
 			{
-				// ÆÄÀÏÀÎ °æ¿ì °³º° ÆÄÀÏ »èÁ¦
+				// íŒŒì¼ì¸ ê²½ìš° ê°œë³„ íŒŒì¼ ì‚­ì œ
 				_sntprintf_s(tszActiveFullPath, _countof(tszActiveFullPath), _TRUNCATE, _T("%s%s"), tszSourceFolder, FindData.cFileName);
 				DeleteFile(tszActiveFullPath);
 			}
@@ -220,11 +220,11 @@ bool RemoveDirectoryRecursive(const TCHAR* ptszFolder, const bool bSelfDel)
 }
 
 //***************************************************************************
-// @brief ¿øº» Æú´õÀÇ ÆÄÀÏ ¹× ÇÏÀ§ Æú´õµéÀ» ´ë»ó Æú´õ·Î Àç±ÍÀûÀ¸·Î º¹»çÇÏ´Â ÇÔ¼ö
-// @param ptszSourceFolder ¿øº» Æú´õ °æ·Î
-// @param ptszDestFolder ´ë»ó Æú´õ °æ·Î
-// @param ShApplyFileInfo ÆÄÀÏ ÇÊÅÍ¸µ ¿É¼Ç ±¸Á¶Ã¼
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief ì›ë³¸ í´ë”ì˜ íŒŒì¼ ë° í•˜ìœ„ í´ë”ë“¤ì„ ëŒ€ìƒ í´ë”ë¡œ ì¬ê·€ì ìœ¼ë¡œ ë³µì‚¬í•˜ëŠ” í•¨ìˆ˜
+// @param ptszSourceFolder ì›ë³¸ í´ë” ê²½ë¡œ
+// @param ptszDestFolder ëŒ€ìƒ í´ë” ê²½ë¡œ
+// @param ShApplyFileInfo íŒŒì¼ í•„í„°ë§ ì˜µì…˜ êµ¬ì¡°ì²´
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool CopyFileRecursive(const TCHAR* ptszSourceFolder, const TCHAR* ptszDestFolder, const SH_APPLY_FILEINFO& ShApplyFileInfo)
 {
@@ -241,7 +241,7 @@ bool CopyFileRecursive(const TCHAR* ptszSourceFolder, const TCHAR* ptszDestFolde
 	if( ptszSourceFolder == nullptr || ptszDestFolder == nullptr ) return false;
 	if( _tcslen(ptszSourceFolder) < 1 || _tcslen(ptszDestFolder) < 1 ) return false;
 
-	// °æ·Î ³¡ ¹®ÀÚ Ã³¸® Á¤±ÔÈ­
+	// ê²½ë¡œ ë ë¬¸ì ì²˜ë¦¬ ì •ê·œí™”
 	if( ptszSourceFolder[_tcslen(ptszSourceFolder) - 1] != '/' && ptszSourceFolder[_tcslen(ptszSourceFolder) - 1] != '\\' )
 	{
 		_sntprintf_s(tszSourceFolder, _countof(tszSourceFolder), _TRUNCATE, _T("%s\\"), ptszSourceFolder);
@@ -260,14 +260,14 @@ bool CopyFileRecursive(const TCHAR* ptszSourceFolder, const TCHAR* ptszDestFolde
 
 	hFindFile = FindFirstFile(tszActiveFolder, &FindData);
 
-	// ÆÄÀÏ ¹× µğ·ºÅä¸® ¼øÈ¸ º¹»ç ¼öÇà
+	// íŒŒì¼ ë° ë””ë ‰í† ë¦¬ ìˆœíšŒ ë³µì‚¬ ìˆ˜í–‰
 	if( INVALID_HANDLE_VALUE != hFindFile )
 	{
 		while( bResult )
 		{
 			if( FindData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY )
 			{
-				// ÇÏÀ§ µğ·ºÅä¸®ÀÎ °æ¿ì ´ë»ó Ãø¿¡µµ Æú´õ »ı¼º ÈÄ Àç±Í È£Ãâ
+				// í•˜ìœ„ ë””ë ‰í† ë¦¬ì¸ ê²½ìš° ëŒ€ìƒ ì¸¡ì—ë„ í´ë” ìƒì„± í›„ ì¬ê·€ í˜¸ì¶œ
 				if( _tcscmp(FindData.cFileName, _T(".")) != 0 && _tcscmp(FindData.cFileName, _T("..")) != 0 )
 				{
 					_sntprintf_s(tszActiveFullPath, _countof(tszActiveFullPath), _TRUNCATE, _T("%s%s"), tszSourceFolder, FindData.cFileName);
@@ -279,7 +279,7 @@ bool CopyFileRecursive(const TCHAR* ptszSourceFolder, const TCHAR* ptszDestFolde
 			}
 			else
 			{
-				// ÆÄÀÏÀÎ °æ¿ì ÇÊÅÍ Á¶°ÇÀ» ¸¸Á·ÇÒ ¶§¸¸ º¹»ç ¼öÇà
+				// íŒŒì¼ì¸ ê²½ìš° í•„í„° ì¡°ê±´ì„ ë§Œì¡±í•  ë•Œë§Œ ë³µì‚¬ ìˆ˜í–‰
 				_sntprintf_s(tszActiveFullPath, _countof(tszActiveFullPath), _TRUNCATE, _T("%s%s"), tszSourceFolder, FindData.cFileName);
 				_sntprintf_s(tszDestFullPath, _countof(tszDestFullPath), _TRUNCATE, _T("%s%s"), tszDestFolder, FindData.cFileName);
 
@@ -298,11 +298,11 @@ bool CopyFileRecursive(const TCHAR* ptszSourceFolder, const TCHAR* ptszDestFolde
 }
 
 //***************************************************************************
-// @brief ¿øº» Æú´õÀÇ ÆÄÀÏ ¹× ÇÏÀ§ Æú´õµéÀ» ´ë»ó Æú´õ·Î Àç±ÍÀûÀ¸·Î ÀÌµ¿ÇÏ´Â ÇÔ¼ö
-// @param ptszSourceFolder ¿øº» Æú´õ °æ·Î
-// @param ptszDestFolder ´ë»ó Æú´õ °æ·Î
-// @param ShApplyFileInfo ÆÄÀÏ ÇÊÅÍ¸µ ¿É¼Ç ±¸Á¶Ã¼
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief ì›ë³¸ í´ë”ì˜ íŒŒì¼ ë° í•˜ìœ„ í´ë”ë“¤ì„ ëŒ€ìƒ í´ë”ë¡œ ì¬ê·€ì ìœ¼ë¡œ ì´ë™í•˜ëŠ” í•¨ìˆ˜
+// @param ptszSourceFolder ì›ë³¸ í´ë” ê²½ë¡œ
+// @param ptszDestFolder ëŒ€ìƒ í´ë” ê²½ë¡œ
+// @param ShApplyFileInfo íŒŒì¼ í•„í„°ë§ ì˜µì…˜ êµ¬ì¡°ì²´
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool MoveFileRecursive(const TCHAR* ptszSourceFolder, const TCHAR* ptszDestFolder, const SH_APPLY_FILEINFO& ShApplyFileInfo)
 {
@@ -337,7 +337,7 @@ bool MoveFileRecursive(const TCHAR* ptszSourceFolder, const TCHAR* ptszDestFolde
 
 	hFindFile = FindFirstFile(tszActiveFolder, &FindData);
 
-	// ÆÄÀÏ ¹× µğ·ºÅä¸® ¼øÈ¸ ÀÌµ¿ ¼öÇà
+	// íŒŒì¼ ë° ë””ë ‰í† ë¦¬ ìˆœíšŒ ì´ë™ ìˆ˜í–‰
 	if( INVALID_HANDLE_VALUE != hFindFile )
 	{
 		while( bResult )
@@ -355,7 +355,7 @@ bool MoveFileRecursive(const TCHAR* ptszSourceFolder, const TCHAR* ptszDestFolde
 			}
 			else
 			{
-				// ÆÄÀÏÀÎ °æ¿ì ÇÊÅÍ Á¶°Ç ¸¸Á· ½Ã MoveFile ¼öÇà
+				// íŒŒì¼ì¸ ê²½ìš° í•„í„° ì¡°ê±´ ë§Œì¡± ì‹œ MoveFile ìˆ˜í–‰
 				_sntprintf_s(tszActiveFullPath, _countof(tszActiveFullPath), _TRUNCATE, _T("%s%s"), tszSourceFolder, FindData.cFileName);
 				_sntprintf_s(tszDestFullPath, _countof(tszDestFullPath), _TRUNCATE, _T("%s%s"), tszDestFolder, FindData.cFileName);
 
@@ -374,9 +374,9 @@ bool MoveFileRecursive(const TCHAR* ptszSourceFolder, const TCHAR* ptszDestFolde
 }
 
 //***************************************************************************
-// @brief ÁöÁ¤ÇÑ °æ·Î°¡ À¯È¿ÇÑ µğ·ºÅä¸®ÀÎÁö È®ÀÎÇÏ´Â ÇÔ¼ö
-// @param ptszFolder °Ë»çÇÒ Æú´õ °æ·Î
-// @return µğ·ºÅä¸® Á¸Àç ½Ã true, ¾Æ´Ï¸é false
+// @brief ì§€ì •í•œ ê²½ë¡œê°€ ìœ íš¨í•œ ë””ë ‰í† ë¦¬ì¸ì§€ í™•ì¸í•˜ëŠ” í•¨ìˆ˜
+// @param ptszFolder ê²€ì‚¬í•  í´ë” ê²½ë¡œ
+// @return ë””ë ‰í† ë¦¬ ì¡´ì¬ ì‹œ true, ì•„ë‹ˆë©´ false
 //***************************************************************************
 bool IsDirectory(const TCHAR* ptszFolder)
 {
@@ -406,11 +406,11 @@ bool IsDirectory(const TCHAR* ptszFolder)
 }
 
 //***************************************************************************
-// @brief ·¹Áö½ºÆ®¸® Å°¸¦ ÇÏÀ§ °æ·Î±îÁö Àç±ÍÀûÀ¸·Î »ı¼º ¶Ç´Â ¿ÀÇÂÇÏ´Â ÇÔ¼ö
-// @param hRoot ·çÆ® Å° ÇÚµé (¿¹: HKEY_LOCAL_MACHINE)
-// @param ptszSubKey »ı¼ºÇÒ ¼­ºê Å° °æ·Î
-// @param bReadOnly ÀĞ±â Àü¿ë ¸ğµå ¿©ºÎ
-// @return ¼º°ø ½Ã ERROR_SUCCESS (0), ½ÇÆĞ ½Ã ¿¡·¯ ÄÚµå
+// @brief ë ˆì§€ìŠ¤íŠ¸ë¦¬ í‚¤ë¥¼ í•˜ìœ„ ê²½ë¡œê¹Œì§€ ì¬ê·€ì ìœ¼ë¡œ ìƒì„± ë˜ëŠ” ì˜¤í”ˆí•˜ëŠ” í•¨ìˆ˜
+// @param hRoot ë£¨íŠ¸ í‚¤ í•¸ë“¤ (ì˜ˆ: HKEY_LOCAL_MACHINE)
+// @param ptszSubKey ìƒì„±í•  ì„œë¸Œ í‚¤ ê²½ë¡œ
+// @param bReadOnly ì½ê¸° ì „ìš© ëª¨ë“œ ì—¬ë¶€
+// @return ì„±ê³µ ì‹œ ERROR_SUCCESS (0), ì‹¤íŒ¨ ì‹œ ì—ëŸ¬ ì½”ë“œ
 //***************************************************************************
 long RegCreateKeyExRecursive(const HKEY hRoot, const TCHAR* ptszSubKey, const bool bReadOnly)
 {
@@ -458,10 +458,10 @@ long RegCreateKeyExRecursive(const HKEY hRoot, const TCHAR* ptszSubKey, const bo
 }
 
 //***************************************************************************
-// @brief ·¹Áö½ºÆ®¸® Å°¿Í ±× ÇÏÀ§ Å°µéÀ» Àç±ÍÀûÀ¸·Î »èÁ¦ÇÏ´Â ÇÔ¼ö
-// @param hKey ºÎ¸ğ ·¹Áö½ºÆ®¸® Å° ÇÚµé
-// @param ptszSubKey »èÁ¦ÇÒ ¼­ºê Å° ÀÌ¸§
-// @return ¼º°ø ½Ã ERROR_SUCCESS (0), ½ÇÆĞ ½Ã ¿¡·¯ ÄÚµå
+// @brief ë ˆì§€ìŠ¤íŠ¸ë¦¬ í‚¤ì™€ ê·¸ í•˜ìœ„ í‚¤ë“¤ì„ ì¬ê·€ì ìœ¼ë¡œ ì‚­ì œí•˜ëŠ” í•¨ìˆ˜
+// @param hKey ë¶€ëª¨ ë ˆì§€ìŠ¤íŠ¸ë¦¬ í‚¤ í•¸ë“¤
+// @param ptszSubKey ì‚­ì œí•  ì„œë¸Œ í‚¤ ì´ë¦„
+// @return ì„±ê³µ ì‹œ ERROR_SUCCESS (0), ì‹¤íŒ¨ ì‹œ ì—ëŸ¬ ì½”ë“œ
 //***************************************************************************
 long RegDeleteKeyRecursive(const HKEY hKey, const TCHAR* ptszSubKey)
 {
@@ -476,7 +476,7 @@ long RegDeleteKeyRecursive(const HKEY hKey, const TCHAR* ptszSubKey)
 	lRetCode = RegOpenKeyEx(hKey, ptszSubKey, 0, KEY_ALL_ACCESS, &newKey);
 	if( lRetCode != ERROR_SUCCESS ) return lRetCode;
 
-	// ÇÏÀ§ Å°°¡ Á¸ÀçÇÒ °æ¿ì ¹İº¹ÇØ¼­ Àç±Í »èÁ¦
+	// í•˜ìœ„ í‚¤ê°€ ì¡´ì¬í•  ê²½ìš° ë°˜ë³µí•´ì„œ ì¬ê·€ ì‚­ì œ
 	while( 1 )
 	{
 		dwSize = REGISTRY_KEY_STRLEN;
@@ -493,7 +493,7 @@ long RegDeleteKeyRecursive(const HKEY hKey, const TCHAR* ptszSubKey)
 }
 
 //***************************************************************************
-// @brief ÁöÁ¤ÇÑ ·¹Áö½ºÆ®¸® °ª(Value)¿¡ µ¥ÀÌÅÍ¸¦ ±â·ÏÇÏ´Â ÇÔ¼ö (ÀÏ¹İ Æ÷ÀÎÅÍÇü)
+// @brief ì§€ì •í•œ ë ˆì§€ìŠ¤íŠ¸ë¦¬ ê°’(Value)ì— ë°ì´í„°ë¥¼ ê¸°ë¡í•˜ëŠ” í•¨ìˆ˜ (ì¼ë°˜ í¬ì¸í„°í˜•)
 //***************************************************************************
 bool RegSetValue(const HKEY hRoot, const TCHAR* ptszSubKey, const DWORD dwOptions, const REGSAM samDesired, const TCHAR* ptszName, DWORD dwType, const void* pvValue, DWORD dwLength)
 {
@@ -518,7 +518,7 @@ bool RegSetValue(const HKEY hRoot, const TCHAR* ptszSubKey, const DWORD dwOption
 }
 
 //***************************************************************************
-// @brief ¹®ÀÚ¿­(REG_SZ) ÇüÅÂÀÇ ·¹Áö½ºÆ®¸® °ªÀ» ±â·ÏÇÏ´Â ÇÔ¼ö
+// @brief ë¬¸ìì—´(REG_SZ) í˜•íƒœì˜ ë ˆì§€ìŠ¤íŠ¸ë¦¬ ê°’ì„ ê¸°ë¡í•˜ëŠ” í•¨ìˆ˜
 //***************************************************************************
 bool RegSetValue(const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* ptszName, const BYTE* pbValue, DWORD dwLength)
 {
@@ -543,7 +543,7 @@ bool RegSetValue(const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* ptszNam
 }
 
 //***************************************************************************
-// @brief ¼ıÀÚ(REG_DWORD) ÇüÅÂÀÇ ·¹Áö½ºÆ®¸® °ªÀ» ±â·ÏÇÏ´Â ÇÔ¼ö
+// @brief ìˆ«ì(REG_DWORD) í˜•íƒœì˜ ë ˆì§€ìŠ¤íŠ¸ë¦¬ ê°’ì„ ê¸°ë¡í•˜ëŠ” í•¨ìˆ˜
 //***************************************************************************
 bool RegSetValue(const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* ptszName, const DWORD dwValue)
 {
@@ -568,7 +568,7 @@ bool RegSetValue(const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* ptszNam
 }
 
 //***************************************************************************
-// @brief ·¹Áö½ºÆ®¸® ¹®ÀÚ¿­(REG_SZ) °ªÀÇ ¹ÙÀÌÆ® ±æÀÌ¸¦ Á¶È¸ÇÏ´Â ÇÔ¼ö
+// @brief ë ˆì§€ìŠ¤íŠ¸ë¦¬ ë¬¸ìì—´(REG_SZ) ê°’ì˜ ë°”ì´íŠ¸ ê¸¸ì´ë¥¼ ì¡°íšŒí•˜ëŠ” í•¨ìˆ˜
 //***************************************************************************
 DWORD GetRegSzValueLen(const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* ptszName)
 {
@@ -593,7 +593,7 @@ DWORD GetRegSzValueLen(const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* p
 }
 
 //***************************************************************************
-// @brief ·¹Áö½ºÆ®¸® °ªÀ» ÀĞ¾î¿À´Â ÇÔ¼ö (ÀÏ¹İ ¹öÆÛÇü)
+// @brief ë ˆì§€ìŠ¤íŠ¸ë¦¬ ê°’ì„ ì½ì–´ì˜¤ëŠ” í•¨ìˆ˜ (ì¼ë°˜ ë²„í¼í˜•)
 //***************************************************************************
 bool RegGetValue(void* pvValue, DWORD& dwLength, const HKEY hRoot, const TCHAR* ptszSubKey, const DWORD dwOptions, const REGSAM samDesired, const TCHAR* ptszName, DWORD& dwType)
 {
@@ -618,7 +618,7 @@ bool RegGetValue(void* pvValue, DWORD& dwLength, const HKEY hRoot, const TCHAR* 
 }
 
 //***************************************************************************
-// @brief ·¹Áö½ºÆ®¸® ¹ÙÀÌÆ® ¹è¿­ °ªÀ» ÀĞ¾î¿À´Â ÇÔ¼ö
+// @brief ë ˆì§€ìŠ¤íŠ¸ë¦¬ ë°”ì´íŠ¸ ë°°ì—´ ê°’ì„ ì½ì–´ì˜¤ëŠ” í•¨ìˆ˜
 //***************************************************************************
 bool RegGetValue(BYTE* pbValue, DWORD& dwLength, const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* ptszName)
 {
@@ -644,7 +644,7 @@ bool RegGetValue(BYTE* pbValue, DWORD& dwLength, const HKEY hRoot, const TCHAR* 
 }
 
 //***************************************************************************
-// @brief ·¹Áö½ºÆ®¸® ¼ıÀÚ(DWORD) °ªÀ» ÀĞ¾î¿À´Â ÇÔ¼ö
+// @brief ë ˆì§€ìŠ¤íŠ¸ë¦¬ ìˆ«ì(DWORD) ê°’ì„ ì½ì–´ì˜¤ëŠ” í•¨ìˆ˜
 //***************************************************************************
 bool RegGetValue(DWORD* pdwValue, const HKEY hRoot, const TCHAR* ptszSubKey, const TCHAR* ptszName)
 {
@@ -672,7 +672,7 @@ bool RegGetValue(DWORD* pdwValue, const HKEY hRoot, const TCHAR* ptszSubKey, con
 }
 
 //***************************************************************************
-// @brief ÁöÁ¤ÇÑ ·¹Áö½ºÆ®¸® Å°°¡ Á¸ÀçÇÏ´ÂÁö È®ÀÎÇÏ´Â ÇÔ¼ö
+// @brief ì§€ì •í•œ ë ˆì§€ìŠ¤íŠ¸ë¦¬ í‚¤ê°€ ì¡´ì¬í•˜ëŠ”ì§€ í™•ì¸í•˜ëŠ” í•¨ìˆ˜
 //***************************************************************************
 bool IsRegKey(const HKEY hKey, const TCHAR* ptszSubKey)
 {
@@ -688,11 +688,11 @@ bool IsRegKey(const HKEY hKey, const TCHAR* ptszSubKey)
 }
 
 //***************************************************************************
-// @brief µ¿ÀÏÇÑ ÀÌ¸§ÀÇ ÆÄÀÏÀÌ Á¸ÀçÇÒ °æ¿ì ÀÎµ¦½º¸¦ ºÙ¿© Áßº¹µÇÁö ¾Ê´Â ÆÄÀÏ ÇÚµéÀ» »ı¼ºÇÏ´Â ÇÔ¼ö
-// @param ptszDestFullPath »ı¼ºµÈ ÃÖÁ¾ ÆÄÀÏÀÇ ÀüÃ¼ °æ·Î¸¦ ¹İÈ¯¹ŞÀ» ¹öÆÛ
-// @param ptszDestFileNameExt »ı¼ºµÈ ÃÖÁ¾ ÆÄÀÏ¸íÀ» ¹İÈ¯¹ŞÀ» ¹öÆÛ
-// @param ptszFullPath ¿øº» ÆÄÀÏ ÀüÃ¼ °æ·Î
-// @return ¼º°ø ½Ã ÆÄÀÏ ÇÚµé(HANDLE), ½ÇÆĞ ½Ã NULL
+// @brief ë™ì¼í•œ ì´ë¦„ì˜ íŒŒì¼ì´ ì¡´ì¬í•  ê²½ìš° ì¸ë±ìŠ¤ë¥¼ ë¶™ì—¬ ì¤‘ë³µë˜ì§€ ì•ŠëŠ” íŒŒì¼ í•¸ë“¤ì„ ìƒì„±í•˜ëŠ” í•¨ìˆ˜
+// @param ptszDestFullPath ìƒì„±ëœ ìµœì¢… íŒŒì¼ì˜ ì „ì²´ ê²½ë¡œë¥¼ ë°˜í™˜ë°›ì„ ë²„í¼
+// @param ptszDestFileNameExt ìƒì„±ëœ ìµœì¢… íŒŒì¼ëª…ì„ ë°˜í™˜ë°›ì„ ë²„í¼
+// @param ptszFullPath ì›ë³¸ íŒŒì¼ ì „ì²´ ê²½ë¡œ
+// @return ì„±ê³µ ì‹œ íŒŒì¼ í•¸ë“¤(HANDLE), ì‹¤íŒ¨ ì‹œ NULL
 //***************************************************************************
 HANDLE GetFileHandleDuplicate(TCHAR* ptszDestFullPath, TCHAR* ptszDestFileNameExt, const TCHAR* ptszFullPath)
 {
@@ -715,7 +715,7 @@ HANDLE GetFileHandleDuplicate(TCHAR* ptszDestFullPath, TCHAR* ptszDestFileNameEx
 	_sntprintf_s(tszTempFullPath, _countof(tszTempFullPath), _TRUNCATE, _T("%s%s"), tszFolderPath, fileNameExt.c_str());
 	_sntprintf_s(tszTempFileNameExt, _countof(tszTempFileNameExt), _TRUNCATE, _T("%s.%s"), fileName.c_str(), fileExt.c_str());
 
-	// ÃÖÃÊ ÆÄÀÏ »ı¼º ½Ãµµ (µ¿ÀÏ ÆÄÀÏÀÌ ¾øÀ¸¸é ¼º°ø)
+	// ìµœì´ˆ íŒŒì¼ ìƒì„± ì‹œë„ (ë™ì¼ íŒŒì¼ì´ ì—†ìœ¼ë©´ ì„±ê³µ)
 	hFile = CreateFile(tszTempFullPath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_NEW, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile == INVALID_HANDLE_VALUE )
 	{
@@ -724,7 +724,7 @@ HANDLE GetFileHandleDuplicate(TCHAR* ptszDestFullPath, TCHAR* ptszDestFileNameEx
 		tszTempFullPath[0] = '\0';
 		tszTempFileNameExt[0] = '\0';
 
-		// ÆÄÀÏÀÌ ÀÌ¹Ì Á¸ÀçÇÏ¸é (1), (2) ÇüÅÂ·Î ÀÎµ¦½º¸¦ ºÙ¿©°¡¸ç »ı¼º Àç½Ãµµ
+		// íŒŒì¼ì´ ì´ë¯¸ ì¡´ì¬í•˜ë©´ (1), (2) í˜•íƒœë¡œ ì¸ë±ìŠ¤ë¥¼ ë¶™ì—¬ê°€ë©° ìƒì„± ì¬ì‹œë„
 		for( i = 1; i < MAX_FILENAME_CONVERT_INDEX_NUM; i++ )
 		{
 			_sntprintf_s(tszTempFileNameExt, _countof(tszTempFileNameExt), _TRUNCATE, _T("%s(%d).%s"), fileName.c_str(), i, fileExt.c_str());
@@ -748,12 +748,12 @@ HANDLE GetFileHandleDuplicate(TCHAR* ptszDestFullPath, TCHAR* ptszDestFileNameEx
 }
 
 //***************************************************************************
-// @brief ·¹Áö½ºÆ®¸®¿¡ ÀúÀåµÈ µğÁöÅĞ Á¦Ç° ID(DigitalProductID)¸¦ µğÄÚµùÇÏ¿© À©µµ¿ì Á¤Ç° ÀÎÁõÅ°(Product Key)¸¦ ÃßÃâÇÏ´Â ÇÔ¼ö
-// @param TProductKey ÃßÃâµÈ Á¦Ç° Å° ¹®ÀÚ¿­À» ÀúÀåÇÒ ÂüÁ¶ º¯¼ö
-// @param pbDigitalProductID ·¹Áö½ºÆ®¸®¿¡¼­ ÀĞ¾î¿Â ¿øº» ¹ÙÀÌÆ® ¹è¿­
-// @param dwLength µ¥ÀÌÅÍ ¹ÙÀÌÆ® ±æÀÌ
-// @param bIsExtractBytesRange ¹ÙÀÌÆ® ÃßÃâ ¹üÀ§ ÇÃ·¡±× (Windows 7 ÀÌÀü vs Windows 8/10/11 ÀÌ»ó ±¸ºĞ)
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief ë ˆì§€ìŠ¤íŠ¸ë¦¬ì— ì €ì¥ëœ ë””ì§€í„¸ ì œí’ˆ ID(DigitalProductID)ë¥¼ ë””ì½”ë”©í•˜ì—¬ ìœˆë„ìš° ì •í’ˆ ì¸ì¦í‚¤(Product Key)ë¥¼ ì¶”ì¶œí•˜ëŠ” í•¨ìˆ˜
+// @param TProductKey ì¶”ì¶œëœ ì œí’ˆ í‚¤ ë¬¸ìì—´ì„ ì €ì¥í•  ì°¸ì¡° ë³€ìˆ˜
+// @param pbDigitalProductID ë ˆì§€ìŠ¤íŠ¸ë¦¬ì—ì„œ ì½ì–´ì˜¨ ì›ë³¸ ë°”ì´íŠ¸ ë°°ì—´
+// @param dwLength ë°ì´í„° ë°”ì´íŠ¸ ê¸¸ì´
+// @param bIsExtractBytesRange ë°”ì´íŠ¸ ì¶”ì¶œ ë²”ìœ„ í”Œë˜ê·¸ (Windows 7 ì´ì „ vs Windows 8/10/11 ì´ìƒ êµ¬ë¶„)
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool GetProductKeyExtract(_tstring& TProductKey, const BYTE* pbDigitalProductID, const DWORD dwLength, const bool bIsExtractBytesRange)
 {
@@ -764,7 +764,7 @@ bool GetProductKeyExtract(_tstring& TProductKey, const BYTE* pbDigitalProductID,
 	BYTE* pbSrcDigitalProductID = nullptr;
 	TCHAR* ptszDecodedChars = nullptr;
 
-	// Á¦Ç° Å° µğÄÚµù¿¡ »ç¿ëµÇ´Â Çã¿ë ¹®ÀÚ ¸Ê Å×ÀÌºí (Base24)
+	// ì œí’ˆ í‚¤ ë””ì½”ë”©ì— ì‚¬ìš©ë˜ëŠ” í—ˆìš© ë¬¸ì ë§µ í…Œì´ë¸” (Base24)
 	TCHAR ptszKeyChars[] = {
 							_T('B'), _T('C'), _T('D'), _T('F'), _T('G'), _T('H'), _T('J'), _T('K'), _T('M'),
 							_T('P'), _T('Q'), _T('R'), _T('T'), _T('V'), _T('W'), _T('X'), _T('Y'),
@@ -780,14 +780,14 @@ bool GetProductKeyExtract(_tstring& TProductKey, const BYTE* pbDigitalProductID,
 	pbSrcDigitalProductID = new BYTE[dwLength + 1];
 	memcpy(pbSrcDigitalProductID, pbDigitalProductID, dwLength + 1);
 
-	// Windows ¹öÀüº° ¿ÀÇÁ¼Â ÀÎµ¦½º ¼³Á¤ (Win8 ÀÌ»óÀº 808 ¹ÙÀÌÆ®, ±× ÀÌÇÏ´Â 52 ¹ÙÀÌÆ®)
+	// Windows ë²„ì „ë³„ ì˜¤í”„ì…‹ ì¸ë±ìŠ¤ ì„¤ì • (Win8 ì´ìƒì€ 808 ë°”ì´íŠ¸, ê·¸ ì´í•˜ëŠ” 52 ë°”ì´íŠ¸)
 	if( bIsExtractBytesRange )
 		nKeyStartIndex = 808;
 	else nKeyStartIndex = 52;
 
 	nKeyEndIndex = nKeyStartIndex + 15;
 
-	// Windows 8 / Office 2013 ÀÌ»ó ½ºÅ¸ÀÏ Å° ÆÇº° ('N' ¹®ÀÚ°¡ Æ÷ÇÔµÉ ¼ö ÀÖ´ÂÁö È®ÀÎ)
+	// Windows 8 / Office 2013 ì´ìƒ ìŠ¤íƒ€ì¼ í‚¤ íŒë³„ ('N' ë¬¸ìê°€ í¬í•¨ë  ìˆ˜ ìˆëŠ”ì§€ í™•ì¸)
 	nIsContainsN = (pbSrcDigitalProductID[nKeyStartIndex + 14] >> 3) & 1;
 	pbSrcDigitalProductID[nKeyStartIndex + 14] = (BYTE)((pbSrcDigitalProductID[nKeyStartIndex + 14] & 0xF7) | ((nIsContainsN & 2) << 2));
 
@@ -800,14 +800,14 @@ bool GetProductKeyExtract(_tstring& TProductKey, const BYTE* pbDigitalProductID,
 	ptszDecodedChars = new TCHAR[nDecodeLength + 1];
 	for( int i = nDecodeLength - 1; i >= 0; i-- )
 	{
-		// 5ÀÚ¸®¸¶´Ù ÇÏÀÌÇÂ(-) »ğÀÔ À§Ä¡ ÁöÁ¤
+		// 5ìë¦¬ë§ˆë‹¤ í•˜ì´í”ˆ(-) ì‚½ì… ìœ„ì¹˜ ì§€ì •
 		if( (i + 1) % 6 == 0 )
 		{
 			ptszDecodedChars[i] = _T('-');
 		}
 		else
 		{
-			// ½ÇÁ¦ Base24 ¾Ë°í¸®Áò µğÄÚµù ¼öÇà
+			// ì‹¤ì œ Base24 ì•Œê³ ë¦¬ì¦˜ ë””ì½”ë”© ìˆ˜í–‰
 			int nDigitMapIndex = 0;
 
 			for( int j = nDecodeStringLength - 1; j >= 0; j-- )
@@ -822,7 +822,7 @@ bool GetProductKeyExtract(_tstring& TProductKey, const BYTE* pbDigitalProductID,
 	}
 	ptszDecodedChars[nDecodeLength] = _T('\0');
 
-	// 'N' ¹®ÀÚ°¡ Æ÷ÇÔµÈ ÃÖ½Å OS Å° Çü½ÄÀÎ °æ¿ì, ¿Ã¹Ù¸¥ À§Ä¡¿¡ 'N'À» Àç¹èÄ¡
+	// 'N' ë¬¸ìê°€ í¬í•¨ëœ ìµœì‹  OS í‚¤ í˜•ì‹ì¸ ê²½ìš°, ì˜¬ë°”ë¥¸ ìœ„ì¹˜ì— 'N'ì„ ì¬ë°°ì¹˜
 	if( nIsContainsN != 0 )
 	{
 		int nFirstLetterIndex = 0;

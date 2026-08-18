@@ -1,4 +1,4 @@
-template<enum_field_types TARGET_TYPE, bool IS_UNSIGNED = false>
+﻿template<enum_field_types TARGET_TYPE, bool IS_UNSIGNED = false>
 struct mysql_param_attr_base
 {
 	static enum_field_types	const target_type = TARGET_TYPE;

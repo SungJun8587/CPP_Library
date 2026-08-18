@@ -46,6 +46,7 @@ public:
     //***************************************************************************
     // @brief 락을 획득합니다. (블로킹 대기)
     // @param name 프로파일링 추적용 락 이름 (기본값: nullptr)
+    //***************************************************************************
     void Lock(const char* name = nullptr) noexcept
     {
 #if PLATFORM_LOCK_WINDOWS
@@ -60,6 +61,7 @@ public:
     // @brief 락 획득을 비블로킹 방식으로 시도합니다.
     // @param name 프로파일링 추적용 락 이름 (기본값: nullptr)
     // @return true: 락 획득 성공, false: 락 획득 실패 (즉시 반환)
+    //***************************************************************************
     [[nodiscard]] bool TryLock(const char* name = nullptr) noexcept
     {
 #if PLATFORM_LOCK_WINDOWS
@@ -74,6 +76,7 @@ public:
     //***************************************************************************
     // @brief 락을 해제합니다.
     // @param name 프로파일링 추적용 락 이름 (기본값: nullptr)
+    //***************************************************************************
     void Unlock(const char* name = nullptr) noexcept
     {
 #if PLATFORM_LOCK_WINDOWS
@@ -123,6 +126,7 @@ public:
     //***************************************************************************
     // @brief 읽기(Shared) 락을 획득합니다. (블로킹 대기)
     // @param name 프로파일링 추적용 락 이름 (기본값: nullptr)
+    //***************************************************************************
     void ReadLock(const char* name = nullptr) noexcept
     {
 #if PLATFORM_LOCK_WINDOWS
@@ -137,6 +141,7 @@ public:
     // @brief 읽기 락 획득을 비블로킹 방식으로 시도합니다.
     // @param name 프로파일링 추적용 락 이름 (기본값: nullptr)
     // @return true: 읽기 락 획득 성공, false: 락 획득 실패
+    //***************************************************************************
     [[nodiscard]] bool TryReadLock(const char* name = nullptr) noexcept
     {
 #if PLATFORM_LOCK_WINDOWS
@@ -150,6 +155,7 @@ public:
     //***************************************************************************
     // @brief 읽기 락을 해제합니다.
     // @param name 프로파일링 추적용 락 이름 (기본값: nullptr)
+    //***************************************************************************
     void ReadUnlock(const char* name = nullptr) noexcept
     {
 #if PLATFORM_LOCK_WINDOWS
@@ -165,6 +171,7 @@ public:
     //***************************************************************************
     // @brief 쓰기(Exclusive) 락을 획득합니다. (블로킹 대기)
     // @param name 프로파일링 추적용 락 이름 (기본값: nullptr)
+    //***************************************************************************
     void WriteLock(const char* name = nullptr) noexcept
     {
 #if PLATFORM_LOCK_WINDOWS
@@ -179,6 +186,7 @@ public:
     // @brief 쓰기 락 획득을 비블로킹 방식으로 시도합니다.
     // @param name 프로파일링 추적용 락 이름 (기본값: nullptr)
     // @return true: 쓰기 락 획득 성공, false: 락 획득 실패
+    //***************************************************************************
     [[nodiscard]] bool TryWriteLock(const char* name = nullptr) noexcept
     {
 #if PLATFORM_LOCK_WINDOWS
@@ -192,6 +200,7 @@ public:
     //***************************************************************************
     // @brief 쓰기 락을 해제합니다.
     // @param name 프로파일링 추적용 락 이름 (기본값: nullptr)
+    //***************************************************************************
     void WriteUnlock(const char* name = nullptr) noexcept
     {
 #if PLATFORM_LOCK_WINDOWS
@@ -233,8 +242,8 @@ public:
     PLockGuard& operator=(const PLockGuard&) = delete;
 
 private:
-    PLock& _lock;
-    const char* _name;
+    PLock& _lock;	    // 관리할 PLock 객체 레퍼런스
+    const char* _name;	// 프로파일링 추적용 락 이름
 };
 
 //***************************************************************************
@@ -255,8 +264,8 @@ public:
     PRReadLockGuard& operator=(const PRReadLockGuard&) = delete;
 
 private:
-    PRWLock& _lock;
-    const char* _name;
+    PRWLock& _lock;	    // 관리할 PRWLock 객체 레퍼런스
+    const char* _name;	// 프로파일링 추적용 락 이름
 };
 
 //***************************************************************************
@@ -277,8 +286,8 @@ public:
     PRWriteLockGuard& operator=(const PRWriteLockGuard&) = delete;
 
 private:
-    PRWLock& _lock;
-    const char* _name;
+    PRWLock& _lock;	    // 관리할 PRWLock 객체 레퍼런스
+    const char* _name;	// 프로파일링 추적용 락 이름
 };
 
-#endif // __PLATFORMLOCK_H__
+#endif // ndef __PLATFORMLOCK_H__

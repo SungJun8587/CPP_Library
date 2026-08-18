@@ -1,3 +1,4 @@
+ï»¿
 //***************************************************************************
 // SocketUtils.cpp: implementation of the CSocketUtils class.
 //
@@ -6,7 +7,7 @@
 #include "pch.h"
 #include "SocketUtils.h"
 
-// ¿µ¹® ¿¡·¯ ¸Ş½ÃÁö Å×ÀÌºí Á¤ÀÇ
+// ì˜ë¬¸ ì—ëŸ¬ ë©”ì‹œì§€ í…Œì´ë¸” ì •ì˜
 const WINSOCK_ERRORCODE_INFO CSocketUtils::_errTableEn[] =
 {
 	{ WSAEINTR,                 _T("Interrupted function call") },
@@ -61,70 +62,70 @@ const WINSOCK_ERRORCODE_INFO CSocketUtils::_errTableEn[] =
 	{ WSASYSCALLFAILURE,        _T("System call failure") }
 };
 
-// ÇÑ±Û ¿¡·¯ ¸Ş½ÃÁö Å×ÀÌºí Á¤ÀÇ
+// í•œê¸€ ì—ëŸ¬ ë©”ì‹œì§€ í…Œì´ë¸” ì •ì˜
 const WINSOCK_ERRORCODE_INFO CSocketUtils::_errTableKr[] =
 {
-	{ WSAEINTR,                 _T("Áß´Ü µÈ ÇÔ¼ö È£Ãâ.") },
-	{ WSAEACCES,                _T("»ç¿ë ±ÇÇÑÀÌ °ÅºÎµÇ¾ú½À´Ï´Ù.") },
-	{ WSAEFAULT,                _T("Àß¸øµÈ ÁÖ¼Ò.") },
-	{ WSAEINVAL,                _T("Àß¸øµÈ ÀÎ¼ö.") },
-	{ WSAEMFILE,                _T("¿­·ÁÀÖ´Â ÆÄÀÏÀÌ ³Ê¹« ¸¹½À´Ï´Ù.") },
-	{ WSAEWOULDBLOCK,           _T("¼ÒÄÏÀÌ Â÷´ÜµË´Ï´Ù.") },
-	{ WSAEINPROGRESS,           _T("ÀÛ¾÷ÀÌ ÇöÀç ÁøÇàÁß.") },
-	{ WSAEALREADY,              _T("ÀÛ¾÷ÀÌ ÀÌ¹Ì ÁøÇàÁß.") },
-	{ WSAENOTSOCK,              _T("¼ÒÄÏÀÌ ¾Æ´Ñ ¼ÒÄÏ¿¡¼­ÀÇ Á¶ÀÛ.") },
-	{ WSAEDESTADDRREQ,          _T("¸ñÀûÁö ÁÖ¼Ò ÇÊ¿ä.") },
-	{ WSAEMSGSIZE,              _T("¸Ş½ÃÁö°¡ ³Ê¹« ±é´Ï´Ù.") },
-	{ WSAEPROTOTYPE,            _T("¼ÒÄÏ¿¡ ´ëÇÑ ÇÁ·ÎÅäÄİ À¯ÇüÀÌ Àß¸øµÇ¾ú½À´Ï´Ù.") },
-	{ WSAENOPROTOOPT,           _T("Àß¸øµÈ ÇÁ·ÎÅäÄİ ¿É¼Ç.") },
-	{ WSAEPROTONOSUPPORT,       _T("Áö¿øµÇÁö ¾Ê´Â ÇÁ·ÎÅäÄİ") },
-	{ WSAESOCKTNOSUPPORT,       _T("¼ÒÄÏ Çü½ÄÀÌ Áö¿ø µÇÁö ¾Ê½À´Ï´Ù.") },
-	{ WSAEOPNOTSUPP,            _T("ÀÛ¾÷ÀÌ Áö¿ø µÇÁö ¾Ê½À´Ï´Ù.") },
-	{ WSAEPFNOSUPPORT,          _T("ÇÁ·ÎÅäÄİ Á¦Ç°±º Áö¿ø µÇÁö ¾Ê½À´Ï´Ù.") },
-	{ WSAEAFNOSUPPORT,          _T("ÇÁ·ÎÅäÄİ ÆĞ¹Ğ¸®°¡ Áö¿ø ÇÏÁö ¾Ê´Â ÁÖ¼Ò.") },
-	{ WSAEADDRINUSE,            _T("ÁÖ¼Ò ÀÌ¹Ì »ç¿ë ÇÕ´Ï´Ù.") },
-	{ WSAEADDRNOTAVAIL,         _T("¿äÃ»ÇÑ ÁÖ¼Ò¸¦ ÇÒ´çÇÒ ¼ö ¾ø½À´Ï´Ù.") },
-	{ WSAENETDOWN,              _T("³×Æ®¿öÅ© ´Ù¿î µÇ¾ú½À´Ï´Ù.") },
-	{ WSAENETUNREACH,           _T("³×Æ®¿öÅ©¿¡ ¿¬°áÇÒ ¼ö ¾ø½À´Ï´Ù.") },
-	{ WSAENETRESET,             _T("³×Æ®¿öÅ© Àç¼³Á¤À¸·Î ¿¬°áÀÌ ²÷¾îÁ³½À´Ï´Ù.") },
-	{ WSAECONNABORTED,          _T("¼ÒÇÁÆ®¿ş¾î ¶§¹®¿¡ ¿¬°áÀÌ Áß´Ü µÇ¾ú½À´Ï´Ù.") },
-	{ WSAECONNRESET,            _T("±âÁ¸ ¿¬°á ¿ø°İ È£½ºÆ®¿¡ ÀÇÇØ °­Á¦·Î ²÷°å½À´Ï´Ù.") },
-	{ WSAENOBUFS,               _T("»ç¿ë °¡´ÉÇÑ ¹öÆÛ °ø°£ÀÌ ¾ø½À´Ï´Ù.") },
-	{ WSAEISCONN,               _T("¼ÒÄÏÀÌ ÀÌ¹Ì ¿¬°á µÇ¾î ÀÖ½À´Ï´Ù.") },
-	{ WSAENOTCONN,              _T("¼ÒÄÏ ¿¬°á µÇ¾î ÀÖÁö ¾Ê½À´Ï´Ù.") },
-	{ WSAESHUTDOWN,             _T("¼ÒÄÏÀÌ Á¾·á µÈ ÈÄ¿¡ º¸³¾ ¼ö ¾ø½À´Ï´Ù.") },
-	{ WSAETIMEDOUT,             _T("¿¬°á ½Ã°£ÀÌ ÃÊ°ú µÇ¾ú½À´Ï´Ù.") },
-	{ WSAECONNREFUSED,          _T("¿¬°á °ÅºÎ µÊ.") },
-	{ WSAEHOSTDOWN,             _T("È£½ºÆ® ´Ù¿î µÇ¾ú½À´Ï´Ù.") },
-	{ WSAEHOSTUNREACH,          _T("È£½ºÆ®¿¡ °æ·Î°¡ ¾ø½À´Ï´Ù.") },
-	{ WSAEPROCLIM,              _T("ÇÁ·Î¼¼½º°¡ ³Ê¹« ¸¹½À´Ï´Ù.") },
-	{ WSASYSNOTREADY,           _T("³×Æ®¿öÅ© ÇÏÀ§ ½Ã½ºÅÛÀ» »ç¿ëÇÒ ¼ö ¾ø½À´Ï´Ù.") },
-	{ WSAVERNOTSUPPORTED,       _T("Winsock.dll ¹öÀüÀÌ ¹üÀ§¸¦ ¹ş¾î³µ½À´Ï´Ù.") },
-	{ WSANOTINITIALISED,        _T("¾ÆÁ÷ ¼öÇà µÇÁö ¾ÊÀ» ¶§ WSAStartupÀ» ¼º°øÀûÀ¸·Î ¼öÇà µË´Ï´Ù.") },
-	{ WSAEDISCON,               _T("Á¤»ó Á¾·á ÁøÇà Áß.") },
-	{ WSATYPE_NOT_FOUND,        _T("Å¬·¡½º À¯ÇüÀ» Ã£À» ¼ö ¾ø½À´Ï´Ù.") },
-	{ WSAHOST_NOT_FOUND,        _T("È£½ºÆ®¸¦ Ã£À» ¼ö ¾ø½À´Ï´Ù.") },
-	{ WSATRY_AGAIN,             _T("½Å·ÚÇÒ ¼ö ¾ø´Â È£½ºÆ®¸¦ Ã£À» ¼ö ¾ø½À´Ï´Ù.") },
-	{ WSANO_RECOVERY,           _T("º¹±¸ÇÒ ¼ö ¾ø´Â ¿À·ùÀÔ´Ï´Ù.") },
-	{ WSANO_DATA,               _T("À¯È¿ÇÑ ÀÌ¸§, ¿äÃ» µÈ Çü½ÄÀÇ µ¥ÀÌÅÍ ·¹ÄÚµå°¡ ¾ø½À´Ï´Ù.") },
-	{ WSA_INVALID_HANDLE,       _T("ÁöÁ¤ÇÑ ÀÌº¥Æ® °³Ã¼ ÇÚµéÀÌ Àß¸ø µÇ¾ú½À´Ï´Ù.") },
-	{ WSA_INVALID_PARAMETER,    _T("ÇÏ³ª ÀÌ»óÀÇ ¸Å°³ º¯¼ö°¡ ¿Ã¹Ù¸£Áö ¾Ê½À´Ï´Ù.") },
-	{ WSA_IO_INCOMPLETE,        _T("Overlapped I/O ÀÌº¥Æ® °³Ã¼¿¡ Åëº¸ »óÅÂ") },
-	{ WSA_IO_PENDING,           _T("Overlapped ÀÛ¾÷ ³ªÁß¿¡ ¿Ï¼º") },
-	{ WSA_NOT_ENOUGH_MEMORY,    _T("»ç¿ë °¡´ÉÇÑ ¸Ş¸ğ¸®°¡ ºÎÁ· ÇÕ´Ï´Ù.") },
-	{ WSA_OPERATION_ABORTED,    _T("Overlapped ÀÛ¾÷ Áß´Ü") },
-	{ WSASYSCALLFAILURE,        _T("½Ã½ºÅÛ È£Ãâ ¿À·ù") }
+	{ WSAEINTR,                 _T("ì¤‘ë‹¨ ëœ í•¨ìˆ˜ í˜¸ì¶œ.") },
+	{ WSAEACCES,                _T("ì‚¬ìš© ê¶Œí•œì´ ê±°ë¶€ë˜ì—ˆìŠµë‹ˆë‹¤.") },
+	{ WSAEFAULT,                _T("ì˜ëª»ëœ ì£¼ì†Œ.") },
+	{ WSAEINVAL,                _T("ì˜ëª»ëœ ì¸ìˆ˜.") },
+	{ WSAEMFILE,                _T("ì—´ë ¤ìˆëŠ” íŒŒì¼ì´ ë„ˆë¬´ ë§ìŠµë‹ˆë‹¤.") },
+	{ WSAEWOULDBLOCK,           _T("ì†Œì¼“ì´ ì°¨ë‹¨ë©ë‹ˆë‹¤.") },
+	{ WSAEINPROGRESS,           _T("ì‘ì—…ì´ í˜„ì¬ ì§„í–‰ì¤‘.") },
+	{ WSAEALREADY,              _T("ì‘ì—…ì´ ì´ë¯¸ ì§„í–‰ì¤‘.") },
+	{ WSAENOTSOCK,              _T("ì†Œì¼“ì´ ì•„ë‹Œ ì†Œì¼“ì—ì„œì˜ ì¡°ì‘.") },
+	{ WSAEDESTADDRREQ,          _T("ëª©ì ì§€ ì£¼ì†Œ í•„ìš”.") },
+	{ WSAEMSGSIZE,              _T("ë©”ì‹œì§€ê°€ ë„ˆë¬´ ê¹ë‹ˆë‹¤.") },
+	{ WSAEPROTOTYPE,            _T("ì†Œì¼“ì— ëŒ€í•œ í”„ë¡œí† ì½œ ìœ í˜•ì´ ì˜ëª»ë˜ì—ˆìŠµë‹ˆë‹¤.") },
+	{ WSAENOPROTOOPT,           _T("ì˜ëª»ëœ í”„ë¡œí† ì½œ ì˜µì…˜.") },
+	{ WSAEPROTONOSUPPORT,       _T("ì§€ì›ë˜ì§€ ì•ŠëŠ” í”„ë¡œí† ì½œ") },
+	{ WSAESOCKTNOSUPPORT,       _T("ì†Œì¼“ í˜•ì‹ì´ ì§€ì› ë˜ì§€ ì•ŠìŠµë‹ˆë‹¤.") },
+	{ WSAEOPNOTSUPP,            _T("ì‘ì—…ì´ ì§€ì› ë˜ì§€ ì•ŠìŠµë‹ˆë‹¤.") },
+	{ WSAEPFNOSUPPORT,          _T("í”„ë¡œí† ì½œ ì œí’ˆêµ° ì§€ì› ë˜ì§€ ì•ŠìŠµë‹ˆë‹¤.") },
+	{ WSAEAFNOSUPPORT,          _T("í”„ë¡œí† ì½œ íŒ¨ë°€ë¦¬ê°€ ì§€ì› í•˜ì§€ ì•ŠëŠ” ì£¼ì†Œ.") },
+	{ WSAEADDRINUSE,            _T("ì£¼ì†Œ ì´ë¯¸ ì‚¬ìš© í•©ë‹ˆë‹¤.") },
+	{ WSAEADDRNOTAVAIL,         _T("ìš”ì²­í•œ ì£¼ì†Œë¥¼ í• ë‹¹í•  ìˆ˜ ì—†ìŠµë‹ˆë‹¤.") },
+	{ WSAENETDOWN,              _T("ë„¤íŠ¸ì›Œí¬ ë‹¤ìš´ ë˜ì—ˆìŠµë‹ˆë‹¤.") },
+	{ WSAENETUNREACH,           _T("ë„¤íŠ¸ì›Œí¬ì— ì—°ê²°í•  ìˆ˜ ì—†ìŠµë‹ˆë‹¤.") },
+	{ WSAENETRESET,             _T("ë„¤íŠ¸ì›Œí¬ ì¬ì„¤ì •ìœ¼ë¡œ ì—°ê²°ì´ ëŠì–´ì¡ŒìŠµë‹ˆë‹¤.") },
+	{ WSAECONNABORTED,          _T("ì†Œí”„íŠ¸ì›¨ì–´ ë•Œë¬¸ì— ì—°ê²°ì´ ì¤‘ë‹¨ ë˜ì—ˆìŠµë‹ˆë‹¤.") },
+	{ WSAECONNRESET,            _T("ê¸°ì¡´ ì—°ê²° ì›ê²© í˜¸ìŠ¤íŠ¸ì— ì˜í•´ ê°•ì œë¡œ ëŠê²¼ìŠµë‹ˆë‹¤.") },
+	{ WSAENOBUFS,               _T("ì‚¬ìš© ê°€ëŠ¥í•œ ë²„í¼ ê³µê°„ì´ ì—†ìŠµë‹ˆë‹¤.") },
+	{ WSAEISCONN,               _T("ì†Œì¼“ì´ ì´ë¯¸ ì—°ê²° ë˜ì–´ ìˆìŠµë‹ˆë‹¤.") },
+	{ WSAENOTCONN,              _T("ì†Œì¼“ ì—°ê²° ë˜ì–´ ìˆì§€ ì•ŠìŠµë‹ˆë‹¤.") },
+	{ WSAESHUTDOWN,             _T("ì†Œì¼“ì´ ì¢…ë£Œ ëœ í›„ì— ë³´ë‚¼ ìˆ˜ ì—†ìŠµë‹ˆë‹¤.") },
+	{ WSAETIMEDOUT,             _T("ì—°ê²° ì‹œê°„ì´ ì´ˆê³¼ ë˜ì—ˆìŠµë‹ˆë‹¤.") },
+	{ WSAECONNREFUSED,          _T("ì—°ê²° ê±°ë¶€ ë¨.") },
+	{ WSAEHOSTDOWN,             _T("í˜¸ìŠ¤íŠ¸ ë‹¤ìš´ ë˜ì—ˆìŠµë‹ˆë‹¤.") },
+	{ WSAEHOSTUNREACH,          _T("í˜¸ìŠ¤íŠ¸ì— ê²½ë¡œê°€ ì—†ìŠµë‹ˆë‹¤.") },
+	{ WSAEPROCLIM,              _T("í”„ë¡œì„¸ìŠ¤ê°€ ë„ˆë¬´ ë§ìŠµë‹ˆë‹¤.") },
+	{ WSASYSNOTREADY,           _T("ë„¤íŠ¸ì›Œí¬ í•˜ìœ„ ì‹œìŠ¤í…œì„ ì‚¬ìš©í•  ìˆ˜ ì—†ìŠµë‹ˆë‹¤.") },
+	{ WSAVERNOTSUPPORTED,       _T("Winsock.dll ë²„ì „ì´ ë²”ìœ„ë¥¼ ë²—ì–´ë‚¬ìŠµë‹ˆë‹¤.") },
+	{ WSANOTINITIALISED,        _T("ì•„ì§ ìˆ˜í–‰ ë˜ì§€ ì•Šì„ ë•Œ WSAStartupì„ ì„±ê³µì ìœ¼ë¡œ ìˆ˜í–‰ ë©ë‹ˆë‹¤.") },
+	{ WSAEDISCON,               _T("ì •ìƒ ì¢…ë£Œ ì§„í–‰ ì¤‘.") },
+	{ WSATYPE_NOT_FOUND,        _T("í´ë˜ìŠ¤ ìœ í˜•ì„ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤.") },
+	{ WSAHOST_NOT_FOUND,        _T("í˜¸ìŠ¤íŠ¸ë¥¼ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤.") },
+	{ WSATRY_AGAIN,             _T("ì‹ ë¢°í•  ìˆ˜ ì—†ëŠ” í˜¸ìŠ¤íŠ¸ë¥¼ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤.") },
+	{ WSANO_RECOVERY,           _T("ë³µêµ¬í•  ìˆ˜ ì—†ëŠ” ì˜¤ë¥˜ì…ë‹ˆë‹¤.") },
+	{ WSANO_DATA,               _T("ìœ íš¨í•œ ì´ë¦„, ìš”ì²­ ëœ í˜•ì‹ì˜ ë°ì´í„° ë ˆì½”ë“œê°€ ì—†ìŠµë‹ˆë‹¤.") },
+	{ WSA_INVALID_HANDLE,       _T("ì§€ì •í•œ ì´ë²¤íŠ¸ ê°œì²´ í•¸ë“¤ì´ ì˜ëª» ë˜ì—ˆìŠµë‹ˆë‹¤.") },
+	{ WSA_INVALID_PARAMETER,    _T("í•˜ë‚˜ ì´ìƒì˜ ë§¤ê°œ ë³€ìˆ˜ê°€ ì˜¬ë°”ë¥´ì§€ ì•ŠìŠµë‹ˆë‹¤.") },
+	{ WSA_IO_INCOMPLETE,        _T("Overlapped I/O ì´ë²¤íŠ¸ ê°œì²´ì— í†µë³´ ìƒíƒœ") },
+	{ WSA_IO_PENDING,           _T("Overlapped ì‘ì—… ë‚˜ì¤‘ì— ì™„ì„±") },
+	{ WSA_NOT_ENOUGH_MEMORY,    _T("ì‚¬ìš© ê°€ëŠ¥í•œ ë©”ëª¨ë¦¬ê°€ ë¶€ì¡± í•©ë‹ˆë‹¤.") },
+	{ WSA_OPERATION_ABORTED,    _T("Overlapped ì‘ì—… ì¤‘ë‹¨") },
+	{ WSASYSCALLFAILURE,        _T("ì‹œìŠ¤í…œ í˜¸ì¶œ ì˜¤ë¥˜") }
 };
 
-// Á¤Àû È®Àå ÇÔ¼ö Æ÷ÀÎÅÍ ÃÊ±âÈ­
+// ì •ì  í™•ì¥ í•¨ìˆ˜ í¬ì¸í„° ì´ˆê¸°í™”
 LPFN_ACCEPTEX               CSocketUtils::_acceptEx = nullptr;
 LPFN_GETACCEPTEXSOCKADDRS    CSocketUtils::_getAcceptExSockAddrs = nullptr;
 LPFN_CONNECTEX               CSocketUtils::_connectEx = nullptr;
 LPFN_DISCONNECTEX            CSocketUtils::_disconnectEx = nullptr;
 
 //***************************************************************************
-// @brief Winsock ¶óÀÌºê·¯¸®(WSAStartup) ¹× IOCP È®Àå ÇÔ¼ö Æ÷ÀÎÅÍ¸¦ ÃÊ±âÈ­ÇÕ´Ï´Ù.
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief Winsock ë¼ì´ë¸ŒëŸ¬ë¦¬(WSAStartup) ë° IOCP í™•ì¥ í•¨ìˆ˜ í¬ì¸í„°ë¥¼ ì´ˆê¸°í™”í•©ë‹ˆë‹¤.
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool CSocketUtils::Init()
 {
@@ -150,7 +151,7 @@ bool CSocketUtils::Init()
 }
 
 //***************************************************************************
-// @brief Winsock ¶óÀÌºê·¯¸® ÀÚ¿ø(WSACleanup)À» ÇØÁ¦ÇÕ´Ï´Ù.
+// @brief Winsock ë¼ì´ë¸ŒëŸ¬ë¦¬ ìì›(WSACleanup)ì„ í•´ì œí•©ë‹ˆë‹¤.
 //***************************************************************************
 void CSocketUtils::Clear()
 {
@@ -158,9 +159,9 @@ void CSocketUtils::Clear()
 }
 
 //***************************************************************************
-// @brief shutdown ÈÄ closesocketÀ» ¼öÇàÇÏ¿© ¼ÒÄÏÀ» Á¤»ó Á¾·áÇÕ´Ï´Ù.
-// @param socket ´ë»ó ¼ÒÄÏ ÇÚµé
-// @param how shutdown ¹æ½Ä (SD_RECEIVE / SD_SEND / SD_BOTH)
+// @brief shutdown í›„ closesocketì„ ìˆ˜í–‰í•˜ì—¬ ì†Œì¼“ì„ ì •ìƒ ì¢…ë£Œí•©ë‹ˆë‹¤.
+// @param socket ëŒ€ìƒ ì†Œì¼“ í•¸ë“¤
+// @param how shutdown ë°©ì‹ (SD_RECEIVE / SD_SEND / SD_BOTH)
 //***************************************************************************
 void CSocketUtils::CloseGraceful(SOCKET socket, int how)
 {
@@ -171,11 +172,11 @@ void CSocketUtils::CloseGraceful(SOCKET socket, int how)
 }
 
 //***************************************************************************
-// @brief WSAIoctl(SIO_GET_EXTENSION_FUNCTION_POINTER)À» »ç¿ëÇÏ¿© È®Àå ÇÔ¼ö Æ÷ÀÎÅÍ 1°³¸¦ ¹ÙÀÎµùÇÕ´Ï´Ù.
-// @param socket ¹ÙÀÎµù Á¶È¸¿¡ »ç¿ëÇÒ ÀÓ½Ã ¼ÒÄÏ ÇÚµé
-// @param guid ¹ÙÀÎµùÇÒ È®Àå ÇÔ¼öÀÇ GUID
-// @param fn ¹ÙÀÎµùµÈ ÇÔ¼ö Æ÷ÀÎÅÍ°¡ ÀúÀåµÉ Ãâ·Â Æ÷ÀÎÅÍ
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief WSAIoctl(SIO_GET_EXTENSION_FUNCTION_POINTER)ì„ ì‚¬ìš©í•˜ì—¬ í™•ì¥ í•¨ìˆ˜ í¬ì¸í„° 1ê°œë¥¼ ë°”ì¸ë”©í•©ë‹ˆë‹¤.
+// @param socket ë°”ì¸ë”© ì¡°íšŒì— ì‚¬ìš©í•  ì„ì‹œ ì†Œì¼“ í•¸ë“¤
+// @param guid ë°”ì¸ë”©í•  í™•ì¥ í•¨ìˆ˜ì˜ GUID
+// @param fn ë°”ì¸ë”©ëœ í•¨ìˆ˜ í¬ì¸í„°ê°€ ì €ì¥ë  ì¶œë ¥ í¬ì¸í„°
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool CSocketUtils::BindExtensionFunction(SOCKET socket, GUID guid, void** fn)
 {
@@ -192,11 +193,11 @@ bool CSocketUtils::BindExtensionFunction(SOCKET socket, GUID guid, void** fn)
 	return (result != SOCKET_ERROR);
 }
 
-// ---------- ¼ÒÄÏ »ı¼º ----------
+// ---------- ì†Œì¼“ ìƒì„± ----------
 
 //***************************************************************************
-// @brief ºñµ¿±â Overlapped I/O¸¦ Áö¿øÇÏ´Â TCP ¼ÒÄÏ(IPv4)À» »ı¼ºÇÕ´Ï´Ù.
-// @return »ı¼ºµÈ ¼ÒÄÏ ÇÚµé (½ÇÆĞ ½Ã INVALID_SOCKET)
+// @brief ë¹„ë™ê¸° Overlapped I/Oë¥¼ ì§€ì›í•˜ëŠ” TCP ì†Œì¼“(IPv4)ì„ ìƒì„±í•©ë‹ˆë‹¤.
+// @return ìƒì„±ëœ ì†Œì¼“ í•¸ë“¤ (ì‹¤íŒ¨ ì‹œ INVALID_SOCKET)
 //***************************************************************************
 SOCKET CSocketUtils::CreateSocket()
 {
@@ -204,8 +205,8 @@ SOCKET CSocketUtils::CreateSocket()
 }
 
 //***************************************************************************
-// @brief ºñµ¿±â Overlapped I/O¸¦ Áö¿øÇÏ´Â UDP ¼ÒÄÏ(IPv4)À» »ı¼ºÇÕ´Ï´Ù.
-// @return »ı¼ºµÈ ¼ÒÄÏ ÇÚµé (½ÇÆĞ ½Ã INVALID_SOCKET)
+// @brief ë¹„ë™ê¸° Overlapped I/Oë¥¼ ì§€ì›í•˜ëŠ” UDP ì†Œì¼“(IPv4)ì„ ìƒì„±í•©ë‹ˆë‹¤.
+// @return ìƒì„±ëœ ì†Œì¼“ í•¸ë“¤ (ì‹¤íŒ¨ ì‹œ INVALID_SOCKET)
 //***************************************************************************
 SOCKET CSocketUtils::CreateUdpSocket()
 {
@@ -213,8 +214,8 @@ SOCKET CSocketUtils::CreateUdpSocket()
 }
 
 //***************************************************************************
-// @brief RIO(Registered I/O) Àü¿ë TCP ¼ÒÄÏ(WSA_FLAG_REGISTERED_IO)À» »ı¼ºÇÕ´Ï´Ù.
-// @return »ı¼ºµÈ ¼ÒÄÏ ÇÚµé (½ÇÆĞ ½Ã INVALID_SOCKET)
+// @brief RIO(Registered I/O) ì „ìš© TCP ì†Œì¼“(WSA_FLAG_REGISTERED_IO)ì„ ìƒì„±í•©ë‹ˆë‹¤.
+// @return ìƒì„±ëœ ì†Œì¼“ í•¸ë“¤ (ì‹¤íŒ¨ ì‹œ INVALID_SOCKET)
 //***************************************************************************
 SOCKET CSocketUtils::CreateRioSocket()
 {
@@ -223,8 +224,8 @@ SOCKET CSocketUtils::CreateRioSocket()
 }
 
 //***************************************************************************
-// @brief RIO(Registered I/O) Àü¿ë UDP ¼ÒÄÏ(WSA_FLAG_REGISTERED_IO)À» »ı¼ºÇÕ´Ï´Ù.
-// @return »ı¼ºµÈ ¼ÒÄÏ ÇÚµé (½ÇÆĞ ½Ã INVALID_SOCKET)
+// @brief RIO(Registered I/O) ì „ìš© UDP ì†Œì¼“(WSA_FLAG_REGISTERED_IO)ì„ ìƒì„±í•©ë‹ˆë‹¤.
+// @return ìƒì„±ëœ ì†Œì¼“ í•¸ë“¤ (ì‹¤íŒ¨ ì‹œ INVALID_SOCKET)
 //***************************************************************************
 SOCKET CSocketUtils::CreateRioUdpSocket()
 {
@@ -232,13 +233,13 @@ SOCKET CSocketUtils::CreateRioUdpSocket()
 		WSA_FLAG_OVERLAPPED | WSA_FLAG_REGISTERED_IO);
 }
 
-// ---------- ¿É¼Ç ----------
+// ---------- ì˜µì…˜ ----------
 
 //***************************************************************************
-// @brief SO_REUSEADDR ¿É¼ÇÀ» ¼³Á¤ÇÏ¿© ÀÌ¹Ì »ç¿ë ÁßÀÎ ÁÖ¼ÒÀÇ Àç»ç¿ë ¿©ºÎ¸¦ ÁöÁ¤ÇÕ´Ï´Ù.
-// @param socket ´ë»ó ¼ÒÄÏ ÇÚµé
-// @param flag Àç»ç¿ë È°¼ºÈ­ ¿©ºÎ (true: È°¼ºÈ­, false: ºñÈ°¼ºÈ­)
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief SO_REUSEADDR ì˜µì…˜ì„ ì„¤ì •í•˜ì—¬ ì´ë¯¸ ì‚¬ìš© ì¤‘ì¸ ì£¼ì†Œì˜ ì¬ì‚¬ìš© ì—¬ë¶€ë¥¼ ì§€ì •í•©ë‹ˆë‹¤.
+// @param socket ëŒ€ìƒ ì†Œì¼“ í•¸ë“¤
+// @param flag ì¬ì‚¬ìš© í™œì„±í™” ì—¬ë¶€ (true: í™œì„±í™”, false: ë¹„í™œì„±í™”)
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool CSocketUtils::SetReuseAddress(SOCKET socket, bool flag)
 {
@@ -248,11 +249,11 @@ bool CSocketUtils::SetReuseAddress(SOCKET socket, bool flag)
 }
 
 //***************************************************************************
-// @brief SO_LINGER ¿É¼ÇÀ» ¼³Á¤ÇÏ¿© ¼ÒÄÏ Á¾·á ½Ã ÀÜ¿© µ¥ÀÌÅÍ Ã³¸® ¹æ½ÄÀ» ÁöÁ¤ÇÕ´Ï´Ù.
-// @param socket ´ë»ó ¼ÒÄÏ ÇÚµé
-// @param onOff Linger ¿É¼Ç È°¼ºÈ­ ¿©ºÎ (1: È°¼ºÈ­, 0: ºñÈ°¼ºÈ­)
-// @param seconds Linger ´ë±â ½Ã°£(ÃÊ ´ÜÀ§)
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief SO_LINGER ì˜µì…˜ì„ ì„¤ì •í•˜ì—¬ ì†Œì¼“ ì¢…ë£Œ ì‹œ ì”ì—¬ ë°ì´í„° ì²˜ë¦¬ ë°©ì‹ì„ ì§€ì •í•©ë‹ˆë‹¤.
+// @param socket ëŒ€ìƒ ì†Œì¼“ í•¸ë“¤
+// @param onOff Linger ì˜µì…˜ í™œì„±í™” ì—¬ë¶€ (1: í™œì„±í™”, 0: ë¹„í™œì„±í™”)
+// @param seconds Linger ëŒ€ê¸° ì‹œê°„(ì´ˆ ë‹¨ìœ„)
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool CSocketUtils::SetLinger(SOCKET socket, uint16 onOff, uint16 seconds)
 {
@@ -264,10 +265,10 @@ bool CSocketUtils::SetLinger(SOCKET socket, uint16 onOff, uint16 seconds)
 }
 
 //***************************************************************************
-// @brief TCP_NODELAY ¿É¼ÇÀ» ¼³Á¤ÇÏ¿© Nagle ¾Ë°í¸®ÁòÀÇ È°¼ºÈ­ ¿©ºÎ¸¦ ÁöÁ¤ÇÕ´Ï´Ù.
-// @param socket ´ë»ó ¼ÒÄÏ ÇÚµé
-// @param flag Nagle ¾Ë°í¸®Áò ºñÈ°¼ºÈ­ ¿©ºÎ (true: Nagle ²û/Áï½Ã Àü¼Û, false: Nagle ÄÔ)
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief TCP_NODELAY ì˜µì…˜ì„ ì„¤ì •í•˜ì—¬ Nagle ì•Œê³ ë¦¬ì¦˜ì˜ í™œì„±í™” ì—¬ë¶€ë¥¼ ì§€ì •í•©ë‹ˆë‹¤.
+// @param socket ëŒ€ìƒ ì†Œì¼“ í•¸ë“¤
+// @param flag Nagle ì•Œê³ ë¦¬ì¦˜ ë¹„í™œì„±í™” ì—¬ë¶€ (true: Nagle ë”/ì¦‰ì‹œ ì „ì†¡, false: Nagle ì¼¬)
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool CSocketUtils::SetNoDelay(SOCKET socket, bool flag)
 {
@@ -277,10 +278,10 @@ bool CSocketUtils::SetNoDelay(SOCKET socket, bool flag)
 }
 
 //***************************************************************************
-// @brief SO_RCVBUF ¿É¼ÇÀ» ¼³Á¤ÇÏ¿© ¼ÒÄÏÀÇ ¼ö½Å ¹öÆÛ Å©±â¸¦ º¯°æÇÕ´Ï´Ù.
-// @param socket ´ë»ó ¼ÒÄÏ ÇÚµé
-// @param size ¹ÙÀÌÆ® ´ÜÀ§ ¼ö½Å ¹öÆÛ Å©±â
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief SO_RCVBUF ì˜µì…˜ì„ ì„¤ì •í•˜ì—¬ ì†Œì¼“ì˜ ìˆ˜ì‹  ë²„í¼ í¬ê¸°ë¥¼ ë³€ê²½í•©ë‹ˆë‹¤.
+// @param socket ëŒ€ìƒ ì†Œì¼“ í•¸ë“¤
+// @param size ë°”ì´íŠ¸ ë‹¨ìœ„ ìˆ˜ì‹  ë²„í¼ í¬ê¸°
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool CSocketUtils::SetRecvBufferSize(SOCKET socket, int32 size)
 {
@@ -289,10 +290,10 @@ bool CSocketUtils::SetRecvBufferSize(SOCKET socket, int32 size)
 }
 
 //***************************************************************************
-// @brief SO_SNDBUF ¿É¼ÇÀ» ¼³Á¤ÇÏ¿© ¼ÒÄÏÀÇ ¼Û½Å ¹öÆÛ Å©±â¸¦ º¯°æÇÕ´Ï´Ù.
-// @param socket ´ë»ó ¼ÒÄÏ ÇÚµé
-// @param size ¹ÙÀÌÆ® ´ÜÀ§ ¼Û½Å ¹öÆÛ Å©±â
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief SO_SNDBUF ì˜µì…˜ì„ ì„¤ì •í•˜ì—¬ ì†Œì¼“ì˜ ì†¡ì‹  ë²„í¼ í¬ê¸°ë¥¼ ë³€ê²½í•©ë‹ˆë‹¤.
+// @param socket ëŒ€ìƒ ì†Œì¼“ í•¸ë“¤
+// @param size ë°”ì´íŠ¸ ë‹¨ìœ„ ì†¡ì‹  ë²„í¼ í¬ê¸°
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool CSocketUtils::SetSendBufferSize(SOCKET socket, int32 size)
 {
@@ -301,10 +302,10 @@ bool CSocketUtils::SetSendBufferSize(SOCKET socket, int32 size)
 }
 
 //***************************************************************************
-// @brief SO_UPDATE_ACCEPT_CONTEXT ¿É¼ÇÀ» ¼³Á¤ÇÏ¿© AcceptEx·Î ¼ö¶ôµÈ ¼ÒÄÏ¿¡ Listen ¼ÒÄÏÀÇ ÄÁÅØ½ºÆ®¸¦ µ¿±âÈ­ÇÕ´Ï´Ù.
-// @param clientSocket AcceptEx·Î ¿¬°á ¼ö¶ôµÈ ¼ÒÄÏ Handle
-// @param listenSocket ´ë±â ÁßÀÌ´ø Listen ¼ÒÄÏ Handle
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief SO_UPDATE_ACCEPT_CONTEXT ì˜µì…˜ì„ ì„¤ì •í•˜ì—¬ AcceptExë¡œ ìˆ˜ë½ëœ ì†Œì¼“ì— Listen ì†Œì¼“ì˜ ì»¨í…ìŠ¤íŠ¸ë¥¼ ë™ê¸°í™”í•©ë‹ˆë‹¤.
+// @param clientSocket AcceptExë¡œ ì—°ê²° ìˆ˜ë½ëœ ì†Œì¼“ Handle
+// @param listenSocket ëŒ€ê¸° ì¤‘ì´ë˜ Listen ì†Œì¼“ Handle
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool CSocketUtils::SetUpdateAcceptContext(SOCKET clientSocket, SOCKET listenSocket)
 {
@@ -313,9 +314,9 @@ bool CSocketUtils::SetUpdateAcceptContext(SOCKET clientSocket, SOCKET listenSock
 }
 
 //***************************************************************************
-// @brief SO_UPDATE_CONNECT_CONTEXT ¿É¼ÇÀ» ¼³Á¤ÇÏ¿© ConnectEx ºñµ¿±â ¿¬°á ¿Ï·á ÈÄ ¼ÒÄÏ ÄÁÅØ½ºÆ®¸¦ °»½ÅÇÕ´Ï´Ù.
-// @param socket ConnectEx°¡ ¿Ï·áµÈ ¼ÒÄÏ Handle
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief SO_UPDATE_CONNECT_CONTEXT ì˜µì…˜ì„ ì„¤ì •í•˜ì—¬ ConnectEx ë¹„ë™ê¸° ì—°ê²° ì™„ë£Œ í›„ ì†Œì¼“ ì»¨í…ìŠ¤íŠ¸ë¥¼ ê°±ì‹ í•©ë‹ˆë‹¤.
+// @param socket ConnectExê°€ ì™„ë£Œëœ ì†Œì¼“ Handle
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool CSocketUtils::SetUpdateConnectContext(SOCKET socket)
 {
@@ -326,14 +327,14 @@ bool CSocketUtils::SetUpdateConnectContext(SOCKET socket)
 // ---------- Connect / Bind / Listen / Close ----------
 
 //***************************************************************************
-// @brief ÁöÁ¤ÇÑ ¼ÒÄÏÀ» ¿ø°İ ÁÖ¼Ò(CNetAddress)¿¡ µ¿±â ¹æ½ÄÀ¸·Î ¿¬°áÇÕ´Ï´Ù.
-// @param socket ¿¬°á¿¡ »ç¿ëÇÒ ´ë»ó ¼ÒÄÏ ÇÚµé
-// @param netAddr Á¢¼ÓÇÒ ¿ø°İÁöÀÇ ³×Æ®¿öÅ© ÁÖ¼Ò Á¤º¸ (CNetAddress)
-// @return bool ¿¬°á ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false ¹İÈ¯
+// @brief ì§€ì •í•œ ì†Œì¼“ì„ ì›ê²© ì£¼ì†Œ(CNetAddress)ì— ë™ê¸° ë°©ì‹ìœ¼ë¡œ ì—°ê²°í•©ë‹ˆë‹¤.
+// @param socket ì—°ê²°ì— ì‚¬ìš©í•  ëŒ€ìƒ ì†Œì¼“ í•¸ë“¤
+// @param netAddr ì ‘ì†í•  ì›ê²©ì§€ì˜ ë„¤íŠ¸ì›Œí¬ ì£¼ì†Œ ì •ë³´ (CNetAddress)
+// @return bool ì—°ê²° ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false ë°˜í™˜
 // @details
-//      - WinsockÀÇ ±âº» µ¿±â `connect()` API¸¦ È£ÃâÇÏ¿© ¿ø°İ ¼­¹ö¿ÍÀÇ 3-Way Handshake¸¦ ¼öÇàÇÕ´Ï´Ù.
-//      - ¿¬°á ½ÇÆĞ ½Ã ³»ºÎÀûÀ¸·Î `ReportError`¸¦ ÅëÇØ Winsock ¿¡·¯ ÄÚµå¸¦ ·Î±×·Î ±â·ÏÇÕ´Ï´Ù.
-//      - RIO(Registered I/O) È¯°æ¿¡¼­ ¼ÒÄÏ ¿¬°á ¿Ï·á ÈÄ RIO_RQ¸¦ »ı¼ºÇÏ±â Àü ´Ü°è¿¡ È°¿ëµË´Ï´Ù.
+//      - Winsockì˜ ê¸°ë³¸ ë™ê¸° `connect()` APIë¥¼ í˜¸ì¶œí•˜ì—¬ ì›ê²© ì„œë²„ì™€ì˜ 3-Way Handshakeë¥¼ ìˆ˜í–‰í•©ë‹ˆë‹¤.
+//      - ì—°ê²° ì‹¤íŒ¨ ì‹œ ë‚´ë¶€ì ìœ¼ë¡œ `ReportError`ë¥¼ í†µí•´ Winsock ì—ëŸ¬ ì½”ë“œë¥¼ ë¡œê·¸ë¡œ ê¸°ë¡í•©ë‹ˆë‹¤.
+//      - RIO(Registered I/O) í™˜ê²½ì—ì„œ ì†Œì¼“ ì—°ê²° ì™„ë£Œ í›„ RIO_RQë¥¼ ìƒì„±í•˜ê¸° ì „ ë‹¨ê³„ì— í™œìš©ë©ë‹ˆë‹¤.
 //***************************************************************************
 bool CSocketUtils::Connect(SOCKET socket, CNetAddress netAddr)
 {
@@ -353,10 +354,10 @@ bool CSocketUtils::Connect(SOCKET socket, CNetAddress netAddr)
 }
 
 //***************************************************************************
-// @brief ¼ÒÄÏ¿¡ ³×Æ®¿öÅ© ÁÖ¼Ò(IP ¹× Port)¸¦ ¹ÙÀÎµùÇÕ´Ï´Ù.
-// @param socket ´ë»ó ¼ÒÄÏ ÇÚµé
-// @param netAddr ¹ÙÀÎµùÇÒ ÁÖ¼Ò Á¤º¸¸¦ ´ãÀº CNetAddress °´Ã¼
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief ì†Œì¼“ì— ë„¤íŠ¸ì›Œí¬ ì£¼ì†Œ(IP ë° Port)ë¥¼ ë°”ì¸ë”©í•©ë‹ˆë‹¤.
+// @param socket ëŒ€ìƒ ì†Œì¼“ í•¸ë“¤
+// @param netAddr ë°”ì¸ë”©í•  ì£¼ì†Œ ì •ë³´ë¥¼ ë‹´ì€ CNetAddress ê°ì²´
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool CSocketUtils::Bind(SOCKET socket, CNetAddress netAddr)
 {
@@ -365,10 +366,10 @@ bool CSocketUtils::Bind(SOCKET socket, CNetAddress netAddr)
 }
 
 //***************************************************************************
-// @brief ¼ÒÄÏÀ» ¿¬°á ¿äÃ» ¼ö½Å ´ë±â »óÅÂ(Listen)·Î ÀüÈ¯ÇÕ´Ï´Ù.
-// @param socket ´ë»ó ¼ÒÄÏ ÇÚµé
-// @param backlog ¿¬°á ´ë±â Å¥ÀÇ ÃÖ´ë Å©±â (±âº»°ª: SOMAXCONN)
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief ì†Œì¼“ì„ ì—°ê²° ìš”ì²­ ìˆ˜ì‹  ëŒ€ê¸° ìƒíƒœ(Listen)ë¡œ ì „í™˜í•©ë‹ˆë‹¤.
+// @param socket ëŒ€ìƒ ì†Œì¼“ í•¸ë“¤
+// @param backlog ì—°ê²° ëŒ€ê¸° íì˜ ìµœëŒ€ í¬ê¸° (ê¸°ë³¸ê°’: SOMAXCONN)
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool CSocketUtils::Listen(SOCKET socket, int32 backlog)
 {
@@ -376,8 +377,8 @@ bool CSocketUtils::Listen(SOCKET socket, int32 backlog)
 }
 
 //***************************************************************************
-// @brief ¼ÒÄÏ ÇÚµéÀ» ´İ¾Æ ³×Æ®¿öÅ© ÀÚ¿øÀ» ÇØÁ¦ÇÕ´Ï´Ù.
-// @param socket ´İÀ» ¼ÒÄÏ ÇÚµé
+// @brief ì†Œì¼“ í•¸ë“¤ì„ ë‹«ì•„ ë„¤íŠ¸ì›Œí¬ ìì›ì„ í•´ì œí•©ë‹ˆë‹¤.
+// @param socket ë‹«ì„ ì†Œì¼“ í•¸ë“¤
 //***************************************************************************
 void CSocketUtils::Close(SOCKET socket)
 {
@@ -385,19 +386,19 @@ void CSocketUtils::Close(SOCKET socket)
 		::closesocket(socket);
 }
 
-// ---------- IOCP È®Àå ÇÔ¼ö ----------
+// ---------- IOCP í™•ì¥ í•¨ìˆ˜ ----------
 
 //***************************************************************************
-// @brief AcceptEx ºñµ¿±â ¼ö¶ô È®Àå ÇÔ¼ö¸¦ È£ÃâÇÕ´Ï´Ù.
-// @param listenSocket ¸®½¼ ¼ÒÄÏ ÇÚµé
-// @param acceptSocket ¹Ì¸® »ı¼ºÇØ µĞ ¼ö¶ô ´ë»ó ¼ÒÄÏ ÇÚµé
-// @param outputBuffer Ã¹ ¼ö½Å µ¥ÀÌÅÍ ¹× ·ÎÄÃ/¿ø°İ ÁÖ¼Ò¸¦ ¼ö½ÅÇÒ ¹öÆÛ Æ÷ÀÎÅÍ
-// @param receiveDataLength outputBuffer¿¡¼­ µ¥ÀÌÅÍ ¼ö½Å¿ëÀ¸·Î »ç¿ëÇÒ ¹ÙÀÌÆ® Å©±â
-// @param localAddrLength ·ÎÄÃ ÁÖ¼Ò ÀúÀå¿ë ¹öÆÛ Å©±â (sizeof(sockaddr_in) + 16)
-// @param remoteAddrLength ¿ø°İ ÁÖ¼Ò ÀúÀå¿ë ¹öÆÛ Å©±â (sizeof(sockaddr_in) + 16)
-// @param bytesReceived ½ÇÁ¦ ¼ö½Å ¿Ï·áµÈ ¹ÙÀÌÆ® ¼ö°¡ Ãâ·ÂµÉ Æ÷ÀÎÅÍ
-// @param overlapped ºñµ¿±â I/O Ã³¸®¸¦ À§ÇÑ OVERLAPPED ±¸Á¶Ã¼ Æ÷ÀÎÅÍ
-// @return ¼º°ø ½Ã TRUE, ½ÇÆĞ ½Ã FALSE (WSA_IO_PENDING µî)
+// @brief AcceptEx ë¹„ë™ê¸° ìˆ˜ë½ í™•ì¥ í•¨ìˆ˜ë¥¼ í˜¸ì¶œí•©ë‹ˆë‹¤.
+// @param listenSocket ë¦¬ìŠ¨ ì†Œì¼“ í•¸ë“¤
+// @param acceptSocket ë¯¸ë¦¬ ìƒì„±í•´ ë‘” ìˆ˜ë½ ëŒ€ìƒ ì†Œì¼“ í•¸ë“¤
+// @param outputBuffer ì²« ìˆ˜ì‹  ë°ì´í„° ë° ë¡œì»¬/ì›ê²© ì£¼ì†Œë¥¼ ìˆ˜ì‹ í•  ë²„í¼ í¬ì¸í„°
+// @param receiveDataLength outputBufferì—ì„œ ë°ì´í„° ìˆ˜ì‹ ìš©ìœ¼ë¡œ ì‚¬ìš©í•  ë°”ì´íŠ¸ í¬ê¸°
+// @param localAddrLength ë¡œì»¬ ì£¼ì†Œ ì €ì¥ìš© ë²„í¼ í¬ê¸° (sizeof(sockaddr_in) + 16)
+// @param remoteAddrLength ì›ê²© ì£¼ì†Œ ì €ì¥ìš© ë²„í¼ í¬ê¸° (sizeof(sockaddr_in) + 16)
+// @param bytesReceived ì‹¤ì œ ìˆ˜ì‹  ì™„ë£Œëœ ë°”ì´íŠ¸ ìˆ˜ê°€ ì¶œë ¥ë  í¬ì¸í„°
+// @param overlapped ë¹„ë™ê¸° I/O ì²˜ë¦¬ë¥¼ ìœ„í•œ OVERLAPPED êµ¬ì¡°ì²´ í¬ì¸í„°
+// @return ì„±ê³µ ì‹œ TRUE, ì‹¤íŒ¨ ì‹œ FALSE (WSA_IO_PENDING ë“±)
 //***************************************************************************
 BOOL CSocketUtils::AcceptEx(SOCKET listenSocket, SOCKET acceptSocket, PVOID outputBuffer,
 	DWORD receiveDataLength, DWORD localAddrLength, DWORD remoteAddrLength,
@@ -409,15 +410,15 @@ BOOL CSocketUtils::AcceptEx(SOCKET listenSocket, SOCKET acceptSocket, PVOID outp
 }
 
 //***************************************************************************
-// @brief AcceptEx ¼ö½Å ¹öÆÛ·ÎºÎÅÍ ·ÎÄÃ ¹× ¿ø°İ SOCKADDR Æ÷ÀÎÅÍ¸¦ ÆÄ½ÌÇÕ´Ï´Ù.
-// @param outputBuffer AcceptEx È£Ãâ ½Ã »ç¿ëÇß´ø ¹öÆÛ Æ÷ÀÎÅÍ
-// @param receiveDataLength AcceptEx È£Ãâ ½Ã ÁöÁ¤ÇÑ ¼ö½Å µ¥ÀÌÅÍ Å©±â
-// @param localAddrLength AcceptEx È£Ãâ ½Ã ÁöÁ¤ÇÑ ·ÎÄÃ ÁÖ¼Ò ¹öÆÛ Å©±â
-// @param remoteAddrLength AcceptEx È£Ãâ ½Ã ÁöÁ¤ÇÑ ¿ø°İ ÁÖ¼Ò ¹öÆÛ Å©±â
-// @param localSockAddr ÆÄ½ÌµÈ ·ÎÄÃ SOCKADDR ±¸Á¶Ã¼ Æ÷ÀÎÅÍ Ãâ·Â
-// @param localSockAddrLen ·ÎÄÃ SOCKADDR ±¸Á¶Ã¼ ±æÀÌ Ãâ·Â
-// @param remoteSockAddr ÆÄ½ÌµÈ ¿ø°İ SOCKADDR ±¸Á¶Ã¼ Æ÷ÀÎÅÍ Ãâ·Â
-// @param remoteSockAddrLen ¿ø°İ SOCKADDR ±¸Á¶Ã¼ ±æÀÌ Ãâ·Â
+// @brief AcceptEx ìˆ˜ì‹  ë²„í¼ë¡œë¶€í„° ë¡œì»¬ ë° ì›ê²© SOCKADDR í¬ì¸í„°ë¥¼ íŒŒì‹±í•©ë‹ˆë‹¤.
+// @param outputBuffer AcceptEx í˜¸ì¶œ ì‹œ ì‚¬ìš©í–ˆë˜ ë²„í¼ í¬ì¸í„°
+// @param receiveDataLength AcceptEx í˜¸ì¶œ ì‹œ ì§€ì •í•œ ìˆ˜ì‹  ë°ì´í„° í¬ê¸°
+// @param localAddrLength AcceptEx í˜¸ì¶œ ì‹œ ì§€ì •í•œ ë¡œì»¬ ì£¼ì†Œ ë²„í¼ í¬ê¸°
+// @param remoteAddrLength AcceptEx í˜¸ì¶œ ì‹œ ì§€ì •í•œ ì›ê²© ì£¼ì†Œ ë²„í¼ í¬ê¸°
+// @param localSockAddr íŒŒì‹±ëœ ë¡œì»¬ SOCKADDR êµ¬ì¡°ì²´ í¬ì¸í„° ì¶œë ¥
+// @param localSockAddrLen ë¡œì»¬ SOCKADDR êµ¬ì¡°ì²´ ê¸¸ì´ ì¶œë ¥
+// @param remoteSockAddr íŒŒì‹±ëœ ì›ê²© SOCKADDR êµ¬ì¡°ì²´ í¬ì¸í„° ì¶œë ¥
+// @param remoteSockAddrLen ì›ê²© SOCKADDR êµ¬ì¡°ì²´ ê¸¸ì´ ì¶œë ¥
 //***************************************************************************
 void CSocketUtils::GetAcceptExSockaddrs(PVOID outputBuffer, DWORD receiveDataLength,
 	DWORD localAddrLength, DWORD remoteAddrLength,
@@ -430,15 +431,15 @@ void CSocketUtils::GetAcceptExSockaddrs(PVOID outputBuffer, DWORD receiveDataLen
 }
 
 //***************************************************************************
-// @brief ConnectEx ºñµ¿±â ¿¬°á È®Àå ÇÔ¼ö¸¦ È£ÃâÇÕ´Ï´Ù.
-// @param socket ¿¬°á¿¡ »ç¿ëÇÒ ¼ÒÄÏ ÇÚµé (¹Ì¸® Bind µÇ¾î ÀÖ¾î¾ß ÇÔ)
-// @param name ¿¬°áÇÒ ¸ñÀûÁö SOCKADDR ±¸Á¶Ã¼ Æ÷ÀÎÅÍ
-// @param nameLen SOCKADDR ±¸Á¶Ã¼ Å©±â
-// @param sendBuffer ¿¬°á Á÷ÈÄ ¹Ù·Î Àü¼ÛÇÒ µ¥ÀÌÅÍ ¹öÆÛ Æ÷ÀÎÅÍ (¾øÀ» °æ¿ì nullptr)
-// @param sendDataLength Àü¼ÛÇÒ µ¥ÀÌÅÍ ±æÀÌ
-// @param bytesSent ½ÇÁ¦ Àü¼Û ¿Ï·áµÈ ¹ÙÀÌÆ® ¼ö Ãâ·Â Æ÷ÀÎÅÍ
-// @param overlapped ºñµ¿±â I/O Ã³¸®¸¦ À§ÇÑ OVERLAPPED ±¸Á¶Ã¼ Æ÷ÀÎÅÍ
-// @return ¼º°ø ½Ã TRUE, ½ÇÆĞ ½Ã FALSE
+// @brief ConnectEx ë¹„ë™ê¸° ì—°ê²° í™•ì¥ í•¨ìˆ˜ë¥¼ í˜¸ì¶œí•©ë‹ˆë‹¤.
+// @param socket ì—°ê²°ì— ì‚¬ìš©í•  ì†Œì¼“ í•¸ë“¤ (ë¯¸ë¦¬ Bind ë˜ì–´ ìˆì–´ì•¼ í•¨)
+// @param name ì—°ê²°í•  ëª©ì ì§€ SOCKADDR êµ¬ì¡°ì²´ í¬ì¸í„°
+// @param nameLen SOCKADDR êµ¬ì¡°ì²´ í¬ê¸°
+// @param sendBuffer ì—°ê²° ì§í›„ ë°”ë¡œ ì „ì†¡í•  ë°ì´í„° ë²„í¼ í¬ì¸í„° (ì—†ì„ ê²½ìš° nullptr)
+// @param sendDataLength ì „ì†¡í•  ë°ì´í„° ê¸¸ì´
+// @param bytesSent ì‹¤ì œ ì „ì†¡ ì™„ë£Œëœ ë°”ì´íŠ¸ ìˆ˜ ì¶œë ¥ í¬ì¸í„°
+// @param overlapped ë¹„ë™ê¸° I/O ì²˜ë¦¬ë¥¼ ìœ„í•œ OVERLAPPED êµ¬ì¡°ì²´ í¬ì¸í„°
+// @return ì„±ê³µ ì‹œ TRUE, ì‹¤íŒ¨ ì‹œ FALSE
 //***************************************************************************
 BOOL CSocketUtils::ConnectEx(SOCKET socket, const SOCKADDR* name, int32 nameLen,
 	PVOID sendBuffer, DWORD sendDataLength,
@@ -449,12 +450,12 @@ BOOL CSocketUtils::ConnectEx(SOCKET socket, const SOCKADDR* name, int32 nameLen,
 }
 
 //***************************************************************************
-// @brief DisconnectEx ºñµ¿±â ¿¬°á ÇØÁ¦ È®Àå ÇÔ¼ö¸¦ È£ÃâÇÕ´Ï´Ù.
-// @param socket ¿¬°áÀ» ²÷À» ¼ÒÄÏ ÇÚµé
-// @param overlapped ºñµ¿±â I/O Ã³¸®¸¦ À§ÇÑ OVERLAPPED ±¸Á¶Ã¼ Æ÷ÀÎÅÍ
-// @param flags ¼ÒÄÏ ÇØÁ¦ ¿É¼Ç ÇÃ·¡±× (TF_REUSE_SOCKET µî)
-// @param reserved ¿¹¾à ÇÊµå (0 ÁöÁ¤)
-// @return ¼º°ø ½Ã TRUE, ½ÇÆĞ ½Ã FALSE
+// @brief DisconnectEx ë¹„ë™ê¸° ì—°ê²° í•´ì œ í™•ì¥ í•¨ìˆ˜ë¥¼ í˜¸ì¶œí•©ë‹ˆë‹¤.
+// @param socket ì—°ê²°ì„ ëŠì„ ì†Œì¼“ í•¸ë“¤
+// @param overlapped ë¹„ë™ê¸° I/O ì²˜ë¦¬ë¥¼ ìœ„í•œ OVERLAPPED êµ¬ì¡°ì²´ í¬ì¸í„°
+// @param flags ì†Œì¼“ í•´ì œ ì˜µì…˜ í”Œë˜ê·¸ (TF_REUSE_SOCKET ë“±)
+// @param reserved ì˜ˆì•½ í•„ë“œ (0 ì§€ì •)
+// @return ì„±ê³µ ì‹œ TRUE, ì‹¤íŒ¨ ì‹œ FALSE
 //***************************************************************************
 BOOL CSocketUtils::DisconnectEx(SOCKET socket, LPOVERLAPPED overlapped, DWORD flags, DWORD reserved)
 {
@@ -463,10 +464,10 @@ BOOL CSocketUtils::DisconnectEx(SOCKET socket, LPOVERLAPPED overlapped, DWORD fl
 }
 
 //***************************************************************************
-// @brief ¼ÒÄÏÀÇ ºí·ÎÅ·/³íºí·ÎÅ·(Non-blocking) ¸ğµå¸¦ ¼³Á¤ÇÕ´Ï´Ù.
-// @param socket ¸ğµå¸¦ º¯°æÇÒ ´ë»ó ¼ÒÄÏ ÇÚµé
-// @param nonBlocking true ¼³Á¤ ½Ã ³íºí·ÎÅ· ¸ğµå, false ¼³Á¤ ½Ã ºí·ÎÅ· ¸ğµå
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief ì†Œì¼“ì˜ ë¸”ë¡œí‚¹/ë…¼ë¸”ë¡œí‚¹(Non-blocking) ëª¨ë“œë¥¼ ì„¤ì •í•©ë‹ˆë‹¤.
+// @param socket ëª¨ë“œë¥¼ ë³€ê²½í•  ëŒ€ìƒ ì†Œì¼“ í•¸ë“¤
+// @param nonBlocking true ì„¤ì • ì‹œ ë…¼ë¸”ë¡œí‚¹ ëª¨ë“œ, false ì„¤ì • ì‹œ ë¸”ë¡œí‚¹ ëª¨ë“œ
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool CSocketUtils::SetNonBlocking(SOCKET socket, bool nonBlocking)
 {
@@ -475,10 +476,10 @@ bool CSocketUtils::SetNonBlocking(SOCKET socket, bool nonBlocking)
 }
 
 //***************************************************************************
-// @brief Å¬¶óÀÌ¾ğÆ®ÀÇ ¿¬°á ¿äÃ»À» ¼ö¶ô(Accept)ÇÏ°í ÁÖ¼Ò Á¤º¸¸¦ ÀĞ¾î¿É´Ï´Ù.
-// @param listenSocket ¿¬°á ¿äÃ»À» ¼ö½Å ´ë±â ÁßÀÎ ¸®½¼(Listen) ¼ÒÄÏ ÇÚµé
-// @param outClientAddress [OUT] ¿¬°áµÈ Å¬¶óÀÌ¾ğÆ®ÀÇ ÁÖ¼Ò Á¤º¸(sockaddr_in)¸¦ ÀúÀåÇÒ ÂüÁ¶ º¯¼ö
-// @return »ı¼ºµÈ Å¬¶óÀÌ¾ğÆ® ¼ÒÄÏ ÇÚµé (½ÇÆĞ ½Ã INVALID_SOCKET)
+// @brief í´ë¼ì´ì–¸íŠ¸ì˜ ì—°ê²° ìš”ì²­ì„ ìˆ˜ë½(Accept)í•˜ê³  ì£¼ì†Œ ì •ë³´ë¥¼ ì½ì–´ì˜µë‹ˆë‹¤.
+// @param listenSocket ì—°ê²° ìš”ì²­ì„ ìˆ˜ì‹  ëŒ€ê¸° ì¤‘ì¸ ë¦¬ìŠ¨(Listen) ì†Œì¼“ í•¸ë“¤
+// @param outClientAddress [OUT] ì—°ê²°ëœ í´ë¼ì´ì–¸íŠ¸ì˜ ì£¼ì†Œ ì •ë³´(sockaddr_in)ë¥¼ ì €ì¥í•  ì°¸ì¡° ë³€ìˆ˜
+// @return ìƒì„±ëœ í´ë¼ì´ì–¸íŠ¸ ì†Œì¼“ í•¸ë“¤ (ì‹¤íŒ¨ ì‹œ INVALID_SOCKET)
 //***************************************************************************
 SOCKET CSocketUtils::Accept(SOCKET listenSocket, sockaddr_in& outClientAddress)
 {
@@ -487,11 +488,11 @@ SOCKET CSocketUtils::Accept(SOCKET listenSocket, sockaddr_in& outClientAddress)
 }
 
 //***************************************************************************
-// @brief ¹®ÀÚ¿­ Çü½ÄÀÇ IP ÁÖ¼Ò¸¦ ÀÌÁø ÁÖ¼Ò ±¸Á¶Ã¼(in_addr / in6_addr)·Î º¯È¯ÇÕ´Ï´Ù.
-// @param af ÁÖ¼Ò Ã¼°è (AF_INET ¶Ç´Â AF_INET6)
-// @param hostAddress IP ÁÖ¼Ò ¹®ÀÚ¿­ (¿¹: _T("127.0.0.1"))
-// @param dest º¯È¯ °á°ú¸¦ ÀúÀåÇÒ ¸Ş¸ğ¸® ¹öÆÛ Æ÷ÀÎÅÍ
-// @return ¼º°ø ½Ã TRUE, ½ÇÆĞ ½Ã FALSE
+// @brief ë¬¸ìì—´ í˜•ì‹ì˜ IP ì£¼ì†Œë¥¼ ì´ì§„ ì£¼ì†Œ êµ¬ì¡°ì²´(in_addr / in6_addr)ë¡œ ë³€í™˜í•©ë‹ˆë‹¤.
+// @param af ì£¼ì†Œ ì²´ê³„ (AF_INET ë˜ëŠ” AF_INET6)
+// @param hostAddress IP ì£¼ì†Œ ë¬¸ìì—´ (ì˜ˆ: _T("127.0.0.1"))
+// @param dest ë³€í™˜ ê²°ê³¼ë¥¼ ì €ì¥í•  ë©”ëª¨ë¦¬ ë²„í¼ í¬ì¸í„°
+// @return ì„±ê³µ ì‹œ TRUE, ì‹¤íŒ¨ ì‹œ FALSE
 //***************************************************************************
 bool CSocketUtils::IPToAddr(const int af, const TCHAR* hostAddress, void* dest)
 {
@@ -527,12 +528,12 @@ bool CSocketUtils::IPToAddr(const int af, const TCHAR* hostAddress, void* dest)
 }
 
 //***************************************************************************
-// @brief ÀÌÁø ÁÖ¼Ò ±¸Á¶Ã¼¸¦ ¹®ÀÚ¿­ IP ÁÖ¼Ò·Î º¯È¯ÇÕ´Ï´Ù.
-// @param af ÁÖ¼Ò Ã¼°è (AF_INET ¶Ç´Â AF_INET6)
-// @param src ¹ÙÀÌ³Ê¸® ÁÖ¼Ò ±¸Á¶Ã¼ Æ÷ÀÎÅÍ
-// @param hostAddress º¯È¯µÈ ¹®ÀÚ¿­ÀÌ ÀúÀåµÉ ¹öÆÛ
-// @param size ¹öÆÛÀÇ Å©±â
-// @return ¼º°ø ½Ã TRUE, ½ÇÆĞ ½Ã FALSE
+// @brief ì´ì§„ ì£¼ì†Œ êµ¬ì¡°ì²´ë¥¼ ë¬¸ìì—´ IP ì£¼ì†Œë¡œ ë³€í™˜í•©ë‹ˆë‹¤.
+// @param af ì£¼ì†Œ ì²´ê³„ (AF_INET ë˜ëŠ” AF_INET6)
+// @param src ë°”ì´ë„ˆë¦¬ ì£¼ì†Œ êµ¬ì¡°ì²´ í¬ì¸í„°
+// @param hostAddress ë³€í™˜ëœ ë¬¸ìì—´ì´ ì €ì¥ë  ë²„í¼
+// @param size ë²„í¼ì˜ í¬ê¸°
+// @return ì„±ê³µ ì‹œ TRUE, ì‹¤íŒ¨ ì‹œ FALSE
 //***************************************************************************
 bool CSocketUtils::AddrToIP(const int af, const void* src, TCHAR* hostAddress, socklen_t size)
 {
@@ -548,11 +549,11 @@ bool CSocketUtils::AddrToIP(const int af, const void* src, TCHAR* hostAddress, s
 	{
 	case AF_INET:
 		reinterpret_cast<sockaddr_in*>(&ss)->sin_addr = *reinterpret_cast<const struct in_addr*>(src);
-		dwSockAddrLen = sizeof(sockaddr_in); // [¼öÁ¤] IPv4 Á¤È®ÇÑ ±¸Á¶Ã¼ Å©±â ÁöÁ¤
+		dwSockAddrLen = sizeof(sockaddr_in); // [ìˆ˜ì •] IPv4 ì •í™•í•œ êµ¬ì¡°ì²´ í¬ê¸° ì§€ì •
 		break;
 	case AF_INET6:
 		reinterpret_cast<sockaddr_in6*>(&ss)->sin6_addr = *reinterpret_cast<const struct in_addr6*>(src);
-		dwSockAddrLen = sizeof(sockaddr_in6); // [¼öÁ¤] IPv6 Á¤È®ÇÑ ±¸Á¶Ã¼ Å©±â ÁöÁ¤
+		dwSockAddrLen = sizeof(sockaddr_in6); // [ìˆ˜ì •] IPv6 ì •í™•í•œ êµ¬ì¡°ì²´ í¬ê¸° ì§€ì •
 		break;
 	default:
 		return false;
@@ -565,9 +566,9 @@ bool CSocketUtils::AddrToIP(const int af, const void* src, TCHAR* hostAddress, s
 }
 
 //***************************************************************************
-// @brief IPv4 ÁÖ¼Ò¸¦ IPv6 Mapped IPv4 ÁÖ¼Ò ÇüÅÂ(::ffff:x.x.x.x)·Î º¯È¯ÇÕ´Ï´Ù.
-// @param ipv4 ¿øº» IPv4 in_addr ±¸Á¶Ã¼
-// @param ipv6 º¯È¯ °á°ú°¡ ÀúÀåµÉ IPv6 in6_addr ÂüÁ¶
+// @brief IPv4 ì£¼ì†Œë¥¼ IPv6 Mapped IPv4 ì£¼ì†Œ í˜•íƒœ(::ffff:x.x.x.x)ë¡œ ë³€í™˜í•©ë‹ˆë‹¤.
+// @param ipv4 ì›ë³¸ IPv4 in_addr êµ¬ì¡°ì²´
+// @param ipv6 ë³€í™˜ ê²°ê³¼ê°€ ì €ì¥ë  IPv6 in6_addr ì°¸ì¡°
 //***************************************************************************
 void CSocketUtils::IPv4ToIPv6(const struct in_addr ipv4, struct in6_addr& ipv6)
 {
@@ -577,11 +578,11 @@ void CSocketUtils::IPv4ToIPv6(const struct in_addr ipv4, struct in6_addr& ipv6)
 }
 
 //***************************************************************************
-// @brief È£½ºÆ® ÀÌ¸§ ¹× Æ÷Æ® ¹øÈ£¸¦ ¹ÙÅÁÀ¸·Î µµ¸ŞÀÎ Á¶È¸(DNS) ÈÄ addrinfo ¸®½ºÆ®¸¦ ÃëµæÇÕ´Ï´Ù.
-// @param hostName µµ¸ŞÀÎ ÀÌ¸§ ¶Ç´Â IP ¹®ÀÚ¿­
-// @param port Æ÷Æ® ¹øÈ£
-// @param sockAddrList Á¶È¸µÈ addrinfo ¸ñ·ÏÀÌ ÀúÀåµÉ std::list ÂüÁ¶
-// @return ¼º°ø ½Ã TRUE, ½ÇÆĞ ½Ã FALSE
+// @brief í˜¸ìŠ¤íŠ¸ ì´ë¦„ ë° í¬íŠ¸ ë²ˆí˜¸ë¥¼ ë°”íƒ•ìœ¼ë¡œ ë„ë©”ì¸ ì¡°íšŒ(DNS) í›„ addrinfo ë¦¬ìŠ¤íŠ¸ë¥¼ ì·¨ë“í•©ë‹ˆë‹¤.
+// @param hostName ë„ë©”ì¸ ì´ë¦„ ë˜ëŠ” IP ë¬¸ìì—´
+// @param port í¬íŠ¸ ë²ˆí˜¸
+// @param sockAddrList ì¡°íšŒëœ addrinfo ëª©ë¡ì´ ì €ì¥ë  std::list ì°¸ì¡°
+// @return ì„±ê³µ ì‹œ TRUE, ì‹¤íŒ¨ ì‹œ FALSE
 //***************************************************************************
 bool CSocketUtils::GetSockAddrIn(const TCHAR* hostName, const int port, std::list<addrinfo>& sockAddrList)
 {
@@ -626,10 +627,10 @@ bool CSocketUtils::GetSockAddrIn(const TCHAR* hostName, const int port, std::lis
 }
 
 //***************************************************************************
-// @brief getpeername()À» ·¡ÇÎÇÏ¿© ¿¬°áµÈ ¼ÒÄÏÀÇ ¿ø°İÁö ÁÖ¼Ò¸¦ Á¶È¸ÇÕ´Ï´Ù.
-// @param socket ´ë»ó ¼ÒÄÏ ÇÚµé
-// @param outAddress Á¶È¸µÈ ¿ø°İÁö ÁÖ¼Ò°¡ Ã¤¿öÁú ±¸Á¶Ã¼
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief getpeername()ì„ ë˜í•‘í•˜ì—¬ ì—°ê²°ëœ ì†Œì¼“ì˜ ì›ê²©ì§€ ì£¼ì†Œë¥¼ ì¡°íšŒí•©ë‹ˆë‹¤.
+// @param socket ëŒ€ìƒ ì†Œì¼“ í•¸ë“¤
+// @param outAddress ì¡°íšŒëœ ì›ê²©ì§€ ì£¼ì†Œê°€ ì±„ì›Œì§ˆ êµ¬ì¡°ì²´
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool CSocketUtils::GetPeerAddress(SOCKET socket, sockaddr_in& outAddress)
 {
@@ -637,12 +638,12 @@ bool CSocketUtils::GetPeerAddress(SOCKET socket, sockaddr_in& outAddress)
 	return ::getpeername(socket, reinterpret_cast<SOCKADDR*>(&outAddress), &addrLen) == 0;
 }
 
-// ---------- ¿¡·¯ ¸Ş½ÃÁö ----------
+// ---------- ì—ëŸ¬ ë©”ì‹œì§€ ----------
 
 //***************************************************************************
-// @brief Winsock ¿¡·¯ ÄÚµå¿¡ ÇØ´çÇÏ´Â ¿µ¹® ¼³¸í ¸Ş½ÃÁö¸¦ Á¶È¸ÇÕ´Ï´Ù.
-// @param errorCode Winsock ¿¡·¯ ¹øÈ£ (WSAGetLastError())
-// @return ¿µ¹® ¿¡·¯ ¸Ş½ÃÁö ¹®ÀÚ¿­ Æ÷ÀÎÅÍ (¾øÀ» °æ¿ì nullptr)
+// @brief Winsock ì—ëŸ¬ ì½”ë“œì— í•´ë‹¹í•˜ëŠ” ì˜ë¬¸ ì„¤ëª… ë©”ì‹œì§€ë¥¼ ì¡°íšŒí•©ë‹ˆë‹¤.
+// @param errorCode Winsock ì—ëŸ¬ ë²ˆí˜¸ (WSAGetLastError())
+// @return ì˜ë¬¸ ì—ëŸ¬ ë©”ì‹œì§€ ë¬¸ìì—´ í¬ì¸í„° (ì—†ì„ ê²½ìš° nullptr)
 //***************************************************************************
 const TCHAR* CSocketUtils::GetErrMsgToWinsockErrCodeEn(const int errorCode)
 {
@@ -655,9 +656,9 @@ const TCHAR* CSocketUtils::GetErrMsgToWinsockErrCodeEn(const int errorCode)
 }
 
 //***************************************************************************
-// @brief Winsock ¿¡·¯ ÄÚµå¿¡ ÇØ´çÇÏ´Â ÇÑ±Û ¼³¸í ¸Ş½ÃÁö¸¦ Á¶È¸ÇÕ´Ï´Ù.
-// @param errorCode Winsock ¿¡·¯ ¹øÈ£ (WSAGetLastError())
-// @return ÇÑ±Û ¿¡·¯ ¸Ş½ÃÁö ¹®ÀÚ¿­ Æ÷ÀÎÅÍ (¾øÀ» °æ¿ì nullptr)
+// @brief Winsock ì—ëŸ¬ ì½”ë“œì— í•´ë‹¹í•˜ëŠ” í•œê¸€ ì„¤ëª… ë©”ì‹œì§€ë¥¼ ì¡°íšŒí•©ë‹ˆë‹¤.
+// @param errorCode Winsock ì—ëŸ¬ ë²ˆí˜¸ (WSAGetLastError())
+// @return í•œê¸€ ì—ëŸ¬ ë©”ì‹œì§€ ë¬¸ìì—´ í¬ì¸í„° (ì—†ì„ ê²½ìš° nullptr)
 //***************************************************************************
 const TCHAR* CSocketUtils::GetErrMsgToWinsockErrCodeKr(const int errorCode)
 {
@@ -670,9 +671,9 @@ const TCHAR* CSocketUtils::GetErrMsgToWinsockErrCodeKr(const int errorCode)
 }
 
 //***************************************************************************
-// @brief ÀÛ¾÷ ¸íÄª°ú ¿¡·¯ ÄÚµå¸¦ Æ÷¸ËÆÃÇÏ¿© ¿¡·¯ º¸°í(·Î±× ±â·Ï)¸¦ ¼öÇàÇÕ´Ï´Ù.
-// @param operationDesc ¿¡·¯°¡ ¹ß»ıÇÑ ÀÛ¾÷¿¡ ´ëÇÑ ¼³¸í
-// @param errorCode Winsock ¿¡·¯ ¹øÈ£
+// @brief ì‘ì—… ëª…ì¹­ê³¼ ì—ëŸ¬ ì½”ë“œë¥¼ í¬ë§·íŒ…í•˜ì—¬ ì—ëŸ¬ ë³´ê³ (ë¡œê·¸ ê¸°ë¡)ë¥¼ ìˆ˜í–‰í•©ë‹ˆë‹¤.
+// @param operationDesc ì—ëŸ¬ê°€ ë°œìƒí•œ ì‘ì—…ì— ëŒ€í•œ ì„¤ëª…
+// @param errorCode Winsock ì—ëŸ¬ ë²ˆí˜¸
 //***************************************************************************
 void CSocketUtils::ReportError(const TCHAR* operationDesc, const int errorCode)
 {
@@ -697,7 +698,7 @@ void CSocketUtils::ReportError(const TCHAR* operationDesc, const int errorCode)
 		operationDesc, errorCode, ptszMsgBuffer);
 	LOG_INFO(_T("Error : %s"), tszBuffer);
 
-	// FormatMessage ½Ã½ºÅÛ ÇÒ´ç ¸Ş¸ğ¸® ÇØÁ¦
+	// FormatMessage ì‹œìŠ¤í…œ í• ë‹¹ ë©”ëª¨ë¦¬ í•´ì œ
 	if( isAllocatedBySystem && ptszMsgBuffer )
 	{
 		::LocalFree(const_cast<TCHAR*>(ptszMsgBuffer));

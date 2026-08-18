@@ -67,6 +67,7 @@ bool		GetFileInfoTime(const TCHAR* ptszFilePath, const int nCase, SYSTEMTIME& st
 bool		IsExistFile(const TCHAR* ptszFilePath);
 DWORD		GetFileSize(const TCHAR* ptszFilePath);
 bool		GetFileInformation(const TCHAR* ptszFilePath, LPBY_HANDLE_FILE_INFORMATION lpFileInformation);
+bool		GetFileInfoAndEncoding(const TCHAR* ptszFullPath, LPBY_HANDLE_FILE_INFORMATION lpFileInformation, EEncoding& outEncoding);
 #endif
 
 EEncoding		GetFileEncodingType(const _tstring& filepath);

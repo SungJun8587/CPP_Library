@@ -39,8 +39,15 @@ class CRioEventPool;
 //
 // [동기화 및 Lifecycle]
 //      - Submission Gate: _submissionMutex를 통해 Shutdown 진입 시 신규 I/O 제출 차단
-//      - Dispatch Gate: _dispatchGate를 통해 워커 스레드 디스패치와 Shutdown 간 단무결성 보장
+//      - Dispatch Gate: _dispatchGate를 통해 워커 스레드의 DispatchBatch()와
+//        Shutdown()의 리소스 파괴 구간이 서로 겹치지 않도록 상호 배제
 //      - CQ Consumer: _cqConsumerMutex를 사용하여 Dequeue / Notify 동시 접근 보호
+//
+// [워커 스레드 정책]
+//      CRioCore 인스턴스당 워커 스레드는 정확히 1개만 존재합니다(재시작 없음,
+//      StartWorker() 1회 성공 후 재호출은 거부됨). Shutdown()은 이 단일
+//      워커가 완전히 정지했음을 확인한 뒤에만 CQ Drain 및 리소스 파괴 단계로
+//      진입합니다.
 //***************************************************************************
 class CRioCore
 {
@@ -54,7 +61,23 @@ public:
     CRioCore& operator=(CRioCore&&) = delete;
 
 public:
+    //***************************************************************************
+    // @brief RIO Core Engine을 초기화합니다 (RIO 함수 테이블 로드 + CQ/IOCP 생성).
+    // @param socket RIO 함수 테이블 로드 및 바인딩을 위한 소켓
+    // @param maxCompletionResults Completion Queue에서 한 번에 처리할 최대 결과 수
+    // @param cqIdentifier CQ 구분 식별자 Tag (하위 2비트는 Receive/Send 태그용으로
+    //        예약되어 있으므로 0이어야 함)
+    // @param eventPool I/O에 사용될 RIO Event Pool 객체 Pointer
+    // @return bool 성공 시 true. 성공 시 상태가 Uninitialized -> Initialized로 전이됨.
+    //***************************************************************************
     bool Initialize(SOCKET socket, ULONG maxCompletionResults, ULONG_PTR cqIdentifier, CRioEventPool* eventPool);
+
+    //***************************************************************************
+    // @brief 외부에서 RIO Engine 정지를 요청합니다 (비동기 — 즉시 정지를 보장하지
+    //        않으며, 워커가 다음 IOCP wake-up 때 정지를 인지함).
+    // @note Dispatch 콜백(CRioObject::Dispatch) 내부에서 호출하면 안 됩니다
+    //       (assert 후 무시됨).
+    //***************************************************************************
     void RequestStop();
 
     //***************************************************************************
@@ -68,9 +91,13 @@ public:
     {
         std::unique_lock<std::mutex> lifecycleLock(_lifecycleMutex);
 
+        // 1. 상태 전제조건 확인: Initialize() 완료 상태여야 하고, 이미 워커가
+        //    실행 중이거나 남아있으면 거부합니다(재시작/중복 시작 방지).
         if( _state.load(std::memory_order_acquire) != Rio::State::Initialized ) return false;
         if( _workerRunning.load(std::memory_order_acquire) || _workerThread.joinable() ) return false;
 
+        // 2. 워커 시작 전 상태 초기화 및 Initialized -> Running 선전이
+        //    (스레드 생성이 실패하면 아래 catch에서 Initialized로 되돌립니다).
         _workerFaulted.store(false, std::memory_order_release);
         _workerThreadId.store(std::thread::id{}, std::memory_order_release);
         _state.store(Rio::State::Running, std::memory_order_release);
@@ -78,6 +105,10 @@ public:
 
         try
         {
+            // 3. 실제 워커 스레드 생성. 스레드 내부에서 자신의 thread id를
+            //    저장한 뒤 사용자 루프(func)를 실행하고, 예외 발생 시
+            //    FaultInternal()로 결함 상태 전이 후 정상적으로 스레드를 종료합니다
+            //    (예외를 스레드 밖으로 내보내지 않음 — std::terminate() 방지).
             _workerThread = std::thread([this, func = std::forward<F>(workerFunc)]() mutable noexcept
                 {
                     _workerThreadId.store(std::this_thread::get_id(), std::memory_order_release);
@@ -98,6 +129,8 @@ public:
         }
         catch( ... )
         {
+            // 4. 스레드 생성 자체가 실패한 경우(리소스 부족 등) — 상태를
+            //    Running 이전(Initialized)으로 되돌려 재시도 가능하게 합니다.
             _workerRunning.store(false, std::memory_order_release);
             _workerThreadId.store(std::thread::id{}, std::memory_order_release);
             _state.store(Rio::State::Initialized, std::memory_order_release);
@@ -105,7 +138,21 @@ public:
         }
     }
 
+    //***************************************************************************
+    // @brief Completion Queue에서 완료 이벤트를 하나(또는 대기 후 하나) 처리합니다.
+    // @param mode Wait: 처리할 게 없으면 IOCP에서 블로킹 대기(워커 스레드 전용).
+    //             Drain: 블로킹 대기 없이 잔여 이벤트만 즉시 처리하고 반환
+    //             (Shutdown()의 드레인 루프 전용).
+    // @return int32 처리된 completion 개수(>=0), 또는 Rio::k* 에러 코드(<0)
+    //***************************************************************************
     int32 DispatchBatch(Rio::DispatchMode mode = Rio::DispatchMode::Wait);
+
+    //***************************************************************************
+    // @brief RIO Core Engine을 안전하게 종료합니다 (워커 Join → outstanding I/O
+    //        드레인 → CQ/IOCP 파괴).
+    // @param drainTimeout 드레인 대기 제한시간
+    // @return Rio::ShutdownResult 종료 결과(Success면 이후 상태는 Closed)
+    //***************************************************************************
     Rio::ShutdownResult Shutdown(std::chrono::milliseconds drainTimeout = Rio::kDefaultDrainTimeout);
 
     //***************************************************************************
@@ -117,11 +164,16 @@ public:
     template<typename F>
     bool SubmitIo(F&& submitFunc)
     {
+        // 1. Shared lock으로 진입 — StopInternal()의 unique_lock과 상호 배제되므로,
+        //    이 lock을 통과했다는 것 자체가 "이 시점엔 Stopping 전이가 진행 중이
+        //    아니다"를 보장합니다.
         std::shared_lock<std::shared_mutex> submissionLock(_submissionMutex);
 
+        // 2. 상태 확인 및 outstanding I/O 카운트 선증가(admission).
         if( _state.load(std::memory_order_acquire) != Rio::State::Running ) return false;
         if( !IncrementIoCount() ) return false;
 
+        // 3. 실제 제출 함수 실행. 실패(또는 예외) 시 증가시켰던 카운트를 롤백합니다.
         try
         {
             if( !submitFunc() )
@@ -268,6 +320,9 @@ private:
 
     void MarkFaulted(bool receiveCqCorrupt, bool sendCqCorrupt) noexcept;
 
+    //***************************************************************************
+    // @brief _state를 from -> to로 원자적으로 전이 시도합니다(CAS 1회).
+    //***************************************************************************
     bool TryTransitionState(Rio::State from, Rio::State to) noexcept
     {
         Rio::State expected = from;
@@ -284,7 +339,9 @@ private:
 
     //***************************************************************************
     // @struct TlsDispatchGuard
-    // @brief TLS Dispatch Context 복원용 RAII 가드
+    // @brief TLS Dispatch Context 복원용 RAII 가드. 스코프 종료 시 이전 값으로
+    //        되돌려 중첩 호출(예: Shutdown()의 드레인 루프가 자기 자신을
+    //        Dispatch Core로 다시 표시하는 경우)에도 안전합니다.
     //***************************************************************************
     struct TlsDispatchGuard
     {
@@ -299,7 +356,7 @@ private:
 
     //***************************************************************************
     // @struct OutstandingIoGuard
-    // @brief Outstanding I/O 카운트 자동 감축용 RAII 가드
+    // @brief CRioCore 자신의 outstanding I/O 카운트를 스코프 종료 시 자동 감축합니다.
     //***************************************************************************
     struct OutstandingIoGuard
     {
@@ -313,7 +370,9 @@ private:
 
     //***************************************************************************
     // @struct ObjectIoCountGuard
-    // @brief CRioObject I/O 카운트 자동 감축용 RAII 가드
+    // @brief CRioObject(개별 세션 등)의 I/O 카운트를 Dispatch() 반환 이후
+    //        스코프 종료 시 자동 감축합니다. 호출자(CRioObject 구현체)는
+    //        이 카운트를 직접 건드리면 안 됩니다.
     //***************************************************************************
     struct ObjectIoCountGuard
     {
@@ -357,7 +416,7 @@ private:
     std::atomic<bool> _receiveCqCorrupted{ false }; // Receive CQ Corrupt 손상 플래그
     std::atomic<bool> _sendCqCorrupted{ false };    // Send CQ Corrupt 손상 플래그
 
-    std::thread _workerThread;                      // Worker Thread
+    std::thread _workerThread;                      // Worker Thread (인스턴스당 1개)
     std::atomic<std::thread::id> _workerThreadId{}; // Worker Thread ID 정보
 
     mutable std::mutex _lifecycleMutex; // Lifecycle 동기화 Mutex

@@ -1,3 +1,4 @@
+ï»¿
 //***************************************************************************
 // AdoDB.cpp : implementation of the CAdoDB class.
 //
@@ -7,7 +8,7 @@
 #include "AdoDB.h"
 
 //***************************************************************************
-// @brief CAdoDB Å¬·¡½º »ı¼ºÀÚ (COM ¶óÀÌºê·¯¸® ÃÊ±âÈ­ ¹× ¸â¹ö º¯¼ö ÃÊ±âÈ­)
+// @brief CAdoDB í´ë˜ìŠ¤ ìƒì„±ì (COM ë¼ì´ë¸ŒëŸ¬ë¦¬ ì´ˆê¸°í™” ë° ë©¤ë²„ ë³€ìˆ˜ ì´ˆê¸°í™”)
 //***************************************************************************
 CAdoDB::CAdoDB()
 {
@@ -19,7 +20,7 @@ CAdoDB::CAdoDB()
 }
 
 //***************************************************************************
-// @brief CAdoDB Å¬·¡½º ¼Ò¸êÀÚ (µ¥ÀÌÅÍº£ÀÌ½º ¹× ¿¬°á °´Ã¼ ÇØÁ¦, COM ¶óÀÌºê·¯¸® ¾ğÀÎÀÌÆ®)
+// @brief CAdoDB í´ë˜ìŠ¤ ì†Œë©¸ì (ë°ì´í„°ë² ì´ìŠ¤ ë° ì—°ê²° ê°ì²´ í•´ì œ, COM ë¼ì´ë¸ŒëŸ¬ë¦¬ ì–¸ì¸ì´íŠ¸)
 //***************************************************************************
 CAdoDB::~CAdoDB()
 {
@@ -43,8 +44,8 @@ CAdoDB::~CAdoDB()
 }
 
 //***************************************************************************
-// @brief µ¥ÀÌÅÍº£ÀÌ½º ¿¬°á »óÅÂ È®ÀÎ
-// @return ¿¬°áµÇ¾î ÀÖÀ¸¸é TRUE, ¾Æ´Ï¸é FALSE
+// @brief ë°ì´í„°ë² ì´ìŠ¤ ì—°ê²° ìƒíƒœ í™•ì¸
+// @return ì—°ê²°ë˜ì–´ ìˆìœ¼ë©´ TRUE, ì•„ë‹ˆë©´ FALSE
 //***************************************************************************
 BOOL CAdoDB::ISConnect()
 {
@@ -52,8 +53,8 @@ BOOL CAdoDB::ISConnect()
 }
 
 //***************************************************************************
-// @brief ·¹ÄÚµå¼Â(Recordset) °´Ã¼ÀÇ ¿¬°á »óÅÂ È®ÀÎ
-// @return ·¹ÄÚµå¼ÂÀÌ ¿­·Á ÀÖÀ¸¸é TRUE, ¾Æ´Ï¸é FALSE
+// @brief ë ˆì½”ë“œì…‹(Recordset) ê°ì²´ì˜ ì—°ê²° ìƒíƒœ í™•ì¸
+// @return ë ˆì½”ë“œì…‹ì´ ì—´ë ¤ ìˆìœ¼ë©´ TRUE, ì•„ë‹ˆë©´ FALSE
 //***************************************************************************
 BOOL CAdoDB::ISRSCon()
 {
@@ -61,8 +62,8 @@ BOOL CAdoDB::ISRSCon()
 }
 
 //***************************************************************************
-// @brief µ¥ÀÌÅÍº£ÀÌ½º ¿¬°á ¿ÀÇÂ »óÅÂ È®ÀÎ
-// @return ¿ÀÇÂµÇ¾î ÀÖÀ¸¸é TRUE, ¾Æ´Ï¸é FALSE
+// @brief ë°ì´í„°ë² ì´ìŠ¤ ì—°ê²° ì˜¤í”ˆ ìƒíƒœ í™•ì¸
+// @return ì˜¤í”ˆë˜ì–´ ìˆìœ¼ë©´ TRUE, ì•„ë‹ˆë©´ FALSE
 //***************************************************************************
 BOOL CAdoDB::ISOpen()
 {
@@ -70,8 +71,8 @@ BOOL CAdoDB::ISOpen()
 }
 
 //***************************************************************************
-// @brief Ä¿¸Çµå(Command) °´Ã¼ »óÅÂ È®ÀÎ
-// @return Ä¿¸Çµå°¡ È°¼ºÈ­µÇ¾î ÀÖÀ¸¸é TRUE, ¾Æ´Ï¸é FALSE
+// @brief ì»¤ë§¨ë“œ(Command) ê°ì²´ ìƒíƒœ í™•ì¸
+// @return ì»¤ë§¨ë“œê°€ í™œì„±í™”ë˜ì–´ ìˆìœ¼ë©´ TRUE, ì•„ë‹ˆë©´ FALSE
 //***************************************************************************
 BOOL CAdoDB::ISCommand()
 {
@@ -79,11 +80,11 @@ BOOL CAdoDB::ISCommand()
 }
 
 //***************************************************************************
-// @brief µ¥ÀÌÅÍº£ÀÌ½º¿¡ ¿¬°áÀ» ¼öÇà
-// @param dbClass         - µ¥ÀÌÅÍº£ÀÌ½º Á¾·ù (EDBClass Å¸ÀÔ)
-// @param lptszConnstring - ¿¬°á ¹®ÀÚ¿­ (LPCTSTR)
-// @param nTimeOut        - ¿¬°á Á¦ÇÑ ½Ã°£ (ÃÊ ´ÜÀ§)
-// @return ¼º°ø ½Ã ADO_OPEN_COMMAND_CREATE, ½ÇÆĞ ½Ã ADO_OPEN_ERROR
+// @brief ë°ì´í„°ë² ì´ìŠ¤ì— ì—°ê²°ì„ ìˆ˜í–‰
+// @param dbClass         - ë°ì´í„°ë² ì´ìŠ¤ ì¢…ë¥˜ (EDBClass íƒ€ì…)
+// @param lptszConnstring - ì—°ê²° ë¬¸ìì—´ (LPCTSTR)
+// @param nTimeOut        - ì—°ê²° ì œí•œ ì‹œê°„ (ì´ˆ ë‹¨ìœ„)
+// @return ì„±ê³µ ì‹œ ADO_OPEN_COMMAND_CREATE, ì‹¤íŒ¨ ì‹œ ADO_OPEN_ERROR
 //***************************************************************************
 int CAdoDB::Connect(const EDBClass dbClass, LPCTSTR lptszConnstring, const int nTimeOut)
 {
@@ -105,7 +106,7 @@ int CAdoDB::Connect(const EDBClass dbClass, LPCTSTR lptszConnstring, const int n
 			m_pRs.CreateInstance(__uuidof(Recordset));
 			bResult = ADO_OPEN_COMMAND_CREATE;
 
-			// ¿¬°á ¼º°ø ½Ã ¼­¹ö Á¤º¸ ·Î±× Ãâ·Â
+			// ì—°ê²° ì„±ê³µ ì‹œ ì„œë²„ ì •ë³´ ë¡œê·¸ ì¶œë ¥
 			TCHAR tszHostInfo[128] = { 0, };
 			TCHAR tszDBMSName[128] = { 0, };
 			TCHAR tszServerVersion[128] = { 0, };
@@ -133,8 +134,8 @@ int CAdoDB::Connect(const EDBClass dbClass, LPCTSTR lptszConnstring, const int n
 }
 
 //***************************************************************************
-// @brief Ä¿¸Çµå Æ÷ÀÎÅÍ(_CommandPtr) ¹İÈ¯
-// @return _CommandPtr °´Ã¼
+// @brief ì»¤ë§¨ë“œ í¬ì¸í„°(_CommandPtr) ë°˜í™˜
+// @return _CommandPtr ê°ì²´
 //***************************************************************************
 _CommandPtr CAdoDB::GetCmdPointer()
 {
@@ -142,8 +143,8 @@ _CommandPtr CAdoDB::GetCmdPointer()
 }
 
 //***************************************************************************
-// @brief ·¹ÄÚµå¼Â Æ÷ÀÎÅÍ(_RecordsetPtr) ¹İÈ¯
-// @return _RecordsetPtr °´Ã¼
+// @brief ë ˆì½”ë“œì…‹ í¬ì¸í„°(_RecordsetPtr) ë°˜í™˜
+// @return _RecordsetPtr ê°ì²´
 //***************************************************************************
 _RecordsetPtr CAdoDB::GetRecPointer()
 {
@@ -151,8 +152,8 @@ _RecordsetPtr CAdoDB::GetRecPointer()
 }
 
 //***************************************************************************
-// @brief µ¥ÀÌÅÍº£ÀÌ½º ¿¬°á ¿©ºÎ ¹İÈ¯
-// @return ¿¬°áµÇ¾î ÀÖÀ¸¸é TRUE, ¾Æ´Ï¸é FALSE
+// @brief ë°ì´í„°ë² ì´ìŠ¤ ì—°ê²° ì—¬ë¶€ ë°˜í™˜
+// @return ì—°ê²°ë˜ì–´ ìˆìœ¼ë©´ TRUE, ì•„ë‹ˆë©´ FALSE
 //***************************************************************************
 BOOL CAdoDB::GetDBCon()
 {
@@ -160,7 +161,7 @@ BOOL CAdoDB::GetDBCon()
 }
 
 //***************************************************************************
-// @brief µ¥ÀÌÅÍº£ÀÌ½º ¿¬°á ´İ±â
+// @brief ë°ì´í„°ë² ì´ìŠ¤ ì—°ê²° ë‹«ê¸°
 //***************************************************************************
 void CAdoDB::ConClose()
 {
@@ -168,7 +169,7 @@ void CAdoDB::ConClose()
 }
 
 //***************************************************************************
-// @brief ·¹ÄÚµå¼Â ´İ±â
+// @brief ë ˆì½”ë“œì…‹ ë‹«ê¸°
 //***************************************************************************
 void CAdoDB::RSClose()
 {
@@ -176,8 +177,8 @@ void CAdoDB::RSClose()
 }
 
 //***************************************************************************
-// @brief Æ®·£Àè¼Ç ½ÃÀÛ
-// @return Æ®·£Àè¼Ç ·¹º§
+// @brief íŠ¸ëœì­ì…˜ ì‹œì‘
+// @return íŠ¸ëœì­ì…˜ ë ˆë²¨
 //***************************************************************************
 long CAdoDB::ConBeginTrans()
 {
@@ -185,7 +186,7 @@ long CAdoDB::ConBeginTrans()
 }
 
 //***************************************************************************
-// @brief Æ®·£Àè¼Ç Ä¿¹Ô
+// @brief íŠ¸ëœì­ì…˜ ì»¤ë°‹
 //***************************************************************************
 void CAdoDB::ConCommitTrans()
 {
@@ -193,7 +194,7 @@ void CAdoDB::ConCommitTrans()
 }
 
 //***************************************************************************
-// @brief Æ®·£Àè¼Ç ·Ñ¹é
+// @brief íŠ¸ëœì­ì…˜ ë¡¤ë°±
 //***************************************************************************
 void CAdoDB::ConRollbackTrans()
 {
@@ -201,7 +202,7 @@ void CAdoDB::ConRollbackTrans()
 }
 
 //***************************************************************************
-// @brief ¿¬°á ÀÛ¾÷ Ãë¼Ò
+// @brief ì—°ê²° ì‘ì—… ì·¨ì†Œ
 //***************************************************************************
 void CAdoDB::ConCancel()
 {
@@ -209,8 +210,8 @@ void CAdoDB::ConCancel()
 }
 
 //***************************************************************************
-// @brief ·¹ÄÚµå¼ÂÀÇ ³¡(EOF)¿¡ µµ´ŞÇß´ÂÁö È®ÀÎ
-// @return EOFÀÌ¸é TRUE, ¾Æ´Ï¸é FALSE
+// @brief ë ˆì½”ë“œì…‹ì˜ ë(EOF)ì— ë„ë‹¬í–ˆëŠ”ì§€ í™•ì¸
+// @return EOFì´ë©´ TRUE, ì•„ë‹ˆë©´ FALSE
 //***************************************************************************
 BOOL CAdoDB::IsEOF()
 {
@@ -218,8 +219,8 @@ BOOL CAdoDB::IsEOF()
 }
 
 //***************************************************************************
-// @brief ·¹ÄÚµå¸¦ ´ÙÀ½À¸·Î ÀÌµ¿
-// @return ¼º°ø ½Ã TRUE, ½ÇÆĞ ½Ã FALSE
+// @brief ë ˆì½”ë“œë¥¼ ë‹¤ìŒìœ¼ë¡œ ì´ë™
+// @return ì„±ê³µ ì‹œ TRUE, ì‹¤íŒ¨ ì‹œ FALSE
 //***************************************************************************
 BOOL CAdoDB::Next()
 {
@@ -227,8 +228,8 @@ BOOL CAdoDB::Next()
 }
 
 //***************************************************************************
-// @brief ·¹ÄÚµå¸¦ ÀÌÀüÀ¸·Î ÀÌµ¿
-// @return ¼º°ø ½Ã TRUE, ½ÇÆĞ ½Ã FALSE
+// @brief ë ˆì½”ë“œë¥¼ ì´ì „ìœ¼ë¡œ ì´ë™
+// @return ì„±ê³µ ì‹œ TRUE, ì‹¤íŒ¨ ì‹œ FALSE
 //***************************************************************************
 BOOL CAdoDB::Prev()
 {
@@ -236,8 +237,8 @@ BOOL CAdoDB::Prev()
 }
 
 //***************************************************************************
-// @brief ·¹ÄÚµå¸¦ Ã¹ ¹øÂ°·Î ÀÌµ¿
-// @return ¼º°ø ½Ã TRUE, ½ÇÆĞ ½Ã FALSE
+// @brief ë ˆì½”ë“œë¥¼ ì²« ë²ˆì§¸ë¡œ ì´ë™
+// @return ì„±ê³µ ì‹œ TRUE, ì‹¤íŒ¨ ì‹œ FALSE
 //***************************************************************************
 BOOL CAdoDB::First()
 {
@@ -245,8 +246,8 @@ BOOL CAdoDB::First()
 }
 
 //***************************************************************************
-// @brief ·¹ÄÚµå¸¦ ¸¶Áö¸·À¸·Î ÀÌµ¿
-// @return ¼º°ø ½Ã TRUE, ½ÇÆĞ ½Ã FALSE
+// @brief ë ˆì½”ë“œë¥¼ ë§ˆì§€ë§‰ìœ¼ë¡œ ì´ë™
+// @return ì„±ê³µ ì‹œ TRUE, ì‹¤íŒ¨ ì‹œ FALSE
 //***************************************************************************
 BOOL CAdoDB::Last()
 {
@@ -254,8 +255,8 @@ BOOL CAdoDB::Last()
 }
 
 //***************************************************************************
-// @brief ÀüÃ¼ ·¹ÄÚµå °³¼ö Á¶È¸
-// @return ·¹ÄÚµå °³¼ö (int)
+// @brief ì „ì²´ ë ˆì½”ë“œ ê°œìˆ˜ ì¡°íšŒ
+// @return ë ˆì½”ë“œ ê°œìˆ˜ (int)
 //***************************************************************************
 int CAdoDB::GetRecCount()
 {
@@ -263,8 +264,8 @@ int CAdoDB::GetRecCount()
 }
 
 //***************************************************************************
-// @brief ÀüÃ¼ ÇÊµå °³¼ö Á¶È¸
-// @return ÇÊµå °³¼ö (int)
+// @brief ì „ì²´ í•„ë“œ ê°œìˆ˜ ì¡°íšŒ
+// @return í•„ë“œ ê°œìˆ˜ (int)
 //***************************************************************************
 int CAdoDB::GetFieldCount()
 {
@@ -272,10 +273,10 @@ int CAdoDB::GetFieldCount()
 }
 
 //***************************************************************************
-// @brief ÀÎµ¦½º¸¦ ÀÌ¿ëÇØ ÇÊµå °ªÀ» ¹®ÀÚ¿­(LPTSTR)·Î Á¶È¸
-// @param x          - ÇÊµå ÀÎµ¦½º ¶Ç´Â ÀÌ¸§ (_variant_t Å¸ÀÔ)
-// @param lptszValue - °ªÀ» ÀúÀåÇÒ ¹öÆÛ (Ãâ·Â)
-// @param nValueLen  - ¹öÆÛÀÇ ÃÖ´ë Å©±â (¹®ÀÚ ´ÜÀ§)
+// @brief ì¸ë±ìŠ¤ë¥¼ ì´ìš©í•´ í•„ë“œ ê°’ì„ ë¬¸ìì—´(LPTSTR)ë¡œ ì¡°íšŒ
+// @param x          - í•„ë“œ ì¸ë±ìŠ¤ ë˜ëŠ” ì´ë¦„ (_variant_t íƒ€ì…)
+// @param lptszValue - ê°’ì„ ì €ì¥í•  ë²„í¼ (ì¶œë ¥)
+// @param nValueLen  - ë²„í¼ì˜ ìµœëŒ€ í¬ê¸° (ë¬¸ì ë‹¨ìœ„)
 //***************************************************************************
 void CAdoDB::GetFieldByIndex(_variant_t x, LPTSTR lptszValue, int nValueLen)
 {
@@ -296,9 +297,9 @@ void CAdoDB::GetFieldByIndex(_variant_t x, LPTSTR lptszValue, int nValueLen)
 }
 
 //***************************************************************************
-// @brief ÀÎµ¦½º¸¦ ÀÌ¿ëÇØ ÇÊµå °ªÀ» longÇüÀ¸·Î Á¶È¸
-// @param x           - ÇÊµå ÀÎµ¦½º ¶Ç´Â ÀÌ¸§ (_variant_t Å¸ÀÔ)
-// @param lFieldValue - °ªÀ» ÀúÀåÇÒ long º¯¼ö (Ãâ·Â)
+// @brief ì¸ë±ìŠ¤ë¥¼ ì´ìš©í•´ í•„ë“œ ê°’ì„ longí˜•ìœ¼ë¡œ ì¡°íšŒ
+// @param x           - í•„ë“œ ì¸ë±ìŠ¤ ë˜ëŠ” ì´ë¦„ (_variant_t íƒ€ì…)
+// @param lFieldValue - ê°’ì„ ì €ì¥í•  long ë³€ìˆ˜ (ì¶œë ¥)
 //***************************************************************************
 void CAdoDB::GetFieldByIndex(_variant_t x, long& lFieldValue)
 {
@@ -321,9 +322,9 @@ void CAdoDB::GetFieldByIndex(_variant_t x, long& lFieldValue)
 }
 
 //***************************************************************************
-// @brief ÀÎµ¦½º¸¦ ÀÌ¿ëÇØ ÇÊµå °ªÀ» int32ÇüÀ¸·Î Á¶È¸
-// @param x            - ÇÊµå ÀÎµ¦½º ¶Ç´Â ÀÌ¸§ (_variant_t Å¸ÀÔ)
-// @param nFieldValue  - °ªÀ» ÀúÀåÇÒ int32 º¯¼ö (Ãâ·Â)
+// @brief ì¸ë±ìŠ¤ë¥¼ ì´ìš©í•´ í•„ë“œ ê°’ì„ int32í˜•ìœ¼ë¡œ ì¡°íšŒ
+// @param x            - í•„ë“œ ì¸ë±ìŠ¤ ë˜ëŠ” ì´ë¦„ (_variant_t íƒ€ì…)
+// @param nFieldValue  - ê°’ì„ ì €ì¥í•  int32 ë³€ìˆ˜ (ì¶œë ¥)
 //***************************************************************************
 void CAdoDB::GetFieldByIndex(_variant_t x, int32& nFieldValue)
 {
@@ -333,9 +334,9 @@ void CAdoDB::GetFieldByIndex(_variant_t x, int32& nFieldValue)
 }
 
 //***************************************************************************
-// @brief ÀÎµ¦½º¸¦ ÀÌ¿ëÇØ ÇÊµå °ªÀ» ulongÇüÀ¸·Î Á¶È¸
-// @param x            - ÇÊµå ÀÎµ¦½º ¶Ç´Â ÀÌ¸§ (_variant_t Å¸ÀÔ)
-// @param ulFieldValue - °ªÀ» ÀúÀåÇÒ ulong º¯¼ö (Ãâ·Â)
+// @brief ì¸ë±ìŠ¤ë¥¼ ì´ìš©í•´ í•„ë“œ ê°’ì„ ulongí˜•ìœ¼ë¡œ ì¡°íšŒ
+// @param x            - í•„ë“œ ì¸ë±ìŠ¤ ë˜ëŠ” ì´ë¦„ (_variant_t íƒ€ì…)
+// @param ulFieldValue - ê°’ì„ ì €ì¥í•  ulong ë³€ìˆ˜ (ì¶œë ¥)
 //***************************************************************************
 void CAdoDB::GetFieldByIndex(_variant_t x, ulong& ulFieldValue)
 {
@@ -353,9 +354,9 @@ void CAdoDB::GetFieldByIndex(_variant_t x, ulong& ulFieldValue)
 }
 
 //***************************************************************************
-// @brief ÀÎµ¦½º¸¦ ÀÌ¿ëÇØ ÇÊµå °ªÀ» uint32ÇüÀ¸·Î Á¶È¸
-// @param x           - ÇÊµå ÀÎµ¦½º ¶Ç´Â ÀÌ¸§ (_variant_t Å¸ÀÔ)
-// @param uFieldValue - °ªÀ» ÀúÀåÇÒ uint32 º¯¼ö (Ãâ·Â)
+// @brief ì¸ë±ìŠ¤ë¥¼ ì´ìš©í•´ í•„ë“œ ê°’ì„ uint32í˜•ìœ¼ë¡œ ì¡°íšŒ
+// @param x           - í•„ë“œ ì¸ë±ìŠ¤ ë˜ëŠ” ì´ë¦„ (_variant_t íƒ€ì…)
+// @param uFieldValue - ê°’ì„ ì €ì¥í•  uint32 ë³€ìˆ˜ (ì¶œë ¥)
 //***************************************************************************
 void CAdoDB::GetFieldByIndex(_variant_t x, uint32& uFieldValue)
 {
@@ -365,9 +366,9 @@ void CAdoDB::GetFieldByIndex(_variant_t x, uint32& uFieldValue)
 }
 
 //***************************************************************************
-// @brief ÀÎµ¦½º¸¦ ÀÌ¿ëÇØ ÇÊµå °ªÀ» doubleÇüÀ¸·Î Á¶È¸
-// @param x             - ÇÊµå ÀÎµ¦½º ¶Ç´Â ÀÌ¸§ (_variant_t Å¸ÀÔ)
-// @param dblFieldValue - °ªÀ» ÀúÀåÇÒ double º¯¼ö (Ãâ·Â)
+// @brief ì¸ë±ìŠ¤ë¥¼ ì´ìš©í•´ í•„ë“œ ê°’ì„ doubleí˜•ìœ¼ë¡œ ì¡°íšŒ
+// @param x             - í•„ë“œ ì¸ë±ìŠ¤ ë˜ëŠ” ì´ë¦„ (_variant_t íƒ€ì…)
+// @param dblFieldValue - ê°’ì„ ì €ì¥í•  double ë³€ìˆ˜ (ì¶œë ¥)
 //***************************************************************************
 void CAdoDB::GetFieldByIndex(_variant_t x, double& dblFieldValue)
 {
@@ -385,9 +386,9 @@ void CAdoDB::GetFieldByIndex(_variant_t x, double& dblFieldValue)
 }
 
 //***************************************************************************
-// @brief ÀÎµ¦½º¸¦ ÀÌ¿ëÇØ ÇÊµå °ªÀ» _tstringÇüÀ¸·Î Á¶È¸
-// @param x             - ÇÊµå ÀÎµ¦½º ¶Ç´Â ÀÌ¸§ (_variant_t Å¸ÀÔ)
-// @param strFieldValue - °ªÀ» ÀúÀåÇÒ _tstring º¯¼ö (Ãâ·Â)
+// @brief ì¸ë±ìŠ¤ë¥¼ ì´ìš©í•´ í•„ë“œ ê°’ì„ _tstringí˜•ìœ¼ë¡œ ì¡°íšŒ
+// @param x             - í•„ë“œ ì¸ë±ìŠ¤ ë˜ëŠ” ì´ë¦„ (_variant_t íƒ€ì…)
+// @param strFieldValue - ê°’ì„ ì €ì¥í•  _tstring ë³€ìˆ˜ (ì¶œë ¥)
 //***************************************************************************
 void CAdoDB::GetFieldByIndex(_variant_t x, _tstring& strFieldValue)
 {
@@ -400,7 +401,7 @@ void CAdoDB::GetFieldByIndex(_variant_t x, _tstring& strFieldValue)
 #ifdef UNICODE
 		strFieldValue = static_cast<LPCTSTR>(bstrVal);
 #else
-		// ANSI È¯°æÀÏ °æ¿ì _bstr_t(UTF-16)¸¦ ¸ÖÆ¼¹ÙÀÌÆ® ¹®ÀÚ¿­·Î º¯È¯
+		// ANSI í™˜ê²½ì¼ ê²½ìš° _bstr_t(UTF-16)ë¥¼ ë©€í‹°ë°”ì´íŠ¸ ë¬¸ìì—´ë¡œ ë³€í™˜
 		strFieldValue = static_cast<const char*>(bstrVal);
 #endif
 	}
@@ -411,10 +412,10 @@ void CAdoDB::GetFieldByIndex(_variant_t x, _tstring& strFieldValue)
 }
 
 //***************************************************************************
-// @brief ÇÊµå ÀÌ¸§À» ÀÌ¿ëÇØ ÇÊµå °ªÀ» ¹®ÀÚ¿­(LPTSTR)·Î Á¶È¸
-// @param lptszFieldName - ÇÊµå ÀÌ¸§ (LPCTSTR)
-// @param lptszValue     - °ªÀ» ÀúÀåÇÒ ¹öÆÛ (Ãâ·Â)
-// @param nValueLen      - ¹öÆÛÀÇ ÃÖ´ë Å©±â (¹®ÀÚ ´ÜÀ§)
+// @brief í•„ë“œ ì´ë¦„ì„ ì´ìš©í•´ í•„ë“œ ê°’ì„ ë¬¸ìì—´(LPTSTR)ë¡œ ì¡°íšŒ
+// @param lptszFieldName - í•„ë“œ ì´ë¦„ (LPCTSTR)
+// @param lptszValue     - ê°’ì„ ì €ì¥í•  ë²„í¼ (ì¶œë ¥)
+// @param nValueLen      - ë²„í¼ì˜ ìµœëŒ€ í¬ê¸° (ë¬¸ì ë‹¨ìœ„)
 //***************************************************************************
 void CAdoDB::GetFieldByName(LPCTSTR lptszFieldName, LPTSTR lptszValue, int nValueLen)
 {
@@ -435,9 +436,9 @@ void CAdoDB::GetFieldByName(LPCTSTR lptszFieldName, LPTSTR lptszValue, int nValu
 }
 
 //***************************************************************************
-// @brief ÇÊµå ÀÌ¸§À» ÀÌ¿ëÇØ ÇÊµå °ªÀ» longÇüÀ¸·Î Á¶È¸
-// @param lptszFieldName - ÇÊµå ÀÌ¸§ (LPCTSTR)
-// @param lFieldValue    - °ªÀ» ÀúÀåÇÒ long º¯¼ö (Ãâ·Â)
+// @brief í•„ë“œ ì´ë¦„ì„ ì´ìš©í•´ í•„ë“œ ê°’ì„ longí˜•ìœ¼ë¡œ ì¡°íšŒ
+// @param lptszFieldName - í•„ë“œ ì´ë¦„ (LPCTSTR)
+// @param lFieldValue    - ê°’ì„ ì €ì¥í•  long ë³€ìˆ˜ (ì¶œë ¥)
 //***************************************************************************
 void CAdoDB::GetFieldByName(LPCTSTR lptszFieldName, long& lFieldValue)
 {
@@ -459,9 +460,9 @@ void CAdoDB::GetFieldByName(LPCTSTR lptszFieldName, long& lFieldValue)
 }
 
 //***************************************************************************
-// @brief ÇÊµå ÀÌ¸§À» ÀÌ¿ëÇØ ÇÊµå °ªÀ» int32ÇüÀ¸·Î Á¶È¸
-// @param lptszFieldName - ÇÊµå ÀÌ¸§ (LPCTSTR)
-// @param nFieldValue    - °ªÀ» ÀúÀåÇÒ int32 º¯¼ö (Ãâ·Â)
+// @brief í•„ë“œ ì´ë¦„ì„ ì´ìš©í•´ í•„ë“œ ê°’ì„ int32í˜•ìœ¼ë¡œ ì¡°íšŒ
+// @param lptszFieldName - í•„ë“œ ì´ë¦„ (LPCTSTR)
+// @param nFieldValue    - ê°’ì„ ì €ì¥í•  int32 ë³€ìˆ˜ (ì¶œë ¥)
 //***************************************************************************
 void CAdoDB::GetFieldByName(LPCTSTR lptszFieldName, int32& nFieldValue)
 {
@@ -471,9 +472,9 @@ void CAdoDB::GetFieldByName(LPCTSTR lptszFieldName, int32& nFieldValue)
 }
 
 //***************************************************************************
-// @brief ÇÊµå ÀÌ¸§À» ÀÌ¿ëÇØ ÇÊµå °ªÀ» ulongÇüÀ¸·Î Á¶È¸
-// @param lptszFieldName - ÇÊµå ÀÌ¸§ (LPCTSTR)
-// @param ulFieldValue   - °ªÀ» ÀúÀåÇÒ ulong º¯¼ö (Ãâ·Â)
+// @brief í•„ë“œ ì´ë¦„ì„ ì´ìš©í•´ í•„ë“œ ê°’ì„ ulongí˜•ìœ¼ë¡œ ì¡°íšŒ
+// @param lptszFieldName - í•„ë“œ ì´ë¦„ (LPCTSTR)
+// @param ulFieldValue   - ê°’ì„ ì €ì¥í•  ulong ë³€ìˆ˜ (ì¶œë ¥)
 //***************************************************************************
 void CAdoDB::GetFieldByName(LPCTSTR lptszFieldName, ulong& ulFieldValue)
 {
@@ -491,9 +492,9 @@ void CAdoDB::GetFieldByName(LPCTSTR lptszFieldName, ulong& ulFieldValue)
 }
 
 //***************************************************************************
-// @brief ÇÊµå ÀÌ¸§À» ÀÌ¿ëÇØ ÇÊµå °ªÀ» uint32ÇüÀ¸·Î Á¶È¸
-// @param lptszFieldName - ÇÊµå ÀÌ¸§ (LPCTSTR)
-// @param uFieldValue    - °ªÀ» ÀúÀåÇÒ uint32 º¯¼ö (Ãâ·Â)
+// @brief í•„ë“œ ì´ë¦„ì„ ì´ìš©í•´ í•„ë“œ ê°’ì„ uint32í˜•ìœ¼ë¡œ ì¡°íšŒ
+// @param lptszFieldName - í•„ë“œ ì´ë¦„ (LPCTSTR)
+// @param uFieldValue    - ê°’ì„ ì €ì¥í•  uint32 ë³€ìˆ˜ (ì¶œë ¥)
 //***************************************************************************
 void CAdoDB::GetFieldByName(LPCTSTR lptszFieldName, uint32& uFieldValue)
 {
@@ -503,9 +504,9 @@ void CAdoDB::GetFieldByName(LPCTSTR lptszFieldName, uint32& uFieldValue)
 }
 
 //***************************************************************************
-// @brief ÇÊµå ÀÌ¸§À» ÀÌ¿ëÇØ ÇÊµå °ªÀ» doubleÇüÀ¸·Î Á¶È¸
-// @param lptszFieldName - ÇÊµå ÀÌ¸§ (LPCTSTR)
-// @param dblFieldValue  - °ªÀ» ÀúÀåÇÒ double º¯¼ö (Ãâ·Â)
+// @brief í•„ë“œ ì´ë¦„ì„ ì´ìš©í•´ í•„ë“œ ê°’ì„ doubleí˜•ìœ¼ë¡œ ì¡°íšŒ
+// @param lptszFieldName - í•„ë“œ ì´ë¦„ (LPCTSTR)
+// @param dblFieldValue  - ê°’ì„ ì €ì¥í•  double ë³€ìˆ˜ (ì¶œë ¥)
 //***************************************************************************
 void CAdoDB::GetFieldByName(LPCTSTR lptszFieldName, double& dblFieldValue)
 {
@@ -523,9 +524,9 @@ void CAdoDB::GetFieldByName(LPCTSTR lptszFieldName, double& dblFieldValue)
 }
 
 //***************************************************************************
-// @brief ÇÊµå ÀÌ¸§À» ÀÌ¿ëÇØ ÇÊµå °ªÀ» _tstringÇüÀ¸·Î Á¶È¸
-// @param lptszFieldName - ÇÊµå ÀÌ¸§ (LPCTSTR)
-// @param strFieldValue  - °ªÀ» ÀúÀåÇÒ _tstring º¯¼ö (Ãâ·Â)
+// @brief í•„ë“œ ì´ë¦„ì„ ì´ìš©í•´ í•„ë“œ ê°’ì„ _tstringí˜•ìœ¼ë¡œ ì¡°íšŒ
+// @param lptszFieldName - í•„ë“œ ì´ë¦„ (LPCTSTR)
+// @param strFieldValue  - ê°’ì„ ì €ì¥í•  _tstring ë³€ìˆ˜ (ì¶œë ¥)
 //***************************************************************************
 void CAdoDB::GetFieldByName(LPCTSTR lptszFieldName, _tstring& strFieldValue)
 {
@@ -548,10 +549,10 @@ void CAdoDB::GetFieldByName(LPCTSTR lptszFieldName, _tstring& strFieldValue)
 }
 
 //***************************************************************************
-// @brief SQL Äõ¸®¸¦ ½ÇÇàÇÏ¿© ·¹ÄÚµå¼ÂÀ» ¿ÀÇÂ
-// @param lptszSourceBuf - ½ÇÇàÇÒ SQL Äõ¸® ¹®ÀÚ¿­ (LPCTSTR)
-// @param lOption        - ¿É¼Ç °ª (±âº»°ª: -1)
-// @return ¼º°ø ½Ã TRUE, ½ÇÆĞ ½Ã FALSE
+// @brief SQL ì¿¼ë¦¬ë¥¼ ì‹¤í–‰í•˜ì—¬ ë ˆì½”ë“œì…‹ì„ ì˜¤í”ˆ
+// @param lptszSourceBuf - ì‹¤í–‰í•  SQL ì¿¼ë¦¬ ë¬¸ìì—´ (LPCTSTR)
+// @param lOption        - ì˜µì…˜ ê°’ (ê¸°ë³¸ê°’: -1)
+// @return ì„±ê³µ ì‹œ TRUE, ì‹¤íŒ¨ ì‹œ FALSE
 //***************************************************************************
 BOOL CAdoDB::Open(LPCTSTR lptszSourceBuf, const long lOption)
 {
@@ -572,10 +573,10 @@ BOOL CAdoDB::Open(LPCTSTR lptszSourceBuf, const long lOption)
 }
 
 //***************************************************************************
-// @brief SQL Äõ¸®¸¦ ½ÇÇà (Execute)
-// @param lptszSourceBuf - ½ÇÇàÇÒ SQL Äõ¸® ¹®ÀÚ¿­ (LPCTSTR)
-// @param lOption        - ¿É¼Ç °ª (±âº»°ª: -1)
-// @return ¼º°ø ½Ã TRUE, ½ÇÆĞ ½Ã FALSE
+// @brief SQL ì¿¼ë¦¬ë¥¼ ì‹¤í–‰ (Execute)
+// @param lptszSourceBuf - ì‹¤í–‰í•  SQL ì¿¼ë¦¬ ë¬¸ìì—´ (LPCTSTR)
+// @param lOption        - ì˜µì…˜ ê°’ (ê¸°ë³¸ê°’: -1)
+// @return ì„±ê³µ ì‹œ TRUE, ì‹¤íŒ¨ ì‹œ FALSE
 //***************************************************************************
 BOOL CAdoDB::Execute(LPCTSTR lptszSourceBuf, const long lOption)
 {
@@ -592,10 +593,10 @@ BOOL CAdoDB::Execute(LPCTSTR lptszSourceBuf, const long lOption)
 }
 
 //***************************************************************************
-// @brief ÀúÀå ÇÁ·Î½ÃÀú(Stored Procedure) ½ÇÇà
-// @param lptszStoredName - ÀúÀå ÇÁ·Î½ÃÀú ÀÌ¸§ (LPCTSTR)
-// @param lOption         - ¿É¼Ç °ª (long)
-// @return ¼º°ø ½Ã TRUE, ½ÇÆĞ ½Ã FALSE
+// @brief ì €ì¥ í”„ë¡œì‹œì €(Stored Procedure) ì‹¤í–‰
+// @param lptszStoredName - ì €ì¥ í”„ë¡œì‹œì € ì´ë¦„ (LPCTSTR)
+// @param lOption         - ì˜µì…˜ ê°’ (long)
+// @return ì„±ê³µ ì‹œ TRUE, ì‹¤íŒ¨ ì‹œ FALSE
 //***************************************************************************
 BOOL CAdoDB::StoredProcedureExecute(LPCTSTR lptszStoredName, const long lOption)
 {
@@ -612,8 +613,8 @@ BOOL CAdoDB::StoredProcedureExecute(LPCTSTR lptszStoredName, const long lOption)
 }
 
 //***************************************************************************
-// @brief ÇÁ·Î½ÃÀú ½ÇÇà °á°ú ¹İÈ¯°ª(Return Value) Á¶È¸
-// @return ¹İÈ¯°ª (long)
+// @brief í”„ë¡œì‹œì € ì‹¤í–‰ ê²°ê³¼ ë°˜í™˜ê°’(Return Value) ì¡°íšŒ
+// @return ë°˜í™˜ê°’ (long)
 //***************************************************************************
 long CAdoDB::GetReturnValue()
 {
@@ -625,7 +626,7 @@ long CAdoDB::GetReturnValue()
 }
 
 //***************************************************************************
-// @brief ÇÁ·Î½ÃÀú ¹İÈ¯ ÆÄ¶ó¹ÌÅÍ »ı¼º ¹× Ãß°¡
+// @brief í”„ë¡œì‹œì € ë°˜í™˜ íŒŒë¼ë¯¸í„° ìƒì„± ë° ì¶”ê°€
 //***************************************************************************
 void CAdoDB::CreateReturnParamAppend()
 {
@@ -636,12 +637,12 @@ void CAdoDB::CreateReturnParamAppend()
 }
 
 //***************************************************************************
-// @brief ÇÁ·Î½ÃÀú ÀÎÀÚ ÆÄ¶ó¹ÌÅÍ »ı¼º ¹× Ãß°¡
-// @param bstrName     - ÆÄ¶ó¹ÌÅÍ ÀÌ¸§ (_bstr_t)
-// @param enumType     - µ¥ÀÌÅÍ Å¸ÀÔ (DataTypeEnum)
-// @param lSize        - ÆÄ¶ó¹ÌÅÍ Å©±â (long)
-// @param vt           - ÆÄ¶ó¹ÌÅÍ °ª (_variant_t)
-// @param bInOutCheck  - ÀÔ·Â ¿©ºÎ È®ÀÎ (TRUE: ÀÔ·Â, FALSE: Ãâ·Â)
+// @brief í”„ë¡œì‹œì € ì¸ì íŒŒë¼ë¯¸í„° ìƒì„± ë° ì¶”ê°€
+// @param bstrName     - íŒŒë¼ë¯¸í„° ì´ë¦„ (_bstr_t)
+// @param enumType     - ë°ì´í„° íƒ€ì… (DataTypeEnum)
+// @param lSize        - íŒŒë¼ë¯¸í„° í¬ê¸° (long)
+// @param vt           - íŒŒë¼ë¯¸í„° ê°’ (_variant_t)
+// @param bInOutCheck  - ì…ë ¥ ì—¬ë¶€ í™•ì¸ (TRUE: ì…ë ¥, FALSE: ì¶œë ¥)
 //***************************************************************************
 void CAdoDB::CreateArgParamAppend(_bstr_t bstrName, enum DataTypeEnum enumType, long lSize, _variant_t vt, BOOL bInOutCheck)
 {
@@ -680,9 +681,9 @@ void CAdoDB::CreateArgParamAppend(_bstr_t bstrName, enum DataTypeEnum enumType, 
 }
 
 //***************************************************************************
-// @brief ·¹ÄÚµå¼Â ÇÊµå °ª Á¶È¸ (_bstr_tÇü)
-// @param x   - ÇÊµå ÀÎµ¦½º ¶Ç´Â ÀÌ¸§ (_variant_t Å¸ÀÔ)
-// @param ret - °ªÀ» ÀúÀåÇÒ _bstr_t º¯¼ö (Ãâ·Â)
+// @brief ë ˆì½”ë“œì…‹ í•„ë“œ ê°’ ì¡°íšŒ (_bstr_tí˜•)
+// @param x   - í•„ë“œ ì¸ë±ìŠ¤ ë˜ëŠ” ì´ë¦„ (_variant_t íƒ€ì…)
+// @param ret - ê°’ì„ ì €ì¥í•  _bstr_t ë³€ìˆ˜ (ì¶œë ¥)
 //***************************************************************************
 void CAdoDB::GetRs(_variant_t x, _bstr_t& ret)
 {
@@ -690,9 +691,9 @@ void CAdoDB::GetRs(_variant_t x, _bstr_t& ret)
 }
 
 //***************************************************************************
-// @brief ·¹ÄÚµå¼Â ÇÊµå °ª Á¶È¸ (_variant_tÇü)
-// @param x   - ÇÊµå ÀÎµ¦½º ¶Ç´Â ÀÌ¸§ (_variant_t Å¸ÀÔ)
-// @param ret - °ªÀ» ÀúÀåÇÒ _variant_t º¯¼ö (Ãâ·Â)
+// @brief ë ˆì½”ë“œì…‹ í•„ë“œ ê°’ ì¡°íšŒ (_variant_tí˜•)
+// @param x   - í•„ë“œ ì¸ë±ìŠ¤ ë˜ëŠ” ì´ë¦„ (_variant_t íƒ€ì…)
+// @param ret - ê°’ì„ ì €ì¥í•  _variant_t ë³€ìˆ˜ (ì¶œë ¥)
 //***************************************************************************
 void CAdoDB::GetRs(_variant_t x, _variant_t& ret)
 {
@@ -700,9 +701,9 @@ void CAdoDB::GetRs(_variant_t x, _variant_t& ret)
 }
 
 //***************************************************************************
-// @brief ·¹ÄÚµå¼Â ÇÊµå °ª Á¶È¸ (floatÇü)
-// @param x   - ÇÊµå ÀÎµ¦½º ¶Ç´Â ÀÌ¸§ (_variant_t Å¸ÀÔ)
-// @param ret - °ªÀ» ÀúÀåÇÒ float º¯¼ö (Ãâ·Â)
+// @brief ë ˆì½”ë“œì…‹ í•„ë“œ ê°’ ì¡°íšŒ (floatí˜•)
+// @param x   - í•„ë“œ ì¸ë±ìŠ¤ ë˜ëŠ” ì´ë¦„ (_variant_t íƒ€ì…)
+// @param ret - ê°’ì„ ì €ì¥í•  float ë³€ìˆ˜ (ì¶œë ¥)
 //***************************************************************************
 void CAdoDB::GetRs(_variant_t x, float& ret)
 {
@@ -710,9 +711,9 @@ void CAdoDB::GetRs(_variant_t x, float& ret)
 }
 
 //***************************************************************************
-// @brief ·¹ÄÚµå¼Â ÇÊµå °ª Á¶È¸ (longÇü)
-// @param x   - ÇÊµå ÀÎµ¦½º ¶Ç´Â ÀÌ¸§ (_variant_t Å¸ÀÔ)
-// @param ret - °ªÀ» ÀúÀåÇÒ long º¯¼ö (Ãâ·Â)
+// @brief ë ˆì½”ë“œì…‹ í•„ë“œ ê°’ ì¡°íšŒ (longí˜•)
+// @param x   - í•„ë“œ ì¸ë±ìŠ¤ ë˜ëŠ” ì´ë¦„ (_variant_t íƒ€ì…)
+// @param ret - ê°’ì„ ì €ì¥í•  long ë³€ìˆ˜ (ì¶œë ¥)
 //***************************************************************************
 void CAdoDB::GetRs(_variant_t x, long& ret)
 {
@@ -720,9 +721,9 @@ void CAdoDB::GetRs(_variant_t x, long& ret)
 }
 
 //***************************************************************************
-// @brief ·¹ÄÚµå¼Â ÇÊµå °ª Á¶È¸ (doubleÇü)
-// @param x   - ÇÊµå ÀÎµ¦½º ¶Ç´Â ÀÌ¸§ (_variant_t Å¸ÀÔ)
-// @param ret - °ªÀ» ÀúÀåÇÒ double º¯¼ö (Ãâ·Â)
+// @brief ë ˆì½”ë“œì…‹ í•„ë“œ ê°’ ì¡°íšŒ (doubleí˜•)
+// @param x   - í•„ë“œ ì¸ë±ìŠ¤ ë˜ëŠ” ì´ë¦„ (_variant_t íƒ€ì…)
+// @param ret - ê°’ì„ ì €ì¥í•  double ë³€ìˆ˜ (ì¶œë ¥)
 //***************************************************************************
 void CAdoDB::GetRs(_variant_t x, double& ret)
 {
@@ -730,10 +731,10 @@ void CAdoDB::GetRs(_variant_t x, double& ret)
 }
 
 //***************************************************************************
-// @brief °¢ DBMSº° ¼­¹ö È£½ºÆ® ¹× ÁÖ¼Ò Á¤º¸¸¦ Á¶È¸
-// @param lptszOut - È£½ºÆ® Á¤º¸¸¦ ÀúÀåÇÒ ¹öÆÛ (Ãâ·Â)
-// @param nMaxLen - ¹öÆÛ Å©±â (TCHAR ´ÜÀ§)
-// @return ¼º°ø ½Ã TRUE, ½ÇÆĞ ½Ã FALSE
+// @brief ê° DBMSë³„ ì„œë²„ í˜¸ìŠ¤íŠ¸ ë° ì£¼ì†Œ ì •ë³´ë¥¼ ì¡°íšŒ
+// @param lptszOut - í˜¸ìŠ¤íŠ¸ ì •ë³´ë¥¼ ì €ì¥í•  ë²„í¼ (ì¶œë ¥)
+// @param nMaxLen - ë²„í¼ í¬ê¸° (TCHAR ë‹¨ìœ„)
+// @return ì„±ê³µ ì‹œ TRUE, ì‹¤íŒ¨ ì‹œ FALSE
 //***************************************************************************
 BOOL CAdoDB::GetHostInfo(LPTSTR lptszOut, int nMaxLen)
 {
@@ -784,10 +785,10 @@ BOOL CAdoDB::GetHostInfo(LPTSTR lptszOut, int nMaxLen)
 }
 
 //***************************************************************************
-// @brief °¢ DBMSº° ¼­¹ö Á¦Ç°¸í/Á¾·ù Á¤º¸¸¦ Á¶È¸
-// @param lptszOut - ¼­¹ö Á¤º¸¸¦ ÀúÀåÇÒ ¹öÆÛ (Ãâ·Â)
-// @param nMaxLen - ¹öÆÛ Å©±â (TCHAR ´ÜÀ§)
-// @return ¼º°ø ½Ã TRUE, ½ÇÆĞ ½Ã FALSE
+// @brief ê° DBMSë³„ ì„œë²„ ì œí’ˆëª…/ì¢…ë¥˜ ì •ë³´ë¥¼ ì¡°íšŒ
+// @param lptszOut - ì„œë²„ ì •ë³´ë¥¼ ì €ì¥í•  ë²„í¼ (ì¶œë ¥)
+// @param nMaxLen - ë²„í¼ í¬ê¸° (TCHAR ë‹¨ìœ„)
+// @return ì„±ê³µ ì‹œ TRUE, ì‹¤íŒ¨ ì‹œ FALSE
 //***************************************************************************
 BOOL CAdoDB::GetDBMSName(LPTSTR lptszOut, int nMaxLen)
 {
@@ -838,18 +839,18 @@ BOOL CAdoDB::GetDBMSName(LPTSTR lptszOut, int nMaxLen)
 }
 
 //***************************************************************************
-// @brief °¢ DBMSº° ¼­¹ö ¹öÀü Á¤º¸¸¦ ¹®ÀÚ¿­·Î Á¶È¸
-// @param pszVersion - ¹öÀü ¹®ÀÚ¿­À» ÀúÀåÇÒ ¹öÆÛ (LPTSTR)
-// @param nMaxLen    - ¹öÆÛÀÇ ÃÖ´ë Å©±â (¹®ÀÚ ´ÜÀ§, º¸Åë _countof(¹öÆÛ)·Î Àü´Ş)
-// @return ¼º°ø ½Ã TRUE, ½ÇÆĞ ½Ã FALSE
+// @brief ê° DBMSë³„ ì„œë²„ ë²„ì „ ì •ë³´ë¥¼ ë¬¸ìì—´ë¡œ ì¡°íšŒ
+// @param pszVersion - ë²„ì „ ë¬¸ìì—´ì„ ì €ì¥í•  ë²„í¼ (LPTSTR)
+// @param nMaxLen    - ë²„í¼ì˜ ìµœëŒ€ í¬ê¸° (ë¬¸ì ë‹¨ìœ„, ë³´í†µ _countof(ë²„í¼)ë¡œ ì „ë‹¬)
+// @return ì„±ê³µ ì‹œ TRUE, ì‹¤íŒ¨ ì‹œ FALSE
 //***************************************************************************
 BOOL CAdoDB::GetServerVersion(LPTSTR pszVersion, int nMaxLen)
 {
-	// ¿¬°áÀÌ ¾ÈµÇ¾î ÀÖ°Å³ª ¹öÆÛ°¡ À¯È¿ÇÏÁö ¾ÊÀ¸¸é ½ÇÆĞ
+	// ì—°ê²°ì´ ì•ˆë˜ì–´ ìˆê±°ë‚˜ ë²„í¼ê°€ ìœ íš¨í•˜ì§€ ì•Šìœ¼ë©´ ì‹¤íŒ¨
 	if( !ISOpen() || pszVersion == nullptr || nMaxLen == 0 )
 		return FALSE;
 
-	// ¹öÆÛ ÃÊ±âÈ­
+	// ë²„í¼ ì´ˆê¸°í™”
 	pszVersion[0] = _T('\0');
 
 	TCHAR tszQuery[256] = { 0, };
@@ -882,7 +883,7 @@ BOOL CAdoDB::GetServerVersion(LPTSTR pszVersion, int nMaxLen)
 			{
 				_bstr_t bstrVal = (_bstr_t)vt;
 
-				// Á¶È¸µÈ ¹®ÀÚ¿­À» Àü´Ş¹ŞÀº LPTSTR ¹öÆÛ¿¡ ¾ÈÀüÇÏ°Ô º¹»ç
+				// ì¡°íšŒëœ ë¬¸ìì—´ì„ ì „ë‹¬ë°›ì€ LPTSTR ë²„í¼ì— ì•ˆì „í•˜ê²Œ ë³µì‚¬
 				_tcscpy_s(pszVersion, nMaxLen, (LPCTSTR)bstrVal);
 
 				pRs->Close();
@@ -897,10 +898,10 @@ BOOL CAdoDB::GetServerVersion(LPTSTR pszVersion, int nMaxLen)
 }
 
 //***************************************************************************
-// @brief °¢ DBMSº° ¼­¹ö Ä³¸¯ÅÍ¼Â(ÀÎÄÚµù) Á¤º¸¸¦ Á¶È¸
-// @param lptszOut - Ä³¸¯ÅÍ¼Â ÀÌ¸§À» ÀúÀåÇÒ ¹öÆÛ (Ãâ·Â)
-// @param nMaxLen - ¹öÆÛ Å©±â (TCHAR ´ÜÀ§)
-// @return ¼º°ø ½Ã TRUE, ½ÇÆĞ ½Ã FALSE
+// @brief ê° DBMSë³„ ì„œë²„ ìºë¦­í„°ì…‹(ì¸ì½”ë”©) ì •ë³´ë¥¼ ì¡°íšŒ
+// @param lptszOut - ìºë¦­í„°ì…‹ ì´ë¦„ì„ ì €ì¥í•  ë²„í¼ (ì¶œë ¥)
+// @param nMaxLen - ë²„í¼ í¬ê¸° (TCHAR ë‹¨ìœ„)
+// @return ì„±ê³µ ì‹œ TRUE, ì‹¤íŒ¨ ì‹œ FALSE
 //***************************************************************************
 BOOL CAdoDB::GetCharacterSetName(LPTSTR lptszOut, int nMaxLen)
 {
@@ -933,7 +934,7 @@ BOOL CAdoDB::GetCharacterSetName(LPTSTR lptszOut, int nMaxLen)
 		_RecordsetPtr pRs = m_pCon->Execute(_bstr_t(tszQuery), NULL, adCmdText);
 		if( pRs != nullptr && !pRs->adoEOF )
 		{
-			// MySQLÀÇ SHOW VARIABLES´Â °á°úÀÇ µÎ ¹øÂ° ÄÃ·³(Index 1)¿¡ °ªÀÌ À§Ä¡
+			// MySQLì˜ SHOW VARIABLESëŠ” ê²°ê³¼ì˜ ë‘ ë²ˆì§¸ ì»¬ëŸ¼(Index 1)ì— ê°’ì´ ìœ„ì¹˜
 			long nColIdx = (m_DbClass == EDBClass::MYSQL) ? 1L : 0L;
 
 			_variant_t vt = pRs->Fields->Item[nColIdx]->Value;

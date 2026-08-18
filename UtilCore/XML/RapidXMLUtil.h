@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // RapidXMLUtil.h : interface for the CRapidXMLUtil class.
 //
@@ -41,17 +41,17 @@ using namespace rapidxml;
 
 //***************************************************************************
 // @class CXMLNode
-// @brief RapidXMLÀÇ xml_node<> Æ÷ÀÎÅÍ¸¦ ·¡ÇÎÇÏ¿© ¾ÈÀüÇÏ°í Æí¸®ÇÑ µ¥ÀÌÅÍ Á¢±ÙÀ» Á¦°øÇÏ´Â Å¬·¡½ºÀÔ´Ï´Ù.
+// @brief RapidXMLì˜ xml_node<> í¬ì¸í„°ë¥¼ ë˜í•‘í•˜ì—¬ ì•ˆì „í•˜ê³  í¸ë¦¬í•œ ë°ì´í„° ì ‘ê·¼ì„ ì œê³µí•˜ëŠ” í´ë˜ìŠ¤ì…ë‹ˆë‹¤.
 //
 // @details
-// RapidXML ³ëµå °³Ã¼¿¡ ´ëÇÑ Á÷Á¢ÀûÀÎ Á¢±ÙÀ» Ãß»óÈ­ÇÏ¿©, ¼Ó¼º(Attribute) ¹× 
-// ³ëµå °ª(Value)À» ´Ù¾çÇÑ ±âº» ÀÚ·áÇü(bool, int, float, double, _tstring µî)À¸·Î 
-// ¾ÈÀüÇÏ°Ô º¯È¯ÇÏ¿© ÀĞÀ» ¼ö ÀÖ´Â ÀÎÅÍÆäÀÌ½º¸¦ Á¦°øÇÕ´Ï´Ù.
+// RapidXML ë…¸ë“œ ê°œì²´ì— ëŒ€í•œ ì§ì ‘ì ì¸ ì ‘ê·¼ì„ ì¶”ìƒí™”í•˜ì—¬, ì†ì„±(Attribute) ë° 
+// ë…¸ë“œ ê°’(Value)ì„ ë‹¤ì–‘í•œ ê¸°ë³¸ ìë£Œí˜•(bool, int, float, double, _tstring ë“±)ìœ¼ë¡œ 
+// ì•ˆì „í•˜ê²Œ ë³€í™˜í•˜ì—¬ ì½ì„ ìˆ˜ ìˆëŠ” ì¸í„°í˜ì´ìŠ¤ë¥¼ ì œê³µí•©ë‹ˆë‹¤.
 //
-// ÁÖ¿ä Ã³¸® ¹× Æ¯Â¡:
-//  - RapidXML raw Æ÷ÀÎÅÍ(xml_node<>*) Ä¸½¶È­ ¹× Null Æ÷ÀÎÅÍ ¾ÈÁ¤¼º Á¦°ø (IsValid)
-//  - ´Ù¾çÇÑ Å¸ÀÔº° ¼Ó¼º(Get*Attr) ¹× ³ëµå °ª(Get*Value) ÃßÃâ ±â´É Áö¿ø
-//  - ´ÜÀÏ ÀÚ½Ä ³ëµå Å½»ö(FindChild) ¹× ¸ñ·Ï ÇüÅÂÀÇ ´ÙÁß ÀÚ½Ä ³ëµå Å½»ö(FindChildren) Áö¿ø
+// ì£¼ìš” ì²˜ë¦¬ ë° íŠ¹ì§•:
+//  - RapidXML raw í¬ì¸í„°(xml_node<>*) ìº¡ìŠí™” ë° Null í¬ì¸í„° ì•ˆì •ì„± ì œê³µ (IsValid)
+//  - ë‹¤ì–‘í•œ íƒ€ì…ë³„ ì†ì„±(Get*Attr) ë° ë…¸ë“œ ê°’(Get*Value) ì¶”ì¶œ ê¸°ëŠ¥ ì§€ì›
+//  - ë‹¨ì¼ ìì‹ ë…¸ë“œ íƒìƒ‰(FindChild) ë° ëª©ë¡ í˜•íƒœì˜ ë‹¤ì¤‘ ìì‹ ë…¸ë“œ íƒìƒ‰(FindChildren) ì§€ì›
 //***************************************************************************
 class CXMLNode
 {
@@ -96,18 +96,18 @@ private:
 
 //***************************************************************************
 // @class CRapidXMLUtil
-// @brief RapidXML ¶óÀÌºê·¯¸®¸¦ ±â¹İÀ¸·Î XML ÆÄ½Ì, »ı¼º, ¼öÁ¤ ¹× Á÷·ÄÈ­/¿ªÁ÷·ÄÈ­¸¦ °ü¸®ÇÏ´Â À¯Æ¿¸®Æ¼ Å¬·¡½ºÀÔ´Ï´Ù.
+// @brief RapidXML ë¼ì´ë¸ŒëŸ¬ë¦¬ë¥¼ ê¸°ë°˜ìœ¼ë¡œ XML íŒŒì‹±, ìƒì„±, ìˆ˜ì • ë° ì§ë ¬í™”/ì—­ì§ë ¬í™”ë¥¼ ê´€ë¦¬í•˜ëŠ” ìœ í‹¸ë¦¬í‹° í´ë˜ìŠ¤ì…ë‹ˆë‹¤.
 //
 // @details
-// XML ¹®¼­ÀÇ ÆÄÀÏ ÀÔÃâ·Â(ParseFromFile, SaveFile), ³ëµå/¼Ó¼º ÆíÁı ¹× C++ µ¥ÀÌÅÍ ±¸Á¶Ã¼,
-// ÄÁÅ×ÀÌ³Ê(CVector, CMap)ÀÇ ÀÚµ¿ XML Á÷·ÄÈ­/¿ªÁ÷·ÄÈ­ ±â´ÉÀ» Á¾ÇÕÀûÀ¸·Î °ü¸®ÇÕ´Ï´Ù.
-// ³»ºÎÀûÀ¸·Î TCHAR ¹®ÀÚ¿­°ú UTF-8 °£ ÀÎÄÚµù º¯È¯À» ÀÚµ¿À¸·Î ¼öÇàÇÕ´Ï´Ù.
+// XML ë¬¸ì„œì˜ íŒŒì¼ ì…ì¶œë ¥(ParseFromFile, SaveFile), ë…¸ë“œ/ì†ì„± í¸ì§‘ ë° C++ ë°ì´í„° êµ¬ì¡°ì²´,
+// ì»¨í…Œì´ë„ˆ(CVector, CMap)ì˜ ìë™ XML ì§ë ¬í™”/ì—­ì§ë ¬í™” ê¸°ëŠ¥ì„ ì¢…í•©ì ìœ¼ë¡œ ê´€ë¦¬í•©ë‹ˆë‹¤.
+// ë‚´ë¶€ì ìœ¼ë¡œ TCHAR ë¬¸ìì—´ê³¼ UTF-8 ê°„ ì¸ì½”ë”© ë³€í™˜ì„ ìë™ìœ¼ë¡œ ìˆ˜í–‰í•©ë‹ˆë‹¤.
 //
-// ÁÖ¿ä Ã³¸® ¹× Æ¯Â¡:
-//  - XML ÆÄÀÏ ¹× ¹®ÀÚ¿­ ÆÄ½Ì, Æ÷¸ËÆÃ ÀúÀå/Ãâ·Â ±â´É Á¦°ø
-//  - ³ëµå, ¼Ó¼º(Attribute), CDataÀÇ µ¿Àû Ãß°¡/¼öÁ¤/»èÁ¦ °ü¸®
-//  - C++ ±âº» ÀÚ·áÇü, ±¸Á¶Ã¼ ¹× ÄÁÅ×ÀÌ³Ê(CVector, CMap)ÀÇ Á÷·ÄÈ­/¿ªÁ÷·ÄÈ­ ÅÛÇÃ¸´ Áö¿ø
-//  - operator[] ¿¬»êÀÚ ¿À¹ö·Îµù ¹× Proxy °³Ã¼¸¦ ÅëÇÑ Á÷°üÀûÀÎ µ¥ÀÌÅÍ Á¢±Ù Áö¿ø
+// ì£¼ìš” ì²˜ë¦¬ ë° íŠ¹ì§•:
+//  - XML íŒŒì¼ ë° ë¬¸ìì—´ íŒŒì‹±, í¬ë§·íŒ… ì €ì¥/ì¶œë ¥ ê¸°ëŠ¥ ì œê³µ
+//  - ë…¸ë“œ, ì†ì„±(Attribute), CDataì˜ ë™ì  ì¶”ê°€/ìˆ˜ì •/ì‚­ì œ ê´€ë¦¬
+//  - C++ ê¸°ë³¸ ìë£Œí˜•, êµ¬ì¡°ì²´ ë° ì»¨í…Œì´ë„ˆ(CVector, CMap)ì˜ ì§ë ¬í™”/ì—­ì§ë ¬í™” í…œí”Œë¦¿ ì§€ì›
+//  - operator[] ì—°ì‚°ì ì˜¤ë²„ë¡œë”© ë° Proxy ê°œì²´ë¥¼ í†µí•œ ì§ê´€ì ì¸ ë°ì´í„° ì ‘ê·¼ ì§€ì›
 //***************************************************************************
 class CRapidXMLUtil
 {
@@ -122,7 +122,7 @@ public:
 	}
 
 	xml_node<char>* GetRootNode() {
-		// Ã¹ ¹øÂ° ³ëµå¸¦ °¡Á®¿Í¼­ root ³ëµå¸¦ ¹İÈ¯
+		// ì²« ë²ˆì§¸ ë…¸ë“œë¥¼ ê°€ì ¸ì™€ì„œ root ë…¸ë“œë¥¼ ë°˜í™˜
 		return _doc.first_node();
 	}
 
@@ -151,7 +151,7 @@ public:
 	void RemoveNodeRecursive(xml_node<char>* node);
 
 	//***************************************************************************
-	// CRapidXMLUtil Å¬·¡½º operator[] Setter, Getter Operator OverloadingÀ» À§ÇÑ ÇÁ·Ï½Ã Å¬·¡½º
+	// CRapidXMLUtil í´ë˜ìŠ¤ operator[] Setter, Getter Operator Overloadingì„ ìœ„í•œ í”„ë¡ì‹œ í´ë˜ìŠ¤
 	class Proxy 
 	{
 		private:
@@ -161,14 +161,14 @@ public:
 		public:
 			Proxy(CRapidXMLUtil& xmlUtil, const _tstring& nodeName) : _xmlUtil(xmlUtil), _nodeName(nodeName) {}
 
-			// = ¿¬»êÀÚ ¿À¹ö·Îµù(°ª ¼³Á¤)
+			// = ì—°ì‚°ì ì˜¤ë²„ë¡œë”©(ê°’ ì„¤ì •)
 			template <typename T>
 			Proxy& operator=(const T& value) {
 				_xmlUtil.ConvertToXML(_nodeName, value);
 				return *this;
 			}
 
-			// T() ¿¬»êÀÚ ¿À¹ö·Îµù(°ª ÀĞ±â)
+			// T() ì—°ì‚°ì ì˜¤ë²„ë¡œë”©(ê°’ ì½ê¸°)
 			template <typename T>
 			operator T() const { return _xmlUtil.ConvertFromXML<T>(_nodeName).value(); }
 	};
@@ -241,16 +241,16 @@ public:
 	template <typename T, typename std::enable_if<std::is_arithmetic<T>::value>::type* = nullptr>
 	inline void GetValue(T& value, xml_node<>* node);
 
-	// C++ ±¸Á¶Ã¼ ¡æ XML º¯È¯(ÇØ´ç ³ëµå¸í¿¡ °ªÀ» ÇÒ´çÇÏ¿© »ı¼ºÇÑ ÈÄ¿¡ XML ¹®ÀÚ¿­À» ¹İÈ¯) 
+	// C++ êµ¬ì¡°ì²´ â†’ XML ë³€í™˜(í•´ë‹¹ ë…¸ë“œëª…ì— ê°’ì„ í• ë‹¹í•˜ì—¬ ìƒì„±í•œ í›„ì— XML ë¬¸ìì—´ì„ ë°˜í™˜) 
 	template <typename T>
 	inline _tstring ConvertToXML(const _tstring& nodeName, const T& obj);
 
-	// XML ¡æ C++ ±¸Á¶Ã¼ º¯È¯(ÇØ´ç ³ëµå¸í¿¡ °ªÀ» std::optional<T> º¯¼ö¿¡ ÇÒ´ç) 
+	// XML â†’ C++ êµ¬ì¡°ì²´ ë³€í™˜(í•´ë‹¹ ë…¸ë“œëª…ì— ê°’ì„ std::optional<T> ë³€ìˆ˜ì— í• ë‹¹) 
 	template <typename T>
 	inline std::optional<T> ConvertFromXML(const _tstring& nodeName);
 
 	//***************************************************************************
-	// ¼ıÀÚ Å¸ÀÔ Á÷·ÄÈ­ ÇÔ¼ö
+	// ìˆ«ì íƒ€ì… ì§ë ¬í™” í•¨ìˆ˜
 	template <typename T>
 	static void Serialize(const T& value, xml_node<>* parent, xml_document<>& doc, const TCHAR* ptszTagName = ItemName)
 	{
@@ -261,7 +261,7 @@ public:
 	}
 
 	//***************************************************************************
-	// ¹®ÀÚ¿­ Å¸ÀÔ Á÷·ÄÈ­ ÇÔ¼ö
+	// ë¬¸ìì—´ íƒ€ì… ì§ë ¬í™” í•¨ìˆ˜
 	static void Serialize(const _tstring& value, xml_node<>* parent, xml_document<>& doc, const TCHAR* ptszTagName = ItemName)
 	{
 		std::string nodeName = TStringToUtf8(ptszTagName);
@@ -272,7 +272,7 @@ public:
 	}
 
 	//***************************************************************************
-	// ¼ıÀÚ, ¹®ÀÚ¿­ Å¸ÀÔ ¿ªÁ÷·ÄÈ­ ÇÔ¼ö
+	// ìˆ«ì, ë¬¸ìì—´ íƒ€ì… ì—­ì§ë ¬í™” í•¨ìˆ˜
 	template <typename T>
 	static void Deserialize(T& value, xml_node<>* node)
 	{
@@ -287,34 +287,34 @@ public:
 	}
 
 private:
-	// º¤ÅÍ Å¸ÀÔ È®ÀÎ
+	// ë²¡í„° íƒ€ì… í™•ì¸
 	template <typename T>
 	struct is_vector : std::false_type {};
 
 	template <typename T, typename Alloc>
 	struct is_vector<CVector<T, Alloc>> : std::true_type {};
 
-	// ¸Ê Å¸ÀÔ È®ÀÎ
+	// ë§µ íƒ€ì… í™•ì¸
 	template <typename T>
 	struct is_map : std::false_type {};
 
 	template <typename K, typename V, typename Comp, typename Alloc>
 	struct is_map<std::map<K, V, Comp, Alloc>> : std::true_type {};
 
-	// T¿¡ ToXML ¸â¹ö ÇÔ¼ö°¡ ÀÖ´ÂÁö È®ÀÎÇÏ´Â Å¸ÀÔ Æ®·¹ÀÌÆ®
+	// Tì— ToXML ë©¤ë²„ í•¨ìˆ˜ê°€ ìˆëŠ”ì§€ í™•ì¸í•˜ëŠ” íƒ€ì… íŠ¸ë ˆì´íŠ¸
 	template <typename T, typename = void>
 	struct has_toxml_method : std::false_type {};
 
 	template <typename T>
 	struct has_toxml_method<T, std::void_t<decltype(std::declval<T>().ToXML(std::declval<xml_node<>*>(), std::declval<xml_document<>&>()))>> : std::true_type {};
 
-	// ÄÄÆÄÀÏ Å¸ÀÓ ¿¡·¯ À¯µµ¿ë À¯Æ¿¸®Æ¼
+	// ì»´íŒŒì¼ íƒ€ì„ ì—ëŸ¬ ìœ ë„ìš© ìœ í‹¸ë¦¬í‹°
 	template <typename T>
 	struct dependent_false : std::false_type {};
 
 private:
-	rapidxml::xml_document<>	_doc;			// XMLÀº Ç×»ó char ±â¹İ ÀúÀå
-	std::string					_xmlString;     // UTF-8·Î ÀúÀå
+	rapidxml::xml_document<>	_doc;			// XMLì€ í•­ìƒ char ê¸°ë°˜ ì €ì¥
+	std::string					_xmlString;     // UTF-8ë¡œ ì €ì¥
 };
 
 #include "XML/RapidXMLUtil.inl"

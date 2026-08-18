@@ -1,4 +1,4 @@
-
+﻿
 //***************************************************************************
 // ServerConnectInfo.h: Implementation for Server Connection Information Management.
 //

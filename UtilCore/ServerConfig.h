@@ -1,4 +1,4 @@
-
+﻿
 //***************************************************************************
 // ServerConfig.h: interface for the CServerConfig class.
 //

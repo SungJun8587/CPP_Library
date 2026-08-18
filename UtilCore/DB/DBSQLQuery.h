@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // DBSQLQuery.h : implementation for the System SQL.
 //
@@ -26,43 +26,43 @@
 class DB_INFO
 {
 public:
-	TCHAR tszDBName[DATABASE_NAME_STRLEN] = { 0, };				// µ¥ÀÌÅÍº£ÀÌ½º ¸í
+	TCHAR tszDBName[DATABASE_NAME_STRLEN] = { 0, };				// ë°ì´í„°ë² ì´ìŠ¤ ëª…
 };
 
 //***************************************************************************
-// µ¥ÀÌÅÍº£ÀÌ½º ¿ÀºêÁ§Æ®
+// ë°ì´í„°ë² ì´ìŠ¤ ì˜¤ë¸Œì íŠ¸
 class DB_OBJECT
 {
-	/// <summary>µ¥ÀÌÅÍº£ÀÌ½º ¸í</summary>
+	/// <summary>ë°ì´í„°ë² ì´ìŠ¤ ëª…</summary>
 	TCHAR tszDBName[DATABASE_NAME_STRLEN] = { 0, };
 
-	/// <summary>¿ÀºêÁ§Æ® Å¸ÀÔ</summary>
+	/// <summary>ì˜¤ë¸Œì íŠ¸ íƒ€ìž…</summary>
 	EDBObjectType ObjectType;
 
-	/// <summary>¿ÀºêÁ§Æ® ¸í</summary>
+	/// <summary>ì˜¤ë¸Œì íŠ¸ ëª…</summary>
 	TCHAR tszObjectName[DATABASE_OBJECT_NAME_STRLEN] = { 0, };
 };
 
 //***************************************************************************
-// DB ½Ã½ºÅÛ Á¤º¸
+// DB ì‹œìŠ¤í…œ ì •ë³´
 class DB_SYSTEM_INFO
 {
 public:
-	/// <summary>DB Á¾·ù(1/2/3 : MSSQL/MYSQL/ORACLE)</summary>
+	/// <summary>DB ì¢…ë¥˜(1/2/3 : MSSQL/MYSQL/ORACLE)</summary>
 	EDBClass DBClass;
 
-	/// <summary>¹öÀü</summary>
+	/// <summary>ë²„ì „</summary>
 	TCHAR tszVersion[DATABASE_BASE_STRLEN] = { 0, };
 	
-	/// <summary>Ä³¸¯ÅÍ¼Â</summary>
+	/// <summary>ìºë¦­í„°ì…‹</summary>
 	TCHAR tszCharacterSet[DATABASE_CHARACTERSET_STRLEN] = { 0, };
 	
-	/// <summary>µ¥ÀÌÅÍ Á¤·Ä(¹®ÀÚºñ±³±ÔÄ¢)</summary>
+	/// <summary>ë°ì´í„° ì •ë ¬(ë¬¸ìžë¹„êµê·œì¹™)</summary>
 	TCHAR tszCollation[DATABASE_CHARACTERSET_STRLEN] = { 0, };
 };
 
 //***************************************************************************
-// DB µ¥ÀÌÅÍ Å¸ÀÔ(MSSQL¸¸ sys.types Å×ÀÌºí Á¸Àç)
+// DB ë°ì´í„° íƒ€ìž…(MSSQLë§Œ sys.types í…Œì´ë¸” ì¡´ìž¬)
 class DB_SYSTEM_DATATYPE
 {
 public:
@@ -76,207 +76,207 @@ public:
 };
 
 //***************************************************************************
-// Å×ÀÌºí Á¤º¸
+// í…Œì´ë¸” ì •ë³´
 class TABLE_INFO
 {
 public:
-	int32	ObjectId;										// MSSQL Å×ÀÌºí °íÀ¯¹øÈ£
-	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];		// MSSQL ½ºÅ°¸¶ ¸í
-	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN];		// Å×ÀÌºí ¸í
-	int64	AutoIncrementValue;								// Identity »ý¼ºµÈ ¸¶Áö¸· °ª
-	TCHAR	tszStorageEngine[DATABASE_BASE_STRLEN];			// ½ºÅä¸®Áö ¿£Áø
-	TCHAR	tszCharacterSet[DATABASE_CHARACTERSET_STRLEN];	// Ä³¸¯ÅÍ¼Â
-	TCHAR	tszCollation[DATABASE_CHARACTERSET_STRLEN];		// ¹®ÀÚºñ±³±ÔÄ¢
-	TCHAR	tszTableComment[DATABASE_WVARCHAR_MAX];			// Å×ÀÌºí ÁÖ¼®
-	TCHAR	tszCreateDate[DATETIME_STRLEN];					// »ý¼º ÀÏ½Ã
-	TCHAR	tszModifyDate[DATETIME_STRLEN];					// ¼öÁ¤ ÀÏ½Ã
+	int32	ObjectId;										// MSSQL í…Œì´ë¸” ê³ ìœ ë²ˆí˜¸
+	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];		// MSSQL ìŠ¤í‚¤ë§ˆ ëª…
+	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN];		// í…Œì´ë¸” ëª…
+	int64	AutoIncrementValue;								// Identity ìƒì„±ëœ ë§ˆì§€ë§‰ ê°’
+	TCHAR	tszStorageEngine[DATABASE_BASE_STRLEN];			// ìŠ¤í† ë¦¬ì§€ ì—”ì§„
+	TCHAR	tszCharacterSet[DATABASE_CHARACTERSET_STRLEN];	// ìºë¦­í„°ì…‹
+	TCHAR	tszCollation[DATABASE_CHARACTERSET_STRLEN];		// ë¬¸ìžë¹„êµê·œì¹™
+	TCHAR	tszTableComment[DATABASE_WVARCHAR_MAX];			// í…Œì´ë¸” ì£¼ì„
+	TCHAR	tszCreateDate[DATETIME_STRLEN];					// ìƒì„± ì¼ì‹œ
+	TCHAR	tszModifyDate[DATETIME_STRLEN];					// ìˆ˜ì • ì¼ì‹œ
 };
 
 //***************************************************************************
-// Å×ÀÌºí ÄÃ·³ Á¤º¸
+// í…Œì´ë¸” ì»¬ëŸ¼ ì •ë³´
 class COLUMN_INFO
 {
 public:
-	int32	ObjectId;											// MSSQL Å×ÀÌºí °íÀ¯¹øÈ£
-	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];			// MSSQL ½ºÅ°¸¶ ¸í
-	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN];			// Å×ÀÌºí ¸í
-	int32	Seq;												// ÄÃ·³ ¼ø¼­
-	TCHAR	tszColumnName[DATABASE_COLUMN_NAME_STRLEN];			// ÄÃ·³ ¸í
-	TCHAR   tszDataType[DATABASE_DATATYPEDESC_STRLEN];			// ÄÃ·³ µ¥ÀÌÅÍÅ¸ÀÔ
-	int64	MaxLength;											// ÄÃ·³ÀÇ ÃÖ´ë ±æÀÌ(¹ÙÀÌÆ®)
-	uint8   Precision;											// ÃÖ´ë ÀüÃ¼ ÀÚ¸´¼ö(¼ýÀÚ ±â¹Ý Çü½ÄÀÎ °æ¿ì¿¡´Â Çü½ÄÀÇ ÃÖ´ë ÀüÃ¼ ÀÚ¸´¼ö, ±×·¸Áö ¾ÊÀ¸¸é 0)
-	uint8	Scale;												// ÃÖ´ë ¼Ò¼ö ÀÚ¸´¼ö(¼ýÀÚ ±â¹ÝÀÎ °æ¿ì Çü½ÄÀÇ ÃÖ´ë ¼Ò¼ö ÀÚ¸´¼ö, ±×·¸Áö ¾ÊÀ¸¸é 0)
-	TCHAR	tszDataTypeDesc[DATABASE_DATATYPEDESC_STRLEN];		// ÄÃ·³ µ¥ÀÌÅÍÅ¸ÀÔ »ó¼¼(Ex. VARCHAR[100])
-	bool	IsNullable;											// NULL Çã¿ë ¿©ºÎ(true/false : Çã¿ë/ºñÇã¿ë)
-	bool	IsIdentity;											// Identity °ª ¿©ºÎ(true/false : À¯/¹«)
-	uint64	SeedValue;											// Identity ½Ãµå °ª
-	uint64  IncValue;											// Identity ÁõºÐ °ª
-	TCHAR   tszDefaultConstraintName[DATABASE_WVARCHAR_MAX];	// ±âº»Á¦¾à Á¶°Ç ¸í
-	TCHAR   tszDefaultDefinition[DATABASE_WVARCHAR_MAX];		// ±âº»°ª Á¤ÀÇ
-	TCHAR	tszCharacterSet[DATABASE_CHARACTERSET_STRLEN];		// Ä³¸¯ÅÍ¼Â
-	TCHAR	tszCollation[DATABASE_CHARACTERSET_STRLEN];			// ¹®ÀÚºñ±³±ÔÄ¢
-	TCHAR	tszColumnComment[DATABASE_WVARCHAR_MAX];			// ÄÃ·³ ÁÖ¼®
+	int32	ObjectId;											// MSSQL í…Œì´ë¸” ê³ ìœ ë²ˆí˜¸
+	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];			// MSSQL ìŠ¤í‚¤ë§ˆ ëª…
+	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN];			// í…Œì´ë¸” ëª…
+	int32	Seq;												// ì»¬ëŸ¼ ìˆœì„œ
+	TCHAR	tszColumnName[DATABASE_COLUMN_NAME_STRLEN];			// ì»¬ëŸ¼ ëª…
+	TCHAR   tszDataType[DATABASE_DATATYPEDESC_STRLEN];			// ì»¬ëŸ¼ ë°ì´í„°íƒ€ìž…
+	int64	MaxLength;											// ì»¬ëŸ¼ì˜ ìµœëŒ€ ê¸¸ì´(ë°”ì´íŠ¸)
+	uint8   Precision;											// ìµœëŒ€ ì „ì²´ ìžë¦¿ìˆ˜(ìˆ«ìž ê¸°ë°˜ í˜•ì‹ì¸ ê²½ìš°ì—ëŠ” í˜•ì‹ì˜ ìµœëŒ€ ì „ì²´ ìžë¦¿ìˆ˜, ê·¸ë ‡ì§€ ì•Šìœ¼ë©´ 0)
+	uint8	Scale;												// ìµœëŒ€ ì†Œìˆ˜ ìžë¦¿ìˆ˜(ìˆ«ìž ê¸°ë°˜ì¸ ê²½ìš° í˜•ì‹ì˜ ìµœëŒ€ ì†Œìˆ˜ ìžë¦¿ìˆ˜, ê·¸ë ‡ì§€ ì•Šìœ¼ë©´ 0)
+	TCHAR	tszDataTypeDesc[DATABASE_DATATYPEDESC_STRLEN];		// ì»¬ëŸ¼ ë°ì´í„°íƒ€ìž… ìƒì„¸(Ex. VARCHAR[100])
+	bool	IsNullable;											// NULL í—ˆìš© ì—¬ë¶€(true/false : í—ˆìš©/ë¹„í—ˆìš©)
+	bool	IsIdentity;											// Identity ê°’ ì—¬ë¶€(true/false : ìœ /ë¬´)
+	uint64	SeedValue;											// Identity ì‹œë“œ ê°’
+	uint64  IncValue;											// Identity ì¦ë¶„ ê°’
+	TCHAR   tszDefaultConstraintName[DATABASE_WVARCHAR_MAX];	// ê¸°ë³¸ì œì•½ ì¡°ê±´ ëª…
+	TCHAR   tszDefaultDefinition[DATABASE_WVARCHAR_MAX];		// ê¸°ë³¸ê°’ ì •ì˜
+	TCHAR	tszCharacterSet[DATABASE_CHARACTERSET_STRLEN];		// ìºë¦­í„°ì…‹
+	TCHAR	tszCollation[DATABASE_CHARACTERSET_STRLEN];			// ë¬¸ìžë¹„êµê·œì¹™
+	TCHAR	tszColumnComment[DATABASE_WVARCHAR_MAX];			// ì»¬ëŸ¼ ì£¼ì„
 };
 
 //***************************************************************************
-// Á¦¾àÁ¶°Ç Á¤º¸
+// ì œì•½ì¡°ê±´ ì •ë³´
 class CONSTRAINT_INFO
 {
 public:
-	int32	ObjectId;												// MSSQL Å×ÀÌºí °íÀ¯¹øÈ£
-	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];				// MSSQL ½ºÅ°¸¶ ¸í
-	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN];				// Å×ÀÌºí ¸í
-	TCHAR   tszConstName[DATABASE_OBJECT_NAME_STRLEN];				// Á¦¾àÁ¶°Ç ¸í
-	TCHAR   tszConstType[DATABASE_OBJECT_NAME_STRLEN];				// Á¦¾àÁ¶°Ç Å¸ÀÔ
-	TCHAR   tszConstTypeDesc[DATABASE_OBJECT_NAME_STRLEN];			// Á¦¾àÁ¶°Ç Å¸ÀÔ ¼³¸í
-	TCHAR   tszConstValue[DATABASE_WVARCHAR_MAX];					// Á¦¾àÁ¶°Ç Á¤ÀÇ°ª
-	bool	IsSystemNamed;											// ½Ã½ºÅÛÀÌ ÀÎµ¦½º¸íÀ» ÇÒ´çÇß´ÂÁö ¿©ºÎ(true/false : À¯/¹«)
-	bool	IsStatus;												// Á¦¾à Á¶°ÇÀÇ ½ÃÇà »óÅÂ. ORACLE¸¸ »ç¿ë(true/false : Á¦¾à Á¶°ÇÀÇ È°¼º(ENABLED)/Á¦¾à Á¶°ÇÀÇ ºñÈ°¼º(DISABLED))
-	TCHAR   tszSortValue[DATABASE_OBJECT_NAME_STRLEN];				// Á¤·Ä °ª
+	int32	ObjectId;												// MSSQL í…Œì´ë¸” ê³ ìœ ë²ˆí˜¸
+	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];				// MSSQL ìŠ¤í‚¤ë§ˆ ëª…
+	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN];				// í…Œì´ë¸” ëª…
+	TCHAR   tszConstName[DATABASE_OBJECT_NAME_STRLEN];				// ì œì•½ì¡°ê±´ ëª…
+	TCHAR   tszConstType[DATABASE_OBJECT_NAME_STRLEN];				// ì œì•½ì¡°ê±´ íƒ€ìž…
+	TCHAR   tszConstTypeDesc[DATABASE_OBJECT_NAME_STRLEN];			// ì œì•½ì¡°ê±´ íƒ€ìž… ì„¤ëª…
+	TCHAR   tszConstValue[DATABASE_WVARCHAR_MAX];					// ì œì•½ì¡°ê±´ ì •ì˜ê°’
+	bool	IsSystemNamed;											// ì‹œìŠ¤í…œì´ ì¸ë±ìŠ¤ëª…ì„ í• ë‹¹í–ˆëŠ”ì§€ ì—¬ë¶€(true/false : ìœ /ë¬´)
+	bool	IsStatus;												// ì œì•½ ì¡°ê±´ì˜ ì‹œí–‰ ìƒíƒœ. ORACLEë§Œ ì‚¬ìš©(true/false : ì œì•½ ì¡°ê±´ì˜ í™œì„±(ENABLED)/ì œì•½ ì¡°ê±´ì˜ ë¹„í™œì„±(DISABLED))
+	TCHAR   tszSortValue[DATABASE_OBJECT_NAME_STRLEN];				// ì •ë ¬ ê°’
 };
 
 //***************************************************************************
-// ÀÎµ¦½º Á¤º¸
+// ì¸ë±ìŠ¤ ì •ë³´
 class INDEX_INFO
 {
 public:
-	int32	ObjectId;										// MSSQL Å×ÀÌºí °íÀ¯¹øÈ£
-	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];		// MSSQL ½ºÅ°¸¶ ¸í
-	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN];		// Å×ÀÌºí ¸í
-	TCHAR   tszIndexName[DATABASE_OBJECT_NAME_STRLEN];		// ÀÎµ¦½º ¸í
-	int32	IndexId;										// ÀÎµ¦½º °íÀ¯¹øÈ£
-	TCHAR   tszIndexType[DATABASE_OBJECT_TYPE_DESC_STRLEN];	// ÀÎµ¦½º Å¸ÀÔ(PRIMARYKEY/UNIQUE/INDEX/FULLTEXT/SPATIAL)
-	bool    IsPrimaryKey;									// ±âº»Å° ¿©ºÎ(true/false : À¯/¹«)
-	bool    IsUnique;										// À¯´ÏÅ© ¿©ºÎ(true/false : À¯/¹«)
-	int32   ColumnSeq;										// ÄÃ·³ ¼ø¼­
-	TCHAR	tszColumnName[DATABASE_COLUMN_NAME_STRLEN];		// ÄÃ·³ ¸í
-	int8    ColumnSort;										// Á¤·Ä(1/2 : ASC/DESC)
-	bool	IsSystemNamed;									// ½Ã½ºÅÛÀÌ ÀÎµ¦½º¸íÀ» ÇÒ´çÇß´ÂÁö ¿©ºÎ(true/false : À¯/¹«)
+	int32	ObjectId;										// MSSQL í…Œì´ë¸” ê³ ìœ ë²ˆí˜¸
+	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];		// MSSQL ìŠ¤í‚¤ë§ˆ ëª…
+	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN];		// í…Œì´ë¸” ëª…
+	TCHAR   tszIndexName[DATABASE_OBJECT_NAME_STRLEN];		// ì¸ë±ìŠ¤ ëª…
+	int32	IndexId;										// ì¸ë±ìŠ¤ ê³ ìœ ë²ˆí˜¸
+	TCHAR   tszIndexType[DATABASE_OBJECT_TYPE_DESC_STRLEN];	// ì¸ë±ìŠ¤ íƒ€ìž…(PRIMARYKEY/UNIQUE/INDEX/FULLTEXT/SPATIAL)
+	bool    IsPrimaryKey;									// ê¸°ë³¸í‚¤ ì—¬ë¶€(true/false : ìœ /ë¬´)
+	bool    IsUnique;										// ìœ ë‹ˆí¬ ì—¬ë¶€(true/false : ìœ /ë¬´)
+	int32   ColumnSeq;										// ì»¬ëŸ¼ ìˆœì„œ
+	TCHAR	tszColumnName[DATABASE_COLUMN_NAME_STRLEN];		// ì»¬ëŸ¼ ëª…
+	int8    ColumnSort;										// ì •ë ¬(1/2 : ASC/DESC)
+	bool	IsSystemNamed;									// ì‹œìŠ¤í…œì´ ì¸ë±ìŠ¤ëª…ì„ í• ë‹¹í–ˆëŠ”ì§€ ì—¬ë¶€(true/false : ìœ /ë¬´)
 };
 
 //***************************************************************************
-// ¿Ü·¡Å° Á¤º¸
+// ì™¸ëž˜í‚¤ ì •ë³´
 class FOREIGNKEYS_INFO
 {
 public:
-	int32	ObjectId;												// MSSQL Å×ÀÌºí °íÀ¯¹øÈ£
-	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];				// MSSQL ½ºÅ°¸¶ ¸í
-	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN];				// Å×ÀÌºí ¸í
-	TCHAR   tszForeignKeyName[DATABASE_OBJECT_NAME_STRLEN];			// ¿Ü·¡Å° ¸í
-	bool	IsDisabled;												// FOREIGN KEY Á¦¾à Á¶°Ç »ç¿ë ¿©ºÎ(0/1 : »ç¿ë°¡´É/»ç¿ëºÒ°¡´É)
-	bool	IsNotTrusted;											// ½Ã½ºÅÛ¿¡¼­ µ¥ÀÌÅÍÀÇ ÀÏ°ý¼º(FOREIGN KEY Á¦¾à Á¶°Ç)¿¡ ´ëÇÑ È®ÀÎ ¿©ºÎ(0/1 : È®ÀÎ/¹ÌÈ®ÀÎ)
-	TCHAR	tszForeignKeyTableName[DATABASE_TABLE_NAME_STRLEN];		// ¿Ü·¡Å° Å×ÀÌºí ¸í
-	TCHAR	tszForeignKeyColumnName[DATABASE_COLUMN_NAME_STRLEN];	// ¿Ü·¡Å° ÄÃ·³ ¸í
-	TCHAR   tszReferenceKeySchemaName[DATABASE_OBJECT_NAME_STRLEN];	// ÂüÁ¶Å° ½ºÅ°¸¶ ¸í
-	TCHAR	tszReferenceKeyTableName[DATABASE_TABLE_NAME_STRLEN];	// ÂüÁ¶Å° Å×ÀÌºí ¸í
-	TCHAR	tszReferenceKeyColumnName[DATABASE_COLUMN_NAME_STRLEN];	// ÂüÁ¶Å° ÄÃ·³ ¸í
-	TCHAR   tszUpdateReferentialAction[60];							// ¾÷µ¥ÀÌÆ® ¹ß»ýÇÒ ¶§ ¿Ü·¡Å°¿¡ ´ëÇØ ¼±¾ðµÈ ÂüÁ¶ ÀÛ¾÷(NO_ACTION/CASCADE/RESTRICT/SET NULL/SET DEFAULT)
-	TCHAR   tszDeleteReferentialAction[60];							// »èÁ¦ ¹ß»ýÇÒ ¶§ ¿Ü·¡Å°¿¡ ´ëÇØ ¼±¾ðµÈ ÂüÁ¶ ÀÛ¾÷(NO_ACTION/CASCADE/RESTRICT/SET NULL/SET DEFAULT)
-	bool	IsSystemNamed;											// ½Ã½ºÅÛÀÌ ÀÎµ¦½º¸íÀ» ÇÒ´çÇß´ÂÁö ¿©ºÎ(true/false : À¯/¹«)
+	int32	ObjectId;												// MSSQL í…Œì´ë¸” ê³ ìœ ë²ˆí˜¸
+	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];				// MSSQL ìŠ¤í‚¤ë§ˆ ëª…
+	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN];				// í…Œì´ë¸” ëª…
+	TCHAR   tszForeignKeyName[DATABASE_OBJECT_NAME_STRLEN];			// ì™¸ëž˜í‚¤ ëª…
+	bool	IsDisabled;												// FOREIGN KEY ì œì•½ ì¡°ê±´ ì‚¬ìš© ì—¬ë¶€(0/1 : ì‚¬ìš©ê°€ëŠ¥/ì‚¬ìš©ë¶ˆê°€ëŠ¥)
+	bool	IsNotTrusted;											// ì‹œìŠ¤í…œì—ì„œ ë°ì´í„°ì˜ ì¼ê´„ì„±(FOREIGN KEY ì œì•½ ì¡°ê±´)ì— ëŒ€í•œ í™•ì¸ ì—¬ë¶€(0/1 : í™•ì¸/ë¯¸í™•ì¸)
+	TCHAR	tszForeignKeyTableName[DATABASE_TABLE_NAME_STRLEN];		// ì™¸ëž˜í‚¤ í…Œì´ë¸” ëª…
+	TCHAR	tszForeignKeyColumnName[DATABASE_COLUMN_NAME_STRLEN];	// ì™¸ëž˜í‚¤ ì»¬ëŸ¼ ëª…
+	TCHAR   tszReferenceKeySchemaName[DATABASE_OBJECT_NAME_STRLEN];	// ì°¸ì¡°í‚¤ ìŠ¤í‚¤ë§ˆ ëª…
+	TCHAR	tszReferenceKeyTableName[DATABASE_TABLE_NAME_STRLEN];	// ì°¸ì¡°í‚¤ í…Œì´ë¸” ëª…
+	TCHAR	tszReferenceKeyColumnName[DATABASE_COLUMN_NAME_STRLEN];	// ì°¸ì¡°í‚¤ ì»¬ëŸ¼ ëª…
+	TCHAR   tszUpdateReferentialAction[60];							// ì—…ë°ì´íŠ¸ ë°œìƒí•  ë•Œ ì™¸ëž˜í‚¤ì— ëŒ€í•´ ì„ ì–¸ëœ ì°¸ì¡° ìž‘ì—…(NO_ACTION/CASCADE/RESTRICT/SET NULL/SET DEFAULT)
+	TCHAR   tszDeleteReferentialAction[60];							// ì‚­ì œ ë°œìƒí•  ë•Œ ì™¸ëž˜í‚¤ì— ëŒ€í•´ ì„ ì–¸ëœ ì°¸ì¡° ìž‘ì—…(NO_ACTION/CASCADE/RESTRICT/SET NULL/SET DEFAULT)
+	bool	IsSystemNamed;											// ì‹œìŠ¤í…œì´ ì¸ë±ìŠ¤ëª…ì„ í• ë‹¹í–ˆëŠ”ì§€ ì—¬ë¶€(true/false : ìœ /ë¬´)
 };
 
 //***************************************************************************
-// Ã¼Å© Á¦¾àÁ¶°Ç Á¤º¸
+// ì²´í¬ ì œì•½ì¡°ê±´ ì •ë³´
 class CHECK_CONSTRAINT_INFO
 {
 public:
-	int32	ObjectId;												// MSSQL Å×ÀÌºí °íÀ¯¹øÈ£
-	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];				// MSSQL ½ºÅ°¸¶ ¸í
-	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN];				// Å×ÀÌºí ¸í
-	TCHAR   tszCheckConstName[DATABASE_OBJECT_NAME_STRLEN];			// Ã¼Å© Á¦¾àÁ¶°Ç ¸í
-	TCHAR   tszCheckValue[DATABASE_WVARCHAR_MAX];					// ÄÃ·³ Á¦¾àÁ¶°Ç Á¤ÀÇ°ª
-	bool	IsSystemNamed;											// ½Ã½ºÅÛÀÌ ÀÎµ¦½º¸íÀ» ÇÒ´çÇß´ÂÁö ¿©ºÎ(true/false : À¯/¹«)
+	int32	ObjectId;												// MSSQL í…Œì´ë¸” ê³ ìœ ë²ˆí˜¸
+	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];				// MSSQL ìŠ¤í‚¤ë§ˆ ëª…
+	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN];				// í…Œì´ë¸” ëª…
+	TCHAR   tszCheckConstName[DATABASE_OBJECT_NAME_STRLEN];			// ì²´í¬ ì œì•½ì¡°ê±´ ëª…
+	TCHAR   tszCheckValue[DATABASE_WVARCHAR_MAX];					// ì»¬ëŸ¼ ì œì•½ì¡°ê±´ ì •ì˜ê°’
+	bool	IsSystemNamed;											// ì‹œìŠ¤í…œì´ ì¸ë±ìŠ¤ëª…ì„ í• ë‹¹í–ˆëŠ”ì§€ ì—¬ë¶€(true/false : ìœ /ë¬´)
 };
 
 //***************************************************************************
-// ±âº»°ª Á¦¾àÁ¶°Ç Á¤º¸
+// ê¸°ë³¸ê°’ ì œì•½ì¡°ê±´ ì •ë³´
 class DEFAULT_CONSTRAINT_INFO
 {
 public:
-	int32	ObjectId;												// MSSQL Å×ÀÌºí °íÀ¯¹øÈ£
-	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];				// MSSQL ½ºÅ°¸¶ ¸í
-	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN];				// Å×ÀÌºí ¸í
-	TCHAR   tszDefaultConstName[DATABASE_OBJECT_NAME_STRLEN];		// ±âº»°ª Á¦¾àÁ¶°Ç ¸í
-	TCHAR   tszColumnName[DATABASE_COLUMN_NAME_STRLEN];				// ÄÃ·³ ¸í
-	TCHAR   tszDefaultValue[DATABASE_WVARCHAR_MAX];					// ÄÃ·³ Á¦¾àÁ¶°Ç Á¤ÀÇ°ª
-	bool	IsSystemNamed;											// ½Ã½ºÅÛÀÌ ÀÎµ¦½º¸íÀ» ÇÒ´çÇß´ÂÁö ¿©ºÎ(true/false : À¯/¹«)
+	int32	ObjectId;												// MSSQL í…Œì´ë¸” ê³ ìœ ë²ˆí˜¸
+	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];				// MSSQL ìŠ¤í‚¤ë§ˆ ëª…
+	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN];				// í…Œì´ë¸” ëª…
+	TCHAR   tszDefaultConstName[DATABASE_OBJECT_NAME_STRLEN];		// ê¸°ë³¸ê°’ ì œì•½ì¡°ê±´ ëª…
+	TCHAR   tszColumnName[DATABASE_COLUMN_NAME_STRLEN];				// ì»¬ëŸ¼ ëª…
+	TCHAR   tszDefaultValue[DATABASE_WVARCHAR_MAX];					// ì»¬ëŸ¼ ì œì•½ì¡°ê±´ ì •ì˜ê°’
+	bool	IsSystemNamed;											// ì‹œìŠ¤í…œì´ ì¸ë±ìŠ¤ëª…ì„ í• ë‹¹í–ˆëŠ”ì§€ ì—¬ë¶€(true/false : ìœ /ë¬´)
 };
 
 //***************************************************************************
-// Æ®¸®°Å Á¤º¸
+// íŠ¸ë¦¬ê±° ì •ë³´
 class TRIGGER_INFO
 {
 public:
-	int32	ObjectId;												// MSSQL Å×ÀÌºí °íÀ¯¹øÈ£
-	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];				// MSSQL ½ºÅ°¸¶ ¸í
-	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN];				// Å×ÀÌºí ¸í
-	TCHAR   tszTriggerName[DATABASE_OBJECT_NAME_STRLEN];			// Æ®¸®°Å ¸í
+	int32	ObjectId;												// MSSQL í…Œì´ë¸” ê³ ìœ ë²ˆí˜¸
+	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];				// MSSQL ìŠ¤í‚¤ë§ˆ ëª…
+	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN];				// í…Œì´ë¸” ëª…
+	TCHAR   tszTriggerName[DATABASE_OBJECT_NAME_STRLEN];			// íŠ¸ë¦¬ê±° ëª…
 };
 
 //***************************************************************************
-// ÀúÀåÇÁ·Î½ÃÀú Á¤º¸
+// ì €ìž¥í”„ë¡œì‹œì € ì •ë³´
 class PROCEDURE_INFO
 {
 public:
-	int32	ObjectId;												// MSSQL ÀúÀåÇÁ·Î½ÃÀú °íÀ¯¹øÈ£
-	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];				// MSSQL ½ºÅ°¸¶ ¸í
-	TCHAR   tszProcName[DATABASE_OBJECT_NAME_STRLEN];				// ÀúÀåÇÁ·Î½ÃÀú ¸í
-	TCHAR	tszProcComment[DATABASE_WVARCHAR_MAX];					// ÀúÀåÇÁ·Î½ÃÀú ÁÖ¼®
-	TCHAR   tszProcText[DATABASE_OBJECT_CONTENTTEXT_STRLEN];		// ÀúÀåÇÁ·Î½ÃÀú ³»¿ë
-	TCHAR	tszCreateDate[DATETIME_STRLEN];							// »ý¼º ÀÏ½Ã
-	TCHAR	tszModifyDate[DATETIME_STRLEN];							// ¼öÁ¤ ÀÏ½Ã
+	int32	ObjectId;												// MSSQL ì €ìž¥í”„ë¡œì‹œì € ê³ ìœ ë²ˆí˜¸
+	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];				// MSSQL ìŠ¤í‚¤ë§ˆ ëª…
+	TCHAR   tszProcName[DATABASE_OBJECT_NAME_STRLEN];				// ì €ìž¥í”„ë¡œì‹œì € ëª…
+	TCHAR	tszProcComment[DATABASE_WVARCHAR_MAX];					// ì €ìž¥í”„ë¡œì‹œì € ì£¼ì„
+	TCHAR   tszProcText[DATABASE_OBJECT_CONTENTTEXT_STRLEN];		// ì €ìž¥í”„ë¡œì‹œì € ë‚´ìš©
+	TCHAR	tszCreateDate[DATETIME_STRLEN];							// ìƒì„± ì¼ì‹œ
+	TCHAR	tszModifyDate[DATETIME_STRLEN];							// ìˆ˜ì • ì¼ì‹œ
 };
 
 //***************************************************************************
-// ÀúÀåÇÁ·Î½ÃÀú ÆÄ¶ó¹ÌÅÍ Á¤º¸
+// ì €ìž¥í”„ë¡œì‹œì € íŒŒë¼ë¯¸í„° ì •ë³´
 class PROCEDURE_PARAM_INFO
 {
 public:
-	int32	ObjectId;												// MSSQL ÀúÀåÇÁ·Î½ÃÀú °íÀ¯¹øÈ£
-	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];				// MSSQL ½ºÅ°¸¶ ¸í
-	TCHAR   tszProcName[DATABASE_OBJECT_NAME_STRLEN];				// ÀúÀåÇÁ·Î½ÃÀú ¸í
-	int32	Seq;													// ÆÄ¶ó¹ÌÅÍ ¼ø¼­
-	int8	ParamMode;												// ÆÄ¶ó¹ÌÅÍ ÀÔÃâ·Â ±¸ºÐ(0/1/2 : RETURN/IN/OUT)
-	TCHAR	tszParamName[DATABASE_COLUMN_NAME_STRLEN];				// ÆÄ¶ó¹ÌÅÍ ¸í
-	TCHAR   tszDataType[DATABASE_DATATYPEDESC_STRLEN];				// ÆÄ¶ó¹ÌÅÍ µ¥ÀÌÅÍÅ¸ÀÔ
-	uint64	MaxLength;												// ÆÄ¶ó¹ÌÅÍÀÇ ÃÖ´ë ±æÀÌ(¹ÙÀÌÆ®)
-	uint8   Precision;												// ÃÖ´ë ÀüÃ¼ ÀÚ¸´¼ö(¼ýÀÚ ±â¹Ý Çü½ÄÀÎ °æ¿ì¿¡´Â Çü½ÄÀÇ ÃÖ´ë ÀüÃ¼ ÀÚ¸´¼ö, ±×·¸Áö ¾ÊÀ¸¸é 0)
-	uint8	Scale;													// ÃÖ´ë ¼Ò¼ö ÀÚ¸´¼ö(¼ýÀÚ ±â¹ÝÀÎ °æ¿ì Çü½ÄÀÇ ÃÖ´ë ¼Ò¼ö ÀÚ¸´¼ö, ±×·¸Áö ¾ÊÀ¸¸é 0)
-	TCHAR	tszDataTypeDesc[DATABASE_DATATYPEDESC_STRLEN];			// ÆÄ¶ó¹ÌÅÍ µ¥ÀÌÅÍÅ¸ÀÔ »ó¼¼(Ex. VARCHAR[100])
-	TCHAR	tszParamComment[DATABASE_WVARCHAR_MAX];					// ÆÄ¶ó¹ÌÅÍ ÁÖ¼®
+	int32	ObjectId;												// MSSQL ì €ìž¥í”„ë¡œì‹œì € ê³ ìœ ë²ˆí˜¸
+	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];				// MSSQL ìŠ¤í‚¤ë§ˆ ëª…
+	TCHAR   tszProcName[DATABASE_OBJECT_NAME_STRLEN];				// ì €ìž¥í”„ë¡œì‹œì € ëª…
+	int32	Seq;													// íŒŒë¼ë¯¸í„° ìˆœì„œ
+	int8	ParamMode;												// íŒŒë¼ë¯¸í„° ìž…ì¶œë ¥ êµ¬ë¶„(0/1/2 : RETURN/IN/OUT)
+	TCHAR	tszParamName[DATABASE_COLUMN_NAME_STRLEN];				// íŒŒë¼ë¯¸í„° ëª…
+	TCHAR   tszDataType[DATABASE_DATATYPEDESC_STRLEN];				// íŒŒë¼ë¯¸í„° ë°ì´í„°íƒ€ìž…
+	uint64	MaxLength;												// íŒŒë¼ë¯¸í„°ì˜ ìµœëŒ€ ê¸¸ì´(ë°”ì´íŠ¸)
+	uint8   Precision;												// ìµœëŒ€ ì „ì²´ ìžë¦¿ìˆ˜(ìˆ«ìž ê¸°ë°˜ í˜•ì‹ì¸ ê²½ìš°ì—ëŠ” í˜•ì‹ì˜ ìµœëŒ€ ì „ì²´ ìžë¦¿ìˆ˜, ê·¸ë ‡ì§€ ì•Šìœ¼ë©´ 0)
+	uint8	Scale;													// ìµœëŒ€ ì†Œìˆ˜ ìžë¦¿ìˆ˜(ìˆ«ìž ê¸°ë°˜ì¸ ê²½ìš° í˜•ì‹ì˜ ìµœëŒ€ ì†Œìˆ˜ ìžë¦¿ìˆ˜, ê·¸ë ‡ì§€ ì•Šìœ¼ë©´ 0)
+	TCHAR	tszDataTypeDesc[DATABASE_DATATYPEDESC_STRLEN];			// íŒŒë¼ë¯¸í„° ë°ì´í„°íƒ€ìž… ìƒì„¸(Ex. VARCHAR[100])
+	TCHAR	tszParamComment[DATABASE_WVARCHAR_MAX];					// íŒŒë¼ë¯¸í„° ì£¼ì„
 };
 
 //***************************************************************************
-// ÇÔ¼ö Á¤º¸
+// í•¨ìˆ˜ ì •ë³´
 class FUNCTION_INFO
 {
 public:
-	int32	ObjectId;												// MSSQL ÇÔ¼ö °íÀ¯¹øÈ£
-	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];				// MSSQL ½ºÅ°¸¶ ¸í
-	TCHAR   tszFuncName[DATABASE_OBJECT_NAME_STRLEN];				// ÇÔ¼ö ¸í
-	TCHAR	tszFuncComment[DATABASE_WVARCHAR_MAX];					// ÇÔ¼ö ÁÖ¼®
-	TCHAR   tszFuncText[DATABASE_OBJECT_CONTENTTEXT_STRLEN];		// ÇÔ¼ö ³»¿ë
-	TCHAR	tszCreateDate[DATETIME_STRLEN];							// »ý¼º ÀÏ½Ã
-	TCHAR	tszModifyDate[DATETIME_STRLEN];							// ¼öÁ¤ ÀÏ½Ã
+	int32	ObjectId;												// MSSQL í•¨ìˆ˜ ê³ ìœ ë²ˆí˜¸
+	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];				// MSSQL ìŠ¤í‚¤ë§ˆ ëª…
+	TCHAR   tszFuncName[DATABASE_OBJECT_NAME_STRLEN];				// í•¨ìˆ˜ ëª…
+	TCHAR	tszFuncComment[DATABASE_WVARCHAR_MAX];					// í•¨ìˆ˜ ì£¼ì„
+	TCHAR   tszFuncText[DATABASE_OBJECT_CONTENTTEXT_STRLEN];		// í•¨ìˆ˜ ë‚´ìš©
+	TCHAR	tszCreateDate[DATETIME_STRLEN];							// ìƒì„± ì¼ì‹œ
+	TCHAR	tszModifyDate[DATETIME_STRLEN];							// ìˆ˜ì • ì¼ì‹œ
 };
 
 //***************************************************************************
-// ÇÔ¼ö ÆÄ¶ó¹ÌÅÍ Á¤º¸
+// í•¨ìˆ˜ íŒŒë¼ë¯¸í„° ì •ë³´
 class FUNCTION_PARAM_INFO
 {
 public:
-	int32	ObjectId;												// MSSQL ÇÔ¼ö °íÀ¯¹øÈ£
-	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];				// MSSQL ½ºÅ°¸¶ ¸í
-	TCHAR   tszFuncName[DATABASE_OBJECT_NAME_STRLEN];				// ÇÔ¼ö ¸í
-	int32	Seq;													// ÆÄ¶ó¹ÌÅÍ ¼ø¼­
-	int8	ParamMode;												// ÆÄ¶ó¹ÌÅÍ ÀÔÃâ·Â ±¸ºÐ(0/1/2 : RETURN/IN/OUT)
-	TCHAR	tszParamName[DATABASE_COLUMN_NAME_STRLEN];				// ÆÄ¶ó¹ÌÅÍ ¸í
-	TCHAR   tszDataType[DATABASE_DATATYPEDESC_STRLEN];				// ÆÄ¶ó¹ÌÅÍ µ¥ÀÌÅÍÅ¸ÀÔ
-	uint64	MaxLength;												// ÆÄ¶ó¹ÌÅÍÀÇ ÃÖ´ë ±æÀÌ(¹ÙÀÌÆ®)
-	uint8   Precision;												// ÃÖ´ë ÀüÃ¼ ÀÚ¸´¼ö(¼ýÀÚ ±â¹Ý Çü½ÄÀÎ °æ¿ì¿¡´Â Çü½ÄÀÇ ÃÖ´ë ÀüÃ¼ ÀÚ¸´¼ö, ±×·¸Áö ¾ÊÀ¸¸é 0)
-	uint8	Scale;													// ÃÖ´ë ¼Ò¼ö ÀÚ¸´¼ö(¼ýÀÚ ±â¹ÝÀÎ °æ¿ì Çü½ÄÀÇ ÃÖ´ë ¼Ò¼ö ÀÚ¸´¼ö, ±×·¸Áö ¾ÊÀ¸¸é 0)
-	TCHAR	tszDataTypeDesc[DATABASE_DATATYPEDESC_STRLEN];			// ÆÄ¶ó¹ÌÅÍ µ¥ÀÌÅÍÅ¸ÀÔ »ó¼¼(Ex. VARCHAR[100])
-	TCHAR	tszParamComment[DATABASE_WVARCHAR_MAX];					// ÆÄ¶ó¹ÌÅÍ ÁÖ¼®
+	int32	ObjectId;												// MSSQL í•¨ìˆ˜ ê³ ìœ ë²ˆí˜¸
+	TCHAR   tszSchemaName[DATABASE_OBJECT_NAME_STRLEN];				// MSSQL ìŠ¤í‚¤ë§ˆ ëª…
+	TCHAR   tszFuncName[DATABASE_OBJECT_NAME_STRLEN];				// í•¨ìˆ˜ ëª…
+	int32	Seq;													// íŒŒë¼ë¯¸í„° ìˆœì„œ
+	int8	ParamMode;												// íŒŒë¼ë¯¸í„° ìž…ì¶œë ¥ êµ¬ë¶„(0/1/2 : RETURN/IN/OUT)
+	TCHAR	tszParamName[DATABASE_COLUMN_NAME_STRLEN];				// íŒŒë¼ë¯¸í„° ëª…
+	TCHAR   tszDataType[DATABASE_DATATYPEDESC_STRLEN];				// íŒŒë¼ë¯¸í„° ë°ì´í„°íƒ€ìž…
+	uint64	MaxLength;												// íŒŒë¼ë¯¸í„°ì˜ ìµœëŒ€ ê¸¸ì´(ë°”ì´íŠ¸)
+	uint8   Precision;												// ìµœëŒ€ ì „ì²´ ìžë¦¿ìˆ˜(ìˆ«ìž ê¸°ë°˜ í˜•ì‹ì¸ ê²½ìš°ì—ëŠ” í˜•ì‹ì˜ ìµœëŒ€ ì „ì²´ ìžë¦¿ìˆ˜, ê·¸ë ‡ì§€ ì•Šìœ¼ë©´ 0)
+	uint8	Scale;													// ìµœëŒ€ ì†Œìˆ˜ ìžë¦¿ìˆ˜(ìˆ«ìž ê¸°ë°˜ì¸ ê²½ìš° í˜•ì‹ì˜ ìµœëŒ€ ì†Œìˆ˜ ìžë¦¿ìˆ˜, ê·¸ë ‡ì§€ ì•Šìœ¼ë©´ 0)
+	TCHAR	tszDataTypeDesc[DATABASE_DATATYPEDESC_STRLEN];			// íŒŒë¼ë¯¸í„° ë°ì´í„°íƒ€ìž… ìƒì„¸(Ex. VARCHAR[100])
+	TCHAR	tszParamComment[DATABASE_WVARCHAR_MAX];					// íŒŒë¼ë¯¸í„° ì£¼ì„
 };
 
 //***************************************************************************
@@ -312,10 +312,10 @@ inline _tstring GetDBSystemDataTypeQuery(EDBClass dbClass)
 			query = MSSQLGetDBSystemDataTypeQuery();
 			break;
 		case EDBClass::MYSQL:
-			// MYSQLÀº ½Ã½ºÅÛ µ¥ÀÌÅÍÅ¸ÀÔ ¸ñ·Ï¿¡ ´ëÇÑ ½Ã½ºÅÛ Å×ÀÌºíÀÌ Á¸ÀçÇÏÁö ¾ÊÀ½
+			// MYSQLì€ ì‹œìŠ¤í…œ ë°ì´í„°íƒ€ìž… ëª©ë¡ì— ëŒ€í•œ ì‹œìŠ¤í…œ í…Œì´ë¸”ì´ ì¡´ìž¬í•˜ì§€ ì•ŠìŒ
 			break;
 		case EDBClass::ORACLE:
-			// ORACLEÀº ½Ã½ºÅÛ µ¥ÀÌÅÍÅ¸ÀÔ ¸ñ·Ï¿¡ ´ëÇÑ ½Ã½ºÅÛ Å×ÀÌºíÀÌ Á¸ÀçÇÏÁö ¾ÊÀ½
+			// ORACLEì€ ì‹œìŠ¤í…œ ë°ì´í„°íƒ€ìž… ëª©ë¡ì— ëŒ€í•œ ì‹œìŠ¤í…œ í…Œì´ë¸”ì´ ì¡´ìž¬í•˜ì§€ ì•ŠìŒ
 			break;
 	}
 	return query;

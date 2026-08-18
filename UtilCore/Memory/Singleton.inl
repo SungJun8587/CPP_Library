@@ -1,4 +1,4 @@
-
+﻿
 //***************************************************************************
 // Singleton.inl : implementation of the CSingleton class.
 //

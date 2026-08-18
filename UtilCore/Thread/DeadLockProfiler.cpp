@@ -8,7 +8,9 @@
 #include "DeadLockProfiler.h"
 
 //***************************************************************************
-//
+// @brief 락을 획득할 때 호출하여 락 계층 구조와 의존성을 기록합니다.
+// @param name 획득한 락의 고유 이름
+//***************************************************************************
 void CDeadLockProfiler::PushLock(const char* name)
 {
 	std::lock_guard<std::mutex> guard(_mutex);
@@ -48,7 +50,9 @@ void CDeadLockProfiler::PushLock(const char* name)
 }
 
 //***************************************************************************
-//
+// @brief 락을 해제할 때 호출하여 스레드 로컬 락 스택을 관리합니다.
+// @param name 해제할 락의 이름
+//***************************************************************************
 void CDeadLockProfiler::PopLock(const char* name)
 {
 	std::lock_guard<std::mutex> guard(_mutex);
@@ -64,7 +68,8 @@ void CDeadLockProfiler::PopLock(const char* name)
 }
 
 //***************************************************************************
-//
+// @brief 현재 구성된 락 의존성 그래프에서 순환(데드락)이 존재하는지 확인합니다.
+//***************************************************************************
 void CDeadLockProfiler::CheckCycle()
 {
 	const int32 lockCount = static_cast<int32>(_nameToId.size());
@@ -88,7 +93,9 @@ void CDeadLockProfiler::CheckCycle()
 }
 
 //***************************************************************************
-//
+// @brief DFS(깊이 우선 탐색)를 수행하여 락 의존성 그래프의 순환 여부를 검사합니다.
+// @param here 탐색을 시작할 락의 ID
+//***************************************************************************
 void CDeadLockProfiler::Dfs(int32 here)
 {
 	if( _discoveredOrder[here] != -1 )

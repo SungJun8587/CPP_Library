@@ -40,42 +40,71 @@ typedef rapidjson::GenericStringBuffer<rapidjson::UTF16<>> WStringBuffer;
 typedef rapidjson::GenericPointer<WValue> WPointer;
 
 #ifdef _UNICODE
-typedef WDocument       _tDocument;
-typedef WValue          _tValue;
-typedef WStringStream   _tStringStream;
-typedef WStringBuffer   _tStringBuffer;
-typedef WPointer        _tPointer;
+typedef WDocument        _tDocument;
+typedef WValue           _tValue;
+typedef WStringStream    _tStringStream;
+typedef WStringBuffer    _tStringBuffer;
+typedef WPointer         _tPointer;
 typedef Writer<WStringBuffer, UTF16<>, UTF16<>> _tWriter;
 typedef PrettyWriter<WStringBuffer, UTF16<>, UTF16<>> _tPrettyWriter;
 typedef GenericArray<true, WValue> _tArray;
 #else
-typedef Document        _tDocument;
-typedef Value           _tValue;
-typedef StringBuffer    _tStringBuffer;
-typedef StringStream    _tStringStream;
-typedef Pointer         _tPointer;
+typedef Document         _tDocument;
+typedef Value            _tValue;
+typedef StringBuffer     _tStringBuffer;
+typedef StringStream     _tStringStream;
+typedef Pointer          _tPointer;
 typedef Writer<StringBuffer, UTF8<>, UTF8<>> _tWriter;
 typedef PrettyWriter<StringBuffer, UTF8<>, UTF8<>> _tPrettyWriter;
 typedef GenericArray<true, Value> _tArray;
 #endif
 
+//***************************************************************************
+// @brief RapidJSON 라이브러리를 래핑하여 JSON 데이터 조작, 파싱, 직렬화를 지원하는 유틸리티 클래스입니다.
+// @detail 유니코드/멀티바이트 환경에 대응하며 연산자 오버로딩 및 프록시 패턴을 통한 직관적인 데이터 접근을 제공합니다.
+//***************************************************************************
 class CRapidJSONUtil
 {
 public:
+    //***************************************************************************
+    // @brief CRapidJSONUtil 객체를 생성합니다.
+    // @detail 내부 문서 객체를 빈 객체로 초기화합니다.
+    //***************************************************************************
     CRapidJSONUtil();
+
+    //***************************************************************************
+    // @brief CRapidJSONUtil 객체의 복사 생성자입니다.
+    // @param other 복사할 대상 CRapidJSONUtil 객체 참조
+    //***************************************************************************
     CRapidJSONUtil(const CRapidJSONUtil& other);
 
+    //***************************************************************************
+    // @brief 내부 래핑된 JSON 문서 객체 참조를 반환합니다.
+    // @return 내부 _tDocument 문서 객체 참조
+    //***************************************************************************
     _tDocument& GetDocument() { return _document; }
 
+    //***************************************************************************
+    // @brief 내부 JSON 문서를 초기화합니다.
+    // @detail 내부 문서를 빈 JSON 객체 상태로 설정합니다.
+    //***************************************************************************
     void Clear() {
         _document.SetObject();		// 객체 초기화
     }
 
+    //***************************************************************************
+    // @brief 디버그 출력 활성화 여부를 설정합니다.
+    // @param bIsDebugPrint 디버그 출력 여부 (true: 켜기, false: 끄기)
+    //***************************************************************************
     void SetDebugPrint(bool bIsDebugPrint) {
         _bIsDebugPrint = bIsDebugPrint;
         Print_DebugInfo(_T("%s is set %s\n"), __TFUNCTION__, bIsDebugPrint ? _T("on") : _T("off"));
     }
 
+    //***************************************************************************
+    // @brief 디버그 출력 활성화 상태를 반환합니다.
+    // @return 디버그 출력 활성화 여부
+    //***************************************************************************
     bool GetDebugPrint() {
         return _bIsDebugPrint;
     }
@@ -129,31 +158,47 @@ public:
 
     //***************************************************************************
     // CRapidJSONUtil 클래스 operator[] Setter, Getter Operator Overloading을 위한 프록시 클래스
-    class Proxy 
+    //***************************************************************************
+    class Proxy
     {
-        private:
-            CRapidJSONUtil& _jsonUtil;
-            _tstring        _key;
+    private:
+        CRapidJSONUtil& _jsonUtil; // 대상 CRapidJSONUtil 객체 참조
+        _tstring        _key;      // 접근할 키 문자열
 
-        public:
-            Proxy(CRapidJSONUtil& jsonUtil, const _tstring& key) : _jsonUtil(jsonUtil), _key(key) {}
+    public:
+        //***************************************************************************
+        // @brief Proxy 객체를 생성합니다.
+        // @param jsonUtil 관리할 CRapidJSONUtil 객체 참조
+        // @param key 접근할 키 문자열
+        //***************************************************************************
+        Proxy(CRapidJSONUtil& jsonUtil, const _tstring& key) : _jsonUtil(jsonUtil), _key(key) {}
 
-            // = 연산자 오버로딩(값 설정)
-            template <typename T>
-            Proxy& operator=(const T& value) {
-                _jsonUtil.AddValue(_key, value);
-                return *this;
-            }
+        // = 연산자 오버로딩(값 설정)
+        template <typename T>
+        Proxy& operator=(const T& value) {
+            _jsonUtil.AddValue(_key, value);
+            return *this;
+        }
 
-            // T() 연산자 오버로딩(값 읽기)
-            template <typename T>
-            operator T() const { return _jsonUtil.Deserialize<T>(_key); }
+        // T() 연산자 오버로딩(값 읽기)
+        template <typename T>
+        operator T() const { return _jsonUtil.Deserialize<T>(_key); }
     };
 
+    //***************************************************************************
+    // @brief 키 문자열을 인자로 받아 프록시 객체를 반환합니다.
+    // @param key 접근할 키 문자열
+    // @return 생성된 Proxy 객체
+    //***************************************************************************
     Proxy operator[](const TCHAR* key) {
         return Proxy(*this, key);
     }
 
+    //***************************************************************************
+    // @brief 키 문자열(_tstring)을 인자로 받아 프록시 객체를 반환합니다.
+    // @param key 접근할 키 문자열
+    // @return 생성된 Proxy 객체
+    //***************************************************************************
     Proxy operator[](const _tstring& key) {
         return operator[](key.c_str());
     }
@@ -212,49 +257,60 @@ public:
 private:
     void	Print_DebugInfo(const TCHAR* ptszFormat, ...);
 
-    // C++ 구조체 → JSON 변환(템플릿(T) 변수값을 _tValue 변수에 할당)
+    //***************************************************************************
+    // @brief C++ 구조체 → JSON 변환(템플릿(T) 변수값을 _tValue 변수에 할당)
+    //***************************************************************************
     template <typename T>
     _tValue ConvertToJSONValue(const T& value) const;
 
-    // JSON → C++ 구조체 변환(_tValue 변수값을 템플릿(T) 변수에 할당)
+    //***************************************************************************
+    // @brief JSON → C++ 구조체 변환(_tValue 변수값을 템플릿(T) 변수에 할당)
+    //***************************************************************************
     template <typename T>
     T ConvertFromJSONValue(const _tValue& value) const;
 
     void RecursiveRemove(_tValue& value);
 
-    // 벡터 타입 확인
+    //***************************************************************************
+    // @brief 벡터 타입 확인
+    //***************************************************************************
     template <typename T>
     struct is_vector : std::false_type {};
 
     template <typename T, typename Alloc>
     struct is_vector<CVector<T, Alloc>> : std::true_type {};
 
-    // 맵 타입 확인
+    //***************************************************************************
+    // @brief 맵 타입 확인
+    //***************************************************************************
     template <typename T>
     struct is_map : std::false_type {};
 
     template <typename K, typename V, typename Comp, typename Alloc>
     struct is_map<CMap<K, V, Comp, Alloc>> : std::true_type {};
 
-    // T에 ToXML 멤버 함수가 있는지 확인하는 타입 트레이트
+    //***************************************************************************
+    // @brief T에 ToXML 멤버 함수가 있는지 확인하는 타입 트레이트
+    //***************************************************************************
     template <typename T, typename = void>
     struct has_tojson_method : std::false_type {};
 
     template <typename T>
     struct has_tojson_method<T, std::void_t<decltype(std::declval<T>().ToJSON(std::declval<_tValue&>(), std::declval<_tDocument::AllocatorType&>()))>> : std::true_type {};
 
-    // 컴파일 타임 에러 유도용 유틸리티
+    //***************************************************************************
+    // @brief 컴파일 타임 에러 유도용 유틸리티
+    //***************************************************************************
     template <typename T>
     struct dependent_false : std::false_type {};
 
 private:
-    _tDocument                  _document;      // JSON Document
-    _tDocument::AllocatorType&  _allocator;     // Allocator
-    
-    bool _bIsDebugPrint;
+    _tDocument                  _document;  // JSON Document
+    _tDocument::AllocatorType& _allocator; // Allocator
+
+    bool                        _bIsDebugPrint; // 디버그 출력 활성화 여부 플래그
 };
 
 #include <JSON/RapidJSONUtil.inl>
 
 #endif // ndef __RAPIDJSONUTIL_H__
-

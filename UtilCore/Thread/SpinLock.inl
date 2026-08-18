@@ -1,30 +1,40 @@
-﻿// SpinLock.inl
+﻿
+//***************************************************************************
+// SpinLock.inl : implementation of the SpinLock class.
+//
+//***************************************************************************
+
 #pragma once
 
 // 빌드 시스템이 이 파일을 독립 소스 파일로 잘못 직접 컴파일하는 것을 완벽히 차단합니다.
 #ifndef __SPINLOCK_H__
-    #error "SpinLock.inl 파일은 직접 컴파일할 수 없습니다. SpinLock.h를 인클루드하세요."
+#error "SpinLock.inl 파일은 직접 컴파일할 수 없습니다. SpinLock.h를 인클루드하세요."
 #endif
 
-// [FIX] 이 .inl은 SpinLock.h에 #include 되어 그 헤더를 쓰는 모든 번역 단위에
+//***************************************************************************
+// 이 .inl은 SpinLock.h에 #include 되어 그 헤더를 쓰는 모든 번역 단위에
 // 그대로 펼쳐지므로, 여기서 using namespace를 쓰면 전역 네임스페이스가
 // RWSpinLockBits의 심볼로 오염된다. 대신 각 사용처에 RWSpinLockBits:: 를 명시한다.
-
+//***************************************************************************
 namespace SpinLockDetail
 {
+    //***************************************************************************
+    // @brief 조건이 충족될 때까지 CPU 일시 정지(Pause) 및 스레드 양보(Yield)를 반복하며 대기합니다.
+    // @param shouldWait 대기 조건을 판별하는 프리디케이트 함수
+    //***************************************************************************
     template <uint32_t MaxPauseBackoff, uint32_t MaxYieldCount, typename Predicate>
     inline void SpinWait(Predicate&& shouldWait) noexcept
     {
-        uint32_t backoff    = 1;
+        uint32_t backoff = 1;
         uint32_t yieldCount = 0;
-        while (shouldWait())
+        while( shouldWait() )
         {
-            if (backoff <= MaxPauseBackoff)
+            if( backoff <= MaxPauseBackoff )
             {
-                for (uint32_t i = 0; i < backoff; ++i) SPINLOCK_PAUSE();
+                for( uint32_t i = 0; i < backoff; ++i ) SPINLOCK_PAUSE();
                 backoff = (backoff <= MaxPauseBackoff / 2) ? backoff * 2 : MaxPauseBackoff;
             }
-            else if (yieldCount < MaxYieldCount)
+            else if( yieldCount < MaxYieldCount )
             {
                 std::this_thread::yield();
                 ++yieldCount;
@@ -40,28 +50,37 @@ namespace SpinLockDetail
             }
         }
     }
-} // namespace SpinLockDetail
+}
 
-// ════════════════════════════════════════════════════════════
-//  SpinLock 구현
-// ════════════════════════════════════════════════════════════
 
+//***************************************************************************
+// SpinLock 구현
+//***************************************************************************
+
+//***************************************************************************
+// @brief 락을 획득할 때까지 스핀 대기합니다.
+// @param name 프로파일링 추적용 락 이름
+//***************************************************************************
 template <typename Preset>
 void SpinLock<Preset>::Lock(const char* name) noexcept
 {
 #if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
-    if (name) gpDeadLockProfiler->PushLock(name);
+    if( name ) gpDeadLockProfiler->PushLock(name);
 #endif
 
-    while (true)
+    while( true )
     {
         SpinLockDetail::SpinWait<Preset::MaxPauseBackoff, Preset::MaxYieldCount>(
             [this]() noexcept { return _locked.load(std::memory_order_relaxed); }
         );
-        if (TryLock()) return;
+        if( TryLock() ) return;
     }
 }
 
+//***************************************************************************
+// @brief 락 획득을 비블로킹 방식으로 시도합니다.
+// @return 락 획득 성공 시 true, 실패 시 false
+//***************************************************************************
 template <typename Preset>
 bool SpinLock<Preset>::TryLock() noexcept
 {
@@ -69,29 +88,36 @@ bool SpinLock<Preset>::TryLock() noexcept
     return _locked.compare_exchange_strong(expected, true, std::memory_order_acquire, std::memory_order_relaxed);
 }
 
+//***************************************************************************
+// @brief 락을 해제합니다.
+// @param name 프로파일링 추적용 락 이름
+//***************************************************************************
 template <typename Preset>
 void SpinLock<Preset>::Unlock(const char* name) noexcept
 {
     _locked.store(false, std::memory_order_release);
 #if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
-    if (name) gpDeadLockProfiler->PopLock(name);
+    if( name ) gpDeadLockProfiler->PopLock(name);
 #endif
 }
 
-// ════════════════════════════════════════════════════════════
-//  RWSpinLock 구현
-// ════════════════════════════════════════════════════════════
 
-// ── Reader ───────────────────────────────────────────────────
+//***************************************************************************
+// RWSpinLock 구현
+//***************************************************************************
 
+//***************************************************************************
+// @brief 읽기 락을 획득합니다.
+// @param name 프로파일링 추적용 락 이름
+//***************************************************************************
 template <typename Preset>
 void RWSpinLock<Preset>::ReadLock(const char* name) noexcept
 {
 #if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
-    if (name) gpDeadLockProfiler->PushLock(name);
+    if( name ) gpDeadLockProfiler->PushLock(name);
 #endif
 
-    while (true)
+    while( true )
     {
         SpinLockDetail::SpinWait<Preset::MaxPauseBackoff, Preset::MaxYieldCount>(
             [this]() noexcept
@@ -102,9 +128,9 @@ void RWSpinLock<Preset>::ReadLock(const char* name) noexcept
         );
 
         const int32_t prev = _state.fetch_add(RWSpinLockBits::READER_ONE, std::memory_order_acquire);
-        if ((prev & (RWSpinLockBits::WRITER_WAITING_MASK | RWSpinLockBits::WRITE_LOCKED)) == 0)
+        if( (prev & (RWSpinLockBits::WRITER_WAITING_MASK | RWSpinLockBits::WRITE_LOCKED)) == 0 )
         {
-            if (((prev + RWSpinLockBits::READER_ONE) & RWSpinLockBits::READER_COUNT_MASK) == 0)
+            if( ((prev + RWSpinLockBits::READER_ONE) & RWSpinLockBits::READER_COUNT_MASK) == 0 )
             {
                 _state.fetch_sub(RWSpinLockBits::READER_ONE, std::memory_order_relaxed);
                 SPINLOCK_FATAL("RWSpinLock::ReadLock - reader count overflow (max 32767)");
@@ -115,23 +141,28 @@ void RWSpinLock<Preset>::ReadLock(const char* name) noexcept
     }
 }
 
+//***************************************************************************
+// @brief 읽기 락 획득을 비블로킹 방식으로 시도합니다.
+// @param name 프로파일링 추적용 락 이름
+// @return 락 획득 성공 시 true, 실패 시 false
+//***************************************************************************
 template <typename Preset>
 bool RWSpinLock<Preset>::TryReadLock(const char* name) noexcept
 {
     const int32_t s = _state.load(std::memory_order_relaxed);
-    if ((s & (RWSpinLockBits::WRITER_WAITING_MASK | RWSpinLockBits::WRITE_LOCKED)) != 0) return false;
+    if( (s & (RWSpinLockBits::WRITER_WAITING_MASK | RWSpinLockBits::WRITE_LOCKED)) != 0 ) return false;
 
     const int32_t prev = _state.fetch_add(RWSpinLockBits::READER_ONE, std::memory_order_acquire);
-    if ((prev & (RWSpinLockBits::WRITER_WAITING_MASK | RWSpinLockBits::WRITE_LOCKED)) == 0)
+    if( (prev & (RWSpinLockBits::WRITER_WAITING_MASK | RWSpinLockBits::WRITE_LOCKED)) == 0 )
     {
-        if (((prev + RWSpinLockBits::READER_ONE) & RWSpinLockBits::READER_COUNT_MASK) == 0)
+        if( ((prev + RWSpinLockBits::READER_ONE) & RWSpinLockBits::READER_COUNT_MASK) == 0 )
         {
             _state.fetch_sub(RWSpinLockBits::READER_ONE, std::memory_order_relaxed);
             SPINLOCK_FATAL("RWSpinLock::TryReadLock - reader count overflow (max 32767)");
         }
 #if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
         // 락 획득 성공 시에만 프로파일러에 이력을 기록한다.
-        if (name) gpDeadLockProfiler->PushLock(name);
+        if( name ) gpDeadLockProfiler->PushLock(name);
 #endif
         return true;
     }
@@ -139,26 +170,32 @@ bool RWSpinLock<Preset>::TryReadLock(const char* name) noexcept
     return false;
 }
 
+//***************************************************************************
+// @brief 읽기 락을 해제합니다.
+// @param name 프로파일링 추적용 락 이름
+//***************************************************************************
 template <typename Preset>
 void RWSpinLock<Preset>::ReadUnlock(const char* name) noexcept
 {
     _state.fetch_sub(RWSpinLockBits::READER_ONE, std::memory_order_release);
 #if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
-    if (name) gpDeadLockProfiler->PopLock(name);
+    if( name ) gpDeadLockProfiler->PopLock(name);
 #endif
 }
 
-// ── Writer ───────────────────────────────────────────────────
-
+//***************************************************************************
+// @brief 쓰기 락을 획득합니다.
+// @param name 프로파일링 추적용 락 이름
+//***************************************************************************
 template <typename Preset>
 void RWSpinLock<Preset>::WriteLock(const char* name) noexcept
 {
 #if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
-    if (name) gpDeadLockProfiler->PushLock(name);
+    if( name ) gpDeadLockProfiler->PushLock(name);
 #endif
 
     const int32_t prev = _state.fetch_add(RWSpinLockBits::WRITER_ONE, std::memory_order_relaxed);
-    if (((prev + RWSpinLockBits::WRITER_ONE) & RWSpinLockBits::WRITER_WAITING_MASK) == 0)
+    if( ((prev + RWSpinLockBits::WRITER_ONE) & RWSpinLockBits::WRITER_WAITING_MASK) == 0 )
     {
         // [FIX] ReadLock/TryReadLock의 오버플로우 처리와 일관되게, FATAL 호출 전에
         // 방금 더한 대기 카운트를 롤백한다. SPINLOCK_FATAL은 기본적으로
@@ -172,7 +209,7 @@ void RWSpinLock<Preset>::WriteLock(const char* name) noexcept
         [this]() noexcept
         {
             int32_t expected = _state.load(std::memory_order_relaxed);
-            if ((expected & (RWSpinLockBits::READER_COUNT_MASK | RWSpinLockBits::WRITE_LOCKED)) != 0) return true;
+            if( (expected & (RWSpinLockBits::READER_COUNT_MASK | RWSpinLockBits::WRITE_LOCKED)) != 0 ) return true;
 
             return !_state.compare_exchange_strong(
                 expected, expected | RWSpinLockBits::WRITE_LOCKED,
@@ -181,6 +218,11 @@ void RWSpinLock<Preset>::WriteLock(const char* name) noexcept
     );
 }
 
+//***************************************************************************
+// @brief 쓰기 락 획득을 비블로킹 방식으로 시도합니다.
+// @param name 프로파일링 추적용 락 이름
+// @return 락 획득 성공 시 true, 실패 시 false
+//***************************************************************************
 template <typename Preset>
 bool RWSpinLock<Preset>::TryWriteLock(const char* name) noexcept
 {
@@ -208,27 +250,31 @@ bool RWSpinLock<Preset>::TryWriteLock(const char* name) noexcept
     // 간의 엄격한 FIFO 순서가 필요한 경우 TryWriteLock() 대신 WriteLock()만
     // 사용해야 한다.
     int32_t expected = _state.load(std::memory_order_relaxed);
-    if ((expected & (RWSpinLockBits::READER_COUNT_MASK | RWSpinLockBits::WRITE_LOCKED)) != 0)
+    if( (expected & (RWSpinLockBits::READER_COUNT_MASK | RWSpinLockBits::WRITE_LOCKED)) != 0 )
         return false;
 
     const int32_t desired = expected + RWSpinLockBits::WRITER_ONE + RWSpinLockBits::WRITE_LOCKED;
-    if (!_state.compare_exchange_strong(
-            expected, desired,
-            std::memory_order_acquire, std::memory_order_relaxed))
+    if( !_state.compare_exchange_strong(
+        expected, desired,
+        std::memory_order_acquire, std::memory_order_relaxed) )
         return false;
 
 #if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
     // 락 획득 성공 시에만 프로파일러에 이력을 기록한다.
-    if (name) gpDeadLockProfiler->PushLock(name);
+    if( name ) gpDeadLockProfiler->PushLock(name);
 #endif
     return true;
 }
 
+//***************************************************************************
+// @brief 쓰기 락을 해제합니다.
+// @param name 프로파일링 추적용 락 이름
+//***************************************************************************
 template <typename Preset>
 void RWSpinLock<Preset>::WriteUnlock(const char* name) noexcept
 {
     _state.fetch_sub(RWSpinLockBits::WRITER_ONE + RWSpinLockBits::WRITE_LOCKED, std::memory_order_release);
 #if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
-    if (name) gpDeadLockProfiler->PopLock(name);
+    if( name ) gpDeadLockProfiler->PopLock(name);
 #endif
 }

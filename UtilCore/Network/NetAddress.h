@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // NetAddress.h : interface for the CNetAddress class.
 //
@@ -9,7 +9,7 @@
 
 //***************************************************************************
 // @class CNetAddress
-// @brief IPv4 ¼ÒÄÏ ÁÖ¼Ò(SOCKADDR_IN) ÆĞÅ· ¹× IP/Port ¹®ÀÚ¿­ º¯È¯ ·¡ÆÛ Å¬·¡½º
+// @brief IPv4 ì†Œì¼“ ì£¼ì†Œ(SOCKADDR_IN) íŒ¨í‚¹ ë° IP/Port ë¬¸ìì—´ ë³€í™˜ ë˜í¼ í´ë˜ìŠ¤
 //***************************************************************************
 class CNetAddress
 {
@@ -19,14 +19,14 @@ public:
 	CNetAddress(_tstring ip, uint16 port);
 
 	//***************************************************************************
-	// @brief ³»ºÎ SOCKADDR_IN ±¸Á¶Ã¼ÀÇ ÂüÁ¶¸¦ ¹İÈ¯ÇÕ´Ï´Ù.
+	// @brief ë‚´ë¶€ SOCKADDR_IN êµ¬ì¡°ì²´ì˜ ì°¸ì¡°ë¥¼ ë°˜í™˜í•©ë‹ˆë‹¤.
 	//***************************************************************************
 	SOCKADDR_IN& GetSockAddr() { return _sockAddr; }
 
 	_tstring		GetIpAddress();
 
 	//***************************************************************************
-	// @brief Æ÷Æ® ¹øÈ£¸¦ ¹İÈ¯ÇÕ´Ï´Ù (Host Byte Order).
+	// @brief í¬íŠ¸ ë²ˆí˜¸ë¥¼ ë°˜í™˜í•©ë‹ˆë‹¤ (Host Byte Order).
 	//***************************************************************************
 	uint16			GetPort() { return ::ntohs(_sockAddr.sin_port); }
 
@@ -34,7 +34,7 @@ public:
 	static IN_ADDR	Ip2Address(const TCHAR* ip);
 
 private:
-	SOCKADDR_IN		_sockAddr = {}; // ¼ÒÄÏ ÁÖ¼Ò(IP, Port, Family) Á¤º¸ ±¸Á¶Ã¼
+	SOCKADDR_IN		_sockAddr = {}; // ì†Œì¼“ ì£¼ì†Œ(IP, Port, Family) ì •ë³´ êµ¬ì¡°ì²´
 };
 
 #endif // ndef __NETADDRESS_H__

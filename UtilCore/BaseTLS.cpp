@@ -1,4 +1,4 @@
-
+﻿
 //***************************************************************************
 // This file contains the implementation of processing for external thread_local variables.
 // 

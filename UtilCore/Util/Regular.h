@@ -1,4 +1,4 @@
-
+﻿
 //***************************************************************************
 // Regular.h: interface for the Reqular Expression Functions.
 //

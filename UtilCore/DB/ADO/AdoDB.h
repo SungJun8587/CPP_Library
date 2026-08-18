@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // AdoDB.h : interface of the CAdoDB class.
 //
@@ -25,7 +25,7 @@ public:
 	CAdoDB();
 	virtual ~CAdoDB();
 
-	// ¿¬°á ¹× »óÅÂ °ü¸®
+	// ì—°ê²° ë° ìƒíƒœ ê´€ë¦¬
 	BOOL ISConnect();
 	BOOL ISRSCon();
 	BOOL ISOpen();
@@ -34,18 +34,18 @@ public:
 	void ConClose();
 	void RSClose();
 
-	// Æ®·£Àè¼Ç °ü¸®
+	// íŠ¸ëœì­ì…˜ ê´€ë¦¬
 	long ConBeginTrans();
 	void ConCommitTrans();
 	void ConRollbackTrans();
 	void ConCancel();
 
-	// Æ÷ÀÎÅÍ ¹× »óÅÂ ¹İÈ¯
+	// í¬ì¸í„° ë° ìƒíƒœ ë°˜í™˜
 	_CommandPtr GetCmdPointer();
 	_RecordsetPtr GetRecPointer();
 	BOOL GetDBCon();
 
-	// ·¹ÄÚµå ÀÌµ¿ ¹× Å½»ö
+	// ë ˆì½”ë“œ ì´ë™ ë° íƒìƒ‰
 	BOOL IsEOF();
 	BOOL Next();
 	BOOL Prev();
@@ -54,7 +54,7 @@ public:
 	int GetRecCount();
 	int GetFieldCount();
 
-	// ÇÊµå °ª Á¶È¸ (ÀÎµ¦½º ±âÁØ)
+	// í•„ë“œ ê°’ ì¡°íšŒ (ì¸ë±ìŠ¤ ê¸°ì¤€)
 	void GetFieldByIndex(_variant_t x, LPTSTR lptszValue, int nValueLen);
 	void GetFieldByIndex(_variant_t x, long& lFieldValue);
 	void GetFieldByIndex(_variant_t x, int32& nFieldValue);
@@ -63,7 +63,7 @@ public:
 	void GetFieldByIndex(_variant_t x, double& dblFieldValue);
 	void GetFieldByIndex(_variant_t x, _tstring& strFieldValue);
 
-	// ÇÊµå °ª Á¶È¸ (ÀÌ¸§ ±âÁØ)
+	// í•„ë“œ ê°’ ì¡°íšŒ (ì´ë¦„ ê¸°ì¤€)
 	void GetFieldByName(LPCTSTR lptszFieldName, LPTSTR lptszValue, int nValueLen);
 	void GetFieldByName(LPCTSTR lptszFieldName, long& lFieldValue);
 	void GetFieldByName(LPCTSTR lptszFieldName, int32& nFieldValue);
@@ -72,34 +72,34 @@ public:
 	void GetFieldByName(LPCTSTR lptszFieldName, double& dblFieldValue);
 	void GetFieldByName(LPCTSTR lptszFieldName, _tstring& strFieldValue);
 
-	// Äõ¸® ¹× ÇÁ·Î½ÃÀú ½ÇÇà
+	// ì¿¼ë¦¬ ë° í”„ë¡œì‹œì € ì‹¤í–‰
 	BOOL Open(LPCTSTR lptszSourceBuf, const long lOption = -1);
 	BOOL Execute(LPCTSTR lptszSourceBuf, const long lOption = -1);
 	BOOL StoredProcedureExecute(LPCTSTR lptszStoredName, const long lOption = -1);
 
-	// ÇÁ·Î½ÃÀú ÆÄ¶ó¹ÌÅÍ °ü·Ã
+	// í”„ë¡œì‹œì € íŒŒë¼ë¯¸í„° ê´€ë ¨
 	long GetReturnValue();
 	void CreateReturnParamAppend();
 	void CreateArgParamAppend(_bstr_t bstrName, enum DataTypeEnum enumType, long lSize, _variant_t vt, BOOL bInOutCheck = TRUE);
 
-	// ·¹ÄÚµå¼Â °ª Á÷Á¢ Á¶È¸ (GetRs)
+	// ë ˆì½”ë“œì…‹ ê°’ ì§ì ‘ ì¡°íšŒ (GetRs)
 	void GetRs(_variant_t x, _bstr_t& ret);
 	void GetRs(_variant_t x, _variant_t& ret);
 	void GetRs(_variant_t x, float& ret);
 	void GetRs(_variant_t x, long& ret);
 	void GetRs(_variant_t x, double& ret);
 
-	// ¼­¹ö È¯°æ Á¤º¸ Á¶È¸
+	// ì„œë²„ í™˜ê²½ ì •ë³´ ì¡°íšŒ
 	BOOL GetHostInfo(LPTSTR lptszOut, int nMaxLen);
 	BOOL GetDBMSName(LPTSTR lptszOut, int nMaxLen);
 	BOOL GetServerVersion(LPTSTR pszVersion, int nMaxLen);
 	BOOL GetCharacterSetName(LPTSTR lptszOut, int nMaxLen);
 
 private:
-	_ConnectionPtr  m_pCon;     // ADO Connection ½º¸¶Æ® Æ÷ÀÎÅÍ
-	_RecordsetPtr   m_pRs;      // ADO Recordset ½º¸¶Æ® Æ÷ÀÎÅÍ
-	_CommandPtr     m_pCmd;     // ADO Command ½º¸¶Æ® Æ÷ÀÎÅÍ
-	EDBClass        m_DbClass;  // ÇöÀç ¿¬°áµÈ µ¥ÀÌÅÍº£ÀÌ½º Á¾·ù ºĞ·ù
+	_ConnectionPtr  m_pCon;     // ADO Connection ìŠ¤ë§ˆíŠ¸ í¬ì¸í„°
+	_RecordsetPtr   m_pRs;      // ADO Recordset ìŠ¤ë§ˆíŠ¸ í¬ì¸í„°
+	_CommandPtr     m_pCmd;     // ADO Command ìŠ¤ë§ˆíŠ¸ í¬ì¸í„°
+	EDBClass        m_DbClass;  // í˜„ì¬ ì—°ê²°ëœ ë°ì´í„°ë² ì´ìŠ¤ ì¢…ë¥˜ ë¶„ë¥˜
 };
 
 #endif // ndef __ADODB_H__

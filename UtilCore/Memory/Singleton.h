@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // Singleton.h : interface for the CSingleton class.
 //
@@ -10,7 +10,7 @@
 template<typename T>
 class CSingleton
 {
-	void* operator new(size_t size)		{ return ::operator new(size); }	// ´Ù¸¥ °÷¿¡¼­ new ¹æÁö¿ë
+	void* operator new(size_t size)		{ return ::operator new(size); }	// ë‹¤ë¥¸ ê³³ì—ì„œ new ë°©ì§€ìš©
 
 public:
 	CSingleton(void);

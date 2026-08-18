@@ -1,4 +1,4 @@
-
+﻿
 #ifndef __UTILCORE_H__
 #define __UTILCORE_H__
 

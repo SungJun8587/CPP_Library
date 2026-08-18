@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // DateTimeUtil.cpp : implementation of the DateTimeUtil Functions.
 //
@@ -8,10 +8,10 @@
 #include "DateTimeUtil.h"
 
 //***************************************************************************
-// @brief TIMESTAMP_STRUCT µ¥ÀÌÅÍ¸¦ time_t·Î º¯È¯ÇÏ¿© ÇÒ´çÇÕ´Ï´Ù.
-// @param t ´ë»ó time_t ÂüÁ¶
-// @param ts º¯È¯ÇÒ TIMESTAMP_STRUCT »ó¼ö ÂüÁ¶
-// @return º¯È¯µÈ time_t ÂüÁ¶
+// @brief TIMESTAMP_STRUCT ë°ì´í„°ë¥¼ time_të¡œ ë³€í™˜í•˜ì—¬ í• ë‹¹í•©ë‹ˆë‹¤.
+// @param t ëŒ€ìƒ time_t ì°¸ì¡°
+// @param ts ë³€í™˜í•  TIMESTAMP_STRUCT ìƒìˆ˜ ì°¸ì¡°
+// @return ë³€í™˜ëœ time_t ì°¸ì¡°
 //***************************************************************************
 time_t& operator<<(time_t& t, const TIMESTAMP_STRUCT& ts)
 {
@@ -23,10 +23,10 @@ time_t& operator<<(time_t& t, const TIMESTAMP_STRUCT& ts)
 }
 
 //***************************************************************************
-// @brief time_t µ¥ÀÌÅÍ¸¦ TIMESTAMP_STRUCT·Î º¯È¯ÇÏ¿© ÇÒ´çÇÕ´Ï´Ù.
-// @param ts ´ë»ó TIMESTAMP_STRUCT ÂüÁ¶
-// @param t º¯È¯ÇÒ time_t »ó¼ö ÂüÁ¶
-// @return º¯È¯µÈ TIMESTAMP_STRUCT ÂüÁ¶
+// @brief time_t ë°ì´í„°ë¥¼ TIMESTAMP_STRUCTë¡œ ë³€í™˜í•˜ì—¬ í• ë‹¹í•©ë‹ˆë‹¤.
+// @param ts ëŒ€ìƒ TIMESTAMP_STRUCT ì°¸ì¡°
+// @param t ë³€í™˜í•  time_t ìƒìˆ˜ ì°¸ì¡°
+// @return ë³€í™˜ëœ TIMESTAMP_STRUCT ì°¸ì¡°
 //***************************************************************************
 TIMESTAMP_STRUCT& operator<<(TIMESTAMP_STRUCT& ts, const time_t& t)
 {
@@ -38,10 +38,10 @@ TIMESTAMP_STRUCT& operator<<(TIMESTAMP_STRUCT& ts, const time_t& t)
 }
 
 //***************************************************************************
-// @brief SYSTEMTIME µ¥ÀÌÅÍ¸¦ time_t·Î º¯È¯ÇÏ¿© ÇÒ´çÇÕ´Ï´Ù.
-// @param t ´ë»ó time_t ÂüÁ¶
-// @param stime º¯È¯ÇÒ SYSTEMTIME »ó¼ö ÂüÁ¶
-// @return º¯È¯µÈ time_t ÂüÁ¶
+// @brief SYSTEMTIME ë°ì´í„°ë¥¼ time_të¡œ ë³€í™˜í•˜ì—¬ í• ë‹¹í•©ë‹ˆë‹¤.
+// @param t ëŒ€ìƒ time_t ì°¸ì¡°
+// @param stime ë³€í™˜í•  SYSTEMTIME ìƒìˆ˜ ì°¸ì¡°
+// @return ë³€í™˜ëœ time_t ì°¸ì¡°
 //***************************************************************************
 time_t& operator<<(time_t& t, const SYSTEMTIME& stime)
 {
@@ -64,10 +64,10 @@ time_t& operator<<(time_t& t, const SYSTEMTIME& stime)
 }
 
 //***************************************************************************
-// @brief time_t µ¥ÀÌÅÍ¸¦ SYSTEMTIMEÀ¸·Î º¯È¯ÇÏ¿© ÇÒ´çÇÕ´Ï´Ù.
-// @param stime ´ë»ó SYSTEMTIME ÂüÁ¶
-// @param t º¯È¯ÇÒ time_t »ó¼ö ÂüÁ¶
-// @return º¯È¯µÈ SYSTEMTIME ÂüÁ¶
+// @brief time_t ë°ì´í„°ë¥¼ SYSTEMTIMEìœ¼ë¡œ ë³€í™˜í•˜ì—¬ í• ë‹¹í•©ë‹ˆë‹¤.
+// @param stime ëŒ€ìƒ SYSTEMTIME ì°¸ì¡°
+// @param t ë³€í™˜í•  time_t ìƒìˆ˜ ì°¸ì¡°
+// @return ë³€í™˜ëœ SYSTEMTIME ì°¸ì¡°
 //***************************************************************************
 SYSTEMTIME& operator<<(SYSTEMTIME& stime, const time_t& t)
 {
@@ -85,8 +85,8 @@ SYSTEMTIME& operator<<(SYSTEMTIME& stime, const time_t& t)
 	stime.wMinute = tmp.tm_min;
 	stime.wSecond = tmp.tm_sec;
 
-	// ¾Æ·¡ ÁÖ¼® »çÀ¯ : local -> GMT ·Î º¯°æµÇ¾î ÁÖ¼®ÇÔ 
-	// (t°¡ local time ÀÌ¶ó¸é st ´Â GMT TIME À¸·Î º¯È¯ÇÑ´Ù.)
+	// ì•„ë˜ ì£¼ì„ ì‚¬ìœ  : local -> GMT ë¡œ ë³€ê²½ë˜ì–´ ì£¼ì„í•¨ 
+	// (tê°€ local time ì´ë¼ë©´ st ëŠ” GMT TIME ìœ¼ë¡œ ë³€í™˜í•œë‹¤.)
 
 // 	FILETIME ft;
 // 
@@ -100,10 +100,10 @@ SYSTEMTIME& operator<<(SYSTEMTIME& stime, const time_t& t)
 }
 
 //***************************************************************************
-// @brief SYSTEMTIME µ¥ÀÌÅÍ¸¦ TIMESTAMP_STRUCT·Î º¯È¯ÇÏ¿© ÇÒ´çÇÕ´Ï´Ù.
-// @param ts ´ë»ó TIMESTAMP_STRUCT ÂüÁ¶
-// @param stime º¯È¯ÇÒ SYSTEMTIME »ó¼ö ÂüÁ¶
-// @return º¯È¯µÈ TIMESTAMP_STRUCT ÂüÁ¶
+// @brief SYSTEMTIME ë°ì´í„°ë¥¼ TIMESTAMP_STRUCTë¡œ ë³€í™˜í•˜ì—¬ í• ë‹¹í•©ë‹ˆë‹¤.
+// @param ts ëŒ€ìƒ TIMESTAMP_STRUCT ì°¸ì¡°
+// @param stime ë³€í™˜í•  SYSTEMTIME ìƒìˆ˜ ì°¸ì¡°
+// @return ë³€í™˜ëœ TIMESTAMP_STRUCT ì°¸ì¡°
 //***************************************************************************
 TIMESTAMP_STRUCT& operator<<(TIMESTAMP_STRUCT& ts, const SYSTEMTIME& stime)
 {
@@ -118,10 +118,10 @@ TIMESTAMP_STRUCT& operator<<(TIMESTAMP_STRUCT& ts, const SYSTEMTIME& stime)
 }
 
 //***************************************************************************
-// @brief TIMESTAMP_STRUCT µ¥ÀÌÅÍ¸¦ SYSTEMTIMEÀ¸·Î º¯È¯ÇÏ¿© ÇÒ´çÇÕ´Ï´Ù.
-// @param stime ´ë»ó SYSTEMTIME ÂüÁ¶
-// @param ts º¯È¯ÇÒ TIMESTAMP_STRUCT »ó¼ö ÂüÁ¶
-// @return º¯È¯µÈ SYSTEMTIME ÂüÁ¶
+// @brief TIMESTAMP_STRUCT ë°ì´í„°ë¥¼ SYSTEMTIMEìœ¼ë¡œ ë³€í™˜í•˜ì—¬ í• ë‹¹í•©ë‹ˆë‹¤.
+// @param stime ëŒ€ìƒ SYSTEMTIME ì°¸ì¡°
+// @param ts ë³€í™˜í•  TIMESTAMP_STRUCT ìƒìˆ˜ ì°¸ì¡°
+// @return ë³€í™˜ëœ SYSTEMTIME ì°¸ì¡°
 //***************************************************************************
 SYSTEMTIME& operator<<(SYSTEMTIME& stime, const TIMESTAMP_STRUCT& ts)
 {
@@ -136,10 +136,10 @@ SYSTEMTIME& operator<<(SYSTEMTIME& stime, const TIMESTAMP_STRUCT& ts)
 }
 
 //***************************************************************************
-// @brief µÎ SYSTEMTIME °ªÀÇ µ¿µî ¿©ºÎ¸¦ ºñ±³ÇÕ´Ï´Ù.
-// @param stime1 ºñ±³ÇÒ Ã¹ ¹øÂ° SYSTEMTIME ÂüÁ¶
-// @param stime2 ºñ±³ÇÒ µÎ ¹øÂ° SYSTEMTIME ÂüÁ¶
-// @return °°À¸¸é true, ´Ù¸£¸é false
+// @brief ë‘ SYSTEMTIME ê°’ì˜ ë™ë“± ì—¬ë¶€ë¥¼ ë¹„êµí•©ë‹ˆë‹¤.
+// @param stime1 ë¹„êµí•  ì²« ë²ˆì§¸ SYSTEMTIME ì°¸ì¡°
+// @param stime2 ë¹„êµí•  ë‘ ë²ˆì§¸ SYSTEMTIME ì°¸ì¡°
+// @return ê°™ìœ¼ë©´ true, ë‹¤ë¥´ë©´ false
 //***************************************************************************
 bool  operator==(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 {
@@ -156,10 +156,10 @@ bool  operator==(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 }
 
 //************************************************Y**************************
-// @brief Ã¹ ¹øÂ° SYSTEMTIMEÀÌ µÎ ¹øÂ° SYSTEMTIMEº¸´Ù Å«Áö ºñ±³ÇÕ´Ï´Ù.
-// @param stime1 ºñ±³ÇÒ Ã¹ ¹øÂ° SYSTEMTIME ÂüÁ¶
-// @param stime2 ºñ±³ÇÒ µÎ ¹øÂ° SYSTEMTIME ÂüÁ¶
-// @return stime1ÀÌ ´õ Å©¸é true, ¾Æ´Ï¸é false
+// @brief ì²« ë²ˆì§¸ SYSTEMTIMEì´ ë‘ ë²ˆì§¸ SYSTEMTIMEë³´ë‹¤ í°ì§€ ë¹„êµí•©ë‹ˆë‹¤.
+// @param stime1 ë¹„êµí•  ì²« ë²ˆì§¸ SYSTEMTIME ì°¸ì¡°
+// @param stime2 ë¹„êµí•  ë‘ ë²ˆì§¸ SYSTEMTIME ì°¸ì¡°
+// @return stime1ì´ ë” í¬ë©´ true, ì•„ë‹ˆë©´ false
 //***************************************************************************
 bool  operator>(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 {
@@ -176,10 +176,10 @@ bool  operator>(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 }
 
 //***************************************************************************
-// @brief Ã¹ ¹øÂ° SYSTEMTIMEÀÌ µÎ ¹øÂ° SYSTEMTIMEº¸´Ù Å©°Å³ª °°ÀºÁö ºñ±³ÇÕ´Ï´Ù.
-// @param stime1 ºñ±³ÇÒ Ã¹ ¹øÂ° SYSTEMTIME ÂüÁ¶
-// @param stime2 ºñ±³ÇÒ µÎ ¹øÂ° SYSTEMTIME ÂüÁ¶
-// @return stime1ÀÌ Å©°Å³ª °°À¸¸é true, ¾Æ´Ï¸é false
+// @brief ì²« ë²ˆì§¸ SYSTEMTIMEì´ ë‘ ë²ˆì§¸ SYSTEMTIMEë³´ë‹¤ í¬ê±°ë‚˜ ê°™ì€ì§€ ë¹„êµí•©ë‹ˆë‹¤.
+// @param stime1 ë¹„êµí•  ì²« ë²ˆì§¸ SYSTEMTIME ì°¸ì¡°
+// @param stime2 ë¹„êµí•  ë‘ ë²ˆì§¸ SYSTEMTIME ì°¸ì¡°
+// @return stime1ì´ í¬ê±°ë‚˜ ê°™ìœ¼ë©´ true, ì•„ë‹ˆë©´ false
 //***************************************************************************
 bool  operator>=(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 {
@@ -196,10 +196,10 @@ bool  operator>=(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 }
 
 //***************************************************************************
-// @brief Ã¹ ¹øÂ° SYSTEMTIMEÀÌ µÎ ¹øÂ° SYSTEMTIMEº¸´Ù ÀÛÀºÁö ºñ±³ÇÕ´Ï´Ù.
-// @param stime1 ºñ±³ÇÒ Ã¹ ¹øÂ° SYSTEMTIME ÂüÁ¶
-// @param stime2 ºñ±³ÇÒ µÎ ¹øÂ° SYSTEMTIME ÂüÁ¶
-// @return stime1ÀÌ ´õ ÀÛÀ¸¸é true, ¾Æ´Ï¸é false
+// @brief ì²« ë²ˆì§¸ SYSTEMTIMEì´ ë‘ ë²ˆì§¸ SYSTEMTIMEë³´ë‹¤ ì‘ì€ì§€ ë¹„êµí•©ë‹ˆë‹¤.
+// @param stime1 ë¹„êµí•  ì²« ë²ˆì§¸ SYSTEMTIME ì°¸ì¡°
+// @param stime2 ë¹„êµí•  ë‘ ë²ˆì§¸ SYSTEMTIME ì°¸ì¡°
+// @return stime1ì´ ë” ì‘ìœ¼ë©´ true, ì•„ë‹ˆë©´ false
 //***************************************************************************
 bool  operator<(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 {
@@ -216,10 +216,10 @@ bool  operator<(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 }
 
 //***************************************************************************
-// @brief Ã¹ ¹øÂ° SYSTEMTIMEÀÌ µÎ ¹øÂ° SYSTEMTIMEº¸´Ù ÀÛ°Å³ª °°ÀºÁö ºñ±³ÇÕ´Ï´Ù.
-// @param stime1 ºñ±³ÇÒ Ã¹ ¹øÂ° SYSTEMTIME ÂüÁ¶
-// @param stime2 ºñ±³ÇÒ µÎ ¹øÂ° SYSTEMTIME ÂüÁ¶
-// @return stime1ÀÌ ÀÛ°Å³ª °°À¸¸é true, ¾Æ´Ï¸é false
+// @brief ì²« ë²ˆì§¸ SYSTEMTIMEì´ ë‘ ë²ˆì§¸ SYSTEMTIMEë³´ë‹¤ ì‘ê±°ë‚˜ ê°™ì€ì§€ ë¹„êµí•©ë‹ˆë‹¤.
+// @param stime1 ë¹„êµí•  ì²« ë²ˆì§¸ SYSTEMTIME ì°¸ì¡°
+// @param stime2 ë¹„êµí•  ë‘ ë²ˆì§¸ SYSTEMTIME ì°¸ì¡°
+// @return stime1ì´ ì‘ê±°ë‚˜ ê°™ìœ¼ë©´ true, ì•„ë‹ˆë©´ false
 //***************************************************************************
 bool  operator<=(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 {
@@ -236,10 +236,10 @@ bool  operator<=(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 }
 
 //***************************************************************************
-// @brief µÎ SYSTEMTIME °£ÀÇ ½Ã°£ Â÷ÀÌ¸¦ ÃÊ(sec) ´ÜÀ§·Î °è»êÇÕ´Ï´Ù.
-// @param stime1 Ã¹ ¹øÂ° SYSTEMTIME »ó¼ö ÂüÁ¶
-// @param stime2 µÎ ¹øÂ° SYSTEMTIME »ó¼ö ÂüÁ¶ (±âÁØ)
-// @return ÃÊ ´ÜÀ§ ½Ã°£ Â÷ÀÌ (stime1ÀÌ ÀÌÀüÀÌ°Å³ª °°À¸¸é 0)
+// @brief ë‘ SYSTEMTIME ê°„ì˜ ì‹œê°„ ì°¨ì´ë¥¼ ì´ˆ(sec) ë‹¨ìœ„ë¡œ ê³„ì‚°í•©ë‹ˆë‹¤.
+// @param stime1 ì²« ë²ˆì§¸ SYSTEMTIME ìƒìˆ˜ ì°¸ì¡°
+// @param stime2 ë‘ ë²ˆì§¸ SYSTEMTIME ìƒìˆ˜ ì°¸ì¡° (ê¸°ì¤€)
+// @return ì´ˆ ë‹¨ìœ„ ì‹œê°„ ì°¨ì´ (stime1ì´ ì´ì „ì´ê±°ë‚˜ ê°™ìœ¼ë©´ 0)
 //***************************************************************************
 uint64 operator-(const SYSTEMTIME& stime1, const SYSTEMTIME& stime2)
 {
@@ -258,10 +258,10 @@ uint64 operator-(const SYSTEMTIME& stime1, const SYSTEMTIME& stime2)
 }
 
 //***************************************************************************
-// @brief ¹®ÀÚ¿­ ÇüÅÂÀÇ ³¯Â¥/½Ã°£À» ÆÄ½ÌÇÏ¿© SYSTEMTIME ±¸Á¶Ã¼¿¡ ÇÒ´çÇÕ´Ï´Ù.
-// @param stime ´ë»ó SYSTEMTIME ÂüÁ¶
-// @param tszDateTime "YYYY-MM-DD HH:MM:SS" Çü½ÄÀÇ ¹®ÀÚ¿­
-// @return º¯È¯µÈ SYSTEMTIME ÂüÁ¶
+// @brief ë¬¸ìì—´ í˜•íƒœì˜ ë‚ ì§œ/ì‹œê°„ì„ íŒŒì‹±í•˜ì—¬ SYSTEMTIME êµ¬ì¡°ì²´ì— í• ë‹¹í•©ë‹ˆë‹¤.
+// @param stime ëŒ€ìƒ SYSTEMTIME ì°¸ì¡°
+// @param tszDateTime "YYYY-MM-DD HH:MM:SS" í˜•ì‹ì˜ ë¬¸ìì—´
+// @return ë³€í™˜ëœ SYSTEMTIME ì°¸ì¡°
 //***************************************************************************
 SYSTEMTIME& operator<<(SYSTEMTIME& stime, TCHAR* tszDateTime)
 {
@@ -273,10 +273,10 @@ SYSTEMTIME& operator<<(SYSTEMTIME& stime, TCHAR* tszDateTime)
 }
 
 //***************************************************************************
-// @brief SYSTEMTIME ±¸Á¶Ã¼ °ªÀ» Æ÷¸ËÆÃµÈ ³¯Â¥/½Ã°£ ¹®ÀÚ¿­·Î º¯È¯ÇÕ´Ï´Ù.
-// @param tszDateTime °á°ú¸¦ ÀúÀåÇÒ TCHAR ¹öÆÛ
-// @param stime º¯È¯ÇÒ SYSTEMTIME ÂüÁ¶
-// @return º¯È¯µÈ TCHAR ¹®ÀÚ¿­ Æ÷ÀÎÅÍ
+// @brief SYSTEMTIME êµ¬ì¡°ì²´ ê°’ì„ í¬ë§·íŒ…ëœ ë‚ ì§œ/ì‹œê°„ ë¬¸ìì—´ë¡œ ë³€í™˜í•©ë‹ˆë‹¤.
+// @param tszDateTime ê²°ê³¼ë¥¼ ì €ì¥í•  TCHAR ë²„í¼
+// @param stime ë³€í™˜í•  SYSTEMTIME ì°¸ì¡°
+// @return ë³€í™˜ëœ TCHAR ë¬¸ìì—´ í¬ì¸í„°
 //***************************************************************************
 TCHAR* operator<<(TCHAR* tszDateTime, SYSTEMTIME& stime)
 {
@@ -288,8 +288,8 @@ TCHAR* operator<<(TCHAR* tszDateTime, SYSTEMTIME& stime)
 }
 
 //***************************************************************************
-// @brief ÇöÀç ½Ã½ºÅÛÀÇ Å¸ÀÓ½ºÅÆÇÁ °ªÀ» ¹İÈ¯ÇÕ´Ï´Ù.
-// @return ÇöÀç time_t Å¸ÀÓ½ºÅÆÇÁ
+// @brief í˜„ì¬ ì‹œìŠ¤í…œì˜ íƒ€ì„ìŠ¤íƒ¬í”„ ê°’ì„ ë°˜í™˜í•©ë‹ˆë‹¤.
+// @return í˜„ì¬ time_t íƒ€ì„ìŠ¤íƒ¬í”„
 //***************************************************************************
 time_t GetCurTimestamp()
 {
@@ -298,8 +298,8 @@ time_t GetCurTimestamp()
 }
 
 //***************************************************************************
-// @brief ÇöÀç Áö¿ª ³¯Â¥ ¹× ½Ã°£(YYYYMMDDhhmmss, 14ÀÚ¸®)À» °¡Á®¿É´Ï´Ù.
-// @param ptszDateTime °á°ú¸¦ ÀúÀåÇÒ TCHAR ¹öÆÛ
+// @brief í˜„ì¬ ì§€ì—­ ë‚ ì§œ ë° ì‹œê°„(YYYYMMDDhhmmss, 14ìë¦¬)ì„ ê°€ì ¸ì˜µë‹ˆë‹¤.
+// @param ptszDateTime ê²°ê³¼ë¥¼ ì €ì¥í•  TCHAR ë²„í¼
 //***************************************************************************
 void GetCurDateTime(TCHAR* ptszDateTime)
 {
@@ -312,8 +312,8 @@ void GetCurDateTime(TCHAR* ptszDateTime)
 }
 
 //***************************************************************************
-// @brief ÇöÀç Áö¿ª ³¯Â¥(YYYYMMDD, 8ÀÚ¸®)¸¦ °¡Á®¿É´Ï´Ù.
-// @param ptszDate °á°ú¸¦ ÀúÀåÇÒ TCHAR ¹öÆÛ
+// @brief í˜„ì¬ ì§€ì—­ ë‚ ì§œ(YYYYMMDD, 8ìë¦¬)ë¥¼ ê°€ì ¸ì˜µë‹ˆë‹¤.
+// @param ptszDate ê²°ê³¼ë¥¼ ì €ì¥í•  TCHAR ë²„í¼
 //***************************************************************************
 void GetCurDate(TCHAR* ptszDate)
 {
@@ -326,8 +326,8 @@ void GetCurDate(TCHAR* ptszDate)
 }
 
 //***************************************************************************
-// @brief ¾îÁ¦ÀÇ ³¯Â¥ ¹× ½Ã°£(YYYYMMDDhhmmss)À» °¡Á®¿É´Ï´Ù.
-// @param ptszDateTime °á°ú¸¦ ÀúÀåÇÒ TCHAR ¹öÆÛ
+// @brief ì–´ì œì˜ ë‚ ì§œ ë° ì‹œê°„(YYYYMMDDhhmmss)ì„ ê°€ì ¸ì˜µë‹ˆë‹¤.
+// @param ptszDateTime ê²°ê³¼ë¥¼ ì €ì¥í•  TCHAR ë²„í¼
 //***************************************************************************
 void GetYesterdayTime(TCHAR* ptszDateTime)
 {
@@ -362,8 +362,8 @@ void GetYesterdayTime(TCHAR* ptszDateTime)
 }
 
 //***************************************************************************
-// @brief ¾îÁ¦ÀÇ ³¯Â¥(YYYYMMDD)¸¦ °¡Á®¿É´Ï´Ù.
-// @param ptszDate °á°ú¸¦ ÀúÀåÇÒ TCHAR ¹öÆÛ
+// @brief ì–´ì œì˜ ë‚ ì§œ(YYYYMMDD)ë¥¼ ê°€ì ¸ì˜µë‹ˆë‹¤.
+// @param ptszDate ê²°ê³¼ë¥¼ ì €ì¥í•  TCHAR ë²„í¼
 //***************************************************************************
 void GetYesterday(TCHAR* ptszDate)
 {
@@ -398,9 +398,9 @@ void GetYesterday(TCHAR* ptszDate)
 }
 
 //***************************************************************************
-// @brief SYSTEMTIME ±¸Á¶Ã¼¸¦ time_t Å¸ÀÓ½ºÅÆÇÁ·Î º¯È¯ÇÕ´Ï´Ù.
-// @param tTime º¯È¯ÇÒ SYSTEMTIME °´Ã¼
-// @return º¯È¯µÈ time_t °ª
+// @brief SYSTEMTIME êµ¬ì¡°ì²´ë¥¼ time_t íƒ€ì„ìŠ¤íƒ¬í”„ë¡œ ë³€í™˜í•©ë‹ˆë‹¤.
+// @param tTime ë³€í™˜í•  SYSTEMTIME ê°ì²´
+// @return ë³€í™˜ëœ time_t ê°’
 //***************************************************************************
 time_t GetTimestampToDateTime(const SYSTEMTIME tTime)
 {
@@ -420,9 +420,9 @@ time_t GetTimestampToDateTime(const SYSTEMTIME tTime)
 }
 
 //***************************************************************************
-// @brief YYYYMMDDhhmmss Çü½ÄÀÇ ¹®ÀÚ¿­À» time_t Å¸ÀÓ½ºÅÆÇÁ·Î º¯È¯ÇÕ´Ï´Ù.
-// @param ptszDateTime º¯È¯ÇÒ ³¯Â¥/½Ã°£ ¹®ÀÚ¿­
-// @return º¯È¯µÈ time_t °ª
+// @brief YYYYMMDDhhmmss í˜•ì‹ì˜ ë¬¸ìì—´ì„ time_t íƒ€ì„ìŠ¤íƒ¬í”„ë¡œ ë³€í™˜í•©ë‹ˆë‹¤.
+// @param ptszDateTime ë³€í™˜í•  ë‚ ì§œ/ì‹œê°„ ë¬¸ìì—´
+// @return ë³€í™˜ëœ time_t ê°’
 //***************************************************************************
 time_t GetTimestampToDateTime(const TCHAR* ptszDateTime)
 {
@@ -443,10 +443,10 @@ time_t GetTimestampToDateTime(const TCHAR* ptszDateTime)
 }
 
 //***************************************************************************
-// @brief time_t Å¸ÀÓ½ºÅÆÇÁ¸¦ SYSTEMTIME ±¸Á¶Ã¼·Î º¯È¯ÇÕ´Ï´Ù.
-// @param tTime °á°ú¸¦ ÀúÀåÇÒ SYSTEMTIME ÂüÁ¶
-// @param timestamp º¯È¯ÇÒ time_t °ª
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief time_t íƒ€ì„ìŠ¤íƒ¬í”„ë¥¼ SYSTEMTIME êµ¬ì¡°ì²´ë¡œ ë³€í™˜í•©ë‹ˆë‹¤.
+// @param tTime ê²°ê³¼ë¥¼ ì €ì¥í•  SYSTEMTIME ì°¸ì¡°
+// @param timestamp ë³€í™˜í•  time_t ê°’
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool  GetSystemTimeToTimestamp(SYSTEMTIME& tTime, const time_t timestamp)
 {
@@ -466,10 +466,10 @@ bool  GetSystemTimeToTimestamp(SYSTEMTIME& tTime, const time_t timestamp)
 }
 
 //***************************************************************************
-// @brief time_t Å¸ÀÓ½ºÅÆÇÁ¸¦ YYYYMMDDhhmmss Çü½ÄÀÇ ¹®ÀÚ¿­·Î º¯È¯ÇÕ´Ï´Ù.
-// @param ptszDateTime °á°ú¸¦ ÀúÀåÇÒ TCHAR ¹öÆÛ
-// @param timestamp º¯È¯ÇÒ time_t °ª
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief time_t íƒ€ì„ìŠ¤íƒ¬í”„ë¥¼ YYYYMMDDhhmmss í˜•ì‹ì˜ ë¬¸ìì—´ë¡œ ë³€í™˜í•©ë‹ˆë‹¤.
+// @param ptszDateTime ê²°ê³¼ë¥¼ ì €ì¥í•  TCHAR ë²„í¼
+// @param timestamp ë³€í™˜í•  time_t ê°’
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool  GetDateTimeToTimestamp(TCHAR* ptszDateTime, const time_t timestamp)
 {
@@ -484,9 +484,9 @@ bool  GetDateTimeToTimestamp(TCHAR* ptszDateTime, const time_t timestamp)
 }
 
 //***************************************************************************
-// @brief YYYYMMDDhhmmss Çü½ÄÀÇ ¹®ÀÚ¿­ÀÌ À¯È¿ÇÑ ³¯Â¥ ¹× ½Ã°£ÀÎÁö °ËÁõÇÕ´Ï´Ù.
-// @param ptszDateTime °ËÁõÇÒ ³¯Â¥/½Ã°£ ¹®ÀÚ¿­
-// @return À¯È¿ÇÏ¸é true, ¾Æ´Ï¸é false
+// @brief YYYYMMDDhhmmss í˜•ì‹ì˜ ë¬¸ìì—´ì´ ìœ íš¨í•œ ë‚ ì§œ ë° ì‹œê°„ì¸ì§€ ê²€ì¦í•©ë‹ˆë‹¤.
+// @param ptszDateTime ê²€ì¦í•  ë‚ ì§œ/ì‹œê°„ ë¬¸ìì—´
+// @return ìœ íš¨í•˜ë©´ true, ì•„ë‹ˆë©´ false
 //***************************************************************************
 bool  IsValidDateTime(const TCHAR* ptszDateTime)
 {
@@ -520,9 +520,9 @@ bool  IsValidDateTime(const TCHAR* ptszDateTime)
 }
 
 //***************************************************************************
-// @brief YYYYMMDD Çü½ÄÀÇ ¹®ÀÚ¿­ÀÌ À¯È¿ÇÑ ³¯Â¥ÀÎÁö °ËÁõÇÕ´Ï´Ù.
-// @param ptszDate °ËÁõÇÒ ³¯Â¥ ¹®ÀÚ¿­
-// @return À¯È¿ÇÏ¸é true, ¾Æ´Ï¸é false
+// @brief YYYYMMDD í˜•ì‹ì˜ ë¬¸ìì—´ì´ ìœ íš¨í•œ ë‚ ì§œì¸ì§€ ê²€ì¦í•©ë‹ˆë‹¤.
+// @param ptszDate ê²€ì¦í•  ë‚ ì§œ ë¬¸ìì—´
+// @return ìœ íš¨í•˜ë©´ true, ì•„ë‹ˆë©´ false
 //***************************************************************************
 bool  IsValidDate(const TCHAR* ptszDate)
 {
@@ -550,9 +550,9 @@ bool  IsValidDate(const TCHAR* ptszDate)
 }
 
 //***************************************************************************
-// @brief hhmmss Çü½ÄÀÇ ¹®ÀÚ¿­ÀÌ À¯È¿ÇÑ ½Ã°£ÀÎÁö °ËÁõÇÕ´Ï´Ù.
-// @param ptszTime °ËÁõÇÒ ½Ã°£ ¹®ÀÚ¿­
-// @return À¯È¿ÇÏ¸é true, ¾Æ´Ï¸é false
+// @brief hhmmss í˜•ì‹ì˜ ë¬¸ìì—´ì´ ìœ íš¨í•œ ì‹œê°„ì¸ì§€ ê²€ì¦í•©ë‹ˆë‹¤.
+// @param ptszTime ê²€ì¦í•  ì‹œê°„ ë¬¸ìì—´
+// @return ìœ íš¨í•˜ë©´ true, ì•„ë‹ˆë©´ false
 //***************************************************************************
 bool  IsValidTime(const TCHAR* ptszTime)
 {
@@ -573,9 +573,9 @@ bool  IsValidTime(const TCHAR* ptszTime)
 }
 
 //***************************************************************************
-// @brief ÁöÁ¤ÇÑ ³¯Â¥/½Ã°£°ú ¿À´ÃÀ» ºñ±³ÇÕ´Ï´Ù.
-// @param ptszDate ºñ±³ÇÒ ³¯Â¥/½Ã°£ ¹®ÀÚ¿­ (YYYYMMDD ¶Ç´Â YYYYMMDDhhmmss)
-// @return À½¼ö: ¿À´Ãº¸´Ù ÀÌÀü, 0: ¿À´Ã°ú °°À½, ¾ç¼ö: ¿À´Ãº¸´Ù ÀÌÈÄ (¿À·ù ½Ã -9999)
+// @brief ì§€ì •í•œ ë‚ ì§œ/ì‹œê°„ê³¼ ì˜¤ëŠ˜ì„ ë¹„êµí•©ë‹ˆë‹¤.
+// @param ptszDate ë¹„êµí•  ë‚ ì§œ/ì‹œê°„ ë¬¸ìì—´ (YYYYMMDD ë˜ëŠ” YYYYMMDDhhmmss)
+// @return ìŒìˆ˜: ì˜¤ëŠ˜ë³´ë‹¤ ì´ì „, 0: ì˜¤ëŠ˜ê³¼ ê°™ìŒ, ì–‘ìˆ˜: ì˜¤ëŠ˜ë³´ë‹¤ ì´í›„ (ì˜¤ë¥˜ ì‹œ -9999)
 //***************************************************************************
 int CompareToday(const TCHAR* ptszDate)
 {
@@ -600,11 +600,11 @@ int CompareToday(const TCHAR* ptszDate)
 }
 
 //***************************************************************************
-// @brief ±âÁØ ³¯Â¥¿¡¼­ ÁöÁ¤ÇÑ °£°İ(ÀÏ ´ÜÀ§)¸¸Å­ ´õÇÏ°Å³ª »« ³¯Â¥¸¦ °è»êÇÕ´Ï´Ù.
-// @param ptszDestDate °á°ú ³¯Â¥(YYYYMMDD)°¡ ÀúÀåµÉ ¹öÆÛ
-// @param ptszSrcDate ±âÁØ ³¯Â¥(YYYYMMDD) ¹®ÀÚ¿­
-// @param nInterval °¡°¨ÇÒ ÀÏ¼ö °£°İ (¾ç¼ö: °ú°Å, À½¼ö: ¹Ì·¡)
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief ê¸°ì¤€ ë‚ ì§œì—ì„œ ì§€ì •í•œ ê°„ê²©(ì¼ ë‹¨ìœ„)ë§Œí¼ ë”í•˜ê±°ë‚˜ ëº€ ë‚ ì§œë¥¼ ê³„ì‚°í•©ë‹ˆë‹¤.
+// @param ptszDestDate ê²°ê³¼ ë‚ ì§œ(YYYYMMDD)ê°€ ì €ì¥ë  ë²„í¼
+// @param ptszSrcDate ê¸°ì¤€ ë‚ ì§œ(YYYYMMDD) ë¬¸ìì—´
+// @param nInterval ê°€ê°í•  ì¼ìˆ˜ ê°„ê²© (ì–‘ìˆ˜: ê³¼ê±°, ìŒìˆ˜: ë¯¸ë˜)
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool  GetDateIntervalDate(TCHAR* ptszDestDate, const TCHAR* ptszSrcDate, const int nInterval)
 {
@@ -716,10 +716,10 @@ bool  GetDateIntervalDate(TCHAR* ptszDestDate, const TCHAR* ptszSrcDate, const i
 }
 
 //***************************************************************************
-// @brief ¿À´Ã ±âÁØ¿¡¼­ ÁöÁ¤ÇÑ °£°İ(ÀÏ ´ÜÀ§)¸¸Å­ ´õÇÏ°Å³ª »« ³¯Â¥¸¦ °è»êÇÕ´Ï´Ù.
-// @param ptszDate °á°ú ³¯Â¥(YYYYMMDD)°¡ ÀúÀåµÉ ¹öÆÛ
-// @param nInterval °¡°¨ÇÒ ÀÏ¼ö °£°İ (¾ç¼ö: °ú°Å, À½¼ö: ¹Ì·¡)
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief ì˜¤ëŠ˜ ê¸°ì¤€ì—ì„œ ì§€ì •í•œ ê°„ê²©(ì¼ ë‹¨ìœ„)ë§Œí¼ ë”í•˜ê±°ë‚˜ ëº€ ë‚ ì§œë¥¼ ê³„ì‚°í•©ë‹ˆë‹¤.
+// @param ptszDate ê²°ê³¼ ë‚ ì§œ(YYYYMMDD)ê°€ ì €ì¥ë  ë²„í¼
+// @param nInterval ê°€ê°í•  ì¼ìˆ˜ ê°„ê²© (ì–‘ìˆ˜: ê³¼ê±°, ìŒìˆ˜: ë¯¸ë˜)
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool  GetDateIntervalToday(TCHAR* ptszDate, const int nInterval)
 {
@@ -821,11 +821,11 @@ bool  GetDateIntervalToday(TCHAR* ptszDate, const int nInterval)
 }
 
 //***************************************************************************
-// @brief µÎ ³¯Â¥/½Ã°£ ¹®ÀÚ¿­ °£ÀÇ ½Ã°£ Â÷ÀÌ¸¦ ÃÊ(sec) ´ÜÀ§·Î °è»êÇÕ´Ï´Ù.
-// @param ptszTime1 Ã¹ ¹øÂ° ³¯Â¥/½Ã°£ ¹®ÀÚ¿­ (YYYYMMDDhhmmss)
-// @param ptszTime2 µÎ ¹øÂ° ³¯Â¥/½Ã°£ ¹®ÀÚ¿­ (YYYYMMDDhhmmss)
-// @param lSecInterval °è»êµÈ ÃÊ °£°İÀÌ ÀúÀåµÉ º¯¼ö ÂüÁ¶
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief ë‘ ë‚ ì§œ/ì‹œê°„ ë¬¸ìì—´ ê°„ì˜ ì‹œê°„ ì°¨ì´ë¥¼ ì´ˆ(sec) ë‹¨ìœ„ë¡œ ê³„ì‚°í•©ë‹ˆë‹¤.
+// @param ptszTime1 ì²« ë²ˆì§¸ ë‚ ì§œ/ì‹œê°„ ë¬¸ìì—´ (YYYYMMDDhhmmss)
+// @param ptszTime2 ë‘ ë²ˆì§¸ ë‚ ì§œ/ì‹œê°„ ë¬¸ìì—´ (YYYYMMDDhhmmss)
+// @param lSecInterval ê³„ì‚°ëœ ì´ˆ ê°„ê²©ì´ ì €ì¥ë  ë³€ìˆ˜ ì°¸ì¡°
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool  GetIntervalSec(const TCHAR* ptszTime1, const TCHAR* ptszTime2, long& lSecInterval)
 {
@@ -867,10 +867,10 @@ bool  GetIntervalSec(const TCHAR* ptszTime1, const TCHAR* ptszTime2, long& lSecI
 }
 
 //***************************************************************************
-// @brief ¹®ÀÚ¿­ ³¯Â¥/½Ã°£À» SQL_TIMESTAMP_STRUCT ±¸Á¶Ã¼·Î º¯È¯ÇÕ´Ï´Ù.
-// @param stDateTime °á°ú SQL_TIMESTAMP_STRUCT ÂüÁ¶
-// @param ptszDateTime º¯È¯ÇÒ ³¯Â¥/½Ã°£ ¹®ÀÚ¿­ (YYYYMMDDhhmmss)
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief ë¬¸ìì—´ ë‚ ì§œ/ì‹œê°„ì„ SQL_TIMESTAMP_STRUCT êµ¬ì¡°ì²´ë¡œ ë³€í™˜í•©ë‹ˆë‹¤.
+// @param stDateTime ê²°ê³¼ SQL_TIMESTAMP_STRUCT ì°¸ì¡°
+// @param ptszDateTime ë³€í™˜í•  ë‚ ì§œ/ì‹œê°„ ë¬¸ìì—´ (YYYYMMDDhhmmss)
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool  GetSqlTime(SQL_TIMESTAMP_STRUCT& stDateTime, const TCHAR* ptszDateTime)
 {
@@ -899,10 +899,10 @@ bool  GetSqlTime(SQL_TIMESTAMP_STRUCT& stDateTime, const TCHAR* ptszDateTime)
 }
 
 //***************************************************************************
-// @brief ¹®ÀÚ¿­ ³¯Â¥/½Ã°£À» SYSTEMTIME ±¸Á¶Ã¼·Î º¯È¯ÇÕ´Ï´Ù.
-// @param tTime °á°ú SYSTEMTIME ÂüÁ¶
-// @param ptszDateTime º¯È¯ÇÒ ³¯Â¥/½Ã°£ ¹®ÀÚ¿­ (YYYYMMDDhhmmss)
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief ë¬¸ìì—´ ë‚ ì§œ/ì‹œê°„ì„ SYSTEMTIME êµ¬ì¡°ì²´ë¡œ ë³€í™˜í•©ë‹ˆë‹¤.
+// @param tTime ê²°ê³¼ SYSTEMTIME ì°¸ì¡°
+// @param ptszDateTime ë³€í™˜í•  ë‚ ì§œ/ì‹œê°„ ë¬¸ìì—´ (YYYYMMDDhhmmss)
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool  GetSystemTime(SYSTEMTIME& tTime, const TCHAR* ptszDateTime)
 {
@@ -931,10 +931,10 @@ bool  GetSystemTime(SYSTEMTIME& tTime, const TCHAR* ptszDateTime)
 }
 
 //***************************************************************************
-// @brief ¿ù ¹øÈ£(1~12)¿¡ ÇØ´çÇÏ´Â ¿µ¹® ¿ù ÀÌ¸§À» °¡Á®¿É´Ï´Ù.
-// @param ptszMonthName °á°ú¸¦ ÀúÀåÇÒ TCHAR ¹öÆÛ
-// @param nMonth ¿ù ¹øÈ£ (1 ~ 12)
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief ì›” ë²ˆí˜¸(1~12)ì— í•´ë‹¹í•˜ëŠ” ì˜ë¬¸ ì›” ì´ë¦„ì„ ê°€ì ¸ì˜µë‹ˆë‹¤.
+// @param ptszMonthName ê²°ê³¼ë¥¼ ì €ì¥í•  TCHAR ë²„í¼
+// @param nMonth ì›” ë²ˆí˜¸ (1 ~ 12)
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool  GetMonthName(TCHAR* ptszMonthName, const int nMonth)
 {
@@ -951,12 +951,12 @@ bool  GetMonthName(TCHAR* ptszMonthName, const int nMonth)
 }
 
 //***************************************************************************
-// @brief Æ¯Á¤ ¿¬, ¿ù, ÀÏ¿¡ ÇØ´çÇÏ´Â ¿µ¹® ¿äÀÏ ÀÌ¸§À» °¡Á®¿É´Ï´Ù.
-// @param ptszDayOfWeek °á°ú¸¦ ÀúÀåÇÒ TCHAR ¹öÆÛ
-// @param nYear ¿¬µµ
-// @param nMonth ¿ù
-// @param nDay ÀÏ
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief íŠ¹ì • ì—°, ì›”, ì¼ì— í•´ë‹¹í•˜ëŠ” ì˜ë¬¸ ìš”ì¼ ì´ë¦„ì„ ê°€ì ¸ì˜µë‹ˆë‹¤.
+// @param ptszDayOfWeek ê²°ê³¼ë¥¼ ì €ì¥í•  TCHAR ë²„í¼
+// @param nYear ì—°ë„
+// @param nMonth ì›”
+// @param nDay ì¼
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool  GetDayOfWeek(TCHAR* ptszDayOfWeek, const int nYear, const int nMonth, const int nDay)
 {
@@ -976,11 +976,11 @@ bool  GetDayOfWeek(TCHAR* ptszDayOfWeek, const int nYear, const int nMonth, cons
 }
 
 //***************************************************************************
-// @brief Æ¯Á¤ ¿¬, ¿ù, ÀÏÀÇ ¿äÀÏ ÀÎµ¦½º¸¦ °è»êÇÕ´Ï´Ù.
-// @param nYear ¿¬µµ
-// @param nMonth ¿ù
-// @param nDay ÀÏ
-// @return ¿äÀÏ ÀÎµ¦½º (0: ÀÏ¿äÀÏ ~ 6: Åä¿äÀÏ, ½ÇÆĞ ½Ã -1)
+// @brief íŠ¹ì • ì—°, ì›”, ì¼ì˜ ìš”ì¼ ì¸ë±ìŠ¤ë¥¼ ê³„ì‚°í•©ë‹ˆë‹¤.
+// @param nYear ì—°ë„
+// @param nMonth ì›”
+// @param nDay ì¼
+// @return ìš”ì¼ ì¸ë±ìŠ¤ (0: ì¼ìš”ì¼ ~ 6: í† ìš”ì¼, ì‹¤íŒ¨ ì‹œ -1)
 //***************************************************************************
 int	DayOfWeek(const int nYear, const int nMonth, const int nDay)
 {
@@ -1008,9 +1008,9 @@ int	DayOfWeek(const int nYear, const int nMonth, const int nDay)
 }
 
 //***************************************************************************
-// @brief Æ¯Á¤ ¿¬µµ±îÁöÀÇ 2¿ù 29ÀÏ(À±ÀÏ) ´©Àû È½¼ö¸¦ °è»êÇÕ´Ï´Ù.
-// @param nYear ¿¬µµ
-// @return À±ÀÏ ´©Àû È½¼ö
+// @brief íŠ¹ì • ì—°ë„ê¹Œì§€ì˜ 2ì›” 29ì¼(ìœ¤ì¼) ëˆ„ì  íšŸìˆ˜ë¥¼ ê³„ì‚°í•©ë‹ˆë‹¤.
+// @param nYear ì—°ë„
+// @return ìœ¤ì¼ ëˆ„ì  íšŸìˆ˜
 //***************************************************************************
 int	CountOfFeb29(int nYear)
 {
@@ -1026,9 +1026,9 @@ int	CountOfFeb29(int nYear)
 }
 
 //***************************************************************************
-// @brief ÁöÁ¤ÇÑ ¿¬µµ°¡ À±³âÀÎÁö ¿©ºÎ¸¦ È®ÀÎÇÕ´Ï´Ù.
-// @param nYear ¿¬µµ
-// @return À±³âÀÌ¸é true, ¾Æ´Ï¸é false
+// @brief ì§€ì •í•œ ì—°ë„ê°€ ìœ¤ë…„ì¸ì§€ ì—¬ë¶€ë¥¼ í™•ì¸í•©ë‹ˆë‹¤.
+// @param nYear ì—°ë„
+// @return ìœ¤ë…„ì´ë©´ true, ì•„ë‹ˆë©´ false
 //***************************************************************************
 bool  IsLeapYear(int nYear)
 {
@@ -1038,10 +1038,10 @@ bool  IsLeapYear(int nYear)
 }
 
 //***************************************************************************
-// @brief ÃÊ(sec)¸¦ hhmmss Çü½ÄÀÇ ¹®ÀÚ¿­·Î º¯È¯ÇÕ´Ï´Ù.
-// @param ptszTime °á°ú¸¦ ÀúÀåÇÒ TCHAR ¹öÆÛ
-// @param lSecond º¯È¯ÇÒ ÃÑ ÃÊ °ª
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief ì´ˆ(sec)ë¥¼ hhmmss í˜•ì‹ì˜ ë¬¸ìì—´ë¡œ ë³€í™˜í•©ë‹ˆë‹¤.
+// @param ptszTime ê²°ê³¼ë¥¼ ì €ì¥í•  TCHAR ë²„í¼
+// @param lSecond ë³€í™˜í•  ì´ ì´ˆ ê°’
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool  GetTimeOfSecond(TCHAR* ptszTime, const long lSecond)
 {
@@ -1072,12 +1072,12 @@ bool  GetTimeOfSecond(TCHAR* ptszTime, const long lSecond)
 }
 
 //***************************************************************************
-// @brief ÃÊ(sec)¸¦ ½Ã, ºĞ, ÃÊ ´ÜÀ§ÀÇ Á¤¼ö·Î °¢°¢ ºĞÇÒÇÕ´Ï´Ù.
-// @param nHour ½Ã°£ÀÌ ÀúÀåµÉ º¯¼ö ÂüÁ¶
-// @param nMinute ºĞÀÌ ÀúÀåµÉ º¯¼ö ÂüÁ¶
-// @param nSec ÃÊ°¡ ÀúÀåµÉ º¯¼ö ÂüÁ¶
-// @param lSecond º¯È¯ÇÒ ÃÑ ÃÊ °ª
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief ì´ˆ(sec)ë¥¼ ì‹œ, ë¶„, ì´ˆ ë‹¨ìœ„ì˜ ì •ìˆ˜ë¡œ ê°ê° ë¶„í• í•©ë‹ˆë‹¤.
+// @param nHour ì‹œê°„ì´ ì €ì¥ë  ë³€ìˆ˜ ì°¸ì¡°
+// @param nMinute ë¶„ì´ ì €ì¥ë  ë³€ìˆ˜ ì°¸ì¡°
+// @param nSec ì´ˆê°€ ì €ì¥ë  ë³€ìˆ˜ ì°¸ì¡°
+// @param lSecond ë³€í™˜í•  ì´ ì´ˆ ê°’
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool  GetTimeOfSecond(int& nHour, int& nMinute, int& nSec, const long lSecond)
 {
@@ -1106,9 +1106,9 @@ bool  GetTimeOfSecond(int& nHour, int& nMinute, int& nSec, const long lSecond)
 }
 
 //***************************************************************************
-// @brief SYSTEMTIMEÀ» Ç¥ÁØ GMT(UTC) Çü½ÄÀÇ ¹®ÀÚ¿­·Î º¯È¯ÇÕ´Ï´Ù.
-// @param ptszStdDateTime °á°ú¸¦ ÀúÀåÇÒ TCHAR ¹öÆÛ
-// @param sTime º¯È¯ÇÒ SYSTEMTIME °´Ã¼
+// @brief SYSTEMTIMEì„ í‘œì¤€ GMT(UTC) í˜•ì‹ì˜ ë¬¸ìì—´ë¡œ ë³€í™˜í•©ë‹ˆë‹¤.
+// @param ptszStdDateTime ê²°ê³¼ë¥¼ ì €ì¥í•  TCHAR ë²„í¼
+// @param sTime ë³€í™˜í•  SYSTEMTIME ê°ì²´
 //***************************************************************************
 void GetGMTTime(TCHAR* ptszStdDateTime, SYSTEMTIME sTime)
 {
@@ -1120,9 +1120,9 @@ void GetGMTTime(TCHAR* ptszStdDateTime, SYSTEMTIME sTime)
 }
 
 //***************************************************************************
-// @brief ·ÎÄÃ Å¸ÀÓ½ºÅÆÇÁ¸¦ GMT Å¸ÀÓ½ºÅÆÇÁ·Î º¯È¯ÇÕ´Ï´Ù.
-// @param dest º¯È¯µÈ GMT time_t°¡ ÀúÀåµÉ ÂüÁ¶
-// @param src º¯È¯ÇÒ ·ÎÄÃ time_t »ó¼ö ÂüÁ¶
+// @brief ë¡œì»¬ íƒ€ì„ìŠ¤íƒ¬í”„ë¥¼ GMT íƒ€ì„ìŠ¤íƒ¬í”„ë¡œ ë³€í™˜í•©ë‹ˆë‹¤.
+// @param dest ë³€í™˜ëœ GMT time_tê°€ ì €ì¥ë  ì°¸ì¡°
+// @param src ë³€í™˜í•  ë¡œì»¬ time_t ìƒìˆ˜ ì°¸ì¡°
 //***************************************************************************
 void ConvertLocaltimeToGMT(time_t& dest, const time_t& src)
 {
@@ -1141,9 +1141,9 @@ void ConvertLocaltimeToGMT(time_t& dest, const time_t& src)
 }
 
 //***************************************************************************
-// @brief GMT Å¸ÀÓ½ºÅÆÇÁ¸¦ ·ÎÄÃ Å¸ÀÓ½ºÅÆÇÁ·Î º¯È¯ÇÕ´Ï´Ù.
-// @param dest º¯È¯µÈ ·ÎÄÃ time_t°¡ ÀúÀåµÉ ÂüÁ¶
-// @param src º¯È¯ÇÒ GMT time_t »ó¼ö ÂüÁ¶
+// @brief GMT íƒ€ì„ìŠ¤íƒ¬í”„ë¥¼ ë¡œì»¬ íƒ€ì„ìŠ¤íƒ¬í”„ë¡œ ë³€í™˜í•©ë‹ˆë‹¤.
+// @param dest ë³€í™˜ëœ ë¡œì»¬ time_tê°€ ì €ì¥ë  ì°¸ì¡°
+// @param src ë³€í™˜í•  GMT time_t ìƒìˆ˜ ì°¸ì¡°
 //***************************************************************************
 void ConvertGMTToLocaltime(time_t& dest, const time_t& src)
 {
@@ -1162,10 +1162,10 @@ void ConvertGMTToLocaltime(time_t& dest, const time_t& src)
 }
 
 //***************************************************************************
-// @brief µÎ SYSTEMTIME °£ÀÇ ºĞ(minute) ´ÜÀ§ °£°İÀ» °è»êÇÕ´Ï´Ù.
-// @param stime1 Ã¹ ¹øÂ° SYSTEMTIME ÂüÁ¶
-// @param stime2 µÎ ¹øÂ° SYSTEMTIME ÂüÁ¶ (±âÁØ)
-// @return ºĞ ´ÜÀ§ ½Ã°£ Â÷ÀÌ (stime2°¡ ÀÌÀüÀÌ°Å³ª °°À¸¸é 0)
+// @brief ë‘ SYSTEMTIME ê°„ì˜ ë¶„(minute) ë‹¨ìœ„ ê°„ê²©ì„ ê³„ì‚°í•©ë‹ˆë‹¤.
+// @param stime1 ì²« ë²ˆì§¸ SYSTEMTIME ì°¸ì¡°
+// @param stime2 ë‘ ë²ˆì§¸ SYSTEMTIME ì°¸ì¡° (ê¸°ì¤€)
+// @return ë¶„ ë‹¨ìœ„ ì‹œê°„ ì°¨ì´ (stime2ê°€ ì´ì „ì´ê±°ë‚˜ ê°™ìœ¼ë©´ 0)
 //***************************************************************************
 uint64 TIME::DifMinute(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 {
@@ -1190,9 +1190,9 @@ uint64 TIME::DifMinute(SYSTEMTIME& stime1, SYSTEMTIME& stime2)
 }
 
 //***************************************************************************
-// @brief SYSTEMTIME °´Ã¼¿¡ ÁöÁ¤µÈ ½Ã°£(100³ª³ëÃÊ ´ÜÀ§ Æ½)À» ´õÇÕ´Ï´Ù.
-// @param stime ¿¬»ê ´ë»ó SYSTEMTIME ÂüÁ¶
-// @param nAddTime ´õÇÒ ½Ã°£ °ª (100³ª³ëÃÊ ´ÜÀ§)
+// @brief SYSTEMTIME ê°ì²´ì— ì§€ì •ëœ ì‹œê°„(100ë‚˜ë…¸ì´ˆ ë‹¨ìœ„ í‹±)ì„ ë”í•©ë‹ˆë‹¤.
+// @param stime ì—°ì‚° ëŒ€ìƒ SYSTEMTIME ì°¸ì¡°
+// @param nAddTime ë”í•  ì‹œê°„ ê°’ (100ë‚˜ë…¸ì´ˆ ë‹¨ìœ„)
 //***************************************************************************
 void TIME::IncreaseSystemTime(SYSTEMTIME& stime, __int64 nAddTime)
 {

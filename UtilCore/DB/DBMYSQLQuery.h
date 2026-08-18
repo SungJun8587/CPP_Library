@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // DBMYSQLQuery.h : implementation for the System SQL.
 //
@@ -10,7 +10,7 @@
 #pragma once
 
 //***************************************************************************
-// MYSQL ÀÎµ¦½ºÅ¸ÀÔ : (CASE INFORMATION_SCHEMA.TABLE_CONSTRAINTS.`CONSTRAINT_TYPE` WHEN 'PRIMARY KEY' THEN 1 WHEN 'UNIQUE' THEN 2 ELSE (CASE INFORMATION_SCHEMA.STATISTICS.`INDEX_TYPE` WHEN 'BTREE' THEN 3 WHEN 'FULLTEXT' THEN 4 WHEN 'SPATIAL' THEN 5 ELSE 0 END) END)
+// MYSQL ì¸ë±ìŠ¤íƒ€ìž… : (CASE INFORMATION_SCHEMA.TABLE_CONSTRAINTS.`CONSTRAINT_TYPE` WHEN 'PRIMARY KEY' THEN 1 WHEN 'UNIQUE' THEN 2 ELSE (CASE INFORMATION_SCHEMA.STATISTICS.`INDEX_TYPE` WHEN 'BTREE' THEN 3 WHEN 'FULLTEXT' THEN 4 WHEN 'SPATIAL' THEN 5 ELSE 0 END) END)
 enum class EMYSQLIndexType
 {
 	NONE = 0,
@@ -52,73 +52,73 @@ inline const EMYSQLIndexType StringToMYSQLIndexType(const TCHAR* ptszIndexType)
 }
 
 //***************************************************************************
-// MYSQL Ä³¸¯ÅÍ¼Â
+// MYSQL ìºë¦­í„°ì…‹
 class MYSQL_CHARACTER_SET
 {
 public:
-	TCHAR tszCharacterSet[DATABASE_CHARACTERSET_STRLEN] = { 0, };			// Ä³¸¯ÅÍ¼Â
-	TCHAR tszDefaultCollation[DATABASE_CHARACTERSET_STRLEN] = { 0, };		// ±âº» µ¥ÀÌÅÍ Á¤·Ä(¹®ÀÚºñ±³±ÔÄ¢)
-	TCHAR tszDescription[DATABASE_WVARCHAR_MAX] = { 0, };					// ¼³¸í
-	int32 MaxLen;															// ÇÑ ¹®ÀÚ¸¦ ÀúÀåÇÏ´Â µ¥ ÇÊ¿äÇÑ ÃÖ´ë ¹ÙÀÌÆ® ¼ö
+	TCHAR tszCharacterSet[DATABASE_CHARACTERSET_STRLEN] = { 0, };			// ìºë¦­í„°ì…‹
+	TCHAR tszDefaultCollation[DATABASE_CHARACTERSET_STRLEN] = { 0, };		// ê¸°ë³¸ ë°ì´í„° ì •ë ¬(ë¬¸ìžë¹„êµê·œì¹™)
+	TCHAR tszDescription[DATABASE_WVARCHAR_MAX] = { 0, };					// ì„¤ëª…
+	int32 MaxLen;															// í•œ ë¬¸ìžë¥¼ ì €ìž¥í•˜ëŠ” ë° í•„ìš”í•œ ìµœëŒ€ ë°”ì´íŠ¸ ìˆ˜
 };
 
 //***************************************************************************
-// MYSQL µ¥ÀÌÅÍ Á¤·Ä(¹®ÀÚºñ±³±ÔÄ¢)
+// MYSQL ë°ì´í„° ì •ë ¬(ë¬¸ìžë¹„êµê·œì¹™)
 class MYSQL_COLLATION
 {
 public:
-	TCHAR tszCharacterSet[DATABASE_CHARACTERSET_STRLEN] = { 0, };			// Ä³¸¯ÅÍ¼Â
-	TCHAR tszCollation[DATABASE_CHARACTERSET_STRLEN] = { 0, };				// µ¥ÀÌÅÍ Á¤·Ä(¹®ÀÚºñ±³±ÔÄ¢)
-	int64 Id;																// µ¥ÀÌÅÍ Á¤·Ä ID
-	TCHAR tszIsCompiled[5] = { 0, };										// ¹®ÀÚ ÁýÇÕÀÌ ¼­¹ö¿¡ ÄÄÆÄÀÏµÇ´ÂÁö ¿©ºÎ
-	TCHAR tszIsDefault[5] = { 0, };											// µ¥ÀÌÅÍ Á¤·ÄÀÌ ÇØ´ç ¹®ÀÚ ÁýÇÕÀÇ ±âº»°ªÀÎÁö ¿©ºÎ
+	TCHAR tszCharacterSet[DATABASE_CHARACTERSET_STRLEN] = { 0, };			// ìºë¦­í„°ì…‹
+	TCHAR tszCollation[DATABASE_CHARACTERSET_STRLEN] = { 0, };				// ë°ì´í„° ì •ë ¬(ë¬¸ìžë¹„êµê·œì¹™)
+	int64 Id;																// ë°ì´í„° ì •ë ¬ ID
+	TCHAR tszIsCompiled[5] = { 0, };										// ë¬¸ìž ì§‘í•©ì´ ì„œë²„ì— ì»´íŒŒì¼ë˜ëŠ”ì§€ ì—¬ë¶€
+	TCHAR tszIsDefault[5] = { 0, };											// ë°ì´í„° ì •ë ¬ì´ í•´ë‹¹ ë¬¸ìž ì§‘í•©ì˜ ê¸°ë³¸ê°’ì¸ì§€ ì—¬ë¶€
 	TCHAR tszPadAttribute[10] = { 0, };										// ENUM('PAD SPACE','NO PAD')
-	int32 SortLen;															// ¹®ÀÚ ÁýÇÕ¿¡ Ç¥ÇöµÈ ¹®ÀÚ¿­À» Á¤·ÄÇÏ´Â µ¥ ÇÊ¿äÇÑ ¸Þ¸ð¸® ¾ç
+	int32 SortLen;															// ë¬¸ìž ì§‘í•©ì— í‘œí˜„ëœ ë¬¸ìžì—´ì„ ì •ë ¬í•˜ëŠ” ë° í•„ìš”í•œ ë©”ëª¨ë¦¬ ì–‘
 };
 
 //***************************************************************************
-// MYSQL Ä³¸¯ÅÍ¼Â°ú ¹®ÀÚºñ±³±ÔÄ¢ ¿¬°á Á¤º¸
+// MYSQL ìºë¦­í„°ì…‹ê³¼ ë¬¸ìžë¹„êµê·œì¹™ ì—°ê²° ì •ë³´
 class MYSQL_CHARACTER_SET_COLLATION
 {
 public:
-	TCHAR tszCharacterSet[DATABASE_CHARACTERSET_STRLEN] = { 0, };			// Ä³¸¯ÅÍ¼Â
-	TCHAR tszCollation[DATABASE_CHARACTERSET_STRLEN] = { 0, };				// µ¥ÀÌÅÍ Á¤·Ä(¹®ÀÚºñ±³±ÔÄ¢)
+	TCHAR tszCharacterSet[DATABASE_CHARACTERSET_STRLEN] = { 0, };			// ìºë¦­í„°ì…‹
+	TCHAR tszCollation[DATABASE_CHARACTERSET_STRLEN] = { 0, };				// ë°ì´í„° ì •ë ¬(ë¬¸ìžë¹„êµê·œì¹™)
 };
 
 //***************************************************************************
-// MYSQL ½ºÅä¸®Áö ¿£Áø Á¤º¸
+// MYSQL ìŠ¤í† ë¦¬ì§€ ì—”ì§„ ì •ë³´
 class MYSQL_STORAGE_ENGINE
 {
 public:
-	TCHAR tszEngine[20] = { 0, };											// ½ºÅä¸®Áö ¿£Áø ¸í
+	TCHAR tszEngine[20] = { 0, };											// ìŠ¤í† ë¦¬ì§€ ì—”ì§„ ëª…
 
-	// ½ºÅä¸®Áö ¿£Áø¿¡ ´ëÇÑ ¼­¹öÀÇ Áö¿ø ¼öÁØ
-	// - YES : ¿£ÁøÀÌ Áö¿øµÇ°í È°¼º »óÅÂ
-	// - DEFAULT : YES¿Í ¸¶Âù°¡Áö·Î, ±×¸®°í ÀÌ°ÍÀº ±âº» ¿£Áø
-	// - NO : ¿£ÁøÀÌ Áö¿øµÇÁö ¾ÊÀ½
-	// - DISABLED : ¿£ÁøÀÌ Áö¿øµÇÁö¸¸ ºñÈ°¼º »óÅÂ	
+	// ìŠ¤í† ë¦¬ì§€ ì—”ì§„ì— ëŒ€í•œ ì„œë²„ì˜ ì§€ì› ìˆ˜ì¤€
+	// - YES : ì—”ì§„ì´ ì§€ì›ë˜ê³  í™œì„± ìƒíƒœ
+	// - DEFAULT : YESì™€ ë§ˆì°¬ê°€ì§€ë¡œ, ê·¸ë¦¬ê³  ì´ê²ƒì€ ê¸°ë³¸ ì—”ì§„
+	// - NO : ì—”ì§„ì´ ì§€ì›ë˜ì§€ ì•ŠìŒ
+	// - DISABLED : ì—”ì§„ì´ ì§€ì›ë˜ì§€ë§Œ ë¹„í™œì„± ìƒíƒœ	
 	TCHAR tszSupport[20] = { 0, };
 
-	TCHAR tszComment[DATABASE_WVARCHAR_MAX] = { 0, };						// ¼³¸í
-	TCHAR tszTransactions[5] = { 0, };										// ½ºÅä¸®Áö ¿£ÁøÀÌ Æ®·£Àè¼ÇÀ» Áö¿øÇÏ´ÂÁö ¿©ºÎ
-	TCHAR tszXA[5] = { 0, };												// ½ºÅä¸®Áö ¿£ÁøÀÌ XA Æ®·£Àè¼ÇÀ» Áö¿øÇÏ´ÂÁö ¿©ºÎ
-	TCHAR tszSavepoints[5] = { 0, };										// ½ºÅä¸®Áö ¿£ÁøÀÌ ÀúÀåÁ¡À» Áö¿øÇÏ´ÂÁö ¿©ºÎ
+	TCHAR tszComment[DATABASE_WVARCHAR_MAX] = { 0, };						// ì„¤ëª…
+	TCHAR tszTransactions[5] = { 0, };										// ìŠ¤í† ë¦¬ì§€ ì—”ì§„ì´ íŠ¸ëžœìž­ì…˜ì„ ì§€ì›í•˜ëŠ”ì§€ ì—¬ë¶€
+	TCHAR tszXA[5] = { 0, };												// ìŠ¤í† ë¦¬ì§€ ì—”ì§„ì´ XA íŠ¸ëžœìž­ì…˜ì„ ì§€ì›í•˜ëŠ”ì§€ ì—¬ë¶€
+	TCHAR tszSavepoints[5] = { 0, };										// ìŠ¤í† ë¦¬ì§€ ì—”ì§„ì´ ì €ìž¥ì ì„ ì§€ì›í•˜ëŠ”ì§€ ì—¬ë¶€
 };
 
 //***************************************************************************
-// MYSQL Å×ÀÌºí Á¶°¢È­ Á¤º¸
+// MYSQL í…Œì´ë¸” ì¡°ê°í™” ì •ë³´
 class MYSQL_TABLE_FRAGMENTATION
 {
 public:
-	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN] = { 0, };				// Å×ÀÌºí ¸í
+	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN] = { 0, };				// í…Œì´ë¸” ëª…
 
-	// ÀüÃ¼ Å©±â
+	// ì „ì²´ í¬ê¸°
 	// - DATA_LENGTH + INDEX_LENGTH
-	// - DATA_LENGTH : MyISAMÀÇ °æ¿ì µ¥ÀÌÅÍ ÆÄÀÏÀÇ ±æÀÌ(¹ÙÀÌÆ®), InnoDBÀÇ °æ¿ì Å¬·¯½ºÅÍÇü ÀÎµ¦½º¿¡ ÇÒ´çµÈ ´ë·«ÀûÀÎ °ø°£ÀÇ ¾ç(¹ÙÀÌÆ®)
-	// - INDEX_LENGTH : MyISAMÀÇ °æ¿ì INDEX_LENGTH ÀÎµ¦½º ÆÄÀÏÀÇ ±æÀÌ(¹ÙÀÌÆ®), InnoDBÀÇ °æ¿ì INDEX_LENGTH Å¬·¯½ºÅÍ µÇÁö ¾ÊÀº ÀÎµ¦½º¿¡ ÇÒ´çµÈ ´ë·«ÀûÀÎ °ø°£ÀÇ ¾ç(¹ÙÀÌÆ®)
+	// - DATA_LENGTH : MyISAMì˜ ê²½ìš° ë°ì´í„° íŒŒì¼ì˜ ê¸¸ì´(ë°”ì´íŠ¸), InnoDBì˜ ê²½ìš° í´ëŸ¬ìŠ¤í„°í˜• ì¸ë±ìŠ¤ì— í• ë‹¹ëœ ëŒ€ëžµì ì¸ ê³µê°„ì˜ ì–‘(ë°”ì´íŠ¸)
+	// - INDEX_LENGTH : MyISAMì˜ ê²½ìš° INDEX_LENGTH ì¸ë±ìŠ¤ íŒŒì¼ì˜ ê¸¸ì´(ë°”ì´íŠ¸), InnoDBì˜ ê²½ìš° INDEX_LENGTH í´ëŸ¬ìŠ¤í„° ë˜ì§€ ì•Šì€ ì¸ë±ìŠ¤ì— í• ë‹¹ëœ ëŒ€ëžµì ì¸ ê³µê°„ì˜ ì–‘(ë°”ì´íŠ¸)
 	uint64  TotalSize;
 
-	// Å×ÀÌºí¿¡ ÇÒ´çµÇ¾úÁö¸¸ »ç¿ëµÇÁö ¾ÊÀº ¹ÙÀÌÆ® ¼ö
+	// í…Œì´ë¸”ì— í• ë‹¹ë˜ì—ˆì§€ë§Œ ì‚¬ìš©ë˜ì§€ ì•Šì€ ë°”ì´íŠ¸ ìˆ˜
 	uint64 DataFreeSize;
 };
 
@@ -128,17 +128,17 @@ inline _tstring MYSQLGetTableColumnOption(_tstring dataTypeDesc, bool isNullable
 {
 	_tstring columnOption = _T("");
 
-	// <ÄÃ·³¼Ó¼º> : CHARACTER SET, COLLATE, {NULL|NOT NULL}, DEFAULT, AUTO_INCREMENT, COMMENT ¼³Á¤ÀÌ Æ÷ÇÔµÊ
-	//  - ¸¸¾à ÄÃ·³ ¼Ó¼º¿¡ Æ÷ÇÔµÈ ¼³Á¤ °ªÀ» º¯°æÇÒ °æ¿ì ¾Æ·¡¿Í °°Àº ¼ø¼­·Î ³ª¿­ÇØ¼­ º¯°æÇÏ¸é µÊ
-	//  - ¸¸¾à Ä³¸¯ÅÍ¼Â, µ¥ÀÌÅÍÁ¤·Ä °ªÀÌ ÇØ´ç µ¥ÀÌÅÍº£ÀÌ½º¿¡ ¼³Á¤µÈ Ä³¸¯ÅÍ¼Â, µ¥ÀÌÅÍÁ¤·Ä °ª°ú µ¿ÀÏÇÑ °æ¿ì µû·Î ¸í½ÃÇÏÁö ¾Ê¾Æµµ µÊ
-	//  - CHARACTER SET 'Ä³¸¯ÅÍ¼Â' COLLATE 'µ¥ÀÌÅÍÁ¤·Ä' {NULL|NOT NULL} DEFAULT °ª AUTO_INCREMENT COMMENT 'ÄÚ¸àÆ®'
+	// <ì»¬ëŸ¼ì†ì„±> : CHARACTER SET, COLLATE, {NULL|NOT NULL}, DEFAULT, AUTO_INCREMENT, COMMENT ì„¤ì •ì´ í¬í•¨ë¨
+	//  - ë§Œì•½ ì»¬ëŸ¼ ì†ì„±ì— í¬í•¨ëœ ì„¤ì • ê°’ì„ ë³€ê²½í•  ê²½ìš° ì•„ëž˜ì™€ ê°™ì€ ìˆœì„œë¡œ ë‚˜ì—´í•´ì„œ ë³€ê²½í•˜ë©´ ë¨
+	//  - ë§Œì•½ ìºë¦­í„°ì…‹, ë°ì´í„°ì •ë ¬ ê°’ì´ í•´ë‹¹ ë°ì´í„°ë² ì´ìŠ¤ì— ì„¤ì •ëœ ìºë¦­í„°ì…‹, ë°ì´í„°ì •ë ¬ ê°’ê³¼ ë™ì¼í•œ ê²½ìš° ë”°ë¡œ ëª…ì‹œí•˜ì§€ ì•Šì•„ë„ ë¨
+	//  - CHARACTER SET 'ìºë¦­í„°ì…‹' COLLATE 'ë°ì´í„°ì •ë ¬' {NULL|NOT NULL} DEFAULT ê°’ AUTO_INCREMENT COMMENT 'ì½”ë©˜íŠ¸'
 	//
-	// `ÄÃ·³¸í` µ¥ÀÌÅÍÅ¸ÀÔ <ÄÃ·³¼Ó¼º>
-	//  - `ÄÃ·³¸í` µ¥ÀÌÅÍÅ¸ÀÔ NOT NULL AUTO_INCREMENT COMMENT 'ÄÚ¸àÆ®'
-	//  - `ÄÃ·³¸í` µ¥ÀÌÅÍÅ¸ÀÔ {NULL|NOT NULL}
-	//  - `ÄÃ·³¸í` µ¥ÀÌÅÍÅ¸ÀÔ {NULL|NOT NULL} DEFAULT °ª COMMENT 'ÄÚ¸àÆ®'
-	//  - `ÄÃ·³¸í` µ¥ÀÌÅÍÅ¸ÀÔ CHARACTER SET 'Ä³¸¯ÅÍ¼Â' COLLATE 'µ¥ÀÌÅÍÁ¤·Ä' {NULL|NOT NULL} COMMENT 'ÄÚ¸àÆ®'
-	//  - `ÄÃ·³¸í` µ¥ÀÌÅÍÅ¸ÀÔ {NULL|NOT NULL} COMMENT 'ÄÚ¸àÆ®'
+	// `ì»¬ëŸ¼ëª…` ë°ì´í„°íƒ€ìž… <ì»¬ëŸ¼ì†ì„±>
+	//  - `ì»¬ëŸ¼ëª…` ë°ì´í„°íƒ€ìž… NOT NULL AUTO_INCREMENT COMMENT 'ì½”ë©˜íŠ¸'
+	//  - `ì»¬ëŸ¼ëª…` ë°ì´í„°íƒ€ìž… {NULL|NOT NULL}
+	//  - `ì»¬ëŸ¼ëª…` ë°ì´í„°íƒ€ìž… {NULL|NOT NULL} DEFAULT ê°’ COMMENT 'ì½”ë©˜íŠ¸'
+	//  - `ì»¬ëŸ¼ëª…` ë°ì´í„°íƒ€ìž… CHARACTER SET 'ìºë¦­í„°ì…‹' COLLATE 'ë°ì´í„°ì •ë ¬' {NULL|NOT NULL} COMMENT 'ì½”ë©˜íŠ¸'
+	//  - `ì»¬ëŸ¼ëª…` ë°ì´í„°íƒ€ìž… {NULL|NOT NULL} COMMENT 'ì½”ë©˜íŠ¸'
 	columnOption = dataTypeDesc;
 	if( characterSet != "" && collation != "" )
 		columnOption = columnOption + " CHARACTER SET '" + characterSet + "' COLLATE '" + collation + "'";
@@ -159,22 +159,22 @@ inline _tstring MYSQLGetDropConstraintQuery(_tstring tableName, _tstring constTy
 
 	if( constType == "PRIMARY KEY" )
 	{
-		// ALTER TABLE `Å×ÀÌºí¸í` DROP PRIMARY KEY;
+		// ALTER TABLE `í…Œì´ë¸”ëª…` DROP PRIMARY KEY;
 		query = tstring_tcformat(_T("ALTER TABLE `%s` DROP PRIMARY KEY;"), tableName.c_str());
 	}
 	else if( constType == "UNIQUE" )
 	{
-		// ALTER TABLE `Å×ÀÌºí¸í` DROP INDEX `Á¦¾àÁ¶°Ç¸í`;
+		// ALTER TABLE `í…Œì´ë¸”ëª…` DROP INDEX `ì œì•½ì¡°ê±´ëª…`;
 		query = tstring_tcformat(_T("ALTER TABLE `%s` DROP INDEX `%s`;"), tableName.c_str(), constName.c_str());
 	}
 	else if( constType == "FOREIGN KEY" )
 	{
-		// ALTER TABLE `Å×ÀÌºí¸í` DROP FOREIGN KEY `Á¦¾àÁ¶°Ç¸í`;
+		// ALTER TABLE `í…Œì´ë¸”ëª…` DROP FOREIGN KEY `ì œì•½ì¡°ê±´ëª…`;
 		query = tstring_tcformat(_T("ALTER TABLE `%s` DROP CONSTRAINT `%s`;"), tableName.c_str(), constName.c_str());
 	}
 	else if( constType == "CHECK" )
 	{
-		// ALTER TABLE `Å×ÀÌºí¸í` DROP CHECK `Á¦¾àÁ¶°Ç¸í`;
+		// ALTER TABLE `í…Œì´ë¸”ëª…` DROP CHECK `ì œì•½ì¡°ê±´ëª…`;
 		query = tstring_tcformat(_T("ALTER TABLE `%s` DROP CHECK `%s`;"), tableName.c_str(), constName.c_str());
 	}
 	return query;
@@ -216,13 +216,13 @@ inline _tstring MYSQLGetDatabaseListQuery()
 //
 inline _tstring MYSQLGetDatabaseBackupQuery(_tstring loginPath, _tstring dbName, _tstring backupFilePath, _tstring defaultCharacterSet = _T(""), bool isNoData = false)
 {
-	// mysqldump -h [¿ø°ÝÈ£½ºÆ®¸í(IP)] port=[¿¬°áÆ÷Æ®] -u [»ç¿ëÀÚ °èÁ¤] -p [ÆÐ½º¿öµå] [µ¥ÀÌÅÍº£ÀÌ½º¸í] > [¹é¾÷ ÆÄÀÏ °æ·Î]
-	// --login-path : mysql_config_editor¸¦ ÀÌ¿ëÇÏ¿© MySQL ¼­¹ö ¿¬°á¿¡ ´ëÇÑ ÀÚ°Ý Á¤º¸(login-path ÀÌ¸§, user, password, host, port, socket Á¤º¸°¡ ³­µ¶È­µÇ¾î µé¾îÀÖÀ½)¸¦ ÀúÀå
-	// --set-gtid-purged=OFF : GTID(Global Transaction Identifier) È°¼ºÈ­ ¿©ºÎ ¼³Á¤(GTID¸¦ »ç¿ëÇÏÁö ¾Ê´Â MySQL DB¸¦ º¹±¸ÇÏ·Á¸é ¹é¾÷ ¼öÇà ½Ã --set-gtid-purged=OFF ¿É¼ÇÀ» Ãß°¡).
-	// --single-transaction : lock À» °ÉÁö ¾Ê°íµµ dump ÆÄÀÏÀÇ Á¤ÇÕ¼º º¸Àå. InnoDB ÀÏ¶§¸¸ »ç¿ë °¡´É.
-	// --no-tablespaces : ÇØ´ç ¿É¼ÇÀ» ÁÙ °æ¿ì CREATE LOGFILE GROUP°ú CREATE TABLESPACE¹®À» »ý¼ºÇÏÁö ¾ÊÀ½
-	// --default-character-set=utf8mb4 : ±âº» ¹®ÀÚ ÁýÇÕÀ» utf8mb4·Î ÁöÁ¤
-	// --no-data : µ¥ÀÌÅÍ¸¦ ¹é¾÷ÇÏÁö ¾Ê°í, DDL¸¸ ¹é¾÷
+	// mysqldump -h [ì›ê²©í˜¸ìŠ¤íŠ¸ëª…(IP)] port=[ì—°ê²°í¬íŠ¸] -u [ì‚¬ìš©ìž ê³„ì •] -p [íŒ¨ìŠ¤ì›Œë“œ] [ë°ì´í„°ë² ì´ìŠ¤ëª…] > [ë°±ì—… íŒŒì¼ ê²½ë¡œ]
+	// --login-path : mysql_config_editorë¥¼ ì´ìš©í•˜ì—¬ MySQL ì„œë²„ ì—°ê²°ì— ëŒ€í•œ ìžê²© ì •ë³´(login-path ì´ë¦„, user, password, host, port, socket ì •ë³´ê°€ ë‚œë…í™”ë˜ì–´ ë“¤ì–´ìžˆìŒ)ë¥¼ ì €ìž¥
+	// --set-gtid-purged=OFF : GTID(Global Transaction Identifier) í™œì„±í™” ì—¬ë¶€ ì„¤ì •(GTIDë¥¼ ì‚¬ìš©í•˜ì§€ ì•ŠëŠ” MySQL DBë¥¼ ë³µêµ¬í•˜ë ¤ë©´ ë°±ì—… ìˆ˜í–‰ ì‹œ --set-gtid-purged=OFF ì˜µì…˜ì„ ì¶”ê°€).
+	// --single-transaction : lock ì„ ê±¸ì§€ ì•Šê³ ë„ dump íŒŒì¼ì˜ ì •í•©ì„± ë³´ìž¥. InnoDB ì¼ë•Œë§Œ ì‚¬ìš© ê°€ëŠ¥.
+	// --no-tablespaces : í•´ë‹¹ ì˜µì…˜ì„ ì¤„ ê²½ìš° CREATE LOGFILE GROUPê³¼ CREATE TABLESPACEë¬¸ì„ ìƒì„±í•˜ì§€ ì•ŠìŒ
+	// --default-character-set=utf8mb4 : ê¸°ë³¸ ë¬¸ìž ì§‘í•©ì„ utf8mb4ë¡œ ì§€ì •
+	// --no-data : ë°ì´í„°ë¥¼ ë°±ì—…í•˜ì§€ ì•Šê³ , DDLë§Œ ë°±ì—…
 	_tstring query = tstring_tcformat(_T("mysqldump --login-path=%s %s --routines --events --single-transaction --set-gtid-purged=OFF --no-tablespaces%s%s > %s"),
 		loginPath.c_str(),
 		dbName.c_str(),
@@ -236,8 +236,8 @@ inline _tstring MYSQLGetDatabaseBackupQuery(_tstring loginPath, _tstring dbName,
 //
 inline _tstring MYSQLGetDatabaseRestoreQuery(_tstring loginPath, _tstring dbName, _tstring restoreFilePath)
 {
-	// mysql -h [¿ø°ÝÈ£½ºÆ®¸í(IP)] port=[¿¬°áÆ÷Æ®] -u [»ç¿ëÀÚ °èÁ¤] -p [ÆÐ½º¿öµå] [µ¥ÀÌÅÍº£ÀÌ½º¸í] < [º¹¿øÇÒ ÆÄÀÏ °æ·Î]
-	// --login-path : mysql_config_editor¸¦ ÀÌ¿ëÇÏ¿© MySQL ¼­¹ö ¿¬°á¿¡ ´ëÇÑ ÀÚ°Ý Á¤º¸(login-path ÀÌ¸§, user, password, host, port, socket Á¤º¸°¡ ³­µ¶È­µÇ¾î µé¾îÀÖÀ½)¸¦ ÀúÀå
+	// mysql -h [ì›ê²©í˜¸ìŠ¤íŠ¸ëª…(IP)] port=[ì—°ê²°í¬íŠ¸] -u [ì‚¬ìš©ìž ê³„ì •] -p [íŒ¨ìŠ¤ì›Œë“œ] [ë°ì´í„°ë² ì´ìŠ¤ëª…] < [ë³µì›í•  íŒŒì¼ ê²½ë¡œ]
+	// --login-path : mysql_config_editorë¥¼ ì´ìš©í•˜ì—¬ MySQL ì„œë²„ ì—°ê²°ì— ëŒ€í•œ ìžê²© ì •ë³´(login-path ì´ë¦„, user, password, host, port, socket ì •ë³´ê°€ ë‚œë…í™”ë˜ì–´ ë“¤ì–´ìžˆìŒ)ë¥¼ ì €ìž¥
 	_tstring query = tstring_tcformat(_T("mysql --login-path=%s %s < %s"), loginPath.c_str(), dbName.c_str(), restoreFilePath.c_str());
 	return query;
 }
@@ -358,8 +358,8 @@ inline _tstring MYSQLGetAlterTableQuery(_tstring tableName, _tstring characterSe
 {
 	_tstring query = _T("");
 
-	// Å×ÀÌºí Ä³¸¯ÅÍ¼Â, µ¥ÀÌÅÍÁ¤·Ä(¹®ÀÚºñ±³±ÔÄ¢), ½ºÅä¸®Áö¿£Áø º¯°æ
-	// ALTER TABLE `Å×ÀÌºí¸í` CHARACTER SET = Ä³¸¯ÅÍ¼Â, COLLATE = µ¥ÀÌÅÍÁ¤·Ä, ENGINE = ½ºÅä¸®Áö¿£Áø;
+	// í…Œì´ë¸” ìºë¦­í„°ì…‹, ë°ì´í„°ì •ë ¬(ë¬¸ìžë¹„êµê·œì¹™), ìŠ¤í† ë¦¬ì§€ì—”ì§„ ë³€ê²½
+	// ALTER TABLE `í…Œì´ë¸”ëª…` CHARACTER SET = ìºë¦­í„°ì…‹, COLLATE = ë°ì´í„°ì •ë ¬, ENGINE = ìŠ¤í† ë¦¬ì§€ì—”ì§„;
 	query = query + "ALTER TABLE `" + tableName + "`";
 
 	if( characterSet != "" )
@@ -381,8 +381,8 @@ inline _tstring MYSQLGetAlterTableCollationQuery(_tstring tableName, _tstring ch
 {
 	_tstring query = _T("");
 
-	// Å×ÀÌºí Ä³¸¯ÅÍ¼Â, µ¥ÀÌÅÍÁ¤·Ä(¹®ÀÚºñ±³±ÔÄ¢)À» º¯°æ
-	// ALTER TABLE `Å×ÀÌºí¸í` CONVERT TO CHARACTER SET Ä³¸¯ÅÍ¼Â COLLATE µ¥ÀÌÅÍÁ¤·Ä;
+	// í…Œì´ë¸” ìºë¦­í„°ì…‹, ë°ì´í„°ì •ë ¬(ë¬¸ìžë¹„êµê·œì¹™)ì„ ë³€ê²½
+	// ALTER TABLE `í…Œì´ë¸”ëª…` CONVERT TO CHARACTER SET ìºë¦­í„°ì…‹ COLLATE ë°ì´í„°ì •ë ¬;
 	query = query + "ALTER TABLE `" + tableName + "` CONVERT TO CHARACTER SET " + characterSet + " COLLATE " + collation + ";";
 	return query;
 }
@@ -393,13 +393,13 @@ inline _tstring MYSQLGetTableFragmentationCheckQuery(_tstring tableName = _T("")
 {
 	_tstring query = _T("");
 
-	// Å×ÀÌºí ´ÜÆíÈ­(Fragmentation) È®ÀÎ
-	// [¹ß»ý ¿øÀÎ]
-	//  - fragmentationÀÌ¶õ INSERT & DELETE°¡ ¼öÂ÷·Ê ¹Ýº¹µÇ¸é¼­ Page ¾È¿¡ È¸¼ö°¡ ¾ÈµÇ´Â(»ç¿ëµÇÁö ¾Ê´Â) ºÎºÐÀÌ ¸¹¾ÆÁö¸é¼­ ¹ß»ýÇÏ°Ô µÇ´Âµ¥
-	//    ±× ¿µÇâÀ¸·Î Å×ÀÌºíÀÌ ½ÇÁ¦·Î °¡Á®¾ß ÇÏ´Â OS °ø°£ º¸´Ù ´õ ¸¹Àº °ø°£À» Â÷ÁöÇÏ°Ô µÊ.
-	// [È®ÀÎ ¹æ¹ý]
-	//  - OS ¼­¹ö¿¡¼­ ÇØ´ç Å×ÀÌºí¿¡ ibd ÆÄÀÏ°ú ¾Æ·¡ Äõ¸®¿¡ totalÀÇ »çÀÌÁî¸¦ ºñ±³ÇÏ¿© °£±Ø ¸¸Å­À» ´ÜÆíÈ­(Fragmentation)·Î ÆÇ´ÜÇÒ ¼ö ÀÖ°í,
-	//    ÀÌ °æ¿ì¿¡ Å×ÀÌºí ÃÖÀûÈ­(OPTIMIZE TABLE)¸¦ ¼öÇàÇØ¼­ ¼º´É Çâ»ó
+	// í…Œì´ë¸” ë‹¨íŽ¸í™”(Fragmentation) í™•ì¸
+	// [ë°œìƒ ì›ì¸]
+	//  - fragmentationì´ëž€ INSERT & DELETEê°€ ìˆ˜ì°¨ë¡€ ë°˜ë³µë˜ë©´ì„œ Page ì•ˆì— íšŒìˆ˜ê°€ ì•ˆë˜ëŠ”(ì‚¬ìš©ë˜ì§€ ì•ŠëŠ”) ë¶€ë¶„ì´ ë§Žì•„ì§€ë©´ì„œ ë°œìƒí•˜ê²Œ ë˜ëŠ”ë°
+	//    ê·¸ ì˜í–¥ìœ¼ë¡œ í…Œì´ë¸”ì´ ì‹¤ì œë¡œ ê°€ì ¸ì•¼ í•˜ëŠ” OS ê³µê°„ ë³´ë‹¤ ë” ë§Žì€ ê³µê°„ì„ ì°¨ì§€í•˜ê²Œ ë¨.
+	// [í™•ì¸ ë°©ë²•]
+	//  - OS ì„œë²„ì—ì„œ í•´ë‹¹ í…Œì´ë¸”ì— ibd íŒŒì¼ê³¼ ì•„ëž˜ ì¿¼ë¦¬ì— totalì˜ ì‚¬ì´ì¦ˆë¥¼ ë¹„êµí•˜ì—¬ ê°„ê·¹ ë§Œí¼ì„ ë‹¨íŽ¸í™”(Fragmentation)ë¡œ íŒë‹¨í•  ìˆ˜ ìžˆê³ ,
+	//    ì´ ê²½ìš°ì— í…Œì´ë¸” ìµœì í™”(OPTIMIZE TABLE)ë¥¼ ìˆ˜í–‰í•´ì„œ ì„±ëŠ¥ í–¥ìƒ
 	query = query + "SELECT `TABLE_NAME` AS `table_name`, ";
 	query = query + "ROUND((DATA_LENGTH + INDEX_LENGTH) / (1024 * 1024), 2) AS `totalsize`, ";
 	query = query + "ROUND((DATA_FREE) / (1024 * 1024 ), 2) AS `datafreesize`";
@@ -421,11 +421,11 @@ inline _tstring MYSQLGetTableFragmentationCheckQuery(_tstring tableName = _T("")
 //
 inline _tstring MYSQLGetOptimizeTableQuery(_tstring tableName)
 {
-	// OPTIMIZE TABLE `Å×ÀÌºí¸í`
-	// MYSQLÀº ÀÎµ¦½º ¸®ºôµå°¡ Á¸ÀçÇÏÁö ¾Ê°í, Å×ÀÌºí ÃÖÀûÈ­(OPTIMIZE TABLE)¸¦ ÁøÇàÇØ¾ß ÇÔ. 
-	// OPTIMIZE [NO_WRITE_TO_BINLOG | LOCAL] TABLE Å×ÀÌºí¸í [, Å×ÀÌºí¸í] ...
-	// ±âº»ÀûÀ¸·Î ¼­¹ö´Â OPTIMIZE TABLE º¹Á¦º»¿¡ º¹Á¦µÇµµ·Ï ¹ÙÀÌ³Ê¸® ·Î±×¿¡ ¸í·É¹®À» ±â·Ï
-	//  - ·Î±ëÀ» ¾ïÁ¦ÇÏ·Á¸é ¼±ÅÃÀû NO_WRITE_TO_BINLOG Å°¿öµå ¶Ç´Â º°Äª LOCAL Å°¿öµå ÁöÁ¤
+	// OPTIMIZE TABLE `í…Œì´ë¸”ëª…`
+	// MYSQLì€ ì¸ë±ìŠ¤ ë¦¬ë¹Œë“œê°€ ì¡´ìž¬í•˜ì§€ ì•Šê³ , í…Œì´ë¸” ìµœì í™”(OPTIMIZE TABLE)ë¥¼ ì§„í–‰í•´ì•¼ í•¨. 
+	// OPTIMIZE [NO_WRITE_TO_BINLOG | LOCAL] TABLE í…Œì´ë¸”ëª… [, í…Œì´ë¸”ëª…] ...
+	// ê¸°ë³¸ì ìœ¼ë¡œ ì„œë²„ëŠ” OPTIMIZE TABLE ë³µì œë³¸ì— ë³µì œë˜ë„ë¡ ë°”ì´ë„ˆë¦¬ ë¡œê·¸ì— ëª…ë ¹ë¬¸ì„ ê¸°ë¡
+	//  - ë¡œê¹…ì„ ì–µì œí•˜ë ¤ë©´ ì„ íƒì  NO_WRITE_TO_BINLOG í‚¤ì›Œë“œ ë˜ëŠ” ë³„ì¹­ LOCAL í‚¤ì›Œë“œ ì§€ì •
 	_tstring query = tstring_tcformat(_T("OPTIMIZE TABLE `%s`;"), tableName.c_str());
 	return query;
 }
@@ -465,12 +465,12 @@ inline _tstring MYSQLGetRenameObjectQuery(_tstring tableName, _tstring chgName, 
 
 	if( columnName != _T("") )
 	{
-		// ALTER TABLE `Å×ÀÌºí¸í` RENAME `º¯°æÇÒÅ×ÀÌºí¸í`;
+		// ALTER TABLE `í…Œì´ë¸”ëª…` RENAME `ë³€ê²½í• í…Œì´ë¸”ëª…`;
 		query = tstring_tcformat(_T("ALTER TABLE `%s` RENAME `%s`;"), tableName.c_str(), chgName.c_str());
 	}
 	else
 	{
-		// ALTER TABLE `Å×ÀÌºí¸í` CHANGE COLUMN `ÄÃ·³¸í` `º¯°æÇÒÄÃ·³¸í` µ¥ÀÌÅÍÅ¸ÀÔ ÄÃ·³¼Ó¼º;
+		// ALTER TABLE `í…Œì´ë¸”ëª…` CHANGE COLUMN `ì»¬ëŸ¼ëª…` `ë³€ê²½í• ì»¬ëŸ¼ëª…` ë°ì´í„°íƒ€ìž… ì»¬ëŸ¼ì†ì„±;
 		_tstring columnOption = MYSQLGetTableColumnOption(dataTypeDesc, isNullable, defaultDefinition, isIdentity, characterSet, collation, comment);
 		query = tstring_tcformat(_T("ALTER TABLE `%s` CHANGE COLUMN `%s` `%s` %s;"), tableName.c_str(), columnName.c_str(), chgName.c_str(), columnOption.c_str());
 	}
@@ -496,8 +496,8 @@ inline _tstring MYSQLGetTableColumnCommentQuery(_tstring tableName, _tstring col
 
 //***************************************************************************
 // Ex)
-//	ALTER TABLE `tbl_table1` COMMENT 'Å×½ºÆ® Å×ÀÌºí';
-//  ALTER TABLE `tbl_table1` MODIFY `Id` VARCHAR(50) NOT NULL COMMENT '¾ÆÀÌµð';
+//	ALTER TABLE `tbl_table1` COMMENT 'í…ŒìŠ¤íŠ¸ í…Œì´ë¸”';
+//  ALTER TABLE `tbl_table1` MODIFY `Id` VARCHAR(50) NOT NULL COMMENT 'ì•„ì´ë””';
 inline _tstring MYSQLProcessTableColumnCommentQuery(_tstring tableName, _tstring setComment, _tstring columnName = _T(""), _tstring dataTypeDesc = _T(""), bool isNullable = false, _tstring defaultDefinition = _T(""), bool isIdentity = false, _tstring characterSet = _T(""), _tstring collation = _T(""))
 {
 	_tstring query = _T("");
@@ -525,7 +525,7 @@ inline _tstring MYSQLGetProcedureCommentQuery(_tstring procName)
 
 //***************************************************************************
 // Ex)
-//	ALTER PROCEDURE `sp_procedure1` COMMENT 'Å×½ºÆ® ÀúÀåÇÁ·Î½ÃÀú';
+//	ALTER PROCEDURE `sp_procedure1` COMMENT 'í…ŒìŠ¤íŠ¸ ì €ìž¥í”„ë¡œì‹œì €';
 inline _tstring MYSQLProcessProcedureCommentQuery(_tstring procName, _tstring comment)
 {
 	_tstring query = _T("");
@@ -547,7 +547,7 @@ inline _tstring MYSQLGetFunctionCommentQuery(_tstring funcName)
 
 //***************************************************************************
 // Ex)
-//	ALTER FUNCTION `sp_function1` COMMENT 'Å×½ºÆ® ÇÔ¼ö';
+//	ALTER FUNCTION `sp_function1` COMMENT 'í…ŒìŠ¤íŠ¸ í•¨ìˆ˜';
 inline _tstring MYSQLProcessFunctionCommentQuery(_tstring funcName, _tstring comment)
 {
 	_tstring query = _T("");

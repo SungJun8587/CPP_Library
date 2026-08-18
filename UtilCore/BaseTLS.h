@@ -1,4 +1,4 @@
-
+﻿
 //***************************************************************************
 // This File include Information about extern thread_local variables.
 // 

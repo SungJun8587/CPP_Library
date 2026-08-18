@@ -1,4 +1,4 @@
-
+﻿
 //***************************************************************************
 // DateTimeUtil.h : interface for the DateTimeUtil Functions.
 //

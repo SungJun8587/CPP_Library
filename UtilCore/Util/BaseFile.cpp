@@ -1,4 +1,4 @@
-
+﻿
 //***************************************************************************
 // BaseFile.cpp : implementation of the CBaseFile class.
 //

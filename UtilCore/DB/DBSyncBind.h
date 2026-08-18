@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // DBSyncBind.h : implementation for the DBSync Bind.
 //
@@ -63,7 +63,7 @@ namespace SP
 		}
 		void Out_AutoIncrementValue(OUT uint64& value)
 		{
-			// ¿À¶óÅ¬ ODBC µå¶óÀÌ¹ö°¡ SQL_C_SBIGINT, SQL_C_UBIGINT Å¸ÀÔÀ» Áö¿øÇÏÁö ¾Ê¾Æ¼­ SQL_C_DOUBLE Å¸ÀÔÀ¸·Î ¿¹¿Ü Ã³¸®
+			// ì˜¤ë¼í´ ODBC ë“œë¼ì´ë²„ê°€ SQL_C_SBIGINT, SQL_C_UBIGINT íƒ€ì…ì„ ì§€ì›í•˜ì§€ ì•Šì•„ì„œ SQL_C_DOUBLE íƒ€ì…ìœ¼ë¡œ ì˜ˆì™¸ ì²˜ë¦¬
 			if( _dbClass == EDBClass::ORACLE ) 
 				BindCol(4, SQL_C_DOUBLE, value);
 			else BindCol(4, value);

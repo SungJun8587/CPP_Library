@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // DBQueryProcess.cpp: implementation of the Database Query Process.
 //
@@ -506,18 +506,18 @@ bool CDBQueryProcess::MSSQLProcessTableColumnComment(const TCHAR* ptszSchemaName
 	{
 		if( comment.c_str() != nullptr && comment.size() > 0 )
 		{
-			//	- EXEC sp_updateextendedproperty [¼Ó¼º¸í], [¼Ó¼º°ª], [level0type], [level0name], [level1type], [level1name], [level2type], [level2name]
+			//	- EXEC sp_updateextendedproperty [ì†ì„±ëª…], [ì†ì„±ê°’], [level0type], [level0name], [level1type], [level1name], [level2type], [level2name]
 			//		Ex)
-			//			- Å×ÀÌºí ÁÖ¼® ¼öÁ¤ : sp_updateextendedproperty 'MS_Description', 'Å×ÀÌºí ¼³¸í', 'SCHEMA', 'dbo', 'TABLE', 'Å×ÀÌºí¸í'
-			//			- ÄÃ·³ ÁÖ¼® ¼öÁ¤   : sp_updateextendedproperty 'MS_Description', 'ÄÃ·³ ¼³¸í', 'SCHEMA', 'dbo', 'TABLE', 'Å×ÀÌºí¸í', 'COLUMN' , 'ÄÃ·³¸í'
+			//			- í…Œì´ë¸” ì£¼ì„ ìˆ˜ì • : sp_updateextendedproperty 'MS_Description', 'í…Œì´ë¸” ì„¤ëª…', 'SCHEMA', 'dbo', 'TABLE', 'í…Œì´ë¸”ëª…'
+			//			- ì»¬ëŸ¼ ì£¼ì„ ìˆ˜ì •   : sp_updateextendedproperty 'MS_Description', 'ì»¬ëŸ¼ ì„¤ëª…', 'SCHEMA', 'dbo', 'TABLE', 'í…Œì´ë¸”ëª…', 'COLUMN' , 'ì»¬ëŸ¼ëª…'
 			return MSSQLUpdateExtendedProperty(extendedProperty);
 		}
 		else
 		{
-			//	- EXEC sp_addextendedproperty [¼Ó¼º¸í], [¼Ó¼º°ª], [level0type], [level0name], [level1type], [level1name], [level2type], [level2name]
+			//	- EXEC sp_addextendedproperty [ì†ì„±ëª…], [ì†ì„±ê°’], [level0type], [level0name], [level1type], [level1name], [level2type], [level2name]
 			//		Ex)
-			//			- Å×ÀÌºí ÁÖ¼® Ãß°¡ : sp_addextendedproperty 'MS_Description', 'Å×ÀÌºí ¼³¸í', 'SCHEMA', 'dbo', 'TABLE', 'Å×ÀÌºí¸í'
-			//			- ÄÃ·³ ÁÖ¼® Ãß°¡   : sp_addextendedproperty 'MS_Description', 'ÄÃ·³ ¼³¸í', 'SCHEMA', 'dbo', 'TABLE', 'Å×ÀÌºí¸í', 'COLUMN' , 'ÄÃ·³¸í'
+			//			- í…Œì´ë¸” ì£¼ì„ ì¶”ê°€ : sp_addextendedproperty 'MS_Description', 'í…Œì´ë¸” ì„¤ëª…', 'SCHEMA', 'dbo', 'TABLE', 'í…Œì´ë¸”ëª…'
+			//			- ì»¬ëŸ¼ ì£¼ì„ ì¶”ê°€   : sp_addextendedproperty 'MS_Description', 'ì»¬ëŸ¼ ì„¤ëª…', 'SCHEMA', 'dbo', 'TABLE', 'í…Œì´ë¸”ëª…', 'COLUMN' , 'ì»¬ëŸ¼ëª…'
 			return MSSQLAddExtendedProperty(extendedProperty);
 		}
 	}
@@ -525,10 +525,10 @@ bool CDBQueryProcess::MSSQLProcessTableColumnComment(const TCHAR* ptszSchemaName
 	{
 		if( comment.c_str() != nullptr && comment.size() > 0 )
 		{
-			//	- EXEC sp_dropextendedproperty [¼Ó¼º¸í], [level0type], [level0name], [level1type], [level1name], [level2type], [level2name]
+			//	- EXEC sp_dropextendedproperty [ì†ì„±ëª…], [level0type], [level0name], [level1type], [level1name], [level2type], [level2name]
 			//		Ex)
-			//			- Å×ÀÌºí ÁÖ¼® »èÁ¦ : sp_dropextendedproperty 'MS_Description', 'SCHEMA', 'dbo', 'TABLE', 'Å×ÀÌºí¸í'
-			//			- ÄÃ·³ ÁÖ¼® »èÁ¦   : sp_dropextendedproperty 'MS_Description', 'SCHEMA', 'dbo', 'TABLE', 'Å×ÀÌºí¸í', 'COLUMN' , 'ÄÃ·³¸í'
+			//			- í…Œì´ë¸” ì£¼ì„ ì‚­ì œ : sp_dropextendedproperty 'MS_Description', 'SCHEMA', 'dbo', 'TABLE', 'í…Œì´ë¸”ëª…'
+			//			- ì»¬ëŸ¼ ì£¼ì„ ì‚­ì œ   : sp_dropextendedproperty 'MS_Description', 'SCHEMA', 'dbo', 'TABLE', 'í…Œì´ë¸”ëª…', 'COLUMN' , 'ì»¬ëŸ¼ëª…'
 			return MSSQLDropExtendedProperty(extendedProperty);
 		}
 	}
@@ -591,18 +591,18 @@ bool CDBQueryProcess::MSSQLProcessProcedureParamComment(const TCHAR* ptszSchemaN
 	{
 		if( comment.c_str() != nullptr && comment.size() > 0 )
 		{
-			//	- EXEC sp_updateextendedproperty [¼Ó¼º¸í], [¼Ó¼º°ª], [level0type], [level0name], [level1type], [level1name], [level2type], [level2name]
+			//	- EXEC sp_updateextendedproperty [ì†ì„±ëª…], [ì†ì„±ê°’], [level0type], [level0name], [level1type], [level1name], [level2type], [level2name]
 			//		Ex)
-			//			- ÇÁ·Î½ÃÀú ÁÖ¼® ¼öÁ¤ : sp_updateextendedproperty 'MS_Description', 'ÇÁ·Î½ÃÀú ¼³¸í', 'SCHEMA', 'dbo', 'PROCEDURE', 'ÇÁ·Î½ÃÀú¸í'
-			//			- ÆÄ¶ó¹ÌÅÍ ÁÖ¼® ¼öÁ¤   : sp_updateextendedproperty 'MS_Description', 'ÆÄ¶ó¹ÌÅÍ ¼³¸í', 'SCHEMA', 'dbo', 'PROCEDURE', 'ÇÁ·Î½ÃÀú¸í', 'PARAMETER' , 'ÆÄ¶ó¹ÌÅÍ¸í'
+			//			- í”„ë¡œì‹œì € ì£¼ì„ ìˆ˜ì • : sp_updateextendedproperty 'MS_Description', 'í”„ë¡œì‹œì € ì„¤ëª…', 'SCHEMA', 'dbo', 'PROCEDURE', 'í”„ë¡œì‹œì €ëª…'
+			//			- íŒŒë¼ë¯¸í„° ì£¼ì„ ìˆ˜ì •   : sp_updateextendedproperty 'MS_Description', 'íŒŒë¼ë¯¸í„° ì„¤ëª…', 'SCHEMA', 'dbo', 'PROCEDURE', 'í”„ë¡œì‹œì €ëª…', 'PARAMETER' , 'íŒŒë¼ë¯¸í„°ëª…'
 			return MSSQLUpdateExtendedProperty(extendedProperty);
 		}
 		else
 		{
-			//	- EXEC sp_addextendedproperty [¼Ó¼º¸í], [¼Ó¼º°ª], [level0type], [level0name], [level1type], [level1name], [level2type], [level2name]
+			//	- EXEC sp_addextendedproperty [ì†ì„±ëª…], [ì†ì„±ê°’], [level0type], [level0name], [level1type], [level1name], [level2type], [level2name]
 			//		Ex)
-			//			- ÇÁ·Î½ÃÀú ÁÖ¼® Ãß°¡ : sp_addextendedproperty 'MS_Description', 'ÇÁ·Î½ÃÀú ¼³¸í', 'SCHEMA', 'dbo', 'PROCEDURE', 'ÇÁ·Î½ÃÀú¸í'
-			//			- ÆÄ¶ó¹ÌÅÍ ÁÖ¼® Ãß°¡   : sp_addextendedproperty 'MS_Description', 'ÆÄ¶ó¹ÌÅÍ ¼³¸í', 'SCHEMA', 'dbo', 'PROCEDURE', 'ÇÁ·Î½ÃÀú¸í', 'PARAMETER' , 'ÆÄ¶ó¹ÌÅÍ¸í'
+			//			- í”„ë¡œì‹œì € ì£¼ì„ ì¶”ê°€ : sp_addextendedproperty 'MS_Description', 'í”„ë¡œì‹œì € ì„¤ëª…', 'SCHEMA', 'dbo', 'PROCEDURE', 'í”„ë¡œì‹œì €ëª…'
+			//			- íŒŒë¼ë¯¸í„° ì£¼ì„ ì¶”ê°€   : sp_addextendedproperty 'MS_Description', 'íŒŒë¼ë¯¸í„° ì„¤ëª…', 'SCHEMA', 'dbo', 'PROCEDURE', 'í”„ë¡œì‹œì €ëª…', 'PARAMETER' , 'íŒŒë¼ë¯¸í„°ëª…'
 			return MSSQLAddExtendedProperty(extendedProperty);
 		}
 	}
@@ -610,10 +610,10 @@ bool CDBQueryProcess::MSSQLProcessProcedureParamComment(const TCHAR* ptszSchemaN
 	{
 		if( comment.c_str() != nullptr && comment.size() > 0 )
 		{
-			//	- EXEC sp_dropextendedproperty [¼Ó¼º¸í], [level0type], [level0name], [level1type], [level1name], [level2type], [level2name]
+			//	- EXEC sp_dropextendedproperty [ì†ì„±ëª…], [level0type], [level0name], [level1type], [level1name], [level2type], [level2name]
 			//		Ex)
-			//			- ÇÁ·Î½ÃÀú ÁÖ¼® »èÁ¦ : sp_dropextendedproperty 'MS_Description', 'SCHEMA', 'dbo', 'PROCEDURE', 'ÇÁ·Î½ÃÀú¸í'
-			//			- ÆÄ¶ó¹ÌÅÍ ÁÖ¼® »èÁ¦   : sp_dropextendedproperty 'MS_Description', 'SCHEMA', 'dbo', 'PROCEDURE', 'ÇÁ·Î½ÃÀú¸í', 'PARAMETER' , 'ÆÄ¶ó¹ÌÅÍ¸í'
+			//			- í”„ë¡œì‹œì € ì£¼ì„ ì‚­ì œ : sp_dropextendedproperty 'MS_Description', 'SCHEMA', 'dbo', 'PROCEDURE', 'í”„ë¡œì‹œì €ëª…'
+			//			- íŒŒë¼ë¯¸í„° ì£¼ì„ ì‚­ì œ   : sp_dropextendedproperty 'MS_Description', 'SCHEMA', 'dbo', 'PROCEDURE', 'í”„ë¡œì‹œì €ëª…', 'PARAMETER' , 'íŒŒë¼ë¯¸í„°ëª…'
 			return MSSQLDropExtendedProperty(extendedProperty);
 		}
 	}
@@ -676,18 +676,18 @@ bool CDBQueryProcess::MSSQLProcessFunctionParamComment(const TCHAR* ptszSchemaNa
 	{
 		if( comment.c_str() != nullptr && comment.size() > 0 )
 		{
-			//	- EXEC sp_updateextendedproperty [¼Ó¼º¸í], [¼Ó¼º°ª], [level0type], [level0name], [level1type], [level1name], [level2type], [level2name]
+			//	- EXEC sp_updateextendedproperty [ì†ì„±ëª…], [ì†ì„±ê°’], [level0type], [level0name], [level1type], [level1name], [level2type], [level2name]
 			//		Ex)
-			//			- ÇÔ¼ö ÁÖ¼® ¼öÁ¤ : sp_updateextendedproperty 'MS_Description', 'ÇÔ¼ö ¼³¸í', 'SCHEMA', 'dbo', 'FUNCTION', 'ÇÔ¼ö¸í'
-			//			- ÆÄ¶ó¹ÌÅÍ ÁÖ¼® ¼öÁ¤   : sp_updateextendedproperty 'MS_Description', 'ÆÄ¶ó¹ÌÅÍ ¼³¸í', 'SCHEMA', 'dbo', 'FUNCTION', 'ÇÔ¼ö¸í', 'PARAMETER' , 'ÆÄ¶ó¹ÌÅÍ¸í'
+			//			- í•¨ìˆ˜ ì£¼ì„ ìˆ˜ì • : sp_updateextendedproperty 'MS_Description', 'í•¨ìˆ˜ ì„¤ëª…', 'SCHEMA', 'dbo', 'FUNCTION', 'í•¨ìˆ˜ëª…'
+			//			- íŒŒë¼ë¯¸í„° ì£¼ì„ ìˆ˜ì •   : sp_updateextendedproperty 'MS_Description', 'íŒŒë¼ë¯¸í„° ì„¤ëª…', 'SCHEMA', 'dbo', 'FUNCTION', 'í•¨ìˆ˜ëª…', 'PARAMETER' , 'íŒŒë¼ë¯¸í„°ëª…'
 			return MSSQLUpdateExtendedProperty(extendedProperty);
 		}
 		else
 		{
-			//	- EXEC sp_addextendedproperty [¼Ó¼º¸í], [¼Ó¼º°ª], [level0type], [level0name], [level1type], [level1name], [level2type], [level2name]
+			//	- EXEC sp_addextendedproperty [ì†ì„±ëª…], [ì†ì„±ê°’], [level0type], [level0name], [level1type], [level1name], [level2type], [level2name]
 			//		Ex)
-			//			- ÇÔ¼ö ÁÖ¼® Ãß°¡ : sp_addextendedproperty 'MS_Description', 'ÇÔ¼ö ¼³¸í', 'SCHEMA', 'dbo', 'FUNCTION', 'ÇÔ¼ö¸í'
-			//			- ÆÄ¶ó¹ÌÅÍ ÁÖ¼® Ãß°¡   : sp_addextendedproperty 'MS_Description', 'ÆÄ¶ó¹ÌÅÍ ¼³¸í', 'SCHEMA', 'dbo', 'FUNCTION', 'ÇÔ¼ö¸í', 'PARAMETER' , 'ÆÄ¶ó¹ÌÅÍ¸í'
+			//			- í•¨ìˆ˜ ì£¼ì„ ì¶”ê°€ : sp_addextendedproperty 'MS_Description', 'í•¨ìˆ˜ ì„¤ëª…', 'SCHEMA', 'dbo', 'FUNCTION', 'í•¨ìˆ˜ëª…'
+			//			- íŒŒë¼ë¯¸í„° ì£¼ì„ ì¶”ê°€   : sp_addextendedproperty 'MS_Description', 'íŒŒë¼ë¯¸í„° ì„¤ëª…', 'SCHEMA', 'dbo', 'FUNCTION', 'í•¨ìˆ˜ëª…', 'PARAMETER' , 'íŒŒë¼ë¯¸í„°ëª…'
 			return MSSQLAddExtendedProperty(extendedProperty);
 		}
 	}
@@ -695,10 +695,10 @@ bool CDBQueryProcess::MSSQLProcessFunctionParamComment(const TCHAR* ptszSchemaNa
 	{
 		if( comment.c_str() != nullptr && comment.size() > 0 )
 		{
-			//	- EXEC sp_dropextendedproperty [¼Ó¼º¸í], [level0type], [level0name], [level1type], [level1name], [level2type], [level2name]
+			//	- EXEC sp_dropextendedproperty [ì†ì„±ëª…], [level0type], [level0name], [level1type], [level1name], [level2type], [level2name]
 			//		Ex)
-			//			- ÇÔ¼ö ÁÖ¼® »èÁ¦ : sp_dropextendedproperty 'MS_Description', 'SCHEMA', 'dbo', 'FUNCTION', 'ÇÔ¼ö¸í'
-			//			- ÆÄ¶ó¹ÌÅÍ ÁÖ¼® »èÁ¦   : sp_dropextendedproperty 'MS_Description', 'SCHEMA', 'dbo', 'FUNCTION', 'ÇÔ¼ö¸í', 'PARAMETER' , 'ÆÄ¶ó¹ÌÅÍ¸í'
+			//			- í•¨ìˆ˜ ì£¼ì„ ì‚­ì œ : sp_dropextendedproperty 'MS_Description', 'SCHEMA', 'dbo', 'FUNCTION', 'í•¨ìˆ˜ëª…'
+			//			- íŒŒë¼ë¯¸í„° ì£¼ì„ ì‚­ì œ   : sp_dropextendedproperty 'MS_Description', 'SCHEMA', 'dbo', 'FUNCTION', 'í•¨ìˆ˜ëª…', 'PARAMETER' , 'íŒŒë¼ë¯¸í„°ëª…'
 			return MSSQLDropExtendedProperty(extendedProperty);
 		}
 	}
@@ -753,7 +753,7 @@ _tstring CDBQueryProcess::MSSQLGetExtendedProperty(const MSSQL_ExtendedProperty 
 		return ret;
 	}
 
-	// °á°ú ·¹ÄÚµå°¡ 1°³ÀÎ °æ¿ì¿¡¸¸ ¼º°ø Ã³¸®
+	// ê²°ê³¼ ë ˆì½”ë“œê°€ 1ê°œì¸ ê²½ìš°ì—ë§Œ ì„±ê³µ ì²˜ë¦¬
 	int64 iRowCount = _dbConn.RowCount();
 	if( iRowCount != 1 )
 	{
@@ -1453,7 +1453,7 @@ _tstring CDBQueryProcess::MYSQLGetTableColumnComment(const TCHAR* ptszTableName,
 		return ret;
 	}
 
-	// °á°ú ·¹ÄÚµå°¡ 1°³ÀÎ °æ¿ì¿¡¸¸ ¼º°ø Ã³¸®
+	// ê²°ê³¼ ë ˆì½”ë“œê°€ 1ê°œì¸ ê²½ìš°ì—ë§Œ ì„±ê³µ ì²˜ë¦¬
 	int64 iRowCount = _dbConn.RowCount();
 	if( iRowCount != 1 )
 	{
@@ -1471,8 +1471,8 @@ _tstring CDBQueryProcess::MYSQLGetTableColumnComment(const TCHAR* ptszTableName,
 
 //***************************************************************************
 // Ex)
-//	ALTER TABLE `tbl_table1` COMMENT 'Å×½ºÆ® Å×ÀÌºí';
-//  ALTER TABLE `tbl_table1` MODIFY `Id` VARCHAR(50) NOT NULL COMMENT '¾ÆÀÌµğ';
+//	ALTER TABLE `tbl_table1` COMMENT 'í…ŒìŠ¤íŠ¸ í…Œì´ë¸”';
+//  ALTER TABLE `tbl_table1` MODIFY `Id` VARCHAR(50) NOT NULL COMMENT 'ì•„ì´ë””';
 bool CDBQueryProcess::MYSQLProcessTableColumnComment(const TCHAR* ptszTableName, const TCHAR* ptszColumnName, const TCHAR* ptszDataTypeDesc, bool bIsNullable, const TCHAR* ptszDefaultDefinition, bool bIsIdentity, const TCHAR* ptszCharacterSet, const TCHAR* ptszCollation, const TCHAR* ptszComment)
 {
 	if( _dbClass != EDBClass::MYSQL ) return false;
@@ -1525,7 +1525,7 @@ _tstring CDBQueryProcess::MYSQLGetProcedureComment(const TCHAR* ptszProcName)
 		return ret;
 	}
 
-	// °á°ú ·¹ÄÚµå°¡ 1°³ÀÎ °æ¿ì¿¡¸¸ ¼º°ø Ã³¸®
+	// ê²°ê³¼ ë ˆì½”ë“œê°€ 1ê°œì¸ ê²½ìš°ì—ë§Œ ì„±ê³µ ì²˜ë¦¬
 	int64 iRowCount = _dbConn.RowCount();
 	if( iRowCount != 1 )
 	{
@@ -1543,7 +1543,7 @@ _tstring CDBQueryProcess::MYSQLGetProcedureComment(const TCHAR* ptszProcName)
 
 //***************************************************************************
 // Ex)
-//	ALTER PROCEDURE `sp_procedure1` COMMENT 'Å×½ºÆ® ÀúÀåÇÁ·Î½ÃÀú';
+//	ALTER PROCEDURE `sp_procedure1` COMMENT 'í…ŒìŠ¤íŠ¸ ì €ì¥í”„ë¡œì‹œì €';
 bool CDBQueryProcess::MYSQLProcessProcedureComment(const TCHAR* ptszProcName, const TCHAR* ptszComment)
 {
 	if( _dbClass != EDBClass::MYSQL ) return false;
@@ -1596,7 +1596,7 @@ _tstring CDBQueryProcess::MYSQLGetFunctionComment(const TCHAR* ptszFuncName)
 		return ret;
 	}
 
-	// °á°ú ·¹ÄÚµå°¡ 1°³ÀÎ °æ¿ì¿¡¸¸ ¼º°ø Ã³¸®
+	// ê²°ê³¼ ë ˆì½”ë“œê°€ 1ê°œì¸ ê²½ìš°ì—ë§Œ ì„±ê³µ ì²˜ë¦¬
 	int64 iRowCount = _dbConn.RowCount();
 	if( iRowCount != 1 )
 	{
@@ -1614,7 +1614,7 @@ _tstring CDBQueryProcess::MYSQLGetFunctionComment(const TCHAR* ptszFuncName)
 
 //***************************************************************************
 // Ex)
-//	ALTER FUNCTION `sp_function1` COMMENT 'Å×½ºÆ® ÇÔ¼ö';
+//	ALTER FUNCTION `sp_function1` COMMENT 'í…ŒìŠ¤íŠ¸ í•¨ìˆ˜';
 bool CDBQueryProcess::MYSQLProcessFunctionComment(const TCHAR* ptszFuncName, const TCHAR* ptszComment)
 {
 	if( _dbClass != EDBClass::MYSQL ) return false;
@@ -1635,8 +1635,8 @@ bool CDBQueryProcess::MYSQLProcessFunctionComment(const TCHAR* ptszFuncName, con
 
 //***************************************************************************
 // Ex)
-//	COMMENT ON TABLE Å×ÀÌºí¸í IS 'ÄÚ¸àÆ®';
-//  COMMENT ON COLUMN Å×ÀÌºí¸í.ÄÃ·³¸í IS 'ÄÚ¸àÆ®';
+//	COMMENT ON TABLE í…Œì´ë¸”ëª… IS 'ì½”ë©˜íŠ¸';
+//  COMMENT ON COLUMN í…Œì´ë¸”ëª….ì»¬ëŸ¼ëª… IS 'ì½”ë©˜íŠ¸';
 bool CDBQueryProcess::ORACLEProcessTableColumnComment(const TCHAR* ptszTableName, const TCHAR* ptszColumnName, const TCHAR* ptszDescription)
 {
 	if( _dbClass != EDBClass::ORACLE ) return false;
@@ -1657,8 +1657,8 @@ bool CDBQueryProcess::ORACLEProcessTableColumnComment(const TCHAR* ptszTableName
 
 //***************************************************************************
 // Ex)
-//  SELECT DBMS_METADATA.GET_DDL('TABLE', 'Å×ÀÌºí¸í') SCRIPT FROM DUAL
-//  SELECT DBMS_METADATA.GET_DDL('INDEX', 'ÀÎµ¦½º¸í') SCRIPT FROM DUAL
+//  SELECT DBMS_METADATA.GET_DDL('TABLE', 'í…Œì´ë¸”ëª…') SCRIPT FROM DUAL
+//  SELECT DBMS_METADATA.GET_DDL('INDEX', 'ì¸ë±ìŠ¤ëª…') SCRIPT FROM DUAL
 _tstring CDBQueryProcess::ORACLEMetaDataGetDDL(const EDBObjectType dbObject, const TCHAR* ptszObjectName, const TCHAR* ptszSchemaName)
 {
 	_tstring query = _T("");
@@ -1690,7 +1690,7 @@ _tstring CDBQueryProcess::ORACLEMetaDataGetDDL(const EDBObjectType dbObject, con
 		return ret;
 	}
 
-	// °á°ú ·¹ÄÚµå°¡ 1°³ÀÎ °æ¿ì¿¡¸¸ ¼º°ø Ã³¸®
+	// ê²°ê³¼ ë ˆì½”ë“œê°€ 1ê°œì¸ ê²½ìš°ì—ë§Œ ì„±ê³µ ì²˜ë¦¬
 	int64 iRowCount = _dbConn.RowCount();
 	if( iRowCount != 1 )
 	{
@@ -1739,7 +1739,7 @@ _tstring CDBQueryProcess::ORACLEGetUserSource(const EDBObjectType dbObject, cons
 		return ret;
 	}
 
-	// °á°ú ·¹ÄÚµå°¡ 1°³ÀÎ °æ¿ì¿¡¸¸ ¼º°ø Ã³¸®
+	// ê²°ê³¼ ë ˆì½”ë“œê°€ 1ê°œì¸ ê²½ìš°ì—ë§Œ ì„±ê³µ ì²˜ë¦¬
 	int64 iRowCount = _dbConn.RowCount();
 	if( iRowCount != 1 )
 	{

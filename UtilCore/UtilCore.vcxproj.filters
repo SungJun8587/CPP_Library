@@ -535,9 +535,6 @@
     <ClCompile Include="Util\EncodingConvert.cpp">
       <Filter>Util</Filter>
     </ClCompile>
-    <ClCompile Include="Containers\Map\ClusterSpinMap.cpp">
-      <Filter>Containers\Map</Filter>
-    </ClCompile>
     <ClCompile Include="Util\BufferWriter.cpp">
       <Filter>Util</Filter>
     </ClCompile>
@@ -656,6 +653,9 @@
       <Filter>Containers\Map</Filter>
     </None>
     <None Include="Containers\Map\UnOrderedMap.inl">
+      <Filter>Containers\Map</Filter>
+    </None>
+    <None Include="Containers\Map\ClusterSpinMap.inl">
       <Filter>Containers\Map</Filter>
     </None>
   </ItemGroup>

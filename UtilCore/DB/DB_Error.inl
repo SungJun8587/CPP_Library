@@ -1,4 +1,4 @@
-class CDBError
+﻿class CDBError
 {
 public:
 	TCHAR* operator()(const SQLSMALLINT nHandleType, const SQLHENV& hStatement, TCHAR* ptszMessage, TCHAR* ptszSQLState = NULL) const

@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // WebUtil.h: interface for the WebUtil Function.
 //
@@ -18,41 +18,41 @@
 #include <array>
 
 //***************************************************************************
-// @brief Base64Dec °á°ú ÄÚµå. È£ÃâºÎ¿¡¼­ ½ÇÆĞ¸¦ ¸í½ÃÀûÀ¸·Î È®ÀÎÇÒ ¼ö ÀÖµµ·Ï
-// ¿¡·¯ ÄÚµå·Î ¹İÈ¯ÇÑ´Ù(¹Î°¨ µ¥ÀÌÅÍ¿¡¼­ ¼Õ»óµÈ ÀÔ·ÂÀ» Á¶¿ëÈ÷ ³Ñ±âÁö ¾Ê±â À§ÇÔ).
+// @brief Base64Dec ê²°ê³¼ ì½”ë“œ. í˜¸ì¶œë¶€ì—ì„œ ì‹¤íŒ¨ë¥¼ ëª…ì‹œì ìœ¼ë¡œ í™•ì¸í•  ìˆ˜ ìˆë„ë¡
+// ì—ëŸ¬ ì½”ë“œë¡œ ë°˜í™˜í•œë‹¤(ë¯¼ê° ë°ì´í„°ì—ì„œ ì†ìƒëœ ì…ë ¥ì„ ì¡°ìš©íˆ ë„˜ê¸°ì§€ ì•Šê¸° ìœ„í•¨).
 enum class Base64DecodeResult
 {
 	Success = 0,
-	InvalidLength,      // ±æÀÌ°¡ 4ÀÇ ¹è¼ö°¡ ¾Æ´Ô
-	InvalidCharacter,   // Base64 ¾ËÆÄºª/ÆĞµù¿¡ ¼ÓÇÏÁö ¾Ê´Â ¹®ÀÚ°¡ Æ÷ÇÔµÊ
+	InvalidLength,      // ê¸¸ì´ê°€ 4ì˜ ë°°ìˆ˜ê°€ ì•„ë‹˜
+	InvalidCharacter,   // Base64 ì•ŒíŒŒë²³/íŒ¨ë”©ì— ì†í•˜ì§€ ì•ŠëŠ” ë¬¸ìê°€ í¬í•¨ë¨
 };
 
 //***************************************************************************
-// À¥ À¯Æ¿¸®Æ¼ ÇÔ¼ö ¼±¾ğ
+// ì›¹ ìœ í‹¸ë¦¬í‹° í•¨ìˆ˜ ì„ ì–¸
 //***************************************************************************
 
-// Base64 ÀÎÄÚµù / µğÄÚµù
+// Base64 ì¸ì½”ë”© / ë””ì½”ë”©
 _tstring Base64Enc(const _tstring& source);
 _tstring Base64Dec(const _tstring& source, Base64DecodeResult* pResult);
 
-// URL ÀÎÄÚµù / µğÄÚµù
+// URL ì¸ì½”ë”© / ë””ì½”ë”©
 _tstring UrlEncode(const _tstring& source, const int iCodePage = CP_ACP);
 _tstring UrlDecode(const _tstring& source, const int iCodePage = CP_ACP);
 _tstring UrlPathEncode(const _tstring& source);
 
-// HTML ÀÎÄÚµù / µğÄÚµù
+// HTML ì¸ì½”ë”© / ë””ì½”ë”©
 _tstring HtmlEncode(const _tstring& source);
 _tstring HtmlDecode(const _tstring& source);
 
-// ÀÚ¹Ù½ºÅ©¸³Æ® Escape / UnEscape
+// ìë°”ìŠ¤í¬ë¦½íŠ¸ Escape / UnEscape
 _tstring Escape(const _tstring& source);
 _tstring UnEscape(const _tstring& source);
 
-// ÀÚ¹Ù½ºÅ©¸³Æ® EncodeURI / DecodeURI
+// ìë°”ìŠ¤í¬ë¦½íŠ¸ EncodeURI / DecodeURI
 _tstring EncodeURI(const _tstring& source, bool bSpaceAsPlus);
 _tstring DecodeURI(const _tstring& source);
 
-// ÀÚ¹Ù½ºÅ©¸³Æ® EncodeURIComponent / DecodeURIComponent
+// ìë°”ìŠ¤í¬ë¦½íŠ¸ EncodeURIComponent / DecodeURIComponent
 _tstring EncodeURIComponent(const _tstring& source);
 _tstring DecodeURIComponent(const _tstring& source);
 

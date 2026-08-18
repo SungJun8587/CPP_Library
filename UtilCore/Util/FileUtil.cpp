@@ -12,10 +12,13 @@
 // @param pBuffer 검사할 데이터 버퍼
 // @param BuffSize 버퍼 크기
 // @return UTF-8 조건을 만족하면 true, 아니면 false
+// @note 0x80 이상의 바이트가 하나도 없는 순수 ASCII 버퍼는 ANSI/UTF-8을
+//       구분할 근거가 없으므로 false를 반환합니다(호출부에서 ANSI로 분류됨).
 //***************************************************************************
 bool IsUTF8WithoutBom(const void* pBuffer, const size_t BuffSize)
 {
 	bool bUTF8 = true;
+	bool bHasMultibyte = false;		// 실제로 0x80 이상 바이트가 한 번이라도 나왔는지 추적
 	unsigned char* start = (unsigned char*)pBuffer;
 	unsigned char* end = (unsigned char*)pBuffer + BuffSize;
 
@@ -33,8 +36,12 @@ bool IsUTF8WithoutBom(const void* pBuffer, const size_t BuffSize)
 		}
 		else if( *start < (0xE0) )	// 2바이트 문자 (110xxxxx 10xxxxxx)
 		{
+			bHasMultibyte = true;
 			if( start >= end - 1 )
+			{
+				bUTF8 = false;		// 잘린 시퀀스 → 무효 처리
 				break;
+			}
 			if( (start[1] & (0xC0)) != 0x80 )
 			{
 				bUTF8 = false;
@@ -44,8 +51,12 @@ bool IsUTF8WithoutBom(const void* pBuffer, const size_t BuffSize)
 		}
 		else if( *start < (0xF0) )	// 3바이트 문자 (1110xxxx 10xxxxxx 10xxxxxx)
 		{
+			bHasMultibyte = true;
 			if( start >= end - 2 )
+			{
+				bUTF8 = false;
 				break;
+			}
 			if( (start[1] & (0xC0)) != 0x80 || (start[2] & (0xC0)) != 0x80 )
 			{
 				bUTF8 = false;
@@ -55,8 +66,12 @@ bool IsUTF8WithoutBom(const void* pBuffer, const size_t BuffSize)
 		}
 		else if( *start < (0xF8) )	// 4바이트 문자 (11110xxx 10xxxxxx 10xxxxxx 10xxxxxx)
 		{
+			bHasMultibyte = true;
 			if( start >= end - 3 )
+			{
+				bUTF8 = false;
 				break;
+			}
 			if( (start[1] & (0xC0)) != 0x80 || (start[2] & (0xC0)) != 0x80 || (start[3] & (0xC0)) != 0x80 )
 			{
 				bUTF8 = false;
@@ -70,7 +85,8 @@ bool IsUTF8WithoutBom(const void* pBuffer, const size_t BuffSize)
 			break;
 		}
 	}
-	return bUTF8;
+
+	return bUTF8 && bHasMultibyte;	// 멀티바이트 시퀀스가 실제로 있고 전부 유효할 때만 true
 }
 
 #ifdef _WIN32
@@ -1015,6 +1031,33 @@ bool GetFileInformation(const TCHAR* ptszFullPath, LPBY_HANDLE_FILE_INFORMATION 
 		return false;
 
 	bResult = ::GetFileInformationByHandle(hFile, lpFileInformation);
+
+	::CloseHandle(hFile);
+
+	return bResult;
+}
+
+//***************************************************************************
+// @brief 파일 핸들을 한 번만 열어 상세 정보와 인코딩 타입을 동시에 조회합니다.
+// @detail GetFileInformation()과 GetFileEncodingType(TCHAR*)를 각각 호출할 때
+//         발생하는 CreateFile/CloseHandle 중복 왕복을 제거합니다.
+// @param ptszFullPath 조회할 파일의 전체 경로
+// @param lpFileInformation 조회 정보를 저장할 BY_HANDLE_FILE_INFORMATION 구조체 포인터
+// @param outEncoding [out] 판별된 인코딩 타입
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
+bool GetFileInfoAndEncoding(const TCHAR* ptszFullPath, LPBY_HANDLE_FILE_INFORMATION lpFileInformation, EEncoding& outEncoding)
+{
+	outEncoding = EEncoding::DEFAULT;
+
+	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
+
+	HANDLE hFile = ::CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	if( hFile == INVALID_HANDLE_VALUE )
+		return false;
+
+	bool bResult = ::GetFileInformationByHandle(hFile, lpFileInformation);
+	outEncoding = DetectFileEncoding(hFile);	// 익명 네임스페이스 공용 헬퍼, 같은 TU라 접근 가능
 
 	::CloseHandle(hFile);
 

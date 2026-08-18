@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // WindowsServiceBase.h : interface for the WindowsServiceBase class.
 //
@@ -11,17 +11,17 @@
 
 //***************************************************************************
 // @class WindowsServiceBase
-// @brief À©µµ¿ì ¼­ºñ½º(Windows Service) ±¸ÇöÀ» À§ÇÑ Ãß»ó º£ÀÌ½º Å¬·¡½º.
+// @brief ìœˆë„ìš° ì„œë¹„ìŠ¤(Windows Service) êµ¬í˜„ì„ ìœ„í•œ ì¶”ìƒ ë² ì´ìŠ¤ í´ëž˜ìŠ¤.
 //
 // @details
-// SCM(Service Control Manager)°ú Åë½ÅÇÏ¿© À©µµ¿ì ¼­ºñ½º¸¦ ¼³Ä¡, Á¦°Å, ½ÃÀÛ, ÁßÁöÇÏ°í 
-// »óÅÂ¸¦ º¸°íÇÒ ¼ö ÀÖ´Â ±â´ÉÀ» Á¦°øÇÕ´Ï´Ù. ¶ÇÇÑ ÄÜ¼Ö µð¹ö±× ¸ðµå¸¦ Áö¿øÇÏ¿© 
-// °³¹ß È¯°æ¿¡¼­ ½±°Ô Å×½ºÆ®ÇÒ ¼ö ÀÖÀ¸¸ç, Á¤Àû ÀÎ½ºÅÏ½º¸¦ ÅëÇØ SCM ÄÝ¹éÀ» ¾ÈÀüÇÏ°Ô À§ÀÓÇÕ´Ï´Ù.
+// SCM(Service Control Manager)ê³¼ í†µì‹ í•˜ì—¬ ìœˆë„ìš° ì„œë¹„ìŠ¤ë¥¼ ì„¤ì¹˜, ì œê±°, ì‹œìž‘, ì¤‘ì§€í•˜ê³  
+// ìƒíƒœë¥¼ ë³´ê³ í•  ìˆ˜ ìžˆëŠ” ê¸°ëŠ¥ì„ ì œê³µí•©ë‹ˆë‹¤. ë˜í•œ ì½˜ì†” ë””ë²„ê·¸ ëª¨ë“œë¥¼ ì§€ì›í•˜ì—¬ 
+// ê°œë°œ í™˜ê²½ì—ì„œ ì‰½ê²Œ í…ŒìŠ¤íŠ¸í•  ìˆ˜ ìžˆìœ¼ë©°, ì •ì  ì¸ìŠ¤í„´ìŠ¤ë¥¼ í†µí•´ SCM ì½œë°±ì„ ì•ˆì „í•˜ê²Œ ìœ„ìž„í•©ë‹ˆë‹¤.
 //
-// ÁÖ¿ä Æ¯Â¡:
-//  - ¼­ºñ½º ¸ðµå¿Í ÄÜ¼Ö µð¹ö±× ¸ðµå µà¾ó Áö¿ø
-//  - SCM°úÀÇ ¿øÈ°ÇÑ Åë½ÅÀ» À§ÇÑ »óÅÂ º¸°í ¹× Á¦¾î ÇÚµé·¯ µî·Ï
-//  - RAII ÆÐÅÏÀ» È°¿ëÇÑ ¾ÈÀüÇÑ ¸®¼Ò½º °ü¸® ¹× ÀÌº¥Æ® µ¿±âÈ­
+// ì£¼ìš” íŠ¹ì§•:
+//  - ì„œë¹„ìŠ¤ ëª¨ë“œì™€ ì½˜ì†” ë””ë²„ê·¸ ëª¨ë“œ ë“€ì–¼ ì§€ì›
+//  - SCMê³¼ì˜ ì›í™œí•œ í†µì‹ ì„ ìœ„í•œ ìƒíƒœ ë³´ê³  ë° ì œì–´ í•¸ë“¤ëŸ¬ ë“±ë¡
+//  - RAII íŒ¨í„´ì„ í™œìš©í•œ ì•ˆì „í•œ ë¦¬ì†ŒìŠ¤ ê´€ë¦¬ ë° ì´ë²¤íŠ¸ ë™ê¸°í™”
 //***************************************************************************
 class WindowsServiceBase
 {
@@ -66,19 +66,19 @@ public:
 	static BOOL WINAPI ControlHandler(DWORD dwCtrlType);
 
 protected:
-	TCHAR					m_tszAppName[MAX_PATH];         // ¾ÖÇÃ¸®ÄÉÀÌ¼Ç ÀÌ¸§
-	TCHAR					m_tszServiceName[MAX_PATH];     // ¼­ºñ½º ÀÌ¸§ (SCM µî·Ï¿ë °íÀ¯ ½Äº°ÀÚ)
-	TCHAR					m_tszDisplayName[MAX_PATH];     // ¼­ºñ½º Ç¥½Ã ÀÌ¸§
-	TCHAR					m_tszServiceDesc[MAX_PATH];     // ¼­ºñ½º ¼³¸í
-	TCHAR					m_tszAppPath[FULLPATH_STRLEN];  // ¾ÖÇÃ¸®ÄÉÀÌ¼Ç ½ÇÇà ÆÄÀÏ °æ·Î
+	TCHAR					m_tszAppName[MAX_PATH];         // ì• í”Œë¦¬ì¼€ì´ì…˜ ì´ë¦„
+	TCHAR					m_tszServiceName[MAX_PATH];     // ì„œë¹„ìŠ¤ ì´ë¦„ (SCM ë“±ë¡ìš© ê³ ìœ  ì‹ë³„ìž)
+	TCHAR					m_tszDisplayName[MAX_PATH];     // ì„œë¹„ìŠ¤ í‘œì‹œ ì´ë¦„
+	TCHAR					m_tszServiceDesc[MAX_PATH];     // ì„œë¹„ìŠ¤ ì„¤ëª…
+	TCHAR					m_tszAppPath[FULLPATH_STRLEN];  // ì• í”Œë¦¬ì¼€ì´ì…˜ ì‹¤í–‰ íŒŒì¼ ê²½ë¡œ
 
-	SERVICE_STATUS			m_ServiceStatus;                // À©µµ¿ì ¼­ºñ½º »óÅÂ ±¸Á¶Ã¼
-	SERVICE_STATUS_HANDLE	m_ServiceStatusHandle;          // ¼­ºñ½º »óÅÂ ÇÚµé
-	DWORD					m_dwErrCode;                    // ¸¶Áö¸· ¹ß»ýÇÑ ¿¡·¯ ÄÚµå
+	SERVICE_STATUS			m_ServiceStatus;                // ìœˆë„ìš° ì„œë¹„ìŠ¤ ìƒíƒœ êµ¬ì¡°ì²´
+	SERVICE_STATUS_HANDLE	m_ServiceStatusHandle;          // ì„œë¹„ìŠ¤ ìƒíƒœ í•¸ë“¤
+	DWORD					m_dwErrCode;                    // ë§ˆì§€ë§‰ ë°œìƒí•œ ì—ëŸ¬ ì½”ë“œ
 
-	DWORD					m_dwCheckPoint;                 // SCM »óÅÂ º¸°í Ã¼Å©Æ÷ÀÎÆ® Ä«¿îÅÍ
-	bool					m_bConsoleMode;                 // ÄÜ¼Ö µð¹ö±× ¸ðµå ¿©ºÎ
-	HANDLE					m_hSvrStopEvent;                // ¼­ºñ½º Á¾·á µ¿±âÈ­ ÀÌº¥Æ® ÇÚµé
+	DWORD					m_dwCheckPoint;                 // SCM ìƒíƒœ ë³´ê³  ì²´í¬í¬ì¸íŠ¸ ì¹´ìš´í„°
+	bool					m_bConsoleMode;                 // ì½˜ì†” ë””ë²„ê·¸ ëª¨ë“œ ì—¬ë¶€
+	HANDLE					m_hSvrStopEvent;                // ì„œë¹„ìŠ¤ ì¢…ë£Œ ë™ê¸°í™” ì´ë²¤íŠ¸ í•¸ë“¤
 };
 
 #endif // ndef __WINDOWSSERVICEBASE_H__

@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // This File include Information about define macro or constant type, Type.
 // 
@@ -135,8 +135,8 @@
 #define DEFAULT_DEP_STR						_T("\0\0")
 #define REPORT_TIMEOUT						0
 
-#define DEADLOCK_STAMP_FREQ				(5*1000)			// Dead Lock ÀÎÁö Ã¼Å© ÁÖ±â (5 sec.)
-#define DEADLOCK_STAMP_CNT				10					// DEADLOCK_STAMP_FREQ(5ÃÊ)ÁÖ±â·Î 10¹ø Ã¼Å©ÇÏ¿© Count°¡ 0ÀÌ µÇ¸é ¼­¹ö °­Á¦Á¾·á(30 sec.)
+#define DEADLOCK_STAMP_FREQ				(5*1000)			// Dead Lock ì¸ì§€ ì²´í¬ ì£¼ê¸° (5 sec.)
+#define DEADLOCK_STAMP_CNT				10					// DEADLOCK_STAMP_FREQ(5ì´ˆ)ì£¼ê¸°ë¡œ 10ë²ˆ ì²´í¬í•˜ì—¬ Countê°€ 0ì´ ë˜ë©´ ì„œë²„ ê°•ì œì¢…ë£Œ(30 sec.)
 
 #define _CONSOLE_LOG
 //#define _FILE_LOG

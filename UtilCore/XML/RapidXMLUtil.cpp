@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // RapidXMLUtil.cpp: implementation of the CRapidXMLUtil class.
 //
@@ -10,10 +10,10 @@
 _locale_t kr = _create_locale(LC_NUMERIC, "kor");
 
 //***************************************************************************
-// @brief Æ¯Á¤ ¼Ó¼º(Attribute)ÀÇ ºÒ¸®¾ğ(bool) °ªÀ» ÀĞ¾î¿É´Ï´Ù.
-// @param ptszKey ¼Ó¼º Å° ÀÌ¸§
-// @param defaultValue ½ÇÆĞ ½Ã ¹İÈ¯ÇÒ ±âº»°ª
-// @return º¯È¯µÈ bool °ª
+// @brief íŠ¹ì • ì†ì„±(Attribute)ì˜ ë¶ˆë¦¬ì–¸(bool) ê°’ì„ ì½ì–´ì˜µë‹ˆë‹¤.
+// @param ptszKey ì†ì„± í‚¤ ì´ë¦„
+// @param defaultValue ì‹¤íŒ¨ ì‹œ ë°˜í™˜í•  ê¸°ë³¸ê°’
+// @return ë³€í™˜ëœ bool ê°’
 //***************************************************************************
 bool CXMLNode::GetBoolAttr(const TCHAR* ptszKey, bool defaultValue)
 {
@@ -29,10 +29,10 @@ bool CXMLNode::GetBoolAttr(const TCHAR* ptszKey, bool defaultValue)
 }
 
 //***************************************************************************
-// @brief Æ¯Á¤ ¼Ó¼º(Attribute)ÀÇ int8 °ªÀ» ÀĞ¾î¿É´Ï´Ù.
-// @param ptszKey ¼Ó¼º Å° ÀÌ¸§
-// @param defaultValue ½ÇÆĞ ½Ã ¹İÈ¯ÇÒ ±âº»°ª
-// @return º¯È¯µÈ int8 °ª
+// @brief íŠ¹ì • ì†ì„±(Attribute)ì˜ int8 ê°’ì„ ì½ì–´ì˜µë‹ˆë‹¤.
+// @param ptszKey ì†ì„± í‚¤ ì´ë¦„
+// @param defaultValue ì‹¤íŒ¨ ì‹œ ë°˜í™˜í•  ê¸°ë³¸ê°’
+// @return ë³€í™˜ëœ int8 ê°’
 //***************************************************************************
 int8 CXMLNode::GetInt8Attr(const TCHAR* ptszKey, int8 defaultValue)
 {
@@ -46,10 +46,10 @@ int8 CXMLNode::GetInt8Attr(const TCHAR* ptszKey, int8 defaultValue)
 }
 
 //***************************************************************************
-// @brief Æ¯Á¤ ¼Ó¼º(Attribute)ÀÇ int16 °ªÀ» ÀĞ¾î¿É´Ï´Ù.
-// @param ptszKey ¼Ó¼º Å° ÀÌ¸§
-// @param defaultValue ½ÇÆĞ ½Ã ¹İÈ¯ÇÒ ±âº»°ª
-// @return º¯È¯µÈ int16 °ª
+// @brief íŠ¹ì • ì†ì„±(Attribute)ì˜ int16 ê°’ì„ ì½ì–´ì˜µë‹ˆë‹¤.
+// @param ptszKey ì†ì„± í‚¤ ì´ë¦„
+// @param defaultValue ì‹¤íŒ¨ ì‹œ ë°˜í™˜í•  ê¸°ë³¸ê°’
+// @return ë³€í™˜ëœ int16 ê°’
 //***************************************************************************
 int16 CXMLNode::GetInt16Attr(const TCHAR* ptszKey, int16 defaultValue)
 {
@@ -63,10 +63,10 @@ int16 CXMLNode::GetInt16Attr(const TCHAR* ptszKey, int16 defaultValue)
 }
 
 //***************************************************************************
-// @brief Æ¯Á¤ ¼Ó¼º(Attribute)ÀÇ int32 °ªÀ» ÀĞ¾î¿É´Ï´Ù.
-// @param ptszKey ¼Ó¼º Å° ÀÌ¸§
-// @param defaultValue ½ÇÆĞ ½Ã ¹İÈ¯ÇÒ ±âº»°ª
-// @return º¯È¯µÈ int32 °ª
+// @brief íŠ¹ì • ì†ì„±(Attribute)ì˜ int32 ê°’ì„ ì½ì–´ì˜µë‹ˆë‹¤.
+// @param ptszKey ì†ì„± í‚¤ ì´ë¦„
+// @param defaultValue ì‹¤íŒ¨ ì‹œ ë°˜í™˜í•  ê¸°ë³¸ê°’
+// @return ë³€í™˜ëœ int32 ê°’
 //***************************************************************************
 int32 CXMLNode::GetInt32Attr(const TCHAR* ptszKey, int32 defaultValue)
 {
@@ -80,10 +80,10 @@ int32 CXMLNode::GetInt32Attr(const TCHAR* ptszKey, int32 defaultValue)
 }
 
 //***************************************************************************
-// @brief Æ¯Á¤ ¼Ó¼º(Attribute)ÀÇ int64 °ªÀ» ÀĞ¾î¿É´Ï´Ù.
-// @param ptszKey ¼Ó¼º Å° ÀÌ¸§
-// @param defaultValue ½ÇÆĞ ½Ã ¹İÈ¯ÇÒ ±âº»°ª
-// @return º¯È¯µÈ int64 °ª
+// @brief íŠ¹ì • ì†ì„±(Attribute)ì˜ int64 ê°’ì„ ì½ì–´ì˜µë‹ˆë‹¤.
+// @param ptszKey ì†ì„± í‚¤ ì´ë¦„
+// @param defaultValue ì‹¤íŒ¨ ì‹œ ë°˜í™˜í•  ê¸°ë³¸ê°’
+// @return ë³€í™˜ëœ int64 ê°’
 //***************************************************************************
 int64 CXMLNode::GetInt64Attr(const TCHAR* ptszKey, int64 defaultValue)
 {
@@ -97,10 +97,10 @@ int64 CXMLNode::GetInt64Attr(const TCHAR* ptszKey, int64 defaultValue)
 }
 
 //***************************************************************************
-// @brief Æ¯Á¤ ¼Ó¼º(Attribute)ÀÇ float °ªÀ» ÀĞ¾î¿É´Ï´Ù.
-// @param ptszKey ¼Ó¼º Å° ÀÌ¸§
-// @param defaultValue ½ÇÆĞ ½Ã ¹İÈ¯ÇÒ ±âº»°ª
-// @return º¯È¯µÈ float °ª
+// @brief íŠ¹ì • ì†ì„±(Attribute)ì˜ float ê°’ì„ ì½ì–´ì˜µë‹ˆë‹¤.
+// @param ptszKey ì†ì„± í‚¤ ì´ë¦„
+// @param defaultValue ì‹¤íŒ¨ ì‹œ ë°˜í™˜í•  ê¸°ë³¸ê°’
+// @return ë³€í™˜ëœ float ê°’
 //***************************************************************************
 float CXMLNode::GetFloatAttr(const TCHAR* ptszKey, float defaultValue)
 {
@@ -114,10 +114,10 @@ float CXMLNode::GetFloatAttr(const TCHAR* ptszKey, float defaultValue)
 }
 
 //***************************************************************************
-// @brief Æ¯Á¤ ¼Ó¼º(Attribute)ÀÇ double °ªÀ» ÀĞ¾î¿É´Ï´Ù.
-// @param ptszKey ¼Ó¼º Å° ÀÌ¸§
-// @param defaultValue ½ÇÆĞ ½Ã ¹İÈ¯ÇÒ ±âº»°ª
-// @return º¯È¯µÈ double °ª
+// @brief íŠ¹ì • ì†ì„±(Attribute)ì˜ double ê°’ì„ ì½ì–´ì˜µë‹ˆë‹¤.
+// @param ptszKey ì†ì„± í‚¤ ì´ë¦„
+// @param defaultValue ì‹¤íŒ¨ ì‹œ ë°˜í™˜í•  ê¸°ë³¸ê°’
+// @return ë³€í™˜ëœ double ê°’
 //***************************************************************************
 double CXMLNode::GetDoubleAttr(const TCHAR* ptszKey, double defaultValue)
 {
@@ -131,10 +131,10 @@ double CXMLNode::GetDoubleAttr(const TCHAR* ptszKey, double defaultValue)
 }
 
 //***************************************************************************
-// @brief Æ¯Á¤ ¼Ó¼º(Attribute)ÀÇ ¹®ÀÚ¿­ °ªÀ» ÀĞ¾î¿É´Ï´Ù.
-// @param ptszKey ¼Ó¼º Å° ÀÌ¸§
-// @param defaultValue ½ÇÆĞ ½Ã ¹İÈ¯ÇÒ ±âº»°ª
-// @return º¯È¯µÈ TCHAR ¹®ÀÚ¿­ Æ÷ÀÎÅÍ
+// @brief íŠ¹ì • ì†ì„±(Attribute)ì˜ ë¬¸ìì—´ ê°’ì„ ì½ì–´ì˜µë‹ˆë‹¤.
+// @param ptszKey ì†ì„± í‚¤ ì´ë¦„
+// @param defaultValue ì‹¤íŒ¨ ì‹œ ë°˜í™˜í•  ê¸°ë³¸ê°’
+// @return ë³€í™˜ëœ TCHAR ë¬¸ìì—´ í¬ì¸í„°
 //***************************************************************************
 const TCHAR* CXMLNode::GetStringAttr(const TCHAR* ptszKey, const TCHAR* defaultValue)
 {
@@ -152,9 +152,9 @@ const TCHAR* CXMLNode::GetStringAttr(const TCHAR* ptszKey, const TCHAR* defaultV
 }
 
 //***************************************************************************
-// @brief ³ëµåÀÇ ÅØ½ºÆ® ºÒ¸®¾ğ(bool) °ªÀ» ÀĞ¾î¿É´Ï´Ù.
-// @param defaultValue ½ÇÆĞ ½Ã ¹İÈ¯ÇÒ ±âº»°ª
-// @return º¯È¯µÈ bool °ª
+// @brief ë…¸ë“œì˜ í…ìŠ¤íŠ¸ ë¶ˆë¦¬ì–¸(bool) ê°’ì„ ì½ì–´ì˜µë‹ˆë‹¤.
+// @param defaultValue ì‹¤íŒ¨ ì‹œ ë°˜í™˜í•  ê¸°ë³¸ê°’
+// @return ë³€í™˜ëœ bool ê°’
 //***************************************************************************
 bool CXMLNode::GetBoolValue(bool defaultValue)
 {
@@ -168,9 +168,9 @@ bool CXMLNode::GetBoolValue(bool defaultValue)
 }
 
 //***************************************************************************
-// @brief ³ëµåÀÇ ÅØ½ºÆ® int8 °ªÀ» ÀĞ¾î¿É´Ï´Ù.
-// @param defaultValue ½ÇÆĞ ½Ã ¹İÈ¯ÇÒ ±âº»°ª
-// @return º¯È¯µÈ int8 °ª
+// @brief ë…¸ë“œì˜ í…ìŠ¤íŠ¸ int8 ê°’ì„ ì½ì–´ì˜µë‹ˆë‹¤.
+// @param defaultValue ì‹¤íŒ¨ ì‹œ ë°˜í™˜í•  ê¸°ë³¸ê°’
+// @return ë³€í™˜ëœ int8 ê°’
 //***************************************************************************
 int8 CXMLNode::GetInt8Value(int8 defaultValue)
 {
@@ -184,9 +184,9 @@ int8 CXMLNode::GetInt8Value(int8 defaultValue)
 }
 
 //***************************************************************************
-// @brief ³ëµåÀÇ ÅØ½ºÆ® int16 °ªÀ» ÀĞ¾î¿É´Ï´Ù.
-// @param defaultValue ½ÇÆĞ ½Ã ¹İÈ¯ÇÒ ±âº»°ª
-// @return º¯È¯µÈ int16 °ª
+// @brief ë…¸ë“œì˜ í…ìŠ¤íŠ¸ int16 ê°’ì„ ì½ì–´ì˜µë‹ˆë‹¤.
+// @param defaultValue ì‹¤íŒ¨ ì‹œ ë°˜í™˜í•  ê¸°ë³¸ê°’
+// @return ë³€í™˜ëœ int16 ê°’
 //***************************************************************************
 int16 CXMLNode::GetInt16Value(int16 defaultValue)
 {
@@ -200,9 +200,9 @@ int16 CXMLNode::GetInt16Value(int16 defaultValue)
 }
 
 //***************************************************************************
-// @brief ³ëµåÀÇ ÅØ½ºÆ® int32 °ªÀ» ÀĞ¾î¿É´Ï´Ù.
-// @param defaultValue ½ÇÆĞ ½Ã ¹İÈ¯ÇÒ ±âº»°ª
-// @return º¯È¯µÈ int32 °ª
+// @brief ë…¸ë“œì˜ í…ìŠ¤íŠ¸ int32 ê°’ì„ ì½ì–´ì˜µë‹ˆë‹¤.
+// @param defaultValue ì‹¤íŒ¨ ì‹œ ë°˜í™˜í•  ê¸°ë³¸ê°’
+// @return ë³€í™˜ëœ int32 ê°’
 //***************************************************************************
 int32 CXMLNode::GetInt32Value(int32 defaultValue)
 {
@@ -216,9 +216,9 @@ int32 CXMLNode::GetInt32Value(int32 defaultValue)
 }
 
 //***************************************************************************
-// @brief ³ëµåÀÇ ÅØ½ºÆ® int64 °ªÀ» ÀĞ¾î¿É´Ï´Ù.
-// @param defaultValue ½ÇÆĞ ½Ã ¹İÈ¯ÇÒ ±âº»°ª
-// @return º¯È¯µÈ int64 °ª
+// @brief ë…¸ë“œì˜ í…ìŠ¤íŠ¸ int64 ê°’ì„ ì½ì–´ì˜µë‹ˆë‹¤.
+// @param defaultValue ì‹¤íŒ¨ ì‹œ ë°˜í™˜í•  ê¸°ë³¸ê°’
+// @return ë³€í™˜ëœ int64 ê°’
 //***************************************************************************
 int64 CXMLNode::GetInt64Value(int64 defaultValue)
 {
@@ -232,9 +232,9 @@ int64 CXMLNode::GetInt64Value(int64 defaultValue)
 }
 
 //***************************************************************************
-// @brief ³ëµåÀÇ ÅØ½ºÆ® float °ªÀ» ÀĞ¾î¿É´Ï´Ù.
-// @param defaultValue ½ÇÆĞ ½Ã ¹İÈ¯ÇÒ ±âº»°ª
-// @return º¯È¯µÈ float °ª
+// @brief ë…¸ë“œì˜ í…ìŠ¤íŠ¸ float ê°’ì„ ì½ì–´ì˜µë‹ˆë‹¤.
+// @param defaultValue ì‹¤íŒ¨ ì‹œ ë°˜í™˜í•  ê¸°ë³¸ê°’
+// @return ë³€í™˜ëœ float ê°’
 //***************************************************************************
 float CXMLNode::GetFloatValue(float defaultValue)
 {
@@ -248,9 +248,9 @@ float CXMLNode::GetFloatValue(float defaultValue)
 }
 
 //***************************************************************************
-// @brief ³ëµåÀÇ ÅØ½ºÆ® double °ªÀ» ÀĞ¾î¿É´Ï´Ù.
-// @param defaultValue ½ÇÆĞ ½Ã ¹İÈ¯ÇÒ ±âº»°ª
-// @return º¯È¯µÈ double °ª
+// @brief ë…¸ë“œì˜ í…ìŠ¤íŠ¸ double ê°’ì„ ì½ì–´ì˜µë‹ˆë‹¤.
+// @param defaultValue ì‹¤íŒ¨ ì‹œ ë°˜í™˜í•  ê¸°ë³¸ê°’
+// @return ë³€í™˜ëœ double ê°’
 //***************************************************************************
 double CXMLNode::GetDoubleValue(double defaultValue)
 {
@@ -264,9 +264,9 @@ double CXMLNode::GetDoubleValue(double defaultValue)
 }
 
 //***************************************************************************
-// @brief ³ëµåÀÇ ÅØ½ºÆ® ¹®ÀÚ¿­ °ªÀ» ÀĞ¾î¿É´Ï´Ù.
-// @param defaultValue ½ÇÆĞ ½Ã ¹İÈ¯ÇÒ ±âº»°ª
-// @return º¯È¯µÈ TCHAR ¹®ÀÚ¿­ Æ÷ÀÎÅÍ
+// @brief ë…¸ë“œì˜ í…ìŠ¤íŠ¸ ë¬¸ìì—´ ê°’ì„ ì½ì–´ì˜µë‹ˆë‹¤.
+// @param defaultValue ì‹¤íŒ¨ ì‹œ ë°˜í™˜í•  ê¸°ë³¸ê°’
+// @return ë³€í™˜ëœ TCHAR ë¬¸ìì—´ í¬ì¸í„°
 //***************************************************************************
 const TCHAR* CXMLNode::GetStringValue(const TCHAR* defaultValue)
 {
@@ -285,9 +285,9 @@ const TCHAR* CXMLNode::GetStringValue(const TCHAR* defaultValue)
 }
 
 //***************************************************************************
-// @brief Å° ÀÌ¸§¿¡ ÇØ´çÇÏ´Â Ã¹ ¹øÂ° ÀÚ½Ä ³ëµå¸¦ Ã£½À´Ï´Ù.
-// @param ptszKey Ã£À» ÀÚ½Ä ³ëµå ÀÌ¸§
-// @return CXMLNode °´Ã¼ (½ÇÆĞ ½Ã À¯È¿ÇÏÁö ¾ÊÀº CXMLNode ¹İÈ¯)
+// @brief í‚¤ ì´ë¦„ì— í•´ë‹¹í•˜ëŠ” ì²« ë²ˆì§¸ ìì‹ ë…¸ë“œë¥¼ ì°¾ìŠµë‹ˆë‹¤.
+// @param ptszKey ì°¾ì„ ìì‹ ë…¸ë“œ ì´ë¦„
+// @return CXMLNode ê°ì²´ (ì‹¤íŒ¨ ì‹œ ìœ íš¨í•˜ì§€ ì•Šì€ CXMLNode ë°˜í™˜)
 //***************************************************************************
 CXMLNode CXMLNode::FindChild(const TCHAR* ptszKey)
 {
@@ -297,9 +297,9 @@ CXMLNode CXMLNode::FindChild(const TCHAR* ptszKey)
 }
 
 //***************************************************************************
-// @brief Å° ÀÌ¸§¿¡ ÇØ´çÇÏ´Â ¸ğµç ÀÚ½Ä ³ëµå ¸®½ºÆ®¸¦ Ã£½À´Ï´Ù.
-// @param ptszKey Ã£À» ÀÚ½Ä ³ëµå ÀÌ¸§
-// @return ÀÚ½Ä ³ëµåµéÀÌ ´ã±ä CVector<CXMLNode>
+// @brief í‚¤ ì´ë¦„ì— í•´ë‹¹í•˜ëŠ” ëª¨ë“  ìì‹ ë…¸ë“œ ë¦¬ìŠ¤íŠ¸ë¥¼ ì°¾ìŠµë‹ˆë‹¤.
+// @param ptszKey ì°¾ì„ ìì‹ ë…¸ë“œ ì´ë¦„
+// @return ìì‹ ë…¸ë“œë“¤ì´ ë‹´ê¸´ CVector<CXMLNode>
 //***************************************************************************
 CVector<CXMLNode> CXMLNode::FindChildren(const TCHAR* ptszKey)
 {
@@ -319,15 +319,15 @@ CVector<CXMLNode> CXMLNode::FindChildren(const TCHAR* ptszKey)
 }
 
 //***************************************************************************
-// @brief CRapidXMLUtil ±âº» »ı¼ºÀÚ
+// @brief CRapidXMLUtil ê¸°ë³¸ ìƒì„±ì
 //***************************************************************************
 CRapidXMLUtil::CRapidXMLUtil()
 {
 }
 
 //***************************************************************************
-// @brief XML ¹®ÀÚ¿­ µ¥ÀÌÅÍ¸¦ Àü´Ş¹Ş¾Æ ÃÊ±âÈ­ÇÏ´Â »ı¼ºÀÚ
-// @param xmlData ÆÄ½ÌÇÒ XML ¹®ÀÚ¿­
+// @brief XML ë¬¸ìì—´ ë°ì´í„°ë¥¼ ì „ë‹¬ë°›ì•„ ì´ˆê¸°í™”í•˜ëŠ” ìƒì„±ì
+// @param xmlData íŒŒì‹±í•  XML ë¬¸ìì—´
 //***************************************************************************
 CRapidXMLUtil::CRapidXMLUtil(const _tstring& xmlData)
 {
@@ -339,8 +339,8 @@ CRapidXMLUtil::CRapidXMLUtil(const _tstring& xmlData)
 }
 
 //***************************************************************************
-// @brief ±íÀº º¹»ç(Deep Copy) »ı¼ºÀÚ
-// @param other º¹»çÇÒ CRapidXMLUtil °´Ã¼
+// @brief ê¹Šì€ ë³µì‚¬(Deep Copy) ìƒì„±ì
+// @param other ë³µì‚¬í•  CRapidXMLUtil ê°ì²´
 //***************************************************************************
 CRapidXMLUtil::CRapidXMLUtil(const CRapidXMLUtil& other)
 {
@@ -352,17 +352,17 @@ CRapidXMLUtil::CRapidXMLUtil(const CRapidXMLUtil& other)
 }
 
 //***************************************************************************
-// @brief CRapidXMLUtil ¼Ò¸êÀÚ
+// @brief CRapidXMLUtil ì†Œë©¸ì
 //***************************************************************************
 CRapidXMLUtil::~CRapidXMLUtil()
 {
 }
 
 //***************************************************************************
-// @brief XML ÆÄÀÏÀ» ÀĞ¾î¼­ CXMLNode ·çÆ®·Î ÆÄ½ÌÇÕ´Ï´Ù.
-// @param filename ÆÄÀÏ °æ·Î
-// @param root [OUT] ÆÄ½Ì °á°ú¸¦ Àü´Ş¹ŞÀ» CXMLNode ÂüÁ¶ °´Ã¼
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief XML íŒŒì¼ì„ ì½ì–´ì„œ CXMLNode ë£¨íŠ¸ë¡œ íŒŒì‹±í•©ë‹ˆë‹¤.
+// @param filename íŒŒì¼ ê²½ë¡œ
+// @param root [OUT] íŒŒì‹± ê²°ê³¼ë¥¼ ì „ë‹¬ë°›ì„ CXMLNode ì°¸ì¡° ê°ì²´
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool CRapidXMLUtil::ParseFromFile(const _tstring& filename, OUT CXMLNode& root)
 {
@@ -376,9 +376,9 @@ bool CRapidXMLUtil::ParseFromFile(const _tstring& filename, OUT CXMLNode& root)
 }
 
 //***************************************************************************
-// @brief ÇöÀç XML Document »óÅÂ¸¦ ÆÄÀÏ¿¡ ÀúÀåÇÕ´Ï´Ù.
-// @param filename ÀúÀåÇÒ ÆÄÀÏ °æ·Î
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief í˜„ì¬ XML Document ìƒíƒœë¥¼ íŒŒì¼ì— ì €ì¥í•©ë‹ˆë‹¤.
+// @param filename ì €ì¥í•  íŒŒì¼ ê²½ë¡œ
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool CRapidXMLUtil::SaveFile(const _tstring& filename)
 {
@@ -399,10 +399,10 @@ bool CRapidXMLUtil::SaveFile(const _tstring& filename)
 }
 
 //***************************************************************************
-// @brief Æ¯Á¤ XML ¹®ÀÚ¿­À» ÆÄÀÏ·Î Á÷Á¢ ÀúÀåÇÕ´Ï´Ù.
-// @param filename ÀúÀåÇÒ ÆÄÀÏ °æ·Î
-// @param xmlData ÀúÀåÇÒ XML ¹®ÀÚ¿­
-// @return ¼º°ø ½Ã true, ½ÇÆĞ ½Ã false
+// @brief íŠ¹ì • XML ë¬¸ìì—´ì„ íŒŒì¼ë¡œ ì§ì ‘ ì €ì¥í•©ë‹ˆë‹¤.
+// @param filename ì €ì¥í•  íŒŒì¼ ê²½ë¡œ
+// @param xmlData ì €ì¥í•  XML ë¬¸ìì—´
+// @return ì„±ê³µ ì‹œ true, ì‹¤íŒ¨ ì‹œ false
 //***************************************************************************
 bool CRapidXMLUtil::SaveFileToXML(const _tstring& filename, const _tstring& xmlData)
 {
@@ -422,7 +422,7 @@ bool CRapidXMLUtil::SaveFileToXML(const _tstring& filename, const _tstring& xmlD
 }
 
 //***************************************************************************
-// @brief ÄÜ¼Ö È­¸é¿¡ ÇöÀç XML ¹®¼­ ³»¿ëÀ» Ãâ·ÂÇÕ´Ï´Ù (µğ¹ö±ë¿ë).
+// @brief ì½˜ì†” í™”ë©´ì— í˜„ì¬ XML ë¬¸ì„œ ë‚´ìš©ì„ ì¶œë ¥í•©ë‹ˆë‹¤ (ë””ë²„ê¹…ìš©).
 //***************************************************************************
 void CRapidXMLUtil::PrintXML() const
 {
@@ -433,7 +433,7 @@ void CRapidXMLUtil::PrintXML() const
 }
 
 //***************************************************************************
-// @brief XML Çì´õ ¼±¾ğ(<?xml version="1.0" encoding="utf-8"?>)À» Ãß°¡ÇÕ´Ï´Ù.
+// @brief XML í—¤ë” ì„ ì–¸(<?xml version="1.0" encoding="utf-8"?>)ì„ ì¶”ê°€í•©ë‹ˆë‹¤.
 //***************************************************************************
 void CRapidXMLUtil::XMLDeclaration()
 {
@@ -444,10 +444,10 @@ void CRapidXMLUtil::XMLDeclaration()
 }
 
 //***************************************************************************
-// @brief ºÎ¸ğ ³ëµå¿¡ »õ·Î¿î ÀÚ½Ä ³ëµå¸¦ Ãß°¡ÇÕ´Ï´Ù.
-// @param parentNode ºÎ¸ğ ³ëµå Æ÷ÀÎÅÍ
-// @param nodeName »ı¼ºÇÒ ³ëµå ÀÌ¸§
-// @return »ı¼ºµÈ ³ëµåÀÇ Æ÷ÀÎÅÍ
+// @brief ë¶€ëª¨ ë…¸ë“œì— ìƒˆë¡œìš´ ìì‹ ë…¸ë“œë¥¼ ì¶”ê°€í•©ë‹ˆë‹¤.
+// @param parentNode ë¶€ëª¨ ë…¸ë“œ í¬ì¸í„°
+// @param nodeName ìƒì„±í•  ë…¸ë“œ ì´ë¦„
+// @return ìƒì„±ëœ ë…¸ë“œì˜ í¬ì¸í„°
 //***************************************************************************
 xml_node<>* CRapidXMLUtil::AddNode(xml_node<>* parentNode, const _tstring& nodeName)
 {
@@ -460,8 +460,8 @@ xml_node<>* CRapidXMLUtil::AddNode(xml_node<>* parentNode, const _tstring& nodeN
 }
 
 //***************************************************************************
-// @brief Root ³ëµå ¾Æ·¡¿¡¼­ Æ¯Á¤ ÀÌ¸§À» °¡Áø ³ëµå¸¦ Ã£¾Æ »èÁ¦ÇÕ´Ï´Ù.
-// @param nodeName »èÁ¦ÇÒ ³ëµå ÀÌ¸§
+// @brief Root ë…¸ë“œ ì•„ë˜ì—ì„œ íŠ¹ì • ì´ë¦„ì„ ê°€ì§„ ë…¸ë“œë¥¼ ì°¾ì•„ ì‚­ì œí•©ë‹ˆë‹¤.
+// @param nodeName ì‚­ì œí•  ë…¸ë“œ ì´ë¦„
 //***************************************************************************
 void CRapidXMLUtil::RemoveNode(const _tstring& nodeName)
 {
@@ -484,10 +484,10 @@ void CRapidXMLUtil::RemoveNode(const _tstring& nodeName)
 }
 
 //***************************************************************************
-// @brief Æ¯Á¤ ³ëµå¿¡ ¼Ó¼ºÀ» Ãß°¡ÇÕ´Ï´Ù.
-// @param node ´ë»ó ³ëµå Æ÷ÀÎÅÍ
-// @param attName ¼Ó¼º ÀÌ¸§
-// @param attValue ¼Ó¼º °ª
+// @brief íŠ¹ì • ë…¸ë“œì— ì†ì„±ì„ ì¶”ê°€í•©ë‹ˆë‹¤.
+// @param node ëŒ€ìƒ ë…¸ë“œ í¬ì¸í„°
+// @param attName ì†ì„± ì´ë¦„
+// @param attValue ì†ì„± ê°’
 //***************************************************************************
 void CRapidXMLUtil::AddAttribute(xml_node<>* node, const _tstring& attName, const _tstring& attValue)
 {
@@ -506,10 +506,10 @@ void CRapidXMLUtil::AddAttribute(xml_node<>* node, const _tstring& attName, cons
 }
 
 //***************************************************************************
-// @brief Æ¯Á¤ ³ëµåÀÇ ¼Ó¼ºÀ» ¼öÁ¤ÇÕ´Ï´Ù (¾øÀ¸¸é ½Å±Ô Ãß°¡).
-// @param node ´ë»ó ³ëµå Æ÷ÀÎÅÍ
-// @param attName ¼Ó¼º ÀÌ¸§
-// @param attValue ¼³Á¤ÇÒ ¼Ó¼º °ª
+// @brief íŠ¹ì • ë…¸ë“œì˜ ì†ì„±ì„ ìˆ˜ì •í•©ë‹ˆë‹¤ (ì—†ìœ¼ë©´ ì‹ ê·œ ì¶”ê°€).
+// @param node ëŒ€ìƒ ë…¸ë“œ í¬ì¸í„°
+// @param attName ì†ì„± ì´ë¦„
+// @param attValue ì„¤ì •í•  ì†ì„± ê°’
 //***************************************************************************
 void CRapidXMLUtil::SetAttribute(xml_node<>* node, const _tstring& attName, const _tstring& attValue)
 {
@@ -527,9 +527,9 @@ void CRapidXMLUtil::SetAttribute(xml_node<>* node, const _tstring& attName, cons
 }
 
 //***************************************************************************
-// @brief Æ¯Á¤ ³ëµå ¹× ÇØ´ç ÀÚ½Ä ³ëµå ÀüÃ¼¿¡¼­ ÁöÁ¤ÇÑ ¼Ó¼ºÀ» Á¦°ÅÇÕ´Ï´Ù.
-// @param node ´ë»ó ³ëµå Æ÷ÀÎÅÍ
-// @param attName »èÁ¦ÇÒ ¼Ó¼º ÀÌ¸§
+// @brief íŠ¹ì • ë…¸ë“œ ë° í•´ë‹¹ ìì‹ ë…¸ë“œ ì „ì²´ì—ì„œ ì§€ì •í•œ ì†ì„±ì„ ì œê±°í•©ë‹ˆë‹¤.
+// @param node ëŒ€ìƒ ë…¸ë“œ í¬ì¸í„°
+// @param attName ì‚­ì œí•  ì†ì„± ì´ë¦„
 //***************************************************************************
 void CRapidXMLUtil::RemoveAttribute(xml_node<>* node, const _tstring& attName)
 {
@@ -550,10 +550,10 @@ void CRapidXMLUtil::RemoveAttribute(xml_node<>* node, const _tstring& attName)
 }
 
 //***************************************************************************
-// @brief ºÎ¸ğ ³ëµå¿¡ ¹®ÀÚ¿­ °ªÀ» °¡Áö´Â ¿ä¼Ò¸¦ Ãß°¡ÇÕ´Ï´Ù.
-// @param str ¼³Á¤ÇÒ ¹®ÀÚ¿­ °ª
-// @param parent ºÎ¸ğ ³ëµå Æ÷ÀÎÅÍ
-// @param ptszTagName »ı¼ºÇÒ ÅÂ±× ÀÌ¸§
+// @brief ë¶€ëª¨ ë…¸ë“œì— ë¬¸ìì—´ ê°’ì„ ê°€ì§€ëŠ” ìš”ì†Œë¥¼ ì¶”ê°€í•©ë‹ˆë‹¤.
+// @param str ì„¤ì •í•  ë¬¸ìì—´ ê°’
+// @param parent ë¶€ëª¨ ë…¸ë“œ í¬ì¸í„°
+// @param ptszTagName ìƒì„±í•  íƒœê·¸ ì´ë¦„
 //***************************************************************************
 void CRapidXMLUtil::AddValue(const _tstring& str, xml_node<>* parent, const TCHAR* ptszTagName)
 {
@@ -564,10 +564,10 @@ void CRapidXMLUtil::AddValue(const _tstring& str, xml_node<>* parent, const TCHA
 }
 
 //***************************************************************************
-// @brief ºÎ¸ğ ³ëµå¿¡ CDATA ¼½¼Ç(<![CDATA[ ³»¿ë ]]>)À» Ãß°¡ÇÕ´Ï´Ù.
-// @param str CDATA ¼½¼Ç¿¡ µé¾î°¥ ¹®ÀÚ¿­
-// @param parent ºÎ¸ğ ³ëµå Æ÷ÀÎÅÍ
-// @param ptszTagName »ı¼ºÇÒ ÅÂ±× ÀÌ¸§
+// @brief ë¶€ëª¨ ë…¸ë“œì— CDATA ì„¹ì…˜(<![CDATA[ ë‚´ìš© ]]>)ì„ ì¶”ê°€í•©ë‹ˆë‹¤.
+// @param str CDATA ì„¹ì…˜ì— ë“¤ì–´ê°ˆ ë¬¸ìì—´
+// @param parent ë¶€ëª¨ ë…¸ë“œ í¬ì¸í„°
+// @param ptszTagName ìƒì„±í•  íƒœê·¸ ì´ë¦„
 //***************************************************************************
 void CRapidXMLUtil::AddCDataValue(const _tstring& str, xml_node<>* parent, const TCHAR* ptszTagName)
 {
@@ -578,9 +578,9 @@ void CRapidXMLUtil::AddCDataValue(const _tstring& str, xml_node<>* parent, const
 }
 
 //***************************************************************************
-// @brief ÁöÁ¤ÇÑ ³ëµåÀÇ ÅØ½ºÆ® °ªÀ» ¾ò¾î¿É´Ï´Ù.
-// @param str [OUT] °¡Á®¿Â ÅØ½ºÆ® °ªÀ» ÀúÀåÇÒ º¯¼ö
-// @param node ´ë»ó ³ëµå Æ÷ÀÎÅÍ
+// @brief ì§€ì •í•œ ë…¸ë“œì˜ í…ìŠ¤íŠ¸ ê°’ì„ ì–»ì–´ì˜µë‹ˆë‹¤.
+// @param str [OUT] ê°€ì ¸ì˜¨ í…ìŠ¤íŠ¸ ê°’ì„ ì €ì¥í•  ë³€ìˆ˜
+// @param node ëŒ€ìƒ ë…¸ë“œ í¬ì¸í„°
 //***************************************************************************
 void CRapidXMLUtil::GetValue(_tstring& str, xml_node<>* node)
 {
@@ -591,8 +591,8 @@ void CRapidXMLUtil::GetValue(_tstring& str, xml_node<>* node)
 }
 
 //***************************************************************************
-// @brief ÁöÁ¤ÇÑ ³ëµå ¹× ±× ÇÏÀ§ ÀÚ½Ä ³ëµåµéÀ» Àç±ÍÀûÀ¸·Î ¿ÏÀüÈ÷ Á¦°ÅÇÕ´Ï´Ù.
-// @param node »èÁ¦ÇÒ ³ëµå Æ÷ÀÎÅÍ
+// @brief ì§€ì •í•œ ë…¸ë“œ ë° ê·¸ í•˜ìœ„ ìì‹ ë…¸ë“œë“¤ì„ ì¬ê·€ì ìœ¼ë¡œ ì™„ì „íˆ ì œê±°í•©ë‹ˆë‹¤.
+// @param node ì‚­ì œí•  ë…¸ë“œ í¬ì¸í„°
 //***************************************************************************
 void CRapidXMLUtil::RemoveNodeRecursive(xml_node<char>* node)
 {
