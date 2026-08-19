@@ -1,6 +1,6 @@
 ﻿
 //***************************************************************************
-// RioEchoSession.cpp : implementation of the CRioEchoSession, CRioClientEchoSession class.
+// RioEchoSession.cpp : implementation of the CRioEchoServerSession, CRioEchoClientSession class.
 //
 //***************************************************************************
 
@@ -8,23 +8,23 @@
 #include "RioEchoSession.h"
 
 //***************************************************************************
-// @brief CRioEchoSession 객체를 생성합니다.
+// @brief CRioEchoServerSession 객체를 생성합니다.
 //***************************************************************************
-CRioEchoSession::CRioEchoSession()
+CRioEchoServerSession::CRioEchoServerSession()
 {
 }
 
 //***************************************************************************
-// @brief CRioEchoSession 객체를 소멸합니다.
+// @brief CRioEchoServerSession 객체를 소멸합니다.
 //***************************************************************************
-CRioEchoSession::~CRioEchoSession()
+CRioEchoServerSession::~CRioEchoServerSession()
 {
 }
 
 //***************************************************************************
 // @brief RIO 클라이언트가 성공적으로 접속했을 때 호출되는 오버라이드 함수입니다.
 //***************************************************************************
-void CRioEchoSession::OnConnected()
+void CRioEchoServerSession::OnConnected()
 {
 	CRioSession::OnConnected();
 	LOG_INFO(_T("[RIO Session] Connected!"));
@@ -34,7 +34,7 @@ void CRioEchoSession::OnConnected()
 // @brief RIO 클라이언트와의 연결이 끊어졌을 때 호출되는 오버라이드 함수입니다.
 // @param reason 세션 종료 사유
 //***************************************************************************
-void CRioEchoSession::OnDisconnected(Rio::CloseReason reason)
+void CRioEchoServerSession::OnDisconnected(Rio::CloseReason reason)
 {
 	CRioSession::OnDisconnected(reason);
 	LOG_INFO(_T("[RIO Session] Disconnected! (Reason: %d)"), static_cast<int>(reason));
@@ -44,7 +44,7 @@ void CRioEchoSession::OnDisconnected(Rio::CloseReason reason)
 // @brief RIO 환경에서 패킷을 수신했을 때 호출되는 순수 가상 오버라이드 함수입니다.
 // @details 수신 링버퍼에서 데이터를 읽어 출력하고, 그대로 클라이언트에게 에코백(Send)합니다.
 //***************************************************************************
-void CRioEchoSession::OnDataReceived()
+void CRioEchoServerSession::OnDataReceived()
 {
 	auto& recvBuffer = GetRecvBuffer();
 
@@ -70,7 +70,7 @@ void CRioEchoSession::OnDataReceived()
 //***************************************************************************
 // @brief RIO 클라이언트가 서버에 성공적으로 접속했을 때 호출되는 오버라이드 함수입니다.
 //***************************************************************************
-void CRioClientEchoSession::OnConnected()
+void CRioEchoClientSession::OnConnected()
 {
 	CRioSession::OnConnected();
 	LOG_INFO(_T("[RIO Client] Connected to Server!"));
@@ -80,7 +80,7 @@ void CRioClientEchoSession::OnConnected()
 // @brief RIO 클라이언트가 서버와의 연결이 종료되었을 때 호출되는 오버라이드 함수입니다.
 // @param reason 세션 종료 사유
 //***************************************************************************
-void CRioClientEchoSession::OnDisconnected(Rio::CloseReason reason)
+void CRioEchoClientSession::OnDisconnected(Rio::CloseReason reason)
 {
 	CRioSession::OnDisconnected(reason);
 	LOG_INFO(_T("[RIO Client] Disconnected from Server! (Reason: %d)"), static_cast<int>(reason));
@@ -89,7 +89,7 @@ void CRioClientEchoSession::OnDisconnected(Rio::CloseReason reason)
 //***************************************************************************
 // @brief RIO 클라이언트가 서버로부터 패킷을 수신했을 때 호출되는 오버라이드 함수입니다.
 //***************************************************************************
-void CRioClientEchoSession::OnDataReceived()
+void CRioEchoClientSession::OnDataReceived()
 {
 	auto& recvBuffer = GetRecvBuffer();
 

@@ -2,10 +2,24 @@
 //***************************************************************************
 // DateTimeUtil.cpp : implementation of the DateTimeUtil Functions.
 //
+// #ifdef _WIN32 블록 : SYSTEMTIME/TIMESTAMP_STRUCT/SQL_TIMESTAMP_STRUCT 등
+//                      Windows/ODBC 전용 타입에 묶인 함수들.
+// ptime 네임스페이스 : 플랫폼 독립 함수들. Windows/POSIX 시그니처 차이가
+//                      있는 지점(localtime_s/r, gmtime_s/r, _mkgmtime/timegm)
+//                      만 내부적으로 다시 #ifdef _WIN32 로 분기합니다.
 //***************************************************************************
 
 #include "pch.h"
 #include "DateTimeUtil.h"
+
+#include <sstream>
+#include <iomanip>
+#include <thread>
+
+//***************************************************************************
+// Windows 전용 (SYSTEMTIME / TIMESTAMP_STRUCT / SQL_TIMESTAMP_STRUCT)
+//***************************************************************************
+#ifdef _WIN32
 
 //***************************************************************************
 // @brief TIMESTAMP_STRUCT 데이터를 time_t로 변환하여 할당합니다.
@@ -288,116 +302,6 @@ TCHAR* operator<<(TCHAR* tszDateTime, SYSTEMTIME& stime)
 }
 
 //***************************************************************************
-// @brief 현재 시스템의 타임스탬프 값을 반환합니다.
-// @return 현재 time_t 타임스탬프
-//***************************************************************************
-time_t GetCurTimestamp()
-{
-	time_t now = time(nullptr);
-	return now;
-}
-
-//***************************************************************************
-// @brief 현재 지역 날짜 및 시간(YYYYMMDDhhmmss, 14자리)을 가져옵니다.
-// @param ptszDateTime 결과를 저장할 TCHAR 버퍼
-//***************************************************************************
-void GetCurDateTime(TCHAR* ptszDateTime)
-{
-	if( ptszDateTime == nullptr ) return;
-
-	SYSTEMTIME	stime;
-	GetLocalTime(&stime);
-
-	_stprintf_s(ptszDateTime, STD_DATETIME_STRLEN, _T("%04d%02d%02d%02d%02d%02d"), stime.wYear, stime.wMonth, stime.wDay, stime.wHour, stime.wMinute, stime.wSecond);
-}
-
-//***************************************************************************
-// @brief 현재 지역 날짜(YYYYMMDD, 8자리)를 가져옵니다.
-// @param ptszDate 결과를 저장할 TCHAR 버퍼
-//***************************************************************************
-void GetCurDate(TCHAR* ptszDate)
-{
-	if( ptszDate == nullptr ) return;
-
-	SYSTEMTIME	stime;
-	GetLocalTime(&stime);
-
-	_stprintf_s(ptszDate, DATE_STRLEN, _T("%04d%02d%02d"), stime.wYear, stime.wMonth, stime.wDay);
-}
-
-//***************************************************************************
-// @brief 어제의 날짜 및 시간(YYYYMMDDhhmmss)을 가져옵니다.
-// @param ptszDateTime 결과를 저장할 TCHAR 버퍼
-//***************************************************************************
-void GetYesterdayTime(TCHAR* ptszDateTime)
-{
-	if( ptszDateTime == nullptr ) return;
-
-	SYSTEMTIME	stime;
-	GetLocalTime(&stime);
-
-	int nMonthList[] = { 0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
-
-	if( stime.wYear % 4 == 0 && stime.wYear % 100 != 0 ) nMonthList[2] = nMonthList[2] + 1;
-	else if( stime.wYear % 4 == 0 && stime.wYear % 100 == 0 && stime.wYear % 400 == 0 ) nMonthList[2] = nMonthList[2] + 1;
-
-	if( stime.wDay - 1 <= 0 )
-	{
-		if( stime.wMonth - 1 <= 0 )
-		{
-			stime.wYear--;
-			stime.wMonth = 12;
-			stime.wDay = 31;
-		}
-		else
-		{
-			stime.wMonth--;
-			stime.wDay = nMonthList[stime.wMonth];
-		}
-	}
-	else
-		stime.wDay--;
-
-	_stprintf_s(ptszDateTime, STD_DATETIME_STRLEN, _T("%04d%02d%02d%02d%02d%02d"), stime.wYear, stime.wMonth, stime.wDay, stime.wHour, stime.wMinute, stime.wSecond);
-}
-
-//***************************************************************************
-// @brief 어제의 날짜(YYYYMMDD)를 가져옵니다.
-// @param ptszDate 결과를 저장할 TCHAR 버퍼
-//***************************************************************************
-void GetYesterday(TCHAR* ptszDate)
-{
-	if( ptszDate == nullptr ) return;
-
-	SYSTEMTIME	stime;
-	GetLocalTime(&stime);
-
-	int nMonthList[] = { 0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
-
-	if( stime.wYear % 4 == 0 && stime.wYear % 100 != 0 ) nMonthList[2] = nMonthList[2] + 1;
-	else if( stime.wYear % 4 == 0 && stime.wYear % 100 == 0 && stime.wYear % 400 == 0 ) nMonthList[2] = nMonthList[2] + 1;
-
-	if( stime.wDay - 1 <= 0 )
-	{
-		if( stime.wMonth - 1 <= 0 )
-		{
-			stime.wYear--;
-			stime.wMonth = 12;
-			stime.wDay = 31;
-		}
-		else
-		{
-			stime.wMonth--;
-			stime.wDay = nMonthList[stime.wMonth];
-		}
-	}
-	else
-		stime.wDay--;
-
-	_stprintf_s(ptszDate, DATE_STRLEN, _T("%04d%02d%02d"), stime.wYear, stime.wMonth, stime.wDay);
-}
-
-//***************************************************************************
 // @brief SYSTEMTIME 구조체를 time_t 타임스탬프로 변환합니다.
 // @param tTime 변환할 SYSTEMTIME 객체
 // @return 변환된 time_t 값
@@ -415,29 +319,6 @@ time_t GetTimestampToDateTime(const SYSTEMTIME tTime)
 	time.tm_wday = 0;								/* days since Sunday - [0,6] */
 	time.tm_yday = 0;								/* days since January 1 - [0,365] */
 	time.tm_isdst = 0;								/* daylight savings time flag */
-
-	return mktime(&time);
-}
-
-//***************************************************************************
-// @brief YYYYMMDDhhmmss 형식의 문자열을 time_t 타임스탬프로 변환합니다.
-// @param ptszDateTime 변환할 날짜/시간 문자열
-// @return 변환된 time_t 값
-//***************************************************************************
-time_t GetTimestampToDateTime(const TCHAR* ptszDateTime)
-{
-	struct tm time;
-
-	time.tm_sec = (ptszDateTime[12] - '0') * 10 + (ptszDateTime[13] - '0');					/* seconds after the minute - [0,59] */
-	time.tm_min = (ptszDateTime[10] - '0') * 10 + (ptszDateTime[11] - '0');					/* minutes after the hour - [0,59] */
-	time.tm_hour = (ptszDateTime[8] - '0') * 10 + (ptszDateTime[9] - '0');					/* hours since midnight - [0,23] */
-	time.tm_mday = (ptszDateTime[6] - '0') * 10 + (ptszDateTime[7] - '0');					/* day of the month - [1,31] */
-	time.tm_mon = (ptszDateTime[4] - '0') * 10 + (ptszDateTime[5] - '0') - 1;				/* months since January - [0,11] */
-	time.tm_year = (ptszDateTime[0] - '0') * 1000 + (ptszDateTime[1] - '0') * 100 + \
-		(ptszDateTime[2] - '0') * 10 + (ptszDateTime[3] - '0') - 1900;						/* years since 1900 */
-	time.tm_wday = 0;																		/* days since Sunday - [0,6] */
-	time.tm_yday = 0;																		/* days since January 1 - [0,365] */
-	time.tm_isdst = 0;																		/* daylight savings time flag */
 
 	return mktime(&time);
 }
@@ -461,24 +342,6 @@ bool  GetSystemTimeToTimestamp(SYSTEMTIME& tTime, const time_t timestamp)
 	tTime.wHour = tm_info.tm_hour;
 	tTime.wMinute = tm_info.tm_min;
 	tTime.wSecond = tm_info.tm_sec;
-
-	return true;
-}
-
-//***************************************************************************
-// @brief time_t 타임스탬프를 YYYYMMDDhhmmss 형식의 문자열로 변환합니다.
-// @param ptszDateTime 결과를 저장할 TCHAR 버퍼
-// @param timestamp 변환할 time_t 값
-// @return 성공 시 true, 실패 시 false
-//***************************************************************************
-bool  GetDateTimeToTimestamp(TCHAR* ptszDateTime, const time_t timestamp)
-{
-	struct tm tm_info;
-
-	errno_t err_no = localtime_s(&tm_info, &timestamp);
-	if( err_no > 0 ) return false;
-
-	_tcsftime(ptszDateTime, STD_DATETIME_STRLEN, _T("%Y%m%d%H%M%S"), &tm_info);
 
 	return true;
 }
@@ -515,353 +378,6 @@ bool  IsValidDateTime(const TCHAR* ptszDateTime)
 	int nSec = (ptszDateTime[12] - '0') * 10 + (ptszDateTime[13] - '0');
 
 	if( nHour < 0 || nHour > 23 || nMin < 0 || nMin > 59 || nSec < 0 || nSec > 59 ) return false;
-
-	return true;
-}
-
-//***************************************************************************
-// @brief YYYYMMDD 형식의 문자열이 유효한 날짜인지 검증합니다.
-// @param ptszDate 검증할 날짜 문자열
-// @return 유효하면 true, 아니면 false
-//***************************************************************************
-bool  IsValidDate(const TCHAR* ptszDate)
-{
-	int i = 0;
-
-	for( i = 0; i < 9; i++ )
-		if( *(ptszDate + i) == NULL ) break;
-
-	if( i < 8 ) return false;
-
-	int nMonthList[] = { 0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
-
-	int nYear = (ptszDate[0] - '0') * 1000 + (ptszDate[1] - '0') * 100 + (ptszDate[2] - '0') * 10 + (ptszDate[3] - '0');
-	int nMonth = (ptszDate[4] - '0') * 10 + (ptszDate[5] - '0');
-	int nDay = (ptszDate[6] - '0') * 10 + (ptszDate[7] - '0');
-
-	if( nYear < 1 || nMonth < 1 || nMonth > 12 || nDay < 1 ) return false;
-
-	if( nYear % 4 == 0 && nYear % 100 != 0 ) nMonthList[2] = nMonthList[2] + 1;
-	else if( nYear % 4 == 0 && nYear % 100 == 0 && nYear % 400 == 0 ) nMonthList[2] = nMonthList[2] + 1;
-
-	if( nDay > nMonthList[nMonth] ) return false;
-
-	return true;
-}
-
-//***************************************************************************
-// @brief hhmmss 형식의 문자열이 유효한 시간인지 검증합니다.
-// @param ptszTime 검증할 시간 문자열
-// @return 유효하면 true, 아니면 false
-//***************************************************************************
-bool  IsValidTime(const TCHAR* ptszTime)
-{
-	int i = 0;
-
-	for( i = 0; i < 7; i++ )
-		if( *(ptszTime + i) == NULL ) break;
-
-	if( i < 6 ) return false;
-
-	int nHour = (ptszTime[0] - '0') * 10 + (ptszTime[1] - '0');
-	int nMin = (ptszTime[2] - '0') * 10 + (ptszTime[3] - '0');
-	int nSec = (ptszTime[4] - '0') * 10 + (ptszTime[5] - '0');
-
-	if( nHour < 0 || nHour > 23 || nMin < 0 || nMin > 59 || nSec < 0 || nSec > 59 ) return false;
-
-	return true;
-}
-
-//***************************************************************************
-// @brief 지정한 날짜/시간과 오늘을 비교합니다.
-// @param ptszDate 비교할 날짜/시간 문자열 (YYYYMMDD 또는 YYYYMMDDhhmmss)
-// @return 음수: 오늘보다 이전, 0: 오늘과 같음, 양수: 오늘보다 이후 (오류 시 -9999)
-//***************************************************************************
-int CompareToday(const TCHAR* ptszDate)
-{
-	if( ptszDate == nullptr ) return -9999;
-
-	size_t nRet = _tcslen(ptszDate);
-	if( nRet != 8 && nRet != 14 )
-		return -9999;
-
-	for( TCHAR* lpsz = (TCHAR*)ptszDate; *lpsz != NULL; ++lpsz )
-		if( !isdigit(*lpsz) ) return -9999;
-
-	TCHAR		tszDateTime[STD_DATETIME_STRLEN];
-
-	SYSTEMTIME	stime;
-	GetLocalTime(&stime);
-
-	if( nRet == 8 ) _stprintf_s(tszDateTime, STD_DATETIME_STRLEN, _T("%04d%02d%02d"), stime.wYear, stime.wMonth, stime.wDay);
-	else _stprintf_s(tszDateTime, STD_DATETIME_STRLEN, _T("%04d%02d%02d%02d%02d%02d"), stime.wYear, stime.wMonth, stime.wDay, stime.wHour, stime.wMinute, stime.wSecond);
-
-	return _tcscmp(ptszDate, tszDateTime);
-}
-
-//***************************************************************************
-// @brief 기준 날짜에서 지정한 간격(일 단위)만큼 더하거나 뺀 날짜를 계산합니다.
-// @param ptszDestDate 결과 날짜(YYYYMMDD)가 저장될 버퍼
-// @param ptszSrcDate 기준 날짜(YYYYMMDD) 문자열
-// @param nInterval 가감할 일수 간격 (양수: 과거, 음수: 미래)
-// @return 성공 시 true, 실패 시 false
-//***************************************************************************
-bool  GetDateIntervalDate(TCHAR* ptszDestDate, const TCHAR* ptszSrcDate, const int nInterval)
-{
-	int nYear(0), nMonth(0), nDay(0);
-
-	SYSTEMTIME	stime;
-	GetLocalTime(&stime);
-
-	int nMonthList[] = { 0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
-
-	nYear = (ptszSrcDate[0] - '0') * 1000 + (ptszSrcDate[1] - '0') * 100 +
-		(ptszSrcDate[2] - '0') * 10 + (ptszSrcDate[3] - '0');
-	nMonth = (ptszSrcDate[4] - '0') * 10 + (ptszSrcDate[5] - '0');
-	nDay = (ptszSrcDate[6] - '0') * 10 + (ptszSrcDate[7] - '0');
-
-	stime.wYear = nYear;
-	stime.wMonth = nMonth;
-	stime.wDay = nDay;
-
-	if( stime.wYear % 4 == 0 && stime.wYear % 100 != 0 ) nMonthList[2] = nMonthList[2] + 1;
-	else if( stime.wYear % 4 == 0 && stime.wYear % 100 == 0 && stime.wYear % 400 == 0 ) nMonthList[2] = nMonthList[2] + 1;
-
-	if( nInterval > 0 )
-	{
-		if( (stime.wDay - nInterval) < 0 )
-		{
-			if( (stime.wMonth - 1) < 0 )
-			{
-				stime.wYear--;
-				stime.wMonth = 12;
-				int nTemp = nInterval - stime.wDay;
-
-				if( nTemp > 31 )
-				{
-					ptszDestDate[0] = _T('\0');
-					return false;
-				}
-
-				stime.wDay = 31 - nTemp;
-			}
-			else
-			{
-				stime.wMonth--;
-				int nTemp = nInterval - stime.wDay;
-
-				if( nTemp > nMonthList[stime.wMonth] )
-				{
-					ptszDestDate[0] = _T('\0');
-					return false;
-				}
-
-				stime.wDay = nMonthList[stime.wMonth] - nTemp;
-			}
-		}
-		else if( (stime.wDay - nInterval) == 0 )
-		{
-			if( stime.wMonth - 1 < 0 )
-			{
-				stime.wYear--;
-				stime.wMonth = 12;
-				stime.wDay = 31;
-			}
-			else
-			{
-				stime.wMonth--;
-				stime.wDay = nMonthList[stime.wMonth];
-			}
-		}
-		else
-			stime.wDay = stime.wDay - nInterval;
-	}
-	else
-	{
-		if( (stime.wDay + (-1 * nInterval)) > nMonthList[stime.wMonth] )
-		{
-			if( stime.wMonth + 1 > 12 )
-			{
-				stime.wYear++;
-				stime.wMonth = 1;
-				int nTemp = (-1 * nInterval) - (nMonthList[12] - stime.wDay);
-
-				if( nTemp > 31 || nTemp < 0 )
-				{
-					ptszDestDate[0] = _T('\0');
-					return false;
-				}
-				stime.wDay = nTemp;
-			}
-			else
-			{
-				int nTemp = (-1 * nInterval) - (nMonthList[stime.wMonth] - stime.wDay);
-
-				stime.wMonth = stime.wMonth + 1;
-
-				if( nTemp > 31 || nTemp < 0 )
-				{
-					ptszDestDate[0] = _T('\0');
-					return false;
-				}
-				stime.wDay = nTemp;
-			}
-		}
-		else stime.wDay = stime.wDay + (-1 * nInterval);
-	}
-
-	_stprintf_s(ptszDestDate, DATE_STRLEN, _T("%04d%02d%02d"), stime.wYear, stime.wMonth, stime.wDay);
-
-	return true;
-}
-
-//***************************************************************************
-// @brief 오늘 기준에서 지정한 간격(일 단위)만큼 더하거나 뺀 날짜를 계산합니다.
-// @param ptszDate 결과 날짜(YYYYMMDD)가 저장될 버퍼
-// @param nInterval 가감할 일수 간격 (양수: 과거, 음수: 미래)
-// @return 성공 시 true, 실패 시 false
-//***************************************************************************
-bool  GetDateIntervalToday(TCHAR* ptszDate, const int nInterval)
-{
-	if( ptszDate == nullptr ) return false;
-
-	SYSTEMTIME	stime;
-	GetLocalTime(&stime);
-
-	int nMonthList[] = { 0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
-
-	if( stime.wYear % 4 == 0 && stime.wYear % 100 != 0 ) nMonthList[2] = nMonthList[2] + 1;
-	else if( stime.wYear % 4 == 0 && stime.wYear % 100 == 0 && stime.wYear % 400 == 0 ) nMonthList[2] = nMonthList[2] + 1;
-
-	if( nInterval > 0 )
-	{
-		if( (stime.wDay - nInterval) < 0 )
-		{
-			if( (stime.wMonth - 1) < 0 )
-			{
-				stime.wYear--;
-				stime.wMonth = 12;
-				int nTemp = nInterval - stime.wDay;
-
-				if( nTemp > 31 )
-				{
-					ptszDate[0] = _T('\0');
-					return false;
-				}
-
-				stime.wDay = 31 - nTemp;
-			}
-			else
-			{
-				stime.wMonth--;
-				int nTemp = nInterval - stime.wDay;
-
-				if( nTemp > nMonthList[stime.wMonth] )
-				{
-					ptszDate[0] = _T('\0');
-					return false;
-				}
-
-				stime.wDay = nMonthList[stime.wMonth] - nTemp;
-			}
-		}
-		else if( (stime.wDay - nInterval) == 0 )
-		{
-			if( stime.wMonth - 1 < 0 )
-			{
-				stime.wYear--;
-				stime.wMonth = 12;
-				stime.wDay = 31;
-			}
-			else
-			{
-				stime.wMonth--;
-				stime.wDay = nMonthList[stime.wMonth];
-			}
-		}
-		else
-			stime.wDay = stime.wDay - nInterval;
-	}
-	else
-	{
-		if( (stime.wDay + (-1 * nInterval)) > nMonthList[stime.wMonth] )
-		{
-			if( stime.wMonth + 1 > 12 )
-			{
-				stime.wYear++;
-				stime.wMonth = 1;
-				int nTemp = (-1 * nInterval) - (nMonthList[12] - stime.wDay);
-
-				if( nTemp > 31 || nTemp < 0 )
-				{
-					ptszDate[0] = _T('\0');
-					return false;
-				}
-				stime.wDay = nTemp;
-			}
-			else
-			{
-				int nTemp = (-1 * nInterval) - (nMonthList[stime.wMonth] - stime.wDay);
-
-				stime.wMonth = stime.wMonth + 1;
-
-				if( nTemp > 31 || nTemp < 0 )
-				{
-					ptszDate[0] = _T('\0');
-					return false;
-				}
-				stime.wDay = nTemp;
-			}
-		}
-		else stime.wDay = stime.wDay + (-1 * nInterval);
-	}
-	_stprintf_s(ptszDate, DATE_STRLEN, _T("%04d%02d%02d"), stime.wYear, stime.wMonth, stime.wDay);
-
-	return true;
-}
-
-//***************************************************************************
-// @brief 두 날짜/시간 문자열 간의 시간 차이를 초(sec) 단위로 계산합니다.
-// @param ptszTime1 첫 번째 날짜/시간 문자열 (YYYYMMDDhhmmss)
-// @param ptszTime2 두 번째 날짜/시간 문자열 (YYYYMMDDhhmmss)
-// @param lSecInterval 계산된 초 간격이 저장될 변수 참조
-// @return 성공 시 true, 실패 시 false
-//***************************************************************************
-bool  GetIntervalSec(const TCHAR* ptszTime1, const TCHAR* ptszTime2, long& lSecInterval)
-{
-	if( _tcslen(ptszTime1) != 14 || _tcslen(ptszTime2) != 14 ) return false;
-
-	struct tm time1;
-	struct tm time2;
-	time_t tTime1;
-	time_t tTime2;
-
-	time1.tm_sec = (ptszTime1[12] - '0') * 10 + (ptszTime1[13] - '0');				/* seconds after the minute - [0,59] */
-	time1.tm_min = (ptszTime1[10] - '0') * 10 + (ptszTime1[11] - '0');				/* minutes after the hour - [0,59] */
-	time1.tm_hour = (ptszTime1[8] - '0') * 10 + (ptszTime1[9] - '0');					/* hours since midnight - [0,23] */
-	time1.tm_mday = (ptszTime1[6] - '0') * 10 + (ptszTime1[7] - '0');					/* day of the month - [1,31] */
-	time1.tm_mon = (ptszTime1[4] - '0') * 10 + (ptszTime1[5] - '0') - 1;				/* months since January - [0,11] */
-	time1.tm_year = (ptszTime1[0] - '0') * 1000 + (ptszTime1[1] - '0') * 100 + \
-		(ptszTime1[2] - '0') * 10 + (ptszTime1[3] - '0') - 1900;		/* years since 1900 */
-	time1.tm_wday = 0;																	/* days since Sunday - [0,6] */
-	time1.tm_yday = 0;																	/* days since January 1 - [0,365] */
-	time1.tm_isdst = 0;																	/* daylight savings time flag */
-
-	time2.tm_sec = (ptszTime2[12] - '0') * 10 + (ptszTime2[13] - '0');				/* seconds after the minute - [0,59] */
-	time2.tm_min = (ptszTime2[10] - '0') * 10 + (ptszTime2[11] - '0');				/* minutes after the hour - [0,59] */
-	time2.tm_hour = (ptszTime2[8] - '0') * 10 + (ptszTime2[9] - '0');					/* hours since midnight - [0,23] */
-	time2.tm_mday = (ptszTime2[6] - '0') * 10 + (ptszTime2[7] - '0');					/* day of the month - [1,31] */
-	time2.tm_mon = (ptszTime2[4] - '0') * 10 + (ptszTime2[5] - '0') - 1;				/* months since January - [0,11] */
-	time2.tm_year = (ptszTime2[0] - '0') * 1000 + (ptszTime2[1] - '0') * 100 + \
-		(ptszTime2[2] - '0') * 10 + (ptszTime2[3] - '0') - 1900;		/* years since 1900 */
-	time2.tm_wday = 0;																	/* days since Sunday - [0,6] */
-	time2.tm_yday = 0;																	/* days since January 1 - [0,365] */
-	time2.tm_isdst = 0;																	/* daylight savings time flag */
-
-	if( (tTime1 = mktime(&time1)) < 0 ) return false;
-	if( (tTime2 = mktime(&time2)) < 0 ) return false;
-
-	lSecInterval = (long)difftime(tTime1, tTime2);
 
 	return true;
 }
@@ -931,181 +447,6 @@ bool  GetSystemTime(SYSTEMTIME& tTime, const TCHAR* ptszDateTime)
 }
 
 //***************************************************************************
-// @brief 월 번호(1~12)에 해당하는 영문 월 이름을 가져옵니다.
-// @param ptszMonthName 결과를 저장할 TCHAR 버퍼
-// @param nMonth 월 번호 (1 ~ 12)
-// @return 성공 시 true, 실패 시 false
-//***************************************************************************
-bool  GetMonthName(TCHAR* ptszMonthName, const int nMonth)
-{
-	const static TCHAR atszMonthNames[][MONTH_ENAME_STRLEN] =
-	{
-		_T("January"), _T("February"), _T("March"), _T("April"), _T("May"), _T("June"), _T("July"), _T("August"), _T("September"), _T("October"), _T("November"), _T("December")
-	};
-
-	if( nMonth < 1 || nMonth > 12 ) return false;
-
-	_tcscpy_s(ptszMonthName, MONTH_ENAME_STRLEN, atszMonthNames[nMonth - 1]);
-
-	return true;
-}
-
-//***************************************************************************
-// @brief 특정 연, 월, 일에 해당하는 영문 요일 이름을 가져옵니다.
-// @param ptszDayOfWeek 결과를 저장할 TCHAR 버퍼
-// @param nYear 연도
-// @param nMonth 월
-// @param nDay 일
-// @return 성공 시 true, 실패 시 false
-//***************************************************************************
-bool  GetDayOfWeek(TCHAR* ptszDayOfWeek, const int nYear, const int nMonth, const int nDay)
-{
-	int		nDayOfWeek;
-
-	const static TCHAR atszWeekDayNames[][WEEKDAY_ENAME_STRLEN] =
-	{
-		_T("Sunday"), _T("Monday"), _T("Tuesday"), _T("Wednesday"), _T("Thursay"), _T("Friday"), _T("Saturday")
-	};
-
-	nDayOfWeek = DayOfWeek(nYear, nMonth, nDay);
-	if( nDayOfWeek < 0 || nDayOfWeek > 6 ) return false;
-
-	_tcscpy_s(ptszDayOfWeek, WEEKDAY_ENAME_STRLEN, atszWeekDayNames[nDayOfWeek]);
-
-	return true;
-}
-
-//***************************************************************************
-// @brief 특정 연, 월, 일의 요일 인덱스를 계산합니다.
-// @param nYear 연도
-// @param nMonth 월
-// @param nDay 일
-// @return 요일 인덱스 (0: 일요일 ~ 6: 토요일, 실패 시 -1)
-//***************************************************************************
-int	DayOfWeek(const int nYear, const int nMonth, const int nDay)
-{
-	int		nDayOfWeek;
-	const static int pnDaysBeforeMonth[] = { 0, 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365 };
-
-	if( nMonth < 0 && nMonth <= 12 ) return -1;
-	if( nDay < 0 ) return -1;
-	if( nDay > (pnDaysBeforeMonth[nMonth + 1] - pnDaysBeforeMonth[nMonth])
-		&& (nMonth != 2 || nDay != 29 || !IsLeapYear(nYear)) ) return -1;
-
-	/* the day of Jan 1, nYear */
-	nDayOfWeek = 6 + nYear % 7 + CountOfFeb29(nYear) % 7 + 14;	/* + 14 : makes nDayOfWeek >= 0 */
-
-	/* the day of nMonth 1, nYear */
-	nDayOfWeek += pnDaysBeforeMonth[nMonth];
-
-	if( nMonth > 2 && IsLeapYear(nYear) )	nDayOfWeek++;
-
-	/* the day of nMonth nDay, nYear */
-	nDayOfWeek += nDay - 1;
-	nDayOfWeek %= 7;
-
-	return nDayOfWeek;
-}
-
-//***************************************************************************
-// @brief 특정 연도까지의 2월 29일(윤일) 누적 횟수를 계산합니다.
-// @param nYear 연도
-// @return 윤일 누적 횟수
-//***************************************************************************
-int	CountOfFeb29(int nYear)
-{
-	int		nCount = 0;
-	if( nYear > 0 )
-	{
-		nCount = 1;		/* Year 0 is a leap year */
-		nYear--;		/* Year nYear is not in the period */
-	}
-	nCount += nYear / 4 - nYear / 100 + nYear / 400;
-
-	return nCount;
-}
-
-//***************************************************************************
-// @brief 지정한 연도가 윤년인지 여부를 확인합니다.
-// @param nYear 연도
-// @return 윤년이면 true, 아니면 false
-//***************************************************************************
-bool  IsLeapYear(int nYear)
-{
-	if( nYear % 4 != 0 ) return false;
-	if( nYear % 100 != 0 )	return true;
-	return (nYear % 400 == 0);
-}
-
-//***************************************************************************
-// @brief 초(sec)를 hhmmss 형식의 문자열로 변환합니다.
-// @param ptszTime 결과를 저장할 TCHAR 버퍼
-// @param lSecond 변환할 총 초 값
-// @return 성공 시 true, 실패 시 false
-//***************************************************************************
-bool  GetTimeOfSecond(TCHAR* ptszTime, const long lSecond)
-{
-	int	nHour = 0, nMinute = 0, nSec = 0;
-	int	nRemindHour = 0;
-
-	if( lSecond < 1 ) return false;
-
-	nHour = lSecond / 3600;
-	nRemindHour = lSecond % 3600;
-	if( nRemindHour > 0 )
-	{
-		nMinute = nRemindHour / 60;
-		nSec = nRemindHour % 60;
-	}
-	else
-	{
-		nMinute = 0;
-		nSec = 0;
-	}
-
-	_stprintf_s(ptszTime, TIME_STRLEN, _T("%02d%02d%02d"), nHour, nMinute, nSec);
-
-	if( !IsValidTime(ptszTime) ) return false;
-	if( nHour > 23 || nMinute > 59 || nSec > 59 ) return false;
-
-	return true;
-}
-
-//***************************************************************************
-// @brief 초(sec)를 시, 분, 초 단위의 정수로 각각 분할합니다.
-// @param nHour 시간이 저장될 변수 참조
-// @param nMinute 분이 저장될 변수 참조
-// @param nSec 초가 저장될 변수 참조
-// @param lSecond 변환할 총 초 값
-// @return 성공 시 true, 실패 시 false
-//***************************************************************************
-bool  GetTimeOfSecond(int& nHour, int& nMinute, int& nSec, const long lSecond)
-{
-	int	nRemindHour = 0;
-
-	nHour = nMinute = nSec = 0;
-
-	if( lSecond < 1 ) return false;
-
-	nHour = lSecond / 3600;
-	nRemindHour = lSecond % 3600;
-	if( nRemindHour > 0 )
-	{
-		nMinute = nRemindHour / 60;
-		nSec = nRemindHour % 60;
-	}
-	else
-	{
-		nMinute = 0;
-		nSec = 0;
-	}
-
-	if( nHour > 23 || nMinute > 59 || nSec > 59 ) return false;
-
-	return true;
-}
-
-//***************************************************************************
 // @brief SYSTEMTIME을 표준 GMT(UTC) 형식의 문자열로 변환합니다.
 // @param ptszStdDateTime 결과를 저장할 TCHAR 버퍼
 // @param sTime 변환할 SYSTEMTIME 객체
@@ -1117,48 +458,6 @@ void GetGMTTime(TCHAR* ptszStdDateTime, SYSTEMTIME sTime)
 
 	_stprintf_s(ptszStdDateTime, STD_DATETIME_STRLEN, _T("%s, %d %s %04d %02d:%02d:%02d GMT"), atszWdayList[sTime.wDayOfWeek],
 		sTime.wDay, atszMonList[sTime.wMonth - 1], sTime.wYear, sTime.wHour, sTime.wMinute, sTime.wSecond);
-}
-
-//***************************************************************************
-// @brief 로컬 타임스탬프를 GMT 타임스탬프로 변환합니다.
-// @param dest 변환된 GMT time_t가 저장될 참조
-// @param src 변환할 로컬 time_t 상수 참조
-//***************************************************************************
-void ConvertLocaltimeToGMT(time_t& dest, const time_t& src)
-{
-	struct tm tm_src;
-	struct tm tm_dest;
-
-	memset(&tm_src, 0, sizeof(struct tm));
-	memset(&tm_dest, 0, sizeof(struct tm));
-
-	localtime_s(&tm_src, &src);
-
-	time_t temp = mktime(&tm_src);
-	gmtime_s(&tm_dest, &temp);
-
-	dest = mktime(&tm_dest);
-}
-
-//***************************************************************************
-// @brief GMT 타임스탬프를 로컬 타임스탬프로 변환합니다.
-// @param dest 변환된 로컬 time_t가 저장될 참조
-// @param src 변환할 GMT time_t 상수 참조
-//***************************************************************************
-void ConvertGMTToLocaltime(time_t& dest, const time_t& src)
-{
-	struct tm tm_src;
-	struct tm tm_dest;
-
-	memset(&tm_src, 0, sizeof(struct tm));
-	memset(&tm_dest, 0, sizeof(struct tm));
-
-	gmtime_s(&tm_src, &src);
-
-	time_t temp = mktime(&tm_src);
-	localtime_s(&tm_dest, &temp);
-
-	dest = mktime(&tm_dest);
 }
 
 //***************************************************************************
@@ -1206,4 +505,627 @@ void TIME::IncreaseSystemTime(SYSTEMTIME& stime, __int64 nAddTime)
 	memcpy(&ftm, &largeInt, sizeof(FILETIME));
 
 	FileTimeToSystemTime(&ftm, &stime);
+}
+
+//***************************************************************************
+// @brief FILETIME(UTC)을 로컬 시각 "YYYY-MM-DD HH:MM:SS" 문자열로 변환합니다.
+// @detail FileTimeToLocalFileTime + FileTimeToSystemTime + operator<<(TCHAR*,
+//         SYSTEMTIME&)를 감싼 편의 함수입니다. 파일 생성/수정 시각처럼
+//         WIN32_FIND_DATA 등에서 얻은 FILETIME을 바로 문자열로 쓸 때 사용합니다.
+// @param ft 변환할 FILETIME (UTC 기준)
+// @return "YYYY-MM-DD HH:MM:SS" 형식의 로컬 시각 문자열
+//***************************************************************************
+_tstring FileTimeToLocalString(const FILETIME& ft)
+{
+	FILETIME ftLocal;
+	SYSTEMTIME stime;
+
+	FileTimeToLocalFileTime(&ft, &ftLocal);
+	FileTimeToSystemTime(&ftLocal, &stime);
+
+	TCHAR tszDateTime[STD_DATETIME_STRLEN] = { 0 };
+	tszDateTime << stime;
+
+	return tszDateTime;
+}
+
+#endif // _WIN32
+
+// ===========================================================================
+// 크로스플랫폼 (ptime 네임스페이스)
+// ===========================================================================
+namespace ptime
+{
+	//***************************************************************************
+	// @brief 현재 시각을 UNIX epoch 기준 밀리초로 반환합니다.
+	// @return epoch 이후 경과 밀리초
+	//***************************************************************************
+	int64_t NowMillis()
+	{
+		return std::chrono::duration_cast<std::chrono::milliseconds>(
+			Clock::now().time_since_epoch()).count();
+	}
+
+	//***************************************************************************
+	// @brief 현재 시각을 UNIX epoch 기준 마이크로초로 반환합니다.
+	// @return epoch 이후 경과 마이크로초
+	//***************************************************************************
+	int64_t NowMicros()
+	{
+		return std::chrono::duration_cast<std::chrono::microseconds>(
+			Clock::now().time_since_epoch()).count();
+	}
+
+	//***************************************************************************
+	// @brief 단조 증가 클럭(steady_clock) 기준 현재 시각을 초 단위로 반환합니다.
+	// @detail 시스템 시간이 변경(NTP 보정, 사용자 변경 등)되어도 영향받지 않으므로
+	//         절대 시각이 아닌 경과 시간 측정 용도로만 사용해야 합니다.
+	// @return steady_clock epoch 이후 경과 초
+	//***************************************************************************
+	double MonotonicNowSec()
+	{
+		return std::chrono::duration<double>(SteadyClock::now().time_since_epoch()).count();
+	}
+
+	//***************************************************************************
+	// @brief thread-safe localtime 변환 (Windows: localtime_s, POSIX: localtime_r)
+	// @param out 결과가 채워질 std::tm 참조
+	// @param t 변환할 time_t 값
+	// @return 성공 시 true
+	//***************************************************************************
+	bool LocalTimeSafe(std::tm& out, const time_t& t)
+	{
+#ifdef _WIN32
+		return localtime_s(&out, &t) == 0;
+#else
+		return localtime_r(&t, &out) != nullptr;
+#endif
+	}
+
+	//***************************************************************************
+	// @brief thread-safe gmtime 변환 (Windows: gmtime_s, POSIX: gmtime_r)
+	// @param out 결과가 채워질 std::tm 참조
+	// @param t 변환할 time_t 값
+	// @return 성공 시 true
+	//***************************************************************************
+	bool GmTimeSafe(std::tm& out, const time_t& t)
+	{
+#ifdef _WIN32
+		return gmtime_s(&out, &t) == 0;
+#else
+		return gmtime_r(&t, &out) != nullptr;
+#endif
+	}
+
+	//***************************************************************************
+	// @brief time_t를 ISO 8601 형식 문자열("YYYY-MM-DDThh:mm:ss")로 변환합니다.
+	// @param t 변환할 time_t 값
+	// @return ISO 8601 문자열, 변환 실패 시 빈 문자열
+	//***************************************************************************
+	_tstring ToIso8601(const time_t& t)
+	{
+		return Format(t, _T("%Y-%m-%dT%H:%M:%S"));
+	}
+
+	//***************************************************************************
+	// @brief time_t를 strftime 포맷 문자열에 따라 변환합니다. (로컬 타임 기준)
+	// @param t 변환할 time_t 값
+	// @param fmt strftime 포맷 (예: _T("%Y%m%d"), _T("%Y-%m"))
+	// @return 포맷팅된 문자열, 변환 실패 시 빈 문자열
+	//***************************************************************************
+	_tstring Format(const time_t& t, const TCHAR* fmt)
+	{
+		std::tm tmVal{};
+		if( !LocalTimeSafe(tmVal, t) ) return {};
+
+		_tstringstream oss;
+		oss << std::put_time(&tmVal, fmt);
+		return oss.str();
+	}
+
+	//***************************************************************************
+	// @brief 현재 시각을 지정한 strftime 포맷으로 반환합니다.
+	// @param fmt strftime 포맷
+	// @return 포맷팅된 문자열
+	//***************************************************************************
+	_tstring FormatNow(const TCHAR* fmt)
+	{
+		return Format(Clock::to_time_t(Clock::now()), fmt);
+	}
+
+	//***************************************************************************
+	// 아래는 Format()을 감싼 편의 함수들입니다. (t 생략 시 현재 시각 사용)
+	// @return 예) ToYYYY: "2026", ToYYYYMM: "202608", ToYYYYMMDD: "20260819"
+	//***************************************************************************
+	_tstring ToYYYY(const time_t& t) { return Format(t, _T("%Y")); }
+	_tstring ToYYYYMM(const time_t& t) { return Format(t, _T("%Y%m")); }
+	_tstring ToYYYYMMDD(const time_t& t) { return Format(t, _T("%Y%m%d")); }
+	_tstring ToMMDD(const time_t& t) { return Format(t, _T("%m%d")); }
+	_tstring ToHHMMSS(const time_t& t) { return Format(t, _T("%H%M%S")); }
+	_tstring ToHHMM(const time_t& t) { return Format(t, _T("%H%M")); }
+	_tstring ToYYYYMMDDHHMMSS(const time_t& t) { return Format(t, _T("%Y%m%d%H%M%S")); }
+	_tstring ToYYYY_MM_DD(const time_t& t) { return Format(t, _T("%Y-%m-%d")); }
+
+	_tstring ToYYYY() { return FormatNow(_T("%Y")); }
+	_tstring ToYYYYMM() { return FormatNow(_T("%Y%m")); }
+	_tstring ToYYYYMMDD() { return FormatNow(_T("%Y%m%d")); }
+	_tstring ToMMDD() { return FormatNow(_T("%m%d")); }
+	_tstring ToHHMMSS() { return FormatNow(_T("%H%M%S")); }
+	_tstring ToHHMM() { return FormatNow(_T("%H%M")); }
+	_tstring ToYYYYMMDDHHMMSS() { return FormatNow(_T("%Y%m%d%H%M%S")); }
+	_tstring ToYYYY_MM_DD() { return FormatNow(_T("%Y-%m-%d")); }
+
+	//***************************************************************************
+	// @brief 지정한 밀리초만큼 현재 스레드를 대기시킵니다.
+	// @param ms 대기 시간(밀리초)
+	//***************************************************************************
+	void SleepMillis(int64_t ms)
+	{
+		std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+	}
+
+	//***************************************************************************
+	// 양력(그레고리력) 계산
+	//***************************************************************************
+
+	//***************************************************************************
+	// @brief 지정한 연도가 그레고리력 기준 윤년인지 확인합니다.
+	// @param year 연도
+	// @return 윤년이면 true
+	//***************************************************************************
+	bool IsLeapYear(int year)
+	{
+		if( year % 4 != 0 ) return false;
+		if( year % 100 != 0 ) return true;
+		return (year % 400 == 0);
+	}
+
+	//***************************************************************************
+	// @brief 지정한 연/월의 마지막 일(말일)을 반환합니다.
+	// @param year 연도
+	// @param month 월 (1~12)
+	// @return 말일(28~31), month가 범위를 벗어나면 0
+	//***************************************************************************
+	int LastDayOfMonth(int year, int month)
+	{
+		static const int daysInMonth[] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+
+		if( month < 1 || month > 12 ) return 0;
+		if( month == 2 && IsLeapYear(year) ) return 29;
+
+		return daysInMonth[month - 1];
+	}
+
+	//***************************************************************************
+	// @brief t가 속한 연/월의 마지막 일(말일)을 반환합니다.
+	// @param t 기준 time_t 값
+	// @return 말일, 변환 실패 시 0
+	//***************************************************************************
+	int LastDayOfMonth(const time_t& t)
+	{
+		std::tm tmVal{};
+		if( !LocalTimeSafe(tmVal, t) ) return 0;
+
+		return LastDayOfMonth(tmVal.tm_year + 1900, tmVal.tm_mon + 1);
+	}
+
+	//***************************************************************************
+	// @brief 지정한 연/월/일의 요일 인덱스를 계산합니다.
+	// @detail std::mktime이 struct tm을 정규화하며 tm_wday를 채워주는 것을
+	//         이용합니다. DST 경계에서 날짜가 밀리는 것을 피하기 위해
+	//         시각을 정오(12시)로 고정합니다.
+	// @param year 연도
+	// @param month 월 (1~12)
+	// @param day 일
+	// @return 요일 인덱스 (0=일요일 ~ 6=토요일), 실패 시 -1
+	//***************************************************************************
+	int DayOfWeekIndex(int year, int month, int day)
+	{
+		std::tm tmVal{};
+		tmVal.tm_year = year - 1900;
+		tmVal.tm_mon = month - 1;
+		tmVal.tm_mday = day;
+		tmVal.tm_hour = 12;
+
+		if( std::mktime(&tmVal) == static_cast<time_t>(-1) ) return -1;
+
+		return tmVal.tm_wday;
+	}
+
+	//***************************************************************************
+	// @brief t의 요일 인덱스를 반환합니다.
+	// @param t 기준 time_t 값
+	// @return 요일 인덱스 (0=일요일 ~ 6=토요일), 실패 시 -1
+	//***************************************************************************
+	int DayOfWeekIndex(const time_t& t)
+	{
+		std::tm tmVal{};
+		if( !LocalTimeSafe(tmVal, t) ) return -1;
+
+		return tmVal.tm_wday;
+	}
+
+	//***************************************************************************
+	// @brief 요일 인덱스를 한글 요일명으로 변환합니다.
+	// @param dayOfWeekIndex 0=일요일 ~ 6=토요일
+	// @return 한글 요일명("일요일" 등), 범위를 벗어나면 빈 문자열
+	//***************************************************************************
+	_tstring WeekdayNameKo(int dayOfWeekIndex)
+	{
+		static const TCHAR* names[] = { _T("일요일"), _T("월요일"), _T("화요일"), _T("수요일"), _T("목요일"), _T("금요일"), _T("토요일") };
+
+		if( dayOfWeekIndex < 0 || dayOfWeekIndex > 6 ) return {};
+		return names[dayOfWeekIndex];
+	}
+
+	//***************************************************************************
+	// @brief t의 한글 요일명을 반환합니다.
+	// @param t 기준 time_t 값
+	// @return 한글 요일명, 실패 시 빈 문자열
+	//***************************************************************************
+	_tstring WeekdayNameKo(const time_t& t)
+	{
+		return WeekdayNameKo(DayOfWeekIndex(t));
+	}
+
+	//***************************************************************************
+	// @brief 요일 인덱스를 영문 요일명으로 변환합니다.
+	// @param dayOfWeekIndex 0=Sunday ~ 6=Saturday
+	// @return 영문 요일명("Sunday" 등), 범위를 벗어나면 빈 문자열
+	//***************************************************************************
+	_tstring WeekdayNameEn(int dayOfWeekIndex)
+	{
+		static const TCHAR* names[] = { _T("Sunday"), _T("Monday"), _T("Tuesday"), _T("Wednesday"), _T("Thursday"), _T("Friday"), _T("Saturday") };
+
+		if( dayOfWeekIndex < 0 || dayOfWeekIndex > 6 ) return {};
+		return names[dayOfWeekIndex];
+	}
+
+	//***************************************************************************
+	// @brief t의 영문 요일명을 반환합니다.
+	// @param t 기준 time_t 값
+	// @return 영문 요일명, 실패 시 빈 문자열
+	//***************************************************************************
+	_tstring WeekdayNameEn(const time_t& t)
+	{
+		return WeekdayNameEn(DayOfWeekIndex(t));
+	}
+
+	//***************************************************************************
+	// @brief 월 번호(1~12)를 영문 월 이름으로 변환합니다.
+	// @param month 월 번호 (1~12)
+	// @return 영문 월 이름("January" 등), 범위를 벗어나면 빈 문자열
+	//***************************************************************************
+	_tstring MonthNameEn(int month)
+	{
+		static const TCHAR* names[] =
+		{
+			_T("January"), _T("February"), _T("March"), _T("April"), _T("May"), _T("June"),
+			_T("July"), _T("August"), _T("September"), _T("October"), _T("November"), _T("December")
+		};
+
+		if( month < 1 || month > 12 ) return {};
+		return names[month - 1];
+	}
+
+	//***************************************************************************
+	// @brief 월 번호(1~12)를 한글 월 표기("1월" 등)로 변환합니다.
+	// @param month 월 번호 (1~12)
+	// @return 한글 월 표기, 범위를 벗어나면 빈 문자열
+	//***************************************************************************
+	_tstring MonthNameKo(int month)
+	{
+		if( month < 1 || month > 12 ) return {};
+
+		_tstringstream oss;
+		oss << month << _T("월");
+		return oss.str();
+	}
+
+	//***************************************************************************
+	// 기준 시각 연산
+	//***************************************************************************
+
+	//***************************************************************************
+	// @brief 현재 시각을 time_t로 반환합니다.
+	// @return 현재 time_t 값
+	//***************************************************************************
+	time_t Now()
+	{
+		return Clock::to_time_t(Clock::now());
+	}
+
+	//***************************************************************************
+	// @brief t에 지정한 초(음수 가능)를 더한 time_t를 반환합니다.
+	// @param t 기준 time_t 값
+	// @param seconds 더할 초 (음수면 과거로 이동)
+	// @return 계산된 time_t 값
+	//***************************************************************************
+	time_t AddSeconds(const time_t& t, int64_t seconds)
+	{
+		return static_cast<time_t>(t + seconds);
+	}
+
+	//***************************************************************************
+	// @brief t가 속한 날짜에 지정한 일수(음수 가능)를 더한 time_t를 반환합니다.
+	// @detail 로컬 달력 필드(년/월/일)에 일수를 더한 뒤 mktime으로 정규화하므로
+	//         월말/윤년 경계를 자동으로 처리합니다.
+	//         (예: AddDays(Now(), -1) 이 어제를 의미합니다.)
+	// @param t 기준 time_t 값
+	// @param days 더할 일수 (음수면 과거로 이동)
+	// @return 계산된 time_t 값, 변환 실패 시 t 그대로 반환
+	//***************************************************************************
+	time_t AddDays(const time_t& t, int days)
+	{
+		std::tm tmVal{};
+		if( !LocalTimeSafe(tmVal, t) ) return t;
+
+		tmVal.tm_mday += days;
+		tmVal.tm_isdst = -1;
+
+		time_t result = std::mktime(&tmVal);
+		return (result == static_cast<time_t>(-1)) ? t : result;
+	}
+
+	//***************************************************************************
+	// @brief 두 time_t 간의 초 단위 차이를 계산합니다. (t1 - t2)
+	// @param t1 첫 번째 time_t 값
+	// @param t2 두 번째 time_t 값 (기준)
+	// @return 초 단위 차이 (t1이 이후면 양수)
+	//***************************************************************************
+	long SecondsBetween(const time_t& t1, const time_t& t2)
+	{
+		return static_cast<long>(std::difftime(t1, t2));
+	}
+
+	//***************************************************************************
+	// @brief 두 time_t 간의 분 단위 차이를 계산합니다. (t1 - t2)
+	// @param t1 첫 번째 time_t 값
+	// @param t2 두 번째 time_t 값 (기준)
+	// @return 분 단위 차이 (t1이 이후면 양수)
+	//***************************************************************************
+	long MinutesBetween(const time_t& t1, const time_t& t2)
+	{
+		return SecondsBetween(t1, t2) / 60;
+	}
+
+	//***************************************************************************
+	// 문자열 파싱/검증
+	//***************************************************************************
+
+	//***************************************************************************
+	// @brief TCHAR 문자가 '0'~'9' 범위인지 확인합니다. (로케일에 의존하지
+	//        않도록 std::isdigit/iswdigit 대신 직접 비교합니다.)
+	// @param c 검사할 문자
+	// @return 숫자 문자이면 true
+	//***************************************************************************
+	static bool IsDigitChar(TCHAR c)
+	{
+		return c >= _T('0') && c <= _T('9');
+	}
+
+	//***************************************************************************
+	// @brief YYYYMMDD(8자리) 문자열이 유효한 날짜인지 검증합니다.
+	// @param yyyymmdd 검증할 문자열
+	// @return 유효하면 true
+	//***************************************************************************
+	bool IsValidDate(const _tstring& yyyymmdd)
+	{
+		if( yyyymmdd.size() != 8 ) return false;
+		for( TCHAR c : yyyymmdd ) if( !IsDigitChar(c) ) return false;
+
+		int year = std::stoi(yyyymmdd.substr(0, 4));
+		int month = std::stoi(yyyymmdd.substr(4, 2));
+		int day = std::stoi(yyyymmdd.substr(6, 2));
+
+		if( year < 1 || month < 1 || month > 12 || day < 1 ) return false;
+		return day <= LastDayOfMonth(year, month);
+	}
+
+	//***************************************************************************
+	// @brief YYYYMMDDHHMMSS(14자리) 문자열이 유효한 날짜/시간인지 검증합니다.
+	// @param yyyymmddhhmmss 검증할 문자열
+	// @return 유효하면 true
+	//***************************************************************************
+	bool IsValidDateTime(const _tstring& yyyymmddhhmmss)
+	{
+		if( yyyymmddhhmmss.size() != 14 ) return false;
+		for( TCHAR c : yyyymmddhhmmss ) if( !IsDigitChar(c) ) return false;
+
+		if( !IsValidDate(yyyymmddhhmmss.substr(0, 8)) ) return false;
+
+		int hour = std::stoi(yyyymmddhhmmss.substr(8, 2));
+		int minute = std::stoi(yyyymmddhhmmss.substr(10, 2));
+		int sec = std::stoi(yyyymmddhhmmss.substr(12, 2));
+
+		return hour <= 23 && minute <= 59 && sec <= 59;
+	}
+
+	//***************************************************************************
+	// @brief YYYYMMDD(8자리) 문자열을 연/월/일 정수로 분리합니다.
+	// @param s 파싱할 문자열
+	// @param year 결과 연도가 저장될 참조
+	// @param month 결과 월이 저장될 참조
+	// @param day 결과 일이 저장될 참조
+	// @return 성공 시 true, 형식이 잘못되면 false
+	//***************************************************************************
+	bool ParseYYYYMMDD(const _tstring& s, int& year, int& month, int& day)
+	{
+		if( !IsValidDate(s) ) return false;
+
+		year = std::stoi(s.substr(0, 4));
+		month = std::stoi(s.substr(4, 2));
+		day = std::stoi(s.substr(6, 2));
+		return true;
+	}
+
+	//***************************************************************************
+	// @brief YYYYMMDDHHMMSS(14자리) 문자열을 std::tm으로 파싱합니다.
+	// @param s 파싱할 문자열
+	// @param out 결과가 채워질 std::tm 참조
+	// @return 성공 시 true, 형식이 잘못되면 false
+	//***************************************************************************
+	bool ParseYYYYMMDDHHMMSS(const _tstring& s, std::tm& out)
+	{
+		if( !IsValidDateTime(s) ) return false;
+
+		out = std::tm{};
+		out.tm_year = std::stoi(s.substr(0, 4)) - 1900;
+		out.tm_mon = std::stoi(s.substr(4, 2)) - 1;
+		out.tm_mday = std::stoi(s.substr(6, 2));
+		out.tm_hour = std::stoi(s.substr(8, 2));
+		out.tm_min = std::stoi(s.substr(10, 2));
+		out.tm_sec = std::stoi(s.substr(12, 2));
+		out.tm_isdst = -1;
+		return true;
+	}
+
+	//***************************************************************************
+	// @brief YYYYMMDDHHMMSS(14자리) 문자열을 time_t로 변환합니다.
+	// @param yyyymmddhhmmss 변환할 문자열
+	// @param out 결과 time_t가 저장될 참조
+	// @return 성공 시 true, 형식이 잘못되면 false
+	//***************************************************************************
+	bool ToTimeT(const _tstring& yyyymmddhhmmss, time_t& out)
+	{
+		std::tm tmVal{};
+		if( !ParseYYYYMMDDHHMMSS(yyyymmddhhmmss, tmVal) ) return false;
+
+		out = std::mktime(&tmVal);
+		return out != static_cast<time_t>(-1);
+	}
+
+	//***************************************************************************
+	// @brief 지정한 날짜(YYYYMMDD 또는 YYYYMMDDHHMMSS) 문자열을 오늘과 비교합니다.
+	// @param yyyymmddOrYyyymmddhhmmss 비교할 문자열 (8자리 또는 14자리)
+	// @return 음수: 오늘보다 이전, 0: 오늘과 같음, 양수: 오늘보다 이후 (형식 오류 시 -9999)
+	//***************************************************************************
+	int CompareToToday(const _tstring& yyyymmddOrYyyymmddhhmmss)
+	{
+		const _tstring& s = yyyymmddOrYyyymmddhhmmss;
+		if( s.size() != 8 && s.size() != 14 ) return -9999;
+		for( TCHAR c : s ) if( !IsDigitChar(c) ) return -9999;
+
+		_tstring today = (s.size() == 8) ? ToYYYYMMDD() : ToYYYYMMDDHHMMSS();
+		return s.compare(today);
+	}
+
+	//***************************************************************************
+	// 초 단위 시간 <-> 시/분/초
+	//***************************************************************************
+
+	//***************************************************************************
+	// @brief 총 초를 "HHMMSS" 형식 문자열로 변환합니다.
+	// @param totalSeconds 변환할 총 초 값 (음수 불가)
+	// @return "HHMMSS" 형식 문자열, 음수 입력 시 빈 문자열
+	//***************************************************************************
+	_tstring SecondsToHHMMSS(long totalSeconds)
+	{
+		int hour = 0, minute = 0, sec = 0;
+		if( !SecondsToHms(totalSeconds, hour, minute, sec) ) return {};
+
+		_tstringstream oss;
+		oss << std::setw(2) << std::setfill(_T('0')) << hour
+			<< std::setw(2) << std::setfill(_T('0')) << minute
+			<< std::setw(2) << std::setfill(_T('0')) << sec;
+		return oss.str();
+	}
+
+	//***************************************************************************
+	// @brief 총 초를 시/분/초로 분할합니다.
+	// @param totalSeconds 변환할 총 초 값 (음수 불가)
+	// @param hour 시간이 저장될 참조
+	// @param minute 분이 저장될 참조
+	// @param sec 초가 저장될 참조
+	// @return 성공 시 true, 음수 입력 시 false
+	//***************************************************************************
+	bool SecondsToHms(long totalSeconds, int& hour, int& minute, int& sec)
+	{
+		hour = minute = sec = 0;
+		if( totalSeconds < 0 ) return false;
+
+		hour = static_cast<int>(totalSeconds / 3600);
+		minute = static_cast<int>((totalSeconds % 3600) / 60);
+		sec = static_cast<int>(totalSeconds % 60);
+		return true;
+	}
+
+	//***************************************************************************
+	// GMT 문자열 / 로컬<->GMT 재해석
+	//***************************************************************************
+
+	//***************************************************************************
+	// @brief time_t를 RFC 822 스타일 GMT 문자열로 변환합니다.
+	// @detail 로케일에 영향받지 않도록 요일/월 이름을 직접 매핑합니다.
+	// @param t 변환할 time_t 값
+	// @return 예) "Wed, 19 Aug 2026 10:23:00 GMT", 변환 실패 시 빈 문자열
+	//***************************************************************************
+	_tstring ToGmtString(const time_t& t)
+	{
+		static const TCHAR* wdayNames[] = { _T("Sun"), _T("Mon"), _T("Tue"), _T("Wed"), _T("Thu"), _T("Fri"), _T("Sat") };
+		static const TCHAR* monNames[] =
+		{
+			_T("Jan"), _T("Feb"), _T("Mar"), _T("Apr"), _T("May"), _T("Jun"), _T("Jul"), _T("Aug"), _T("Sep"), _T("Oct"), _T("Nov"), _T("Dec")
+		};
+
+		std::tm tmVal{};
+		if( !GmTimeSafe(tmVal, t) ) return {};
+
+		_tstringstream oss;
+		oss << wdayNames[tmVal.tm_wday] << _T(", ")
+			<< std::setw(2) << std::setfill(_T('0')) << tmVal.tm_mday << _T(' ')
+			<< monNames[tmVal.tm_mon] << _T(' ')
+			<< (tmVal.tm_year + 1900) << _T(' ')
+			<< std::setw(2) << std::setfill(_T('0')) << tmVal.tm_hour << _T(':')
+			<< std::setw(2) << std::setfill(_T('0')) << tmVal.tm_min << _T(':')
+			<< std::setw(2) << std::setfill(_T('0')) << tmVal.tm_sec << _T(" GMT");
+		return oss.str();
+	}
+
+	//***************************************************************************
+	// @brief std::tm(UTC 필드 기준)을 time_t로 변환합니다. (Windows: _mkgmtime,
+	//        POSIX: timegm)
+	// @param tmVal UTC 기준 필드가 채워진 std::tm 참조
+	// @return 변환된 time_t 값
+	//***************************************************************************
+	static time_t FromUtcTm(std::tm& tmVal)
+	{
+#ifdef _WIN32
+		return _mkgmtime(&tmVal);
+#else
+		return timegm(&tmVal);
+#endif
+	}
+
+	//***************************************************************************
+	// @brief t의 로컬 벽시계 값(년/월/일 시:분:초)을 그대로 GMT로 재해석한
+	//        time_t를 반환합니다. 실제 시간대 변환이 아니라 같은 숫자를
+	//        다른 시간대로 재해석합니다.
+	// @param t 기준 time_t 값
+	// @return 재해석된 time_t 값, 변환 실패 시 t 그대로 반환
+	//***************************************************************************
+	time_t ShiftLocalToGmt(const time_t& t)
+	{
+		std::tm tmVal{};
+		if( !LocalTimeSafe(tmVal, t) ) return t;
+
+		return FromUtcTm(tmVal);
+	}
+
+	//***************************************************************************
+	// @brief t의 GMT 벽시계 값(년/월/일 시:분:초)을 그대로 로컬 시각으로
+	//        재해석한 time_t를 반환합니다. 실제 시간대 변환이 아니라 같은
+	//        숫자를 다른 시간대로 재해석합니다.
+	// @param t 기준 time_t 값
+	// @return 재해석된 time_t 값, 변환 실패 시 t 그대로 반환
+	//***************************************************************************
+	time_t ShiftGmtToLocal(const time_t& t)
+	{
+		std::tm tmVal{};
+		if( !GmTimeSafe(tmVal, t) ) return t;
+
+		tmVal.tm_isdst = -1;
+		time_t result = std::mktime(&tmVal);
+		return (result == static_cast<time_t>(-1)) ? t : result;
+	}
 }

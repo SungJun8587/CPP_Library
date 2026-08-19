@@ -55,7 +55,7 @@ int main()
         {
             CNetServiceRef clientService = CNetworkFactory::CreateClientService(
                 ENetworkEngineType::IOCP, serverAddress,
-                []() { return std::make_shared<CIocpClientEchoSession>(); },
+                []() { return std::make_shared<CIocpEchoClientSession>(); },
                 1, &iocpCore
             );
 

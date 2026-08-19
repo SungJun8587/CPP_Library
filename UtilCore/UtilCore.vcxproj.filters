@@ -397,6 +397,9 @@
     <ClInclude Include="Network\NetworkFactory.h">
       <Filter>Network</Filter>
     </ClInclude>
+    <ClInclude Include="Util\DirectoryUtil.h">
+      <Filter>Util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">
@@ -613,6 +616,9 @@
     </ClCompile>
     <ClCompile Include="Network\NetworkFactory.cpp">
       <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\DirectoryUtil.cpp">
+      <Filter>Util</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

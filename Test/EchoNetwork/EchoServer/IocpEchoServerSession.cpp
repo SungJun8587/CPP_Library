@@ -29,8 +29,10 @@ void CIocpEchoServerSession::OnConnected()
 {
     CIocpSession::OnConnected();
 
-    // 세션 ID 가져오기 (엔진에 따라 GetSessionId() 또는 GetId() 사용)
     uint64 sessionId = GetSessionId();
+
+    // 세션 종료 사유 가져오기
+    Iocp::CloseReason reason = GetCloseReason();
 
     LOG_INFO(_T("[IOCP Session] Connected! (Session ID: %llu)"), sessionId);
 }
@@ -39,12 +41,28 @@ void CIocpEchoServerSession::OnConnected()
 // @brief 클라이언트와의 연결이 끊어졌을 때 호출되는 오버라이드 함수입니다.
 // @details 부모 클래스의 연결 해제 로직을 수행하고 연결 종료 로그를 출력합니다.
 //***************************************************************************
-void CIocpEchoServerSession::OnDisconnect()
+void CIocpEchoServerSession::OnDisconnected()
 {
-    CIocpSession::OnDisconnect();
+    CIocpSession::OnDisconnected();
 
     uint64 sessionId = GetSessionId();
-    LOG_INFO(_T("[IOCP Session] Disconnected! (Session ID: %llu)"), sessionId);
+
+    // 세션 종료 사유 가져오기
+    Iocp::CloseReason reason = GetCloseReason();
+
+    // 사유를 문자열(또는 정수 코드로) 변환해서 함께 출력
+    LPCTSTR reasonStr = _T("Unknown");
+    switch( reason )
+    {
+    case Iocp::CloseReason::None:               reasonStr = _T("None"); break;
+    case Iocp::CloseReason::RemoteClosed:       reasonStr = _T("RemoteClosed (Client Disconnected)"); break;
+    case Iocp::CloseReason::SocketError:        reasonStr = _T("SocketError"); break;
+    case Iocp::CloseReason::RingBufferOverflow: reasonStr = _T("RingBufferOverflow"); break;
+    case Iocp::CloseReason::ForcedClose:        reasonStr = _T("ForcedClose (Server Initiated)"); break;
+    case Iocp::CloseReason::InternalError:      reasonStr = _T("InternalError"); break;
+    }
+
+    LOG_INFO(_T("[IOCP Session] Disconnected! (Session ID: %llu, Reason: %s)"), sessionId, reasonStr);
 }
 
 //***************************************************************************

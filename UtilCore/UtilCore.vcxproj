@@ -124,6 +124,7 @@
     <ClInclude Include="Util\BufferWriter.h" />
     <ClInclude Include="Util\CalculatedElapsedTime.h" />
     <ClInclude Include="Util\CommonUtil.h" />
+    <ClInclude Include="Util\DirectoryUtil.h" />
     <ClInclude Include="Util\EncodingConvert.h" />
     <ClInclude Include="Util\TypeCast.h" />
     <ClInclude Include="Util\WinCharsetConv.h" />
@@ -207,6 +208,7 @@
     <ClCompile Include="Util\BufferReader.cpp" />
     <ClCompile Include="Util\BufferWriter.cpp" />
     <ClCompile Include="Util\CommonUtil.cpp" />
+    <ClCompile Include="Util\DirectoryUtil.cpp" />
     <ClCompile Include="Util\EncodingConvert.cpp" />
     <ClCompile Include="Util\WinCharsetConv.cpp" />
     <ClCompile Include="Util\DateTimeUtil.cpp" />

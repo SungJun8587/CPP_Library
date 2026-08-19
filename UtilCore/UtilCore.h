@@ -113,6 +113,7 @@ using namespace std;
 #include <Util/DateTimeUtil.h>
 #include <Util/Regular.h>
 #include <Util/StringUtil.h>
+#include <Util/DirectoryUtil.h>
 #include <Util/FileUtil.h>
 #include <Util/ShellUtil.h>
 #include <Util/WebUtil.h>

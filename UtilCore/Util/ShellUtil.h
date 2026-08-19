@@ -23,16 +23,12 @@
 #include <Util/StringUtil.h>
 #endif
 
-//***************************************************************************
-// @brief 파일 복사/이동 시 필터링 조건을 관리하는 구조체
-//***************************************************************************
-typedef struct _SH_APPLY_FILEINFO
-{
-	int			m_nFilterMode;						// 필터 모드 (0: 필터링 없음, 1: 화이트리스트/허용, 2: 블랙리스트/제외)
-	TCHAR		m_tszApplyExt[MAX_BUFFER_SIZE];		// 필터링할 확장자 목록 (예: "txt" 또는 "txt;log;csv")
-	TCHAR		m_tszModifyStDate[DATE_STRLEN];		// 파일 수정일 기준 시작일 (YYYYMMDD 형식, 예: "20260101")
-	TCHAR		m_tszModifyEdDate[DATE_STRLEN];		// 파일 수정일 기준 종료일 (YYYYMMDD 형식, 예: "20260807")
-} SH_APPLY_FILEINFO, * PSH_APPLY_FILEINFO;
+#ifndef __DIRECTORYUTIL_H__
+#include "DirectoryUtil.h"		// SH_APPLY_FILEINFO, IsMatchedExtension()/IsAbleFile(), 재귀 파일 조작 함수 — 플랫폼 공용 구현
+#endif
+
+// 기존 코드 호환용 포인터 typedef (SH_APPLY_FILEINFO 정의는 FileFilterUtil.h로 이전됨)
+typedef SH_APPLY_FILEINFO* PSH_APPLY_FILEINFO;
 
 //***************************************************************************
 // @brief 파일 시스템(경로, 폴더, 파일명) 정보를 관리하는 구조체
@@ -81,13 +77,8 @@ typedef struct _SH_REGISTRY_INFO
 	DWORD	m_dwValueLen;							// 레지스트리 값 데이터의 바이트 크기
 } SH_REGISTRY_INFO, * PSH_REGISTRY_INFO;
 
-bool	IsMatchedExtension(const TCHAR* ptszFilePath, const TCHAR* pExtFilter, int nFilterMode);
-bool	IsAbleFile(const TCHAR* ptszSourceFullPath, const SH_APPLY_FILEINFO& ShApplyFileInfo);
-bool	CreateDirectoryRecursive(const TCHAR* ptszFolder);
-bool	RemoveDirectoryRecursive(const TCHAR* ptszFolder, const bool  bSelfDel = TRUE);
-bool	CopyFileRecursive(const TCHAR* ptszSourceFolder, const TCHAR* ptszDestFolder, const SH_APPLY_FILEINFO& ShApplyFileInfo);
-bool	MoveFileRecursive(const TCHAR* ptszSourceFolder, const TCHAR* ptszDestFolder, const SH_APPLY_FILEINFO& ShApplyFileInfo);
-bool	IsDirectory(const TCHAR* ptszFolder);
+// IsDirectory()/CreateDirectoryRecursive()/RemoveDirectoryRecursive()/CopyFileRecursive()/MoveFileRecursive()는
+// DirectoryUtil.h에서 선언됨(std::filesystem::path 기반, 플랫폼 공용)
 
 long	RegCreateKeyExRecursive(const HKEY hRoot, const TCHAR* ptszSubKey, const bool  bReadOnly);
 long	RegDeleteKeyRecursive(const HKEY hKey, const TCHAR* ptszSubKey);
@@ -106,4 +97,3 @@ HANDLE	GetFileHandleDuplicate(TCHAR* ptszDestFullPath, TCHAR* ptszDestFileNameEx
 bool GetProductKeyExtract(_tstring& TProductKey, const BYTE* pbDigitalProductID, const DWORD dwLength, const bool bIsExtractBytesRange);
 
 #endif // ndef __SHELLUTIL_H__
-

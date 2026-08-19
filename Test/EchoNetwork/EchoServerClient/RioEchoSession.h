@@ -1,6 +1,6 @@
 ﻿
 //***************************************************************************
-// RioEchoSession.h : interface for the CRioEchoSession, CRioClientEchoSession class.
+// RioEchoSession.h : interface for the CRioEchoServerSession, CRioEchoClientSession class.
 //
 //***************************************************************************
 
@@ -12,15 +12,15 @@
 #endif
 
 //***************************************************************************
-// @class CRioEchoSession
+// @class CRioEchoServerSession
 // @brief 서버용 RIO 에코 세션 클래스
 // @details RIO 세션 이벤트(연결, 해제, 데이터 수신)를 처리하고 에코 기능을 수행합니다.
 //***************************************************************************
-class CRioEchoSession : public CRioSession
+class CRioEchoServerSession : public CRioSession
 {
 public:
-	CRioEchoSession();
-	virtual ~CRioEchoSession();
+	CRioEchoServerSession();
+	virtual ~CRioEchoServerSession();
 
 	//***************************************************************************
 	// @brief 클라이언트 연결 성공 시 호출되는 오버라이드 함수입니다.
@@ -41,11 +41,11 @@ public:
 };
 
 //***************************************************************************
-// @class CRioClientEchoSession
+// @class CRioEchoClientSession
 // @brief 클라이언트용 RIO 에코 세션 클래스
 // @details RIO 환경에서 서버와의 연결 및 수신 데이터를 처리합니다.
 //***************************************************************************
-class CRioClientEchoSession : public CRioSession
+class CRioEchoClientSession : public CRioSession
 {
 public:
 	//***************************************************************************

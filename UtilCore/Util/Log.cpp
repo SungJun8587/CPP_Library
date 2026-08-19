@@ -200,7 +200,7 @@ void CLogManager::Write(const ELOG_TYPE p_nType, const bool bFlag, const TCHAR* 
 	va_list args;
 
 	va_start(args, ptszFormat);
-	_vsntprintf_s(tszLog, _countof(tszLog), LOG_MAX_BUFFER_SIZE, ptszFormat, args);
+	_vsntprintf_s(tszLog, _countof(tszLog), _TRUNCATE, ptszFormat, args);
 	va_end(args);
 
 	m_LogType[static_cast<short>(p_nType)].LogWrite(p_nType, tszLog, bFlag);

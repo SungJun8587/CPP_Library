@@ -16,7 +16,14 @@ int main()
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif
 
-    _tcout.imbue(std::locale("korean")); // 유니코드 출력 설정
+#ifdef _WIN32
+    // 1. C 런타임 로케일 설정
+    setlocale(LC_ALL, ".UTF8");		// printf, scanf 등 C 스타일의 입출력 함수나 일부 문자열 처리 함수들이 UTF-8 문자열을 올바르게 인식하고 처리할 수 있게 함.
+
+    // 2. 콘솔 입출력 코드페이지를 UTF-8(65001)로 변경
+    SetConsoleOutputCP(CP_UTF8);	// 프로그램이 콘솔창에 텍스트를 출력할 때(std::cout, printf 등), 유니코드 문자가 깨지지 않고 올바른 모양(한글 등)으로 그려지도록 지정
+    SetConsoleCP(CP_UTF8);			// 사용자가 콘솔창에 키보드로 입력하는 텍스트(std::cin, scanf 등)를 프로그램이 UTF-8 인코딩으로 정확하게 읽어들이도록 보장
+#endif
 
     // 1. 전역 시스템 초기화 (gpThreadManager 및 gpMemory 생성)
     BaseGlobal::Init();
@@ -53,6 +60,17 @@ int main()
             ENetworkEngineType::IOCP, serverAddress,
             []() { return std::make_shared<CIocpEchoServerSession>(); },
             2000, &iocpCore
+        );
+    }
+    else if( kTestEngineType == ENetworkEngineType::RIO )
+    {
+        rioCore = std::make_shared<CRioCore>();
+
+        // 서버 서비스 생성 (RIO)
+        serverService = CNetworkFactory::CreateServerService(
+            ENetworkEngineType::RIO, serverAddress,
+            []() { return std::make_shared<CRioEchoServerSession>(); },
+            10, &rioCore
         );
     }
 

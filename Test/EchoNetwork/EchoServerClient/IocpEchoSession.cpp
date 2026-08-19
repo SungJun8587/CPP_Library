@@ -1,6 +1,6 @@
 ﻿
 //***************************************************************************
-// IocpEchoSession.cpp : implementation of the CIocpEchoSession, CIocpClientEchoSession class.
+// IocpEchoSession.cpp : implementation of the CIocpEchoServerSession, CIocpClientEchoSession class.
 //
 //***************************************************************************
 
@@ -8,16 +8,16 @@
 #include "IocpEchoSession.h"
 
 //***************************************************************************
-// @brief CIocpEchoSession 객체를 생성합니다.
+// @brief CIocpEchoServerSession 객체를 생성합니다.
 //***************************************************************************
-CIocpEchoSession::CIocpEchoSession()
+CIocpEchoServerSession::CIocpEchoServerSession()
 {
 }
 
 //***************************************************************************
-// @brief CIocpEchoSession 객체를 소멸합니다.
+// @brief CIocpEchoServerSession 객체를 소멸합니다.
 //***************************************************************************
-CIocpEchoSession::~CIocpEchoSession()
+CIocpEchoServerSession::~CIocpEchoServerSession()
 {
 }
 
@@ -25,7 +25,7 @@ CIocpEchoSession::~CIocpEchoSession()
 // @brief 클라이언트가 성공적으로 접속했을 때 호출되는 오버라이드 함수입니다.
 // @details 부모 클래스의 연결 초기화 로직을 수행하고 접속 성공 로그를 출력합니다.
 //***************************************************************************
-void CIocpEchoSession::OnConnected()
+void CIocpEchoServerSession::OnConnected()
 {
 	CIocpSession::OnConnected();
 	LOG_INFO(_T("[IOCP Session] Connected!"));
@@ -35,9 +35,9 @@ void CIocpEchoSession::OnConnected()
 // @brief 클라이언트와의 연결이 끊어졌을 때 호출되는 오버라이드 함수입니다.
 // @details 부모 클래스의 연결 해제 로직을 수행하고 연결 종료 로그를 출력합니다.
 //***************************************************************************
-void CIocpEchoSession::OnDisconnect()
+void CIocpEchoServerSession::OnDisconnected()
 {
-	CIocpSession::OnDisconnect();
+	CIocpSession::OnDisconnected();
 	LOG_INFO(_T("[IOCP Session] Disconnected!"));
 }
 
@@ -49,7 +49,7 @@ void CIocpEchoSession::OnDisconnect()
 // @param len 수신된 데이터의 길이 (바이트 단위)
 // @return 처리한 데이터의 바이트 길이를 반환합니다.
 //***************************************************************************
-int32 CIocpEchoSession::OnRecv(BYTE* buffer, int32 len)
+int32 CIocpEchoServerSession::OnRecv(BYTE* buffer, int32 len)
 {
     // 1. UTF-8 바이트를 유니코드(UTF-16 / std::wstring)로 올바르게 변환
     int wlen = MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<char*>(buffer), len, nullptr, 0);
@@ -71,7 +71,7 @@ int32 CIocpEchoSession::OnRecv(BYTE* buffer, int32 len)
 // @brief 패킷 전송이 완료되었을 때 호출되는 오버라이드 함수입니다.
 // @param len 전송된 데이터의 길이 (바이트 단위)
 //***************************************************************************
-void CIocpEchoSession::OnSend(int32 len)
+void CIocpEchoServerSession::OnSend(int32 len)
 {
 	// 전송 완료 후 추가 처리 (필요시 구현)
 }
@@ -79,7 +79,7 @@ void CIocpEchoSession::OnSend(int32 len)
 //***************************************************************************
 // @brief 서버에 성공적으로 접속했을 때 호출되는 오버라이드 함수입니다.
 //***************************************************************************
-void CIocpClientEchoSession::OnConnected()
+void CIocpEchoClientSession::OnConnected()
 {
 	CIocpSession::OnConnected();
 	LOG_INFO(_T("[Client] Connected to Server!"));
@@ -91,7 +91,7 @@ void CIocpClientEchoSession::OnConnected()
 // @param len 수신된 데이터의 길이 (바이트 단위)
 // @return 처리한 데이터의 바이트 길이를 반환합니다.
 //***************************************************************************
-int32 CIocpClientEchoSession::OnRecv(BYTE* buffer, int32 len)
+int32 CIocpEchoClientSession::OnRecv(BYTE* buffer, int32 len)
 {
     // 1. UTF-8 바이트를 유니코드(UTF-16 / std::wstring)로 올바르게 변환
     int wlen = MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<char*>(buffer), len, nullptr, 0);

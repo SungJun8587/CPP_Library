@@ -107,18 +107,18 @@ private:
 };
 
 #define LOG_WRITE(LOGLEVEL, LOGFLAG, ...) \
-	CLogManager::Instance()->Write(LOGLEVEL, LOGFLAG, __VA_ARGS__)
+	CLogManager::Instance().Write(LOGLEVEL, LOGFLAG, __VA_ARGS__)
 
 #define LOG_DEBUG(...) \
-	CLogManager::Instance()->Write(ELOG_TYPE::LOG_TYPE_DEBUG, true, __VA_ARGS__)
+	CLogManager::Instance().Write(ELOG_TYPE::LOG_TYPE_DEBUG, true, __VA_ARGS__)
 #define LOG_TRACE(...) \
-	CLogManager::Instance()->Write(ELOG_TYPE::LOG_TYPE_TRACE, true, __VA_ARGS__)
+	CLogManager::Instance().Write(ELOG_TYPE::LOG_TYPE_TRACE, true, __VA_ARGS__)
 #define LOG_INFO(...) \
-	CLogManager::Instance()->Write(ELOG_TYPE::LOG_TYPE_INFO, true, __VA_ARGS__)
+	CLogManager::Instance().Write(ELOG_TYPE::LOG_TYPE_INFO, true, __VA_ARGS__)
 #define LOG_WARNING(...) \
-	CLogManager::Instance()->Write(ELOG_TYPE::LOG_TYPE_WARNING, true, __VA_ARGS__)
+	CLogManager::Instance().Write(ELOG_TYPE::LOG_TYPE_WARNING, true, __VA_ARGS__)
 #define LOG_ERROR(...) \
-	CLogManager::Instance()->Write(ELOG_TYPE::LOG_TYPE_ERROR, true, __VA_ARGS__)
+	CLogManager::Instance().Write(ELOG_TYPE::LOG_TYPE_ERROR, true, __VA_ARGS__)
 
 //***************************************************************************
 // @brief 전체 로그 시스템을 총괄하는 싱글톤 매니저 클래스입니다.
@@ -128,6 +128,19 @@ private:
 class CLogManager
 {
 public:
+	CLogManager(const CLogManager&) = delete;
+	CLogManager& operator=(const CLogManager&) = delete;
+
+	//***************************************************************************
+	// @brief CLogManager 싱글톤 인스턴스를 반환합니다.
+	// @return CLogManager 싱글톤 객체 참조
+	//***************************************************************************
+	static CLogManager& Instance()
+	{
+		static CLogManager instance;
+		return instance;
+	}
+
 	//***************************************************************************
 	// @brief 로그 매니저를 생성하고 하위 로그 객체들을 초기화합니다.
 	// @param ptszDirecoryName 로그 파일을 저장할 디렉토리 경로
@@ -142,23 +155,11 @@ public:
 	//***************************************************************************
 	void Write(const ELOG_TYPE p_nType, const bool bFlag, const TCHAR* ptszFormat, ...);
 
-	//***************************************************************************
-	// @brief CLogManager 싱글톤 인스턴스를 반환합니다.
-	// @return CLogManager 싱글톤 객체의 공유 포인터(std::shared_ptr)
-	//***************************************************************************
-	static std::shared_ptr<CLogManager> Instance();
-
 private:
+	CLogManager() = default;
+	~CLogManager() = default;
+
 	CLog m_LogType[static_cast<short>(ELOG_TYPE::LOG_TYPE_MAX_NUM)]; // 로그 타입별 CLog 인스턴스 배열
-};
-
-static std::shared_ptr<CLogManager> logmanager_;
-
-inline std::shared_ptr<CLogManager> CLogManager::Instance() {
-	if( !logmanager_ )
-		logmanager_ = std::make_shared<CLogManager>();
-
-	return logmanager_;
 };
 
 #endif // ndef __LOG_H__

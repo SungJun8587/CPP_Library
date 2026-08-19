@@ -103,7 +103,7 @@ public:
 protected:
 	// 상위 콘텐츠 레이어(CGameSession 등)에서 오버라이딩할 가상 함수
 	virtual void	OnConnected() {}
-	virtual void	OnDisconnect() {}
+	virtual void	OnDisconnected() {}
 	virtual int32	OnRecv(BYTE* buffer, int32 len) { return len; }
 	virtual void	OnSend(int32 len) {}
 

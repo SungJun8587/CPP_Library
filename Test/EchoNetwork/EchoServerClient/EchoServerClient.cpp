@@ -76,19 +76,6 @@ int RioSimpleTest()
 	}
 	std::cout << "2. RIO extension functions loaded successfully.\n";
 
-	// 4. connect() 수행
-	SOCKADDR_IN sa = {};
-	sa.sin_family = AF_INET;
-	inet_pton(AF_INET, "127.0.0.1", &sa.sin_addr);
-	sa.sin_port = htons(12345);
-
-	if( connect(sock, (SOCKADDR*)&sa, sizeof(sa)) == SOCKET_ERROR ) {
-		std::cerr << "connect failed with error (can be ignored if no server is up): " << WSAGetLastError() << "\n";
-	}
-	else {
-		std::cout << "3. connect() succeeded.\n";
-	}
-
 	// 5. 버퍼 malloc 및 RIORegisterBuffer() 등록
 	const DWORD bufferSize = 1024;
 	char* sendBuffer = (char*)malloc(bufferSize);
@@ -133,6 +120,19 @@ int RioSimpleTest()
 		return 1;
 	}
 	std::cout << "5. CQ and RQ created successfully.\n";
+
+	// 4. connect() 수행
+	SOCKADDR_IN sa = {};
+	sa.sin_family = AF_INET;
+	inet_pton(AF_INET, "127.0.0.1", &sa.sin_addr);
+	sa.sin_port = htons(12345);
+
+	if( connect(sock, (SOCKADDR*)&sa, sizeof(sa)) == SOCKET_ERROR ) {
+		std::cerr << "connect failed with error (can be ignored if no server is up): " << WSAGetLastError() << "\n";
+	}
+	else {
+		std::cout << "3. connect() succeeded.\n";
+	}
 
 	// 7. RIOSendEx 단발성 호출
 	OVERLAPPED ov = {};
@@ -199,14 +199,14 @@ int IocpRioTest()
 		// 서버 서비스 생성
 		serverService = CNetworkFactory::CreateServerService(
 			ENetworkEngineType::IOCP, serverAddress,
-			[]() { return std::make_shared<CIocpEchoSession>(); },
+			[]() { return std::make_shared<CIocpEchoServerSession>(); },
 			10, &iocpCore
 		);
 
 		// 클라이언트 서비스 생성
 		clientService = CNetworkFactory::CreateClientService(
 			ENetworkEngineType::IOCP, serverAddress,
-			[]() { return std::make_shared<CIocpClientEchoSession>(); },
+			[]() { return std::make_shared<CIocpEchoClientSession>(); },
 			1, &iocpCore
 		);
 	}
@@ -217,14 +217,14 @@ int IocpRioTest()
 		// 서버 서비스 생성 (RIO)
 		serverService = CNetworkFactory::CreateServerService(
 			ENetworkEngineType::RIO, serverAddress,
-			[]() { return std::make_shared<CRioEchoSession>(); },
+			[]() { return std::make_shared<CRioEchoServerSession>(); },
 			10, &rioCore
 		);
 
 		// 클라이언트 서비스 생성 (RIO)
 		clientService = CNetworkFactory::CreateClientService(
 			ENetworkEngineType::RIO, serverAddress,
-			[]() { return std::make_shared<CRioClientEchoSession>(); },
+			[]() { return std::make_shared<CRioEchoClientSession>(); },
 			1, &rioCore
 		);
 	}
@@ -298,9 +298,16 @@ int main()
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif
 	
-	_tcout.imbue(std::locale("korean")); // 유니코드 출력 설정
+#ifdef _WIN32
+	// 1. C 런타임 로케일 설정
+	setlocale(LC_ALL, ".UTF8");		// printf, scanf 등 C 스타일의 입출력 함수나 일부 문자열 처리 함수들이 UTF-8 문자열을 올바르게 인식하고 처리할 수 있게 함.
 
-	//int retCode = RioSimpleTest();
-	int retCode = IocpRioTest();
+	// 2. 콘솔 입출력 코드페이지를 UTF-8(65001)로 변경
+	SetConsoleOutputCP(CP_UTF8);	// 프로그램이 콘솔창에 텍스트를 출력할 때(std::cout, printf 등), 유니코드 문자가 깨지지 않고 올바른 모양(한글 등)으로 그려지도록 지정
+	SetConsoleCP(CP_UTF8);			// 사용자가 콘솔창에 키보드로 입력하는 텍스트(std::cin, scanf 등)를 프로그램이 UTF-8 인코딩으로 정확하게 읽어들이도록 보장
+#endif
+
+	int retCode = RioSimpleTest();
+	//int retCode = IocpRioTest();
 }
 

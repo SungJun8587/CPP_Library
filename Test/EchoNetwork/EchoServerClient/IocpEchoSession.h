@@ -1,6 +1,6 @@
 ﻿
 //***************************************************************************
-// IocpEchoSession.h : interface for the CIocpEchoSession, CIocpClientEchoSession class.
+// IocpEchoSession.h : interface for the CIocpEchoServerSession, CIocpClientEchoSession class.
 //
 //***************************************************************************
 
@@ -12,15 +12,15 @@
 #endif
 
 //***************************************************************************
-// @class CIocpEchoSession
+// @class CIocpEchoServerSession
 // @brief 서버용 IOCP 에코 세션 클래스
 // @details 클라이언트의 연결 수락, 연결 해제, 패킷 수신 및 송신(에코) 이벤트를 처리합니다.
 //***************************************************************************
-class CIocpEchoSession : public CIocpSession
+class CIocpEchoServerSession : public CIocpSession
 {
 public:
-	CIocpEchoSession();
-	virtual ~CIocpEchoSession();
+	CIocpEchoServerSession();
+	virtual ~CIocpEchoServerSession();
 
 	//***************************************************************************
 	// @brief 클라이언트 연결 성공 시 호출되는 콜백 함수입니다.
@@ -30,7 +30,7 @@ public:
 	//***************************************************************************
 	// @brief 클라이언트 연결 종료 시 호출되는 콜백 함수입니다.
 	//***************************************************************************
-	virtual void OnDisconnect() override;
+	virtual void OnDisconnected() override;
 
 	//***************************************************************************
 	// @brief 패킷 수신 시 호출되는 콜백 함수입니다.
@@ -49,11 +49,11 @@ public:
 };
 
 //***************************************************************************
-// @class CIocpClientEchoSession
+// @class CIocpEchoClientSession
 // @brief 클라이언트용 IOCP 에코 세션 클래스
 // @details 서버와의 연결 및 데이터 수신 이벤트를 처리합니다.
 //***************************************************************************
-class CIocpClientEchoSession : public CIocpSession
+class CIocpEchoClientSession : public CIocpSession
 {
 public:
 	//***************************************************************************
