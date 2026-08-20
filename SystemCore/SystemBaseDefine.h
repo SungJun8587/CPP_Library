@@ -1,4 +1,4 @@
-
+﻿
 //***************************************************************************
 // This File include Information about systeminfo define macro or constant type, Type.
 // 
@@ -87,9 +87,9 @@
 #define RAM_FORMFACTORDESC_STRLEN			32
 #define RAM_MEMORYTYPEDESC_STRLEN			32
 
-#define HDDISK_MODEL_STRLEN					32
-#define	HDDISK_NAME_STRLEN					32
-#define	HDDISK_MANUFACTURER_STRLEN			32
+#define HDDISK_MODEL_STRLEN					64
+#define	HDDISK_NAME_STRLEN					64
+#define	HDDISK_MANUFACTURER_STRLEN			64
 #define	HDDISK_DESCRIPTION_STRLEN			128
 
 #define DRIVE_NAME_STRLEN					16

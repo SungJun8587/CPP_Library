@@ -35,7 +35,8 @@ class CRioBuffer;
 //
 //      CRioCore는 생성자에서 외부로부터 주입받아 공유 소유합니다(CIocpServerService와
 //      동일한 패턴 — 코어 생성/수명 관리는 호출자 책임, 이 서비스는 Start()에서
-//      그 인스턴스를 Initialize()하고 사용만 합니다).
+//      그 인스턴스를 Initialize()하고 사용만 합니다). CRioCore는 멀티 워커
+//      스레드 버전이므로 StartWorkers(N, ...)로 구동합니다.
 //
 //      송신 버퍼(RIO_BUFFERID)는 이 서비스가 소유하지 않습니다. 세션마다
 //      자기 소유의 송신 링버퍼(CRingBuffer)를 갖고 있고, 그 실제 메모리를
@@ -61,8 +62,10 @@ public:
 	//        호출자 책임입니다(CIocpServerService와 동일한 패턴).
 	// @param factory 접속마다 세션 객체를 생성할 팩토리 함수
 	// @param maxSessionCount 동시에 수용할 최대 세션 수 (기본값 1)
+	// @param workerThreadCount RIO 완료 처리용 워커 스레드 개수 (기본값 0 = CRioCore가
+	//        hardware_concurrency()/2로 자동 산정)
 	//***************************************************************************
-	CRioServerService(CNetAddress address, CRioCoreRef rioCore, SessionFactory factory, int32 maxSessionCount = 1);
+	CRioServerService(CNetAddress address, CRioCoreRef rioCore, SessionFactory factory, int32 maxSessionCount = 1, uint32_t workerThreadCount = 0);
 
 	//***************************************************************************
 	// @brief 소멸자 (기본 소멸자 — 실제 자원 정리는 Close()가 담당)
@@ -71,7 +74,7 @@ public:
 
 	//***************************************************************************
 	// @brief RIO 서버 구동 (코어 초기화, 이벤트 풀/수신 버퍼 풀 초기화,
-	//        워커 스레드 시작, Listener 시작)
+	//        멀티 워커 스레드 시작, Listener 시작)
 	// @return bool 모든 초기화 단계와 Listener 시작까지 성공하면 true. 어느 한
 	//         단계라도 실패하면 false를 반환하며, 그 시점까지 만든 자원은
 	//         내부에서 역순으로 정리됩니다(워커가 이미 Running 상태였다면
@@ -111,6 +114,7 @@ private:
 	CRioSessionManager _sessionManager;					// 서버 서비스가 소유하는 RIO 세션 매니저
 	CRioEventPool	_eventPool;							// 이 서비스 소속 세션들이 공유하는 RIO 이벤트 풀
 	CRioBufferRef	_globalRecvBuffer;					// 클라이언트 비동기 수신(RIOReceive)용 글로벌 CRioBuffer 객체
+	uint32_t		_workerThreadCount = 0;				// StartWorkers()에 넘길 워커 스레드 개수 (0=자동)
 };
 
 //***************************************************************************
@@ -134,8 +138,9 @@ public:
 	//        이 인스턴스를 그대로 Initialize()합니다.
 	// @param factory 세션 객체 생성을 위한 팩토리 함수
 	// @param maxSessionCount 생성 및 관리할 최대 클라이언트 세션 수 (기본값: 1)
+	// @param workerThreadCount RIO 완료 처리용 워커 스레드 개수 (기본값 0 = 자동 산정)
 	//***************************************************************************
-	CRioClientService(CNetAddress address, CRioCoreRef rioCore, SessionFactory factory, int32 maxSessionCount = 1);
+	CRioClientService(CNetAddress address, CRioCoreRef rioCore, SessionFactory factory, int32 maxSessionCount = 1, uint32_t workerThreadCount = 0);
 
 	//***************************************************************************
 	// @brief 소멸자 (기본 소멸자 — 실제 자원 정리는 Close()가 담당)
@@ -143,7 +148,7 @@ public:
 	virtual ~CRioClientService() = default;
 
 	//***************************************************************************
-	// @brief RIO 클라이언트 서비스를 구동합니다 (코어 초기화, 워커 시작, N개 세션 연결).
+	// @brief RIO 클라이언트 서비스를 구동합니다 (코어 초기화, 멀티 워커 시작, N개 세션 연결).
 	// @return bool 이벤트 풀/코어/수신 버퍼 초기화 및 요청한 세션 수만큼의 접속이
 	//         모두 성공하면 true. 세션 연결 도중 하나라도 실패하면 그 이전까지
 	//         맺어진 세션들을 전부 정리하고 false를 반환합니다(부분 성공 상태로
@@ -182,6 +187,7 @@ private:
 	CRioSessionManager	_sessionManager;						// 클라이언트 서비스가 소유하는 RIO 세션 매니저
 	CRioEventPool		_eventPool;								// 이 서비스 소속 세션들이 공유하는 RIO 이벤트 풀
 	CRioBufferRef		_globalRecvBuffer;						// 클라이언트 비동기 수신(RIOReceive)용 글로벌 CRioBuffer 객체
+	uint32_t			_workerThreadCount = 0;					// StartWorkers()에 넘길 워커 스레드 개수 (0=자동)
 };
 
 #endif // ndef __RIOSERVICE_H__

@@ -1,4 +1,4 @@
-
+﻿
 //***************************************************************************
 // OsInfo.h: interface for the COsInfo Class.
 //
@@ -9,10 +9,14 @@
 
 #pragma once
 
+#ifndef __SYSTEMBASEDEFINE_H__
+#include <SystemBaseDefine.h>
+#endif
+
 #include <windows.h>
 
 #ifndef SM_SERVERR2
-	#define SM_SERVERR2								0x00000059	
+#define SM_SERVERR2								0x00000059	
 #endif
 
 #define PRODUCT_UNDEFINED                           0x00000000
@@ -187,213 +191,334 @@
 
 #define PRODUCT_UNLICENSED                          0xABCDABCD
 
-typedef void (WINAPI *PGetNativeSystemInfo)(LPSYSTEM_INFO);
-typedef BOOL(WINAPI *PGetProductInfo)(DWORD, DWORD, DWORD, DWORD, PDWORD);
+typedef void (WINAPI* PGetNativeSystemInfo)(LPSYSTEM_INFO);
+typedef BOOL(WINAPI* PGetProductInfo)(DWORD, DWORD, DWORD, DWORD, PDWORD);
+typedef void (WINAPI* RtlGetVersion_FUNC)(OSVERSIONINFOEXW*);
 
-typedef void (WINAPI *RtlGetVersion_FUNC)(OSVERSIONINFOEXW*);
 BOOL GetVersionOS(OSVERSIONINFOEX* os);
 BOOL IsWindowVersion(int nMajorVersion, int nMinorVersion, int nPlatformId);
 
 //***************************************************************************
-//
+// @brief Windows OS 버전을 정의한 열거형입니다.
+// @details Windows 3.1, 95부터 Windows 10, 11 및 Windows Server 시리즈까지의 OS 버전을 분류합니다.
+//***************************************************************************
 typedef enum WindowsVersion
 {
-   Windows,
-   Windows32s,
-   Windows95,
-   Windows95OSR2,
-   Windows98,
-   Windows98SE,
-   WindowsMillennium,
-   WindowsNT351,
-   WindowsNT40,
-   WindowsNT40Server,
-   Windows2000,
-   WindowsXP,
-   WindowsXPProfessionalx64,
-   WindowsHomeServer,
-   WindowsServer2003,
-   WindowsServer2003R2,
-   WindowsVista,
-   WindowsVistaSP1,
-   WindowsVistaSP2,
-   WindowsServer2008,
-   WindowsServer2008SP2,
-   WindowsServer2008R2,
-   WindowsServer2008R2SP2,
-   Windows7,
-   Windows7SP1,
-   WindowsServer2012,
-   Windows8,
-   Windows81,
-   WindowsServer2012R2,
-   Windows10,
-   Windows10_1511,
-   Windows10_1607,
-   Windows10_1703,
-   Windows10_1709,
-   Windows10_1803,
-   Windows10_1809,
-   Windows10_1903,
-   Windows10_1909,
-   Windows10_2004,
-   Windows10_20H2,
-   Windows10_21H1,
-   Windows10_21H2,
-   Windows10_22H2,
-   WindowsServer2016,
-   WindowsServer2019,
-   WindowsServer2022,
-   Windows11_21H2,
-   Windows11_22H2,
-   Windows11_23H2,
+	Windows,
+	Windows32s,
+	Windows95,
+	Windows95OSR2,
+	Windows98,
+	Windows98SE,
+	WindowsMillennium,
+	WindowsNT351,
+	WindowsNT40,
+	WindowsNT40Server,
+	Windows2000,
+	WindowsXP,
+	WindowsXPProfessionalx64,
+	WindowsHomeServer,
+	WindowsServer2003,
+	WindowsServer2003R2,
+	WindowsVista,
+	WindowsVistaSP1,
+	WindowsVistaSP2,
+	WindowsServer2008,
+	WindowsServer2008SP2,
+	WindowsServer2008R2,
+	WindowsServer2008R2SP2,
+	Windows7,
+	Windows7SP1,
+	WindowsServer2012,
+	Windows8,
+	Windows81,
+	WindowsServer2012R2,
+	Windows10,
+	Windows10_1511,
+	Windows10_1607,
+	Windows10_1703,
+	Windows10_1709,
+	Windows10_1803,
+	Windows10_1809,
+	Windows10_1903,
+	Windows10_1909,
+	Windows10_2004,
+	Windows10_20H2,
+	Windows10_21H1,
+	Windows10_21H2,
+	Windows10_22H2,
+	WindowsServer2016,
+	WindowsServer2019,
+	WindowsServer2022,
+	WindowsServer2025,
+	Windows11_21H2,
+	Windows11_22H2,
+	Windows11_23H2,
+	Windows11_24H2
 } WindowsVersion;
 
 //***************************************************************************
-//
+// @brief Windows OS 에디션 제품군을 정의한 열거형입니다.
+// @details Home, Professional, Enterprise, Datacenter Server 등 세부 제품 에디션을 분류합니다.
+//***************************************************************************
 typedef enum WindowsEdition
 {
-   EditionUnknown,
+	EditionUnknown,
 
-   Workstation,
-   Server,
-   AdvancedServer,
-   Home,
+	Workstation,
+	Server,
+	AdvancedServer,
+	Home,
 
-   Ultimate,
-   HomeBasic,
-   HomePremium,
-   Enterprise,
-   HomeBasic_N,
-   Business,
-   StandardServer,
-   DatacenterServer,
-   SmallBusinessServer,
-   EnterpriseServer,
-   Starter,
-   DatacenterServerCore,
-   StandardServerCore,
-   EnterpriseServerCore,
-   EnterpriseServerIA64,
-   Business_N,
-   WebServer,
-   ClusterServer,
-   HomeServer,
-   StorageExpressServer,
-   StorageStandardServer,
-   StorageWorkgroupServer,
-   StorageEnterpriseServer,
-   ServerForSmallBusiness,
-   SmallBusinessServerPremium,
-   HomePremium_N,
-   Enterprise_N,
-   Ultimate_N,
-   WebServerCore,
-   MediumBusinessServerManagement,
-   MediumBusinessServerSecurity,
-   MediumBusinessServerMessaging,
-   ServerFoundation,
-   HomePremiumServer,
-   ServerForSmallBusiness_V,
-   StandardServer_V,
-   DatacenterServer_V,
-   EnterpriseServer_V,
-   DatacenterServerCore_V,
-   StandardServerCore_V,
-   EnterpriseServerCore_V,
-   HyperV,
-   StorageExpressServerCore,
-   StorageStandardServerCore,
-   StorageWorkgroupServerCore,
-   StorageEnterpriseServerCore,
-   Starter_N,
-   Professional,
-   Professional_N,
-   SBSolutionServer,
-   ServerForSBSolution,
-   StandardServerSolutions,
-   StandardServerSolutionsCore,
-   SBSolutionServer_EM,
-   ServerForSBSolution_EM,
-   SolutionEmbeddedServer,
-   SolutionEmbeddedServerCore,
-   SmallBusinessServerPremiumCore,
-   EssentialBusinessServerMGMT,
-   EssentialBusinessServerADDL,
-   EssentialBusinessServerMGMTSVC,
-   EssentialBusinessServerADDLSVC,
-   ClusterServer_V,
-   Embedded,
-   Starter_E,
-   HomeBasic_E,
-   HomePremium_E,
-   Professional_E,
-   Enterprise_E,
-   Ultimate_E,
-   Windows10Home_E,
-   Windows10Education_E
+	Ultimate,
+	HomeBasic,
+	HomePremium,
+	Enterprise,
+	HomeBasic_N,
+	Business,
+	StandardServer,
+	DatacenterServer,
+	SmallBusinessServer,
+	EnterpriseServer,
+	Starter,
+	DatacenterServerCore,
+	StandardServerCore,
+	EnterpriseServerCore,
+	EnterpriseServerIA64,
+	Business_N,
+	WebServer,
+	ClusterServer,
+	HomeServer,
+	StorageExpressServer,
+	StorageStandardServer,
+	StorageWorkgroupServer,
+	StorageEnterpriseServer,
+	ServerForSmallBusiness,
+	SmallBusinessServerPremium,
+	HomePremium_N,
+	Enterprise_N,
+	Ultimate_N,
+	WebServerCore,
+	MediumBusinessServerManagement,
+	MediumBusinessServerSecurity,
+	MediumBusinessServerMessaging,
+	ServerFoundation,
+	HomePremiumServer,
+	ServerForSmallBusiness_V,
+	StandardServer_V,
+	DatacenterServer_V,
+	EnterpriseServer_V,
+	DatacenterServerCore_V,
+	StandardServerCore_V,
+	EnterpriseServerCore_V,
+	HyperV,
+	StorageExpressServerCore,
+	StorageStandardServerCore,
+	StorageWorkgroupServerCore,
+	StorageEnterpriseServerCore,
+	Starter_N,
+	Professional,
+	Professional_N,
+	SBSolutionServer,
+	ServerForSBSolution,
+	StandardServerSolutions,
+	StandardServerSolutionsCore,
+	SBSolutionServer_EM,
+	ServerForSBSolution_EM,
+	SolutionEmbeddedServer,
+	SolutionEmbeddedServerCore,
+	SmallBusinessServerPremiumCore,
+	EssentialBusinessServerMGMT,
+	EssentialBusinessServerADDL,
+	EssentialBusinessServerMGMTSVC,
+	EssentialBusinessServerADDLSVC,
+	ClusterServer_V,
+	Embedded,
+	Starter_E,
+	HomeBasic_E,
+	HomePremium_E,
+	Professional_E,
+	Enterprise_E,
+	Ultimate_E,
+	Windows10Home_E,
+	Windows10Education_E
 } WindowsEdition;
 
 //***************************************************************************
-//
-class COsInfo  
+// @brief 운영체제(Windows) 정보를 감지하고 관리하는 클래스입니다.
+// @details 현재 실행 중인 Windows의 버전, 에디션, 아키텍처(32비트/64비트), 빌드 번호 및 서비스 팩 정보 등을 수집하고 조회하는 기능을 제공합니다.
+//***************************************************************************
+class COsInfo
 {
 public:
+	//***************************************************************************
+	// @brief COsInfo 클래스의 생성자로, OS 정보 및 시스템 정보를 초기화 및 감지합니다.
+	// @param 없음
+	// @return 없음
+	//***************************************************************************
 	COsInfo();
+
+	//***************************************************************************
+	// @brief COsInfo 클래스의 소멸자입니다.
+	// @param 없음
+	// @return 없음
+	//***************************************************************************
 	virtual ~COsInfo();
 
+	//***************************************************************************
+	// @brief 감지된 Windows OS 버전을 반환합니다.
+	// @param 없음
+	// @return WindowsVersion 감지된 OS 버전 열거형
+	//***************************************************************************
 	WindowsVersion GetWindowsVersion() const {
-		return m_nWinVersion;								// returns the windows version
+		return m_nWinVersion;
 	}
+
+	//***************************************************************************
+	// @brief 감지된 Windows 에디션 정보를 반환합니다.
+	// @param 없음
+	// @return WindowsEdition 감지된 에디션 열거형
+	//***************************************************************************
 	WindowsEdition GetWindowsEdition() const {
-		return m_nWinEdition;								// returns the windows edition
+		return m_nWinEdition;
 	}
 
+	//***************************************************************************
+	// @brief OS 주 버전(Major Version)을 반환합니다.
+	// @param 없음
+	// @return DWORD 주 버전 번호
+	//***************************************************************************
 	DWORD GetMajorVersion() const {
-		return m_Osvi.dwMajorVersion;						// returns major version
+		return m_Osvi.dwMajorVersion;
 	}
+
+	//***************************************************************************
+	// @brief OS 부 버전(Minor Version)을 반환합니다.
+	// @param 없음
+	// @return DWORD 부 버전 번호
+	//***************************************************************************
 	DWORD GetMinorVersion() const {
-		return m_Osvi.dwMinorVersion;						// returns minor version
+		return m_Osvi.dwMinorVersion;
 	}
+
+	//***************************************************************************
+	// @brief OS 빌드 번호(Build Number)를 반환합니다.
+	// @param 없음
+	// @return DWORD 빌드 번호
+	//***************************************************************************
 	DWORD GetBuildNumber() const {
-		return m_Osvi.dwBuildNumber;						// returns build number
+		return m_Osvi.dwBuildNumber;
 	}
+
+	//***************************************************************************
+	// @brief OS 플랫폼 ID를 반환합니다.
+	// @param 없음
+	// @return DWORD 플랫폼 ID
+	//***************************************************************************
 	DWORD GetPlatformID() const {
-		return m_Osvi.dwPlatformId;							// returns platform ID
+		return m_Osvi.dwPlatformId;
 	}
+
+	//***************************************************************************
+	// @brief 감지된 OS 설명 문자열을 반환합니다.
+	// @param 없음
+	// @return TCHAR* OS 설명 문자열 포인터
+	//***************************************************************************
 	TCHAR* GetDescription() const {
-		return (TCHAR *)m_tszDescription;					// returns description
+		return (TCHAR*)m_tszDescription;
 	}
+
+	//***************************************************************************
+	// @brief 서비스 팩 및 빌드 정보 문자열을 반환합니다.
+	// @param 없음
+	// @return TCHAR* 서비스 팩 문자열 포인터
+	//***************************************************************************
 	TCHAR* GetServicePack() const {
-		return (TCHAR *)m_tszServicePack;					// additional information about service pack
+		return (TCHAR*)m_tszServicePack;
 	}
-   
-	bool IsNTPlatform() const;								// true if NT platform
-	bool IsWindowsPlatform() const;							// true is Windows platform
-	bool IsWin32sPlatform() const;							// true is Win32s platform
 
-	bool Is32bitPlatform() const;							// true if platform is 32-bit
-	bool Is64bitPlatform() const;							// true if platform is 64-bit
+	//***************************************************************************
+	// @brief OS가 NT 플랫폼 계열인지 확인합니다.
+	// @param 없음
+	// @return bool NT 플랫폼이면 true, 아니면 false
+	//***************************************************************************
+	bool IsNTPlatform() const;
 
+	//***************************************************************************
+	// @brief OS가 Windows 9x 계열 플랫폼인지 확인합니다.
+	// @param 없음
+	// @return bool Windows 9x 계열 플랫폼이면 true, 아니면 false
+	//***************************************************************************
+	bool IsWindowsPlatform() const;
+
+	//***************************************************************************
+	// @brief OS가 Win32s 플랫폼인지 확인합니다.
+	// @param 없음
+	// @return bool Win32s 플랫폼이면 true, 아니면 false
+	//***************************************************************************
+	bool IsWin32sPlatform() const;
+
+	//***************************************************************************
+	// @brief 실행 중인 시스템 플랫폼이 32비트 환경인지 확인합니다.
+	// @param 없음
+	// @return bool 32비트 환경이면 true, 아니면 false
+	//***************************************************************************
+	bool Is32bitPlatform() const;
+
+	//***************************************************************************
+	// @brief 실행 중인 시스템 플랫폼이 64비트 환경인지 확인합니다.
+	// @param 없음
+	// @return bool 64비트 환경이면 true, 아니면 false
+	//***************************************************************************
+	bool Is64bitPlatform() const;
+
+	//***************************************************************************
+	// @brief OS 버전 및 에디션 정보를 종합하여 설명 문자열을 생성합니다.
+	// @param 없음
+	// @return 없음
+	//***************************************************************************
 	void DetectDescription();
 
 private:
+	//***************************************************************************
+	// @brief OS 버전(Windows 10, 11, Server 등)을 내부적으로 감지합니다.
+	// @param 없음
+	// @return 없음
+	//***************************************************************************
 	void DetectWindowsVersion();
+
+	//***************************************************************************
+	// @brief OS 에디션(Professional, Enterprise, Server 등)을 내부적으로 감지합니다.
+	// @param 없음
+	// @return 없음
+	//***************************************************************************
 	void DetectWindowsEdition();
+
+	//***************************************************************************
+	// @brief 서비스 팩 및 상세 빌드 번호 정보를 내부적으로 감지합니다.
+	// @param 없음
+	// @return 없음
+	//***************************************************************************
 	void DetectWindowsServicePack();
+
+	//***************************************************************************
+	// @brief GetProductInfo API를 사용하여 상세 프로덕트 유형을 감지합니다.
+	// @param 없음
+	// @return DWORD 프로덕트 타입 ID
+	//***************************************************************************
 	DWORD DetectProductInfo();
 
 private:
-	WindowsVersion		m_nWinVersion;
-	WindowsEdition		m_nWinEdition;
+	WindowsVersion		m_nWinVersion; // 감지된 Windows 버전 정보
+	WindowsEdition		m_nWinEdition; // 감지된 Windows 에디션 정보
 
-	BOOL				m_bOsVersionInfoEx;
+	BOOL				m_bOsVersionInfoEx; // GetVersionEx/RtlGetVersion 구동 성공 여부
 
-	TCHAR				m_tszDescription[ OS_DESCRIPTION_STRLEN ];
-	TCHAR				m_tszServicePack[ OS_SERVICEPACK_STRLEN ];
+	TCHAR				m_tszDescription[OS_DESCRIPTION_STRLEN]; // OS 전체 설명 문자열 버퍼
+	TCHAR				m_tszServicePack[OS_SERVICEPACK_STRLEN]; // 서비스 팩 및 빌드 상세 문자열 버퍼
 
-	OSVERSIONINFOEX		m_Osvi;
-	SYSTEM_INFO			m_Sysi;
+	OSVERSIONINFOEX		m_Osvi; // OS 버전 상세 구조체
+	SYSTEM_INFO			m_Sysi; // 시스템 하드웨어 정보 구조체
 };
 
 #endif // ndef __OSINFO_H__

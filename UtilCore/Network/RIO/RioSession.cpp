@@ -191,7 +191,7 @@ void CRioSession::FinalizeClose() noexcept
 
         closeReason = _closeReason.load(std::memory_order_acquire);
 
-        // 1. RIO Request Queue 핸들 초기화
+        // 1. RIO Request Queue 핸들 초기화 (소켓 닫힐 때 RIO 서브시스템이 함께 정리함)
         _requestQueue.store(RIO_INVALID_RQ, std::memory_order_release);
 
         // 2. 소켓 핸들 완전 정리
@@ -258,6 +258,7 @@ bool CRioSession::PostReceiveInternal() noexcept
         // 5. 할당받은 슬롯의 실제 RIO 버퍼 정보(RIO_BUF) 획득 시도
         else if( !bufferPool->GetRioBuffer(slotIndex, rioBuf) )
         {
+            // 정보 획득 실패 시, 앞서 할당받았던 슬롯을 곧바로 반납하고 상태 초기화
             bufferPool->FreeSlot(slotIndex);
             slotIndex = Rio::kInvalidSlotIndex;
             failureReason = Rio::CloseReason::InternalError;
@@ -269,6 +270,7 @@ bool CRioSession::PostReceiveInternal() noexcept
 
             if( eventPool == nullptr )
             {
+                // 이벤트 풀이 존재하지 않으면, 슬롯 반납 및 내부 에러 처리
                 bufferPool->FreeSlot(slotIndex);
                 slotIndex = Rio::kInvalidSlotIndex;
                 failureReason = Rio::CloseReason::InternalError;
@@ -279,6 +281,7 @@ bool CRioSession::PostReceiveInternal() noexcept
                 rioEvent = eventPool->Alloc();
                 if( rioEvent == nullptr )
                 {
+                    // 이벤트 할당 실패(풀 고갈) 시, 슬롯 반납 및 사유 기록
                     bufferPool->FreeSlot(slotIndex);
                     slotIndex = Rio::kInvalidSlotIndex;
                     failureReason = Rio::CloseReason::EventPoolExhausted;
@@ -311,12 +314,14 @@ bool CRioSession::PostReceiveInternal() noexcept
         }
     }
 
+    // 10. 과정 중 발생한 실패 사유가 존재한다면 세션을 지정된 사유로 종료하고 false 반환
     if( failureReason != Rio::CloseReason::None )
     {
         Close(failureReason);
         return false;
     }
 
+    // 11. 모든 수신 포스트 과정 성공
     return true;
 }
 
@@ -525,17 +530,6 @@ bool CRioSession::FlushSendInternal() noexcept
             bufferCount = _sendBuffer.GetRioSendBuffers(rioBufs, _sendBufferId);
         }
 
-        if( bufferCount > 0 )
-        {
-            LOG_DEBUG(_T("[RIO Session FlushSend] BufferCount: %d | _sendBufferId: %p | rioBufs[0].BufferId: %p | Offset: %lu | Length: %lu | Match: %s"),
-                bufferCount,
-                static_cast<void*>(_sendBufferId),
-                static_cast<void*>(rioBufs[0].BufferId),
-                rioBufs[0].Offset,
-                rioBufs[0].Length,
-                (_sendBufferId == rioBufs[0].BufferId) ? _T("TRUE") : _T("FALSE"));
-        }
-
         if( bufferCount <= 0 )
         {
             PRWriteLockGuard sendWriteGuard(_sendLock, __FUNCTION__);
@@ -684,5 +678,5 @@ void CRioSession::CloseSocketInternal() noexcept
 {
     const SOCKET socketToClose = _socket.exchange(INVALID_SOCKET, std::memory_order_acq_rel);
 
-    if( socketToClose != INVALID_SOCKET ) ::closesocket(socketToClose);
+    CSocketUtils::Close(socketToClose);
 }

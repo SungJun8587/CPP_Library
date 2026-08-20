@@ -1,4 +1,4 @@
-
+﻿
 //***************************************************************************
 // HardwareInfo.cpp: implementation of the Hardware Information class.
 //
@@ -6,2251 +6,1149 @@
 
 #include "pch.h"
 #include "HardwareInfo.h"
+#include <comdef.h>
+#include <vector>
 
 //***************************************************************************
-//
-void ChangeDataFormat(const __int64& nData, TCHAR *ptszFormat)
+// Helper Functions & RAII Wrappers
+//***************************************************************************
+namespace
 {
-	const int NUMFORMATTERS = 5;
-	double	dblBase = (double)nData;
-	int		nNumConversions = 0;
-	TCHAR	tszFormatters[NUMFORMATTERS][10] = { _T(" bytes"), _T(" KB"), _T(" MB"), _T(" GB"), _T(" TB") };
+    //***************************************************************************
+    // @brief   VARIANT 자원의 자동 해제를 담당하는 RAII 구조체입니다.
+    // @param   없음
+    // @return  없음
+    // @detail  생성 시 VariantInit, 소멸 시 VariantClear를 호출하여 메모리 누수를 방지합니다.
+    //***************************************************************************
+    struct CVariantGuard : public VARIANT
+    {
+        CVariantGuard() { VariantInit(this); }
+        ~CVariantGuard() { VariantClear(this); }
+    };
 
-	while( dblBase > 1000 )
-	{
-		dblBase /= 1024;
-		nNumConversions++;
-	}
+    //***************************************************************************
+    // @brief   WMI 객체에서 문자열(BSTR) 속성을 추출합니다.
+    // @param   Wmi WMI 객체 참조
+    // @param   nIndex 쿼리 결과의 인덱스
+    // @param   pcszProp 가져올 WMI 속성 이름
+    // @param   dest 속성값을 저장할 출력 버퍼
+    // @return  void
+    // @detail  BSTR 변환 시 _bstr_t를 사용하여 안전하게 TCHAR 문자열로 복사합니다.
+    //***************************************************************************
+    template <size_t N>
+    void FetchWmiString(CWmi& Wmi, int nIndex, const TCHAR* pcszProp, TCHAR(&dest)[N])
+    {
+        CVariantGuard vt;
+        Wmi.GetProperties(nIndex, pcszProp, vt);
 
-	if( (0 <= nNumConversions) && (nNumConversions <= NUMFORMATTERS) )
-		_stprintf_s(ptszFormat, NUMERIC_STRING_LEN, _T("%0.2f%s"), dblBase, tszFormatters[nNumConversions]);
+        if( vt.vt == VT_BSTR && vt.bstrVal != nullptr )
+        {
+            _bstr_t bstr(vt.bstrVal);
+            _tcscpy_s(dest, N, static_cast<LPCTSTR>(bstr));
+        }
+    }
+
+    //***************************************************************************
+    // @brief   WMI 객체에서 64비트 정수형 속성을 추출합니다.
+    // @param   Wmi WMI 객체 참조
+    // @param   nIndex 쿼리 결과의 인덱스
+    // @param   pcszProp 가져올 WMI 속성 이름
+    // @return  __int64 파싱된 64비트 정수값 (실패 시 0)
+    // @detail  BSTR 형태로 반환된 용량/크기 데이터를 검증 후 __int64로 변환합니다.
+    //***************************************************************************
+    __int64 FetchWmiInt64(CWmi& Wmi, int nIndex, const TCHAR* pcszProp)
+    {
+        CVariantGuard vt;
+        Wmi.GetProperties(nIndex, pcszProp, vt);
+
+        if( vt.vt == VT_BSTR && vt.bstrVal != nullptr )
+        {
+            _bstr_t bstr(vt.bstrVal);
+            LPCTSTR ptszStr = static_cast<LPCTSTR>(bstr);
+            if( ptszStr && *ptszStr != _T('\0') && std::all_of(ptszStr, ptszStr + _tcslen(ptszStr), ::_istdigit) )
+            {
+                return _ttoi64(ptszStr);
+            }
+        }
+        return 0;
+    }
 }
 
 //***************************************************************************
-// Construction/Destruction
+// @brief   바이트 단위의 데이터를 KB, MB, GB, TB 형태의 포맷 문자열로 변환합니다.
+// @param   nData 변환할 바이트 단위 크기 데이터
+// @param   ptszFormat 포맷팅된 결과 문자열을 저장할 버퍼
+// @return  void
+// @detail  1024 기준으로 단위를 반복 계산하며 오버플로를 방지하기 위해 배열 한계를 제어합니다.
+//***************************************************************************
+void ChangeDataFormat(const __int64& nData, TCHAR* ptszFormat)
+{
+    const int NUMFORMATTERS = 5;
+    double dblBase = static_cast<double>(nData);
+    int nNumConversions = 0;
+    const TCHAR* tszFormatters[NUMFORMATTERS] = { _T(" bytes"), _T(" KB"), _T(" MB"), _T(" GB"), _T(" TB") };
+
+    while( dblBase >= 1024.0 && nNumConversions < (NUMFORMATTERS - 1) )
+    {
+        dblBase /= 1024.0;
+        nNumConversions++;
+    }
+
+    _stprintf_s(ptszFormat, NUMERIC_STRING_LEN, _T("%0.2f%s"), dblBase, tszFormatters[nNumConversions]);
+}
+
+//***************************************************************************
+// CBiosInfo
 //***************************************************************************
 
+//***************************************************************************
+// @brief   CBiosInfo 클래스 생성자입니다.
+// @param   없음
+// @return  없음
+// @detail  멤버 변수 m_Bios를 0으로 초기화합니다.
+//***************************************************************************
 CBiosInfo::CBiosInfo()
 {
-	ZeroMemory(&m_Bios, sizeof(HWINFO_BIOS));
+    ZeroMemory(&m_Bios, sizeof(HWINFO_BIOS));
 }
 
+//***************************************************************************
+// @brief   CBiosInfo 클래스 소멸자입니다.
+// @param   없음
+// @return  없음
+// @detail  클래스 객체 해제 시 필요한 정리를 수행합니다.
+//***************************************************************************
 CBiosInfo::~CBiosInfo()
 {
 }
 
 //***************************************************************************
-//
-BOOL CBiosInfo::GetInformation(CWmi &Wmi)
+// @brief   WMI를 통해 BIOS 정보를 수집합니다.
+// @param   Wmi WMI 모듈 참조
+// @return  BOOL 성공 시 TRUE, 실패 시 FALSE
+// @detail  Win32_BIOS 클래스에서 제조사, 버전, 시리얼 번호 등의 속성을 추출합니다.
+//***************************************************************************
+BOOL CBiosInfo::GetInformation(CWmi& Wmi)
 {
-	USES_CONVERSION;
+    int nIndex = Wmi.ExecQuery(_T("Win32_BIOS"));
+    if( nIndex < 0 ) return FALSE;
 
-	int		nIndex = 0;
+    FetchWmiString(Wmi, 0, _T("Manufacturer"), m_Bios.m_tszManufacturer);
+    FetchWmiString(Wmi, 0, _T("SMBIOSBIOSVersion"), m_Bios.m_tszSmVersion);
+    FetchWmiString(Wmi, 0, _T("Version"), m_Bios.m_tszVersion);
+    FetchWmiString(Wmi, 0, _T("IdentificationCode"), m_Bios.m_tszIdentificationCode);
+    FetchWmiString(Wmi, 0, _T("SerialNumber"), m_Bios.m_tszSerialNumber);
+    FetchWmiString(Wmi, 0, _T("ReleaseDate"), m_Bios.m_tszReleaseDate);
 
-	VARIANT		vtManufacturer;
-	VARIANT		vtSmVersion;
-	VARIANT		vtVersion;
-	VARIANT		vtIdentificationCode;
-	VARIANT		vtSerialNumber;
-	VARIANT		vtReleaseDate;
-
-	nIndex = Wmi.ExecQuery(_T("Win32_BIOS"));
-	if( nIndex < 0 ) return false;
-
-	VariantInit(&vtManufacturer);
-
-	Wmi.GetProperties(0, _T("Manufacturer"), vtManufacturer);
-
-	if( vtManufacturer.vt == VT_BSTR )
-	{
-#ifdef _UNICODE	
-		_tcscpy_s(m_Bios.m_tszManufacturer, _countof(m_Bios.m_tszManufacturer), OLE2W(vtManufacturer.bstrVal));
-#else
-		_tcscpy_s(m_Bios.m_tszManufacturer, _countof(m_Bios.m_tszManufacturer), OLE2A(vtManufacturer.bstrVal));
-#endif
-	}
-
-	VariantClear(&vtManufacturer);
-
-	VariantInit(&vtSmVersion);
-
-	Wmi.GetProperties(0, _T("SMBIOSBIOSVersion"), vtSmVersion);
-
-	if( vtSmVersion.vt == VT_BSTR )
-	{
-#ifdef _UNICODE	
-		_tcscpy_s(m_Bios.m_tszSmVersion, _countof(m_Bios.m_tszSmVersion), OLE2W(vtSmVersion.bstrVal));
-#else
-		_tcscpy_s(m_Bios.m_tszSmVersion, _countof(m_Bios.m_tszSmVersion), OLE2A(vtSmVersion.bstrVal));
-#endif
-	}
-
-	VariantClear(&vtSmVersion);
-
-	VariantInit(&vtVersion);
-
-	Wmi.GetProperties(0, _T("Version"), vtVersion);
-
-	if( vtVersion.vt == VT_BSTR )
-	{
-#ifdef _UNICODE	
-		_tcscpy_s(m_Bios.m_tszVersion, _countof(m_Bios.m_tszVersion), OLE2W(vtVersion.bstrVal));
-#else
-		_tcscpy_s(m_Bios.m_tszVersion, _countof(m_Bios.m_tszVersion), OLE2A(vtVersion.bstrVal));
-#endif
-	}
-
-	VariantClear(&vtVersion);
-
-	VariantInit(&vtIdentificationCode);
-
-	Wmi.GetProperties(0, _T("IdentificationCode"), vtIdentificationCode);
-
-	if( vtIdentificationCode.vt == VT_BSTR )
-	{
-#ifdef _UNICODE	
-		_tcscpy_s(m_Bios.m_tszIdentificationCode, _countof(m_Bios.m_tszIdentificationCode), OLE2W(vtIdentificationCode.bstrVal));
-#else
-		_tcscpy_s(m_Bios.m_tszIdentificationCode, _countof(m_Bios.m_tszIdentificationCode), OLE2A(vtIdentificationCode.bstrVal));
-#endif
-	}
-
-	VariantClear(&vtIdentificationCode);
-
-	VariantInit(&vtSerialNumber);
-
-	Wmi.GetProperties(0, _T("SerialNumber"), vtSerialNumber);
-
-	if( vtSerialNumber.vt == VT_BSTR )
-	{
-#ifdef _UNICODE	
-		_tcscpy_s(m_Bios.m_tszSerialNumber, _countof(m_Bios.m_tszSerialNumber), OLE2W(vtSerialNumber.bstrVal));
-#else
-		_tcscpy_s(m_Bios.m_tszSerialNumber, _countof(m_Bios.m_tszSerialNumber), OLE2A(vtSerialNumber.bstrVal));
-#endif
-	}
-
-	VariantClear(&vtSerialNumber);
-
-	VariantInit(&vtReleaseDate);
-
-	Wmi.GetProperties(0, _T("ReleaseDate"), vtReleaseDate);
-
-	if( vtReleaseDate.vt == VT_BSTR )
-	{
-#ifdef _UNICODE	
-		_tcscpy_s(m_Bios.m_tszReleaseDate, _countof(m_Bios.m_tszReleaseDate), OLE2W(vtReleaseDate.bstrVal));
-#else
-		_tcscpy_s(m_Bios.m_tszReleaseDate, _countof(m_Bios.m_tszReleaseDate), OLE2A(vtReleaseDate.bstrVal));
-#endif
-	}
-
-	VariantClear(&vtReleaseDate);
-
-	return true;
+    return TRUE;
 }
 
-///***************************************************************************
-// Construction/Destruction
+//***************************************************************************
+// CMainBoardInfo
 //***************************************************************************
 
+//***************************************************************************
+// @brief   CMainBoardInfo 클래스 생성자입니다.
+// @param   없음
+// @return  없음
+// @detail  멤버 변수 m_MainBoard를 0으로 초기화합니다.
+//***************************************************************************
 CMainBoardInfo::CMainBoardInfo()
 {
-	ZeroMemory(&m_MainBoard, sizeof(HWINFO_MAINBOARD));
+    ZeroMemory(&m_MainBoard, sizeof(HWINFO_MAINBOARD));
 }
 
+//***************************************************************************
+// @brief   CMainBoardInfo 클래스 소멸자입니다.
+// @param   없음
+// @return  없음
+// @detail  클래스 객체 해제 시 필요한 정리를 수행합니다.
+//***************************************************************************
 CMainBoardInfo::~CMainBoardInfo()
 {
 }
 
 //***************************************************************************
-//
-BOOL CMainBoardInfo::GetInformation(CWmi &Wmi)
+// @brief   WMI를 통해 메인보드 정보를 수집합니다.
+// @param   Wmi WMI 모듈 참조
+// @return  BOOL 성공 시 TRUE, 실패 시 FALSE
+// @detail  Win32_BaseBoard 클래스에서 메인보드 제품명, 시리얼, 제조사 정보를 수집합니다.
+//***************************************************************************
+BOOL CMainBoardInfo::GetInformation(CWmi& Wmi)
 {
-	USES_CONVERSION;
+    int nIndex = Wmi.ExecQuery(_T("Win32_BaseBoard"));
+    if( nIndex < 0 ) return FALSE;
 
-	int			nIndex = 0;
+    FetchWmiString(Wmi, 0, _T("Product"), m_MainBoard.m_tszProduct);
+    FetchWmiString(Wmi, 0, _T("SerialNumber"), m_MainBoard.m_tszSerialNumber);
+    FetchWmiString(Wmi, 0, _T("Manufacturer"), m_MainBoard.m_tszManufacturer);
+    FetchWmiString(Wmi, 0, _T("Description"), m_MainBoard.m_tszDescription);
 
-	VARIANT		vtProduct;
-	VARIANT		vtSerialNumber;
-	VARIANT		vtManufacturer;
-	VARIANT		vtDescription;
-
-	nIndex = Wmi.ExecQuery(_T("Win32_BaseBoard"));
-	if( nIndex < 0 ) return false;
-
-	VariantInit(&vtProduct);
-
-	Wmi.GetProperties(0, _T("Product"), vtProduct);
-
-	if( vtProduct.vt == VT_BSTR )
-	{
-#ifdef _UNICODE	
-		_tcscpy_s(m_MainBoard.m_tszProduct, _countof(m_MainBoard.m_tszProduct), OLE2W(vtProduct.bstrVal));
-#else
-		_tcscpy_s(m_MainBoard.m_tszProduct, _countof(m_MainBoard.m_tszProduct), OLE2A(vtProduct.bstrVal));
-#endif
-	}
-
-	VariantClear(&vtProduct);
-
-	VariantInit(&vtSerialNumber);
-
-	Wmi.GetProperties(0, _T("SerialNumber"), vtSerialNumber);
-
-	if( vtSerialNumber.vt == VT_BSTR )
-	{
-#ifdef _UNICODE	
-		_tcscpy_s(m_MainBoard.m_tszSerialNumber, _countof(m_MainBoard.m_tszSerialNumber), OLE2W(vtSerialNumber.bstrVal));
-#else
-		_tcscpy_s(m_MainBoard.m_tszSerialNumber, _countof(m_MainBoard.m_tszSerialNumber), OLE2A(vtSerialNumber.bstrVal));
-#endif
-	}
-
-	VariantClear(&vtSerialNumber);
-
-	VariantInit(&vtManufacturer);
-
-	Wmi.GetProperties(0, _T("Manufacturer"), vtManufacturer);
-
-	if( vtManufacturer.vt == VT_BSTR )
-	{
-#ifdef _UNICODE	
-		_tcscpy_s(m_MainBoard.m_tszManufacturer, _countof(m_MainBoard.m_tszManufacturer), OLE2W(vtManufacturer.bstrVal));
-#else
-		_tcscpy_s(m_MainBoard.m_tszManufacturer, _countof(m_MainBoard.m_tszManufacturer), OLE2A(vtManufacturer.bstrVal));
-#endif
-	}
-
-	VariantClear(&vtManufacturer);
-
-	VariantInit(&vtDescription);
-
-	Wmi.GetProperties(0, _T("Description"), vtDescription);
-
-	if( vtDescription.vt == VT_BSTR )
-	{
-#ifdef _UNICODE	
-		_tcscpy_s(m_MainBoard.m_tszDescription, _countof(m_MainBoard.m_tszDescription), OLE2W(vtDescription.bstrVal));
-#else
-		_tcscpy_s(m_MainBoard.m_tszDescription, _countof(m_MainBoard.m_tszDescription), OLE2A(vtDescription.bstrVal));
-#endif
-	}
-
-	VariantClear(&vtDescription);
-
-	return true;
+    return TRUE;
 }
 
 //***************************************************************************
-// Construction/Destruction
+// CMemoryInfo
 //***************************************************************************
 
+//***************************************************************************
+// @brief   CMemoryInfo 클래스 생성자입니다.
+// @param   없음
+// @return  없음
+// @detail  메모리 정보 구조체 m_Memory를 초기화합니다.
+//***************************************************************************
 CMemoryInfo::CMemoryInfo()
 {
-	ZeroMemory(&m_Memory, sizeof(HWINFO_MEMORY));
+    ZeroMemory(&m_Memory, sizeof(HWINFO_MEMORY));
 }
 
+//***************************************************************************
+// @brief   CMemoryInfo 클래스 소멸자입니다.
+// @param   없음
+// @return  없음
+// @detail  std::vector에 저장된 HWINFO_RAM 동적 할당 포인터 객체들을 모두 해제합니다.
+//***************************************************************************
 CMemoryInfo::~CMemoryInfo()
 {
-	HWINFO_RAM		*pRam = NULL;
-
-	for( int i = 0; i < m_sRamArray.GetCount(); i++ )
-	{
-		pRam = m_sRamArray.At(i);
-
-		if( pRam )
-		{
-			delete pRam;
-			pRam = NULL;
-		}
-	}
+    for( HWINFO_RAM* pRam : m_sRamArray )
+    {
+        delete pRam;
+    }
+    m_sRamArray.clear();
 }
 
 //***************************************************************************
-//
-BOOL CMemoryInfo::GetInformation(CWmi &Wmi)
+// @brief   WMI를 통해 시스템 RAM 및 가상 메모리 정보를 수집합니다.
+// @param   Wmi WMI 모듈 참조
+// @return  BOOL 성공 시 TRUE, 실패 시 FALSE
+// @detail  Win32_PhysicalMemory와 Win32_OperatingSystem 정보를 이용해 메모리 모듈별 스펙 및 용량을 std::vector에 저장합니다.
+//         전체 물리 메모리 총량은 GlobalMemoryStatusEx로 별도 산출합니다(슬롯별 Capacity 합산이 아님).
+//***************************************************************************
+BOOL CMemoryInfo::GetInformation(CWmi& Wmi)
 {
-	USES_CONVERSION;
-
-	DWORD	dwRamCount = 0;
-	int		nIndex = 0;
-	TCHAR	tszCapacity[NUMERIC_STRING_LEN];
-	TCHAR	tszPhysicalMemory[NUMERIC_STRING_LEN];
-	TCHAR	tszTotalVirtualMemory[NUMERIC_STRING_LEN];
-	TCHAR	tszFreeVirtualMemory[NUMERIC_STRING_LEN];
-	TCHAR	tszTotalPageFile[NUMERIC_STRING_LEN];
-	TCHAR	tszFreePageFile[NUMERIC_STRING_LEN];
-
-	VARIANT		vtBankLabel;
-	VARIANT		vtName;
-	VARIANT		vtDeviceLocator;
-	VARIANT		vtCapacity;
-	VARIANT		vtFormFactor;
-	VARIANT		vtMemoryType;
-	VARIANT		vtSpeed;
-	VARIANT		vtFreePhysicalMemory;
-	VARIANT		vtTotalVirtualMemory;
-	VARIANT		vtFreeVirtualMemory;
-	VARIANT		vtTotalPageFile;
-	VARIANT		vtFreePageFile;
-
-	HWINFO_RAM	*pRam = NULL;
-
-	nIndex = Wmi.ExecQuery(_T("Win32_PhysicalMemory"));
-	if( nIndex < 0 ) return false;
-
-	for( int i = 0; i < nIndex; i++ )
-	{
-		pRam = new HWINFO_RAM;
-
-		VariantInit(&vtBankLabel);
-
-		Wmi.GetProperties(i, _T("BankLabel"), vtBankLabel);
-
-		if( vtBankLabel.vt == VT_BSTR )
-		{
-#ifdef _UNICODE	
-			_tcscpy_s(pRam->m_tszBankLabel, _countof(pRam->m_tszBankLabel), OLE2W(vtBankLabel.bstrVal));
-#else
-			_tcscpy_s(pRam->m_tszBankLabel, _countof(pRam->m_tszBankLabel), OLE2A(vtBankLabel.bstrVal));
-#endif
-		}
-
-		VariantClear(&vtBankLabel);
-
-		VariantInit(&vtName);
-
-		Wmi.GetProperties(i, _T("Name"), vtName);
-
-		if( vtName.vt == VT_BSTR )
-		{
-#ifdef _UNICODE	
-			_tcscpy_s(pRam->m_tszName, _countof(pRam->m_tszName), OLE2W(vtName.bstrVal));
-#else
-			_tcscpy_s(pRam->m_tszName, _countof(pRam->m_tszName), OLE2A(vtName.bstrVal));
-#endif
-		}
-
-		VariantClear(&vtName);
-
-		VariantInit(&vtDeviceLocator);
-
-		Wmi.GetProperties(i, _T("DeviceLocator"), vtDeviceLocator);
-
-		if( vtDeviceLocator.vt == VT_BSTR )
-		{
-#ifdef _UNICODE	
-			_tcscpy_s(pRam->m_tszDeviceLocator, _countof(pRam->m_tszDeviceLocator), OLE2W(vtDeviceLocator.bstrVal));
-#else
-			_tcscpy_s(pRam->m_tszDeviceLocator, _countof(pRam->m_tszDeviceLocator), OLE2A(vtDeviceLocator.bstrVal));
-#endif
-		}
-
-		VariantClear(&vtDeviceLocator);
-
-		VariantInit(&vtCapacity);
-
-		Wmi.GetProperties(i, _T("Capacity"), vtCapacity);
-
-		if( vtCapacity.vt == VT_BSTR )
-		{
-#ifdef _UNICODE	
-			_tcscpy_s(tszCapacity, _countof(tszCapacity), OLE2W(vtCapacity.bstrVal));
-#else
-			_tcscpy_s(tszCapacity, _countof(tszCapacity), OLE2A(vtCapacity.bstrVal));
-#endif
-
-			if( IsAllNumeric(tszCapacity) )
-			{
-				pRam->m_nCapacity = _ttoi64(tszCapacity);
-				m_Memory.m_nTotalMemSize = m_Memory.m_nTotalMemSize + _ttoi64(tszCapacity);
-			}
-		}
-
-		VariantClear(&vtCapacity);
-
-		VariantInit(&vtFormFactor);
-
-		Wmi.GetProperties(i, _T("FormFactor"), vtFormFactor);
-
-		if( vtFormFactor.vt == VT_I4 )
-		{
-			pRam->m_dwFormFactor = vtFormFactor.lVal;
-			FormFactorFormatDesc(vtFormFactor.lVal, pRam->m_tszFormFactorDesc);
-		}
-
-		VariantClear(&vtFormFactor);
-
-		VariantInit(&vtMemoryType);
-
-		Wmi.GetProperties(i, _T("MemoryType"), vtMemoryType);
-
-		if( vtMemoryType.vt == VT_I4 )
-		{
-			pRam->m_dwMemoryType = vtMemoryType.lVal;
-			MemoryTypeFormatDesc(vtMemoryType.lVal, pRam->m_tszMemoryTypeDesc);
-		}
-
-		VariantClear(&vtMemoryType);
-
-		VariantInit(&vtSpeed);
-
-		Wmi.GetProperties(i, _T("Speed"), vtSpeed);
-
-		if( vtSpeed.vt == VT_I4 )
-			pRam->m_dwSpeed = vtSpeed.lVal;
-
-		VariantClear(&vtSpeed);
-
-		dwRamCount++;
-
-		m_sRamArray.Add(pRam);
-	}
-
-	m_Memory.m_dwRamCount = dwRamCount;
-
-	nIndex = Wmi.ExecQuery(_T("Win32_OperatingSystem"));
-	if( nIndex < 0 ) return false;
-
-	VariantInit(&vtFreePhysicalMemory);
-
-	Wmi.GetProperties(0, _T("FreePhysicalMemory"), vtFreePhysicalMemory);
-
-	if( vtFreePhysicalMemory.vt == VT_BSTR )
-	{
-#ifdef _UNICODE	
-		_tcscpy_s(tszPhysicalMemory, _countof(tszPhysicalMemory), OLE2W(vtFreePhysicalMemory.bstrVal));
-#else
-		_tcscpy_s(tszPhysicalMemory, _countof(tszPhysicalMemory), OLE2A(vtFreePhysicalMemory.bstrVal));
-#endif
-
-		if( IsAllNumeric(tszPhysicalMemory) )
-			m_Memory.m_nPhysicalMemSize = m_Memory.m_nPhysicalMemSize + _ttoi64(tszPhysicalMemory);
-	}
-
-	VariantClear(&vtFreePhysicalMemory);
-
-	VariantInit(&vtTotalVirtualMemory);
-
-	Wmi.GetProperties(0, _T("TotalVirtualMemorySize"), vtTotalVirtualMemory);
-
-	if( vtTotalVirtualMemory.vt == VT_BSTR )
-	{
-#ifdef _UNICODE	
-		_tcscpy_s(tszTotalVirtualMemory, _countof(tszTotalVirtualMemory), OLE2W(vtTotalVirtualMemory.bstrVal));
-#else
-		_tcscpy_s(tszTotalVirtualMemory, _countof(tszTotalVirtualMemory), OLE2A(vtTotalVirtualMemory.bstrVal));
-#endif
-
-		if( IsAllNumeric(tszTotalVirtualMemory) )
-			m_Memory.m_nTotalVirtualMemSize = m_Memory.m_nTotalVirtualMemSize + _ttoi64(tszTotalVirtualMemory);
-	}
-
-	VariantClear(&vtTotalVirtualMemory);
-
-	VariantInit(&vtFreeVirtualMemory);
-
-	Wmi.GetProperties(0, _T("FreeVirtualMemory"), vtFreeVirtualMemory);
-
-	if( vtFreeVirtualMemory.vt == VT_BSTR )
-	{
-#ifdef _UNICODE	
-		_tcscpy_s(tszFreeVirtualMemory, _countof(tszFreeVirtualMemory), OLE2W(vtFreeVirtualMemory.bstrVal));
-#else
-		_tcscpy_s(tszFreeVirtualMemory, _countof(tszFreeVirtualMemory), OLE2A(vtFreeVirtualMemory.bstrVal));
-#endif
-
-		if( IsAllNumeric(tszFreeVirtualMemory) )
-			m_Memory.m_nFreeVirtualMemSize = m_Memory.m_nFreeVirtualMemSize + _ttoi64(tszFreeVirtualMemory);
-	}
-
-	VariantClear(&vtFreeVirtualMemory);
-
-	VariantInit(&vtTotalPageFile);
-
-	Wmi.GetProperties(0, _T("SizeStoredInPagingFiles"), vtTotalPageFile);
-
-	if( vtTotalPageFile.vt == VT_BSTR )
-	{
-#ifdef _UNICODE	
-		_tcscpy_s(tszTotalPageFile, _countof(tszTotalPageFile), OLE2W(vtTotalPageFile.bstrVal));
-#else
-		_tcscpy_s(tszTotalPageFile, _countof(tszTotalPageFile), OLE2A(vtTotalPageFile.bstrVal));
-#endif
-
-		if( IsAllNumeric(tszTotalPageFile) )
-			m_Memory.m_nTotalPageFileSize = m_Memory.m_nTotalPageFileSize + _ttoi64(tszTotalPageFile);
-	}
-
-	VariantClear(&vtTotalPageFile);
-
-	VariantInit(&vtFreePageFile);
-
-	Wmi.GetProperties(0, _T("FreeSpaceInPagingFiles"), vtFreePageFile);
-
-	if( vtFreePageFile.vt == VT_BSTR )
-	{
-#ifdef _UNICODE	
-		_tcscpy_s(tszFreePageFile, _countof(tszFreePageFile), OLE2W(vtFreePageFile.bstrVal));
-#else
-		_tcscpy_s(tszFreePageFile, _countof(tszFreePageFile), OLE2A(vtFreePageFile.bstrVal));
-#endif
-
-		if( IsAllNumeric(tszFreePageFile) )
-			m_Memory.m_nFreePageFileSize = m_Memory.m_nFreePageFileSize + _ttoi64(tszFreePageFile);
-	}
-
-	VariantClear(&vtFreePageFile);
-
-	return true;
+    DWORD dwRamCount = 0;
+    int nIndex = Wmi.ExecQuery(_T("Win32_PhysicalMemory"));
+    if( nIndex < 0 ) return FALSE;
+
+    for( int i = 0; i < nIndex; i++ )
+    {
+        HWINFO_RAM* pRam = new HWINFO_RAM;
+
+        FetchWmiString(Wmi, i, _T("BankLabel"), pRam->m_tszBankLabel);
+        FetchWmiString(Wmi, i, _T("Name"), pRam->m_tszName);
+        FetchWmiString(Wmi, i, _T("DeviceLocator"), pRam->m_tszDeviceLocator);
+
+        // [수정] 개별 슬롯의 Capacity는 표시용으로만 저장하고, 전체 메모리 총량에는
+        // 더 이상 합산하지 않습니다. LPDDR4/온보드(임베디드) 메모리는 물리 다이 1개가
+        // 컨트롤러/채널 단위로 여러 인스턴스로 보고되는 경우가 있어, 슬롯별 Capacity를
+        // 그대로 합치면 실제 실장 용량보다 과다 집계될 수 있습니다.
+        // 전체 물리 메모리 총량은 아래에서 GlobalMemoryStatusEx()로 단일 조회합니다.
+        pRam->m_nCapacity = FetchWmiInt64(Wmi, i, _T("Capacity"));
+
+        // 1. FormFactor 처리 (VariantChangeType으로 VT_I4 변환 시도)
+        CVariantGuard vtFormFactor;
+        Wmi.GetProperties(i, _T("FormFactor"), vtFormFactor);
+
+        // VT_UI2, VT_I2 등 다양한 정수 형식을 VT_I4로 안전하게 변환
+        if( SUCCEEDED(VariantChangeType(&vtFormFactor, &vtFormFactor, 0, VT_I4)) )
+        {
+            pRam->m_dwFormFactor = vtFormFactor.lVal;
+            _tcscpy_s(pRam->m_tszFormFactorDesc, _countof(pRam->m_tszFormFactorDesc), FormFactorFormatDesc(vtFormFactor.lVal).c_str());
+        }
+
+        // 2. MemoryType 처리 (SMBIOSMemoryType 우선 조회 후 MemoryType 폴백)
+        CVariantGuard vtMemoryType;
+        Wmi.GetProperties(i, _T("SMBIOSMemoryType"), vtMemoryType);
+
+        // SMBIOSMemoryType이 없거나 VT_EMPTY/VT_NULL인 경우 기존 MemoryType 조회
+        if( vtMemoryType.vt == VT_EMPTY || vtMemoryType.vt == VT_NULL || vtMemoryType.lVal == 0 )
+        {
+            Wmi.GetProperties(i, _T("MemoryType"), vtMemoryType);
+        }
+
+        if( SUCCEEDED(VariantChangeType(&vtMemoryType, &vtMemoryType, 0, VT_I4)) )
+        {
+            pRam->m_dwMemoryType = vtMemoryType.lVal;
+            _tcscpy_s(pRam->m_tszMemoryTypeDesc, _countof(pRam->m_tszMemoryTypeDesc), MemoryTypeFormatDesc(vtMemoryType.lVal).c_str());
+        }
+
+        // 3. Speed 처리
+        CVariantGuard vtSpeed;
+        Wmi.GetProperties(i, _T("Speed"), vtSpeed);
+        if( SUCCEEDED(VariantChangeType(&vtSpeed, &vtSpeed, 0, VT_I4)) )
+        {
+            pRam->m_dwSpeed = vtSpeed.lVal;
+        }
+
+        dwRamCount++;
+        m_sRamArray.push_back(pRam);
+    }
+
+    m_Memory.m_dwRamCount = dwRamCount;
+
+    // [수정] 전체 물리 메모리 총량은 슬롯별 Capacity 합산 대신
+    // GlobalMemoryStatusEx()로 한 번에 조회합니다.
+    MEMORYSTATUSEX statex;
+    ZeroMemory(&statex, sizeof(statex));
+    statex.dwLength = sizeof(statex);
+    if( GlobalMemoryStatusEx(&statex) )
+    {
+        m_Memory.m_nTotalMemSize = static_cast<__int64>(statex.ullTotalPhys);
+    }
+
+    nIndex = Wmi.ExecQuery(_T("Win32_OperatingSystem"));
+    if( nIndex < 0 ) return FALSE;
+
+    m_Memory.m_nPhysicalMemSize += FetchWmiInt64(Wmi, 0, _T("FreePhysicalMemory"));
+    m_Memory.m_nTotalVirtualMemSize += FetchWmiInt64(Wmi, 0, _T("TotalVirtualMemorySize"));
+    m_Memory.m_nFreeVirtualMemSize += FetchWmiInt64(Wmi, 0, _T("FreeVirtualMemory"));
+    m_Memory.m_nTotalPageFileSize += FetchWmiInt64(Wmi, 0, _T("SizeStoredInPagingFiles"));
+    m_Memory.m_nFreePageFileSize += FetchWmiInt64(Wmi, 0, _T("FreeSpaceInPagingFiles"));
+
+    return TRUE;
 }
 
 //***************************************************************************
-//
-void CMemoryInfo::FormFactorFormatDesc(DWORD dwFormFactor, TCHAR *ptszFormFactor) const
+// @brief   FormFactor 열거형 ID 값을 문자열 설명으로 변환합니다. (SMBIOS 3.7+ 반영)
+// @param   dwFormFactor WMI FormFactor 코드값
+// @return  _tstring 폼팩터 규격명 문자열
+//***************************************************************************
+_tstring CMemoryInfo::FormFactorFormatDesc(DWORD dwFormFactor) const
 {
-	switch( dwFormFactor )
-	{
-		case 0:
-			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("Unknown"));
-			break;
-		case 1:
-			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("Other"));
-			break;
-		case 2:
-			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("SIP"));
-			break;
-		case 3:
-			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("DIP"));
-			break;
-		case 4:
-			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("ZIP"));
-			break;
-		case 5:
-			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("SOJ"));
-			break;
-		case 6:
-			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("Proprietary"));
-			break;
-		case 7:
-			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("SIMM"));
-			break;
-		case 8:
-			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("DIMM"));
-			break;
-		case 9:
-			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("TSOP"));
-			break;
-		case 10:
-			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("PGA"));
-			break;
-		case 11:
-			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("RIMM"));
-			break;
-		case 12:
-			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("SODIMM"));
-			break;
-		case 13:
-			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("SRIMM"));
-			break;
-		case 14:
-			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("SMD"));
-			break;
-		case 15:
-			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("SSMP"));
-			break;
-		case 16:
-			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("QFP"));
-			break;
-		case 17:
-			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("TQFP"));
-			break;
-		case 18:
-			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("SOIC"));
-			break;
-		case 19:
-			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("LCC"));
-			break;
-		case 20:
-			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("PLCC"));
-			break;
-		case 21:
-			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("BGA"));
-			break;
-		case 22:
-			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("FPBGA"));
-			break;
-		case 23:
-			_tcscpy_s(ptszFormFactor, RAM_FORMFACTORDESC_STRLEN, _T("LGA"));
-			break;
-		default:
-			ptszFormFactor[0] = '\0';
-			break;
-	}
+    switch( dwFormFactor )
+    {
+    case 0: return _T("Unknown (Onboard / Embedded)");
+    case 1:  return _T("Other");
+    case 2:  return _T("SIP");
+    case 3:  return _T("DIP");
+    case 4:  return _T("ZIP");
+    case 5:  return _T("SOJ");
+    case 6:  return _T("Proprietary");
+    case 7:  return _T("SIMM");
+    case 8:  return _T("DIMM");
+    case 9:  return _T("TSOP");
+    case 10: return _T("PGA");
+    case 11: return _T("RIMM");
+    case 12: return _T("SODIMM");
+    case 13: return _T("SRIMM");
+    case 14: return _T("SMD");
+    case 15: return _T("SSMP");
+    case 16: return _T("QFP");
+    case 17: return _T("TQFP");
+    case 18: return _T("SOIC");
+    case 19: return _T("LCC");
+    case 20: return _T("PLCC");
+    case 21: return _T("BGA");
+    case 22: return _T("FPBGA");
+    case 23: return _T("LGA");
+    case 24: return _T("FB-DIMM");
+    case 25: return _T("Die");
+    case 26: return _T("CAMM");
+    default: return _T("Unknown");
+    }
 }
 
 //***************************************************************************
-//
-void CMemoryInfo::MemoryTypeFormatDesc(DWORD dwMemoryType, TCHAR *ptszMemoryType) const
+// @brief   MemoryType 열거형 ID 값을 문자열 설명으로 변환합니다. (SMBIOS 3.7+ 반영)
+// @param   dwMemoryType WMI MemoryType / SMBIOSMemoryType 코드값
+// @return  _tstring 메모리 규격명 문자열
+//***************************************************************************
+_tstring CMemoryInfo::MemoryTypeFormatDesc(DWORD dwMemoryType) const
 {
-	switch( dwMemoryType )
-	{
-		case 0:
-			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("Unknown"));
-			break;
-		case 1:
-			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("Other"));
-			break;
-		case 2:
-			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("DRAM"));
-			break;
-		case 3:
-			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("Synchronous DRAM"));
-			break;
-		case 4:
-			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("Cache DRAM"));
-			break;
-		case 5:
-			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("EDO"));
-			break;
-		case 6:
-			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("EDRAM"));
-			break;
-		case 7:
-			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("VRAM"));
-			break;
-		case 8:
-			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("SRAM"));
-			break;
-		case 9:
-			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("RAM"));
-			break;
-		case 10:
-			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("ROM"));
-			break;
-		case 11:
-			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("Flash"));
-			break;
-		case 12:
-			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("EEPROM"));
-			break;
-		case 13:
-			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("FEPROM"));
-			break;
-		case 14:
-			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("EPROM"));
-			break;
-		case 15:
-			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("CDRAM"));
-			break;
-		case 16:
-			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("3DRAM"));
-			break;
-		case 17:
-			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("SDRAM"));
-			break;
-		case 18:
-			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("SGRAM"));
-			break;
-		case 19:
-			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("RDRAM"));
-			break;
-		case 20:
-			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("DDR"));
-			break;
-		case 21:
-			_tcscpy_s(ptszMemoryType, RAM_MEMORYTYPEDESC_STRLEN, _T("DDR-2"));
-			break;
-		default:
-			ptszMemoryType[0] = '\0';
-			break;
-	}
+    switch( dwMemoryType )
+    {
+    case 0:  return _T("Unknown");
+    case 1:  return _T("Other");
+    case 2:  return _T("DRAM");
+    case 3:  return _T("Synchronous DRAM");
+    case 4:  return _T("Cache DRAM");
+    case 5:  return _T("EDO");
+    case 6:  return _T("EDRAM");
+    case 7:  return _T("VRAM");
+    case 8:  return _T("SRAM");
+    case 9:  return _T("RAM");
+    case 10: return _T("ROM");
+    case 11: return _T("Flash");
+    case 12: return _T("EEPROM");
+    case 13: return _T("FEPROM");
+    case 14: return _T("EPROM");
+    case 15: return _T("CDRAM");
+    case 16: return _T("3DRAM");
+    case 17: return _T("SDRAM");
+    case 18: return _T("SGRAM");
+    case 19: return _T("RDRAM");
+    case 20: return _T("DDR");
+    case 21: return _T("DDR2");
+    case 22: return _T("DDR2 FB-DIMM");
+    case 24: return _T("DDR3");
+    case 25: return _T("FBD2");
+    case 26: return _T("DDR4");
+    case 27: return _T("LPDDR");
+    case 28: return _T("LPDDR2");
+    case 29: return _T("LPDDR3");
+    case 30: return _T("LPDDR4");
+    case 31: return _T("Logical non-volatile device");
+    case 32: return _T("HBM");
+    case 33: return _T("HBM2");
+    case 34: return _T("DDR5");
+    case 35: return _T("LPDDR5");
+    case 36: return _T("HBM3");
+    default: return _T("Unknown");
+    }
 }
 
 //***************************************************************************
-// Construction/Destruction
+// CHdDiskInfo
 //***************************************************************************
 
+//***************************************************************************
+// @brief   CHdDiskInfo 클래스 생성자입니다.
+// @param   없음
+// @return  없음
+// @detail  물리 하드디스크 정보 관리를 위한 객체를 초기화합니다.
+//***************************************************************************
 CHdDiskInfo::CHdDiskInfo()
 {
 }
 
+//***************************************************************************
+// @brief   CHdDiskInfo 클래스 소멸자입니다.
+// @param   없음
+// @return  없음
+// @detail  std::vector에 저장된 물리 하드디스크 동적 객체 메모리를 모두 해제합니다.
+//***************************************************************************
 CHdDiskInfo::~CHdDiskInfo()
 {
-	HWINFO_HDDISK		*pHdDisk = NULL;
-
-	for( int i = 0; i < m_sHdDiskArray.GetCount(); i++ )
-	{
-		pHdDisk = m_sHdDiskArray.At(i);
-
-		if( pHdDisk )
-		{
-			delete pHdDisk;
-			pHdDisk = NULL;
-		}
-	}
+    for( HWINFO_HDDISK* pHdDisk : m_sHdDiskArray )
+    {
+        delete pHdDisk;
+    }
+    m_sHdDiskArray.clear();
 }
 
 //***************************************************************************
-//
-BOOL CHdDiskInfo::GetInformation(CWmi &Wmi)
+// @brief   WMI를 통해 물리 디스크 드라이브 목록과 용량을 추출합니다.
+// @param   Wmi WMI 모듈 참조
+// @return  BOOL 성공 시 TRUE, 실패 시 FALSE
+// @detail  Win32_DiskDrive 쿼리를 수행하여 검색된 각 하드디스크 정보를 std::vector에 저장합니다.
+//***************************************************************************
+BOOL CHdDiskInfo::GetInformation(CWmi& Wmi)
 {
-	USES_CONVERSION;
+    int nIndex = Wmi.ExecQuery(_T("Win32_DiskDrive"));
+    if( nIndex < 0 ) return FALSE;
 
-	int		nIndex = 0;
-	TCHAR	tszTotalSize[NUMERIC_STRING_LEN];
+    for( int i = 0; i < nIndex; i++ )
+    {
+        HWINFO_HDDISK* pHdDisk = new HWINFO_HDDISK;
 
-	VARIANT		vtModel;
-	VARIANT		vtName;
-	VARIANT		vtManufacturer;
-	VARIANT		vtDescription;
-	VARIANT		vtSize;
+        FetchWmiString(Wmi, i, _T("Model"), pHdDisk->m_tszModel);
+        FetchWmiString(Wmi, i, _T("Name"), pHdDisk->m_tszName);
+        FetchWmiString(Wmi, i, _T("Manufacturer"), pHdDisk->m_tszManufacturer);
+        FetchWmiString(Wmi, i, _T("Description"), pHdDisk->m_tszDescription);
 
-	HWINFO_HDDISK	*pHdDisk = NULL;
+        pHdDisk->m_nTotalSize = FetchWmiInt64(Wmi, i, _T("Size"));
 
-	nIndex = Wmi.ExecQuery(_T("Win32_DiskDrive"));
-	if( nIndex < 0 ) return false;
+        m_sHdDiskArray.push_back(pHdDisk);
+    }
 
-	for( int i = 0; i < nIndex; i++ )
-	{
-		pHdDisk = new HWINFO_HDDISK;
-
-		VariantInit(&vtModel);
-
-		Wmi.GetProperties(i, _T("Model"), vtModel);
-
-		if( vtModel.vt == VT_BSTR )
-		{
-#ifdef _UNICODE	
-			_tcscpy_s(pHdDisk->m_tszModel, _countof(pHdDisk->m_tszModel), OLE2W(vtModel.bstrVal));
-#else
-			_tcscpy_s(pHdDisk->m_tszModel, _countof(pHdDisk->m_tszModel), OLE2A(vtModel.bstrVal));
-#endif
-		}
-
-		VariantClear(&vtModel);
-
-		VariantInit(&vtName);
-
-		Wmi.GetProperties(i, _T("Name"), vtName);
-
-		if( vtName.vt == VT_BSTR )
-		{
-#ifdef _UNICODE	
-			_tcscpy_s(pHdDisk->m_tszName, _countof(pHdDisk->m_tszName), OLE2W(vtName.bstrVal));
-#else
-			_tcscpy_s(pHdDisk->m_tszName, _countof(pHdDisk->m_tszName), OLE2A(vtName.bstrVal));
-#endif
-		}
-
-		VariantClear(&vtName);
-
-		VariantInit(&vtManufacturer);
-
-		Wmi.GetProperties(i, _T("Manufacturer"), vtManufacturer);
-
-		if( vtManufacturer.vt == VT_BSTR )
-		{
-#ifdef _UNICODE	
-			_tcscpy_s(pHdDisk->m_tszManufacturer, _countof(pHdDisk->m_tszManufacturer), OLE2W(vtManufacturer.bstrVal));
-#else
-			_tcscpy_s(pHdDisk->m_tszManufacturer, _countof(pHdDisk->m_tszManufacturer), OLE2A(vtManufacturer.bstrVal));
-#endif
-		}
-
-		VariantClear(&vtManufacturer);
-
-		VariantInit(&vtDescription);
-
-		Wmi.GetProperties(i, _T("Description"), vtDescription);
-
-		if( vtDescription.vt == VT_BSTR )
-		{
-#ifdef _UNICODE	
-			_tcscpy_s(pHdDisk->m_tszDescription, _countof(pHdDisk->m_tszDescription), OLE2W(vtDescription.bstrVal));
-#else
-			_tcscpy_s(pHdDisk->m_tszDescription, _countof(pHdDisk->m_tszDescription), OLE2A(vtDescription.bstrVal));
-#endif
-		}
-
-		VariantClear(&vtDescription);
-
-		VariantInit(&vtSize);
-
-		Wmi.GetProperties(i, _T("Size"), vtSize);
-
-		if( vtSize.vt == VT_BSTR )
-		{
-#ifdef _UNICODE	
-			_tcscpy_s(tszTotalSize, _countof(tszTotalSize), OLE2W(vtSize.bstrVal));
-#else
-			_tcscpy_s(tszTotalSize, _countof(tszTotalSize), OLE2A(vtSize.bstrVal));
-#endif
-
-			if( IsAllNumeric(tszTotalSize) )
-				pHdDisk->m_nTotalSize = _ttoi64(tszTotalSize);
-		}
-
-		VariantClear(&vtSize);
-
-		m_sHdDiskArray.Add(pHdDisk);
-	}
-
-	return true;
+    return TRUE;
 }
 
 //***************************************************************************
-// Construction/Destruction
+// CDriveInfo
 //***************************************************************************
 
+//***************************************************************************
+// @brief   CDriveInfo 클래스 생성자입니다.
+// @param   없음
+// @return  없음
+// @detail  논리 드라이브 관리를 위한 인스턴스를 생성합니다.
+//***************************************************************************
 CDriveInfo::CDriveInfo()
 {
 }
 
+//***************************************************************************
+// @brief   CDriveInfo 클래스 소멸자입니다.
+// @param   없음
+// @return  없음
+// @detail  std::vector 내의 로지컬 드라이브 포인터를 순회하며 할당을 해제합니다.
+//***************************************************************************
 CDriveInfo::~CDriveInfo()
 {
-	HWINFO_DRIVE		*pDrive = NULL;
-
-	for( int i = 0; i < m_sDriveArray.GetCount(); i++ )
-	{
-		pDrive = m_sDriveArray.At(i);
-
-		if( pDrive )
-		{
-			delete pDrive;
-			pDrive = NULL;
-		}
-	}
+    for( HWINFO_DRIVE* pDrive : m_sDriveArray )
+    {
+        delete pDrive;
+    }
+    m_sDriveArray.clear();
 }
 
 //***************************************************************************
-//
-BOOL CDriveInfo::GetInformation(CWmi &Wmi)
+// @brief   WMI를 통해 논리 디스크(로컬 드라이브) 정보를 수집합니다.
+// @param   Wmi WMI 모듈 참조
+// @return  BOOL 성공 시 TRUE, 실패 시 FALSE
+// @detail  drivetype = 3(고정 디스크)인 항목만 추려서 용량 및 남은 공간을 구하고 vector에 푸시합니다.
+//***************************************************************************
+BOOL CDriveInfo::GetInformation(CWmi& Wmi)
 {
-	USES_CONVERSION;
+    DWORD dwDriveCount = 0;
+    int nIndex = Wmi.ExecQuery(_T("Win32_LogicalDisk WHERE drivetype = 3"));
+    if( nIndex < 0 ) return FALSE;
 
-	DWORD	dwDriveCount = 0;
-	int		nIndex = 0;
-	TCHAR	tszTotalSpace[NUMERIC_STRING_LEN];
-	TCHAR	tszFreeSpace[NUMERIC_STRING_LEN];
+    for( int i = 0; i < nIndex; i++ )
+    {
+        HWINFO_DRIVE* pDrive = new HWINFO_DRIVE;
 
-	VARIANT		vtName;
-	VARIANT		vtFileSystem;
-	VARIANT		vtSize;
-	VARIANT		vtFreeSpace;
+        FetchWmiString(Wmi, i, _T("Name"), pDrive->m_tszName);
+        FetchWmiString(Wmi, i, _T("FileSystem"), pDrive->m_tszFileSystem);
 
-	HWINFO_DRIVE	*pDrive = NULL;
+        pDrive->m_nTotalSpace = FetchWmiInt64(Wmi, i, _T("Size"));
+        m_Drives.m_nTotalSpace += pDrive->m_nTotalSpace;
 
-	nIndex = Wmi.ExecQuery(_T("Win32_LogicalDisk WHERE drivetype = 3"));
-	if( nIndex < 0 ) return false;
+        pDrive->m_nFreeSpace = FetchWmiInt64(Wmi, i, _T("FreeSpace"));
+        m_Drives.m_nFreeSpace += pDrive->m_nFreeSpace;
 
-	for( int i = 0; i < nIndex; i++ )
-	{
-		pDrive = new HWINFO_DRIVE;
+        dwDriveCount++;
+        m_sDriveArray.push_back(pDrive);
+    }
 
-		VariantInit(&vtName);
-
-		Wmi.GetProperties(i, _T("Name"), vtName);
-
-		if( vtName.vt == VT_BSTR )
-		{
-#ifdef _UNICODE	
-			_tcscpy_s(pDrive->m_tszName, _countof(pDrive->m_tszName), OLE2W(vtName.bstrVal));
-#else
-			_tcscpy_s(pDrive->m_tszName, _countof(pDrive->m_tszName), OLE2A(vtName.bstrVal));
-#endif
-		}
-
-		VariantClear(&vtName);
-
-		VariantInit(&vtFileSystem);
-
-		Wmi.GetProperties(i, _T("FileSystem"), vtFileSystem);
-
-		if( vtFileSystem.vt == VT_BSTR )
-		{
-#ifdef _UNICODE	
-			_tcscpy_s(pDrive->m_tszFileSystem, _countof(pDrive->m_tszFileSystem), OLE2W(vtFileSystem.bstrVal));
-#else
-			_tcscpy_s(pDrive->m_tszFileSystem, _countof(pDrive->m_tszFileSystem), OLE2A(vtFileSystem.bstrVal));
-#endif
-		}
-
-		VariantClear(&vtFileSystem);
-
-		VariantInit(&vtSize);
-
-		Wmi.GetProperties(i, _T("Size"), vtSize);
-
-		if( vtSize.vt == VT_BSTR )
-		{
-#ifdef _UNICODE	
-			_tcscpy_s(tszTotalSpace, _countof(tszTotalSpace), OLE2W(vtSize.bstrVal));
-#else
-			_tcscpy_s(tszTotalSpace, _countof(tszTotalSpace), OLE2A(vtSize.bstrVal));
-#endif
-
-			if( IsAllNumeric(tszTotalSpace) )
-			{
-				pDrive->m_nTotalSpace = _ttoi64(tszTotalSpace);
-				m_Drives.m_nTotalSpace = m_Drives.m_nTotalSpace + _ttoi64(tszTotalSpace);
-			}
-		}
-
-		VariantClear(&vtSize);
-
-		VariantInit(&vtFreeSpace);
-
-		Wmi.GetProperties(i, _T("FreeSpace"), vtFreeSpace);
-
-		if( vtFreeSpace.vt == VT_BSTR )
-		{
-#ifdef _UNICODE	
-			_tcscpy_s(tszFreeSpace, _countof(tszFreeSpace), OLE2W(vtFreeSpace.bstrVal));
-#else
-			_tcscpy_s(tszFreeSpace, _countof(tszFreeSpace), OLE2A(vtFreeSpace.bstrVal));
-#endif
-
-			if( IsAllNumeric(tszFreeSpace) )
-			{
-				pDrive->m_nFreeSpace = _ttoi64(tszFreeSpace);
-				m_Drives.m_nFreeSpace = m_Drives.m_nFreeSpace + _ttoi64(tszFreeSpace);
-			}
-		}
-
-		VariantClear(&vtFreeSpace);
-
-		dwDriveCount++;
-
-		m_sDriveArray.Add(pDrive);
-	}
-
-	m_Drives.m_dwDriveCount = dwDriveCount;
-
-	return true;
+    m_Drives.m_dwDriveCount = dwDriveCount;
+    return TRUE;
 }
 
 //***************************************************************************
-// Construction/Destruction
+// CSoundCardInfo
 //***************************************************************************
 
+//***************************************************************************
+// @brief   CSoundCardInfo 클래스 생성자입니다.
+// @param   없음
+// @return  없음
+// @detail  멤버 변수 m_SoundCard를 0으로 초기화합니다.
+//***************************************************************************
 CSoundCardInfo::CSoundCardInfo()
 {
-	ZeroMemory(&m_SoundCard, sizeof(HWINFO_MEMORY));
+    ZeroMemory(&m_SoundCard, sizeof(HWINFO_SOUNDCARD));
 }
 
+//***************************************************************************
+// @brief   CSoundCardInfo 클래스 소멸자입니다.
+// @param   없음
+// @return  없음
+// @detail  사운드 카드 객체 종료 시 필요한 정리를 수행합니다.
+//***************************************************************************
 CSoundCardInfo::~CSoundCardInfo()
 {
 }
 
 //***************************************************************************
-//
+// @brief   waveOut API를 통해 사운드 카드의 가용성 및 상세 속성을 가져옵니다.
+// @param   없음
+// @return  BOOL 사운드 카드가 존재하면 TRUE, 없으면 FALSE
+// @detail  waveOutGetDevCaps를 사용하여 사운드 장치의 이름, 제조사 코드 및 볼륨 제어 지원 유무를 확인합니다.
+//***************************************************************************
 BOOL CSoundCardInfo::GetInformation()
 {
-	BOOL	bIsInstalled = false;
-	UINT	uWavNumDevices = 0;
-	UINT	uWavCaps = 0;
-	TCHAR	tszCompany[SOUNDCARD_COMPANYNAME_STRLEN];
+    UINT uWavNumDevices = waveOutGetNumDevs();
+    BOOL bIsInstalled = (uWavNumDevices > 0) ? TRUE : FALSE;
 
-	WAVEOUTCAPS wavCaps;
+    if( bIsInstalled )
+    {
+        WAVEOUTCAPS wavCaps;
+        if( waveOutGetDevCaps(0, &wavCaps, sizeof(WAVEOUTCAPS)) == MMSYSERR_NOERROR )
+        {
+            _tcscpy_s(m_SoundCard.m_tszProductName, _countof(m_SoundCard.m_tszProductName), wavCaps.szPname);
 
-	// Get the number of audio output devices installed on your system.
-	uWavNumDevices = waveOutGetNumDevs();
-	bIsInstalled = (uWavNumDevices > 0) ? TRUE : FALSE;
+            _tcscpy_s(m_SoundCard.m_tszCompanyName, _countof(m_SoundCard.m_tszCompanyName), GetAudioDevCompanyName(wavCaps.wMid).c_str());
 
-	// If the device is present, only then we will proceed to get other information.
- 	if( bIsInstalled )
-	{
-		uWavCaps = sizeof(WAVEOUTCAPS);
+            m_SoundCard.m_bHasSeparateLRVolCtrl = (wavCaps.dwSupport & WAVECAPS_VOLUME) ? TRUE : FALSE;
+            m_SoundCard.m_bHasVolCtrl = (wavCaps.dwSupport & AUXCAPS_VOLUME) ? TRUE : FALSE;
+        }
+    }
 
-		if( waveOutGetDevCaps(0, &wavCaps, uWavCaps) == MMSYSERR_NOERROR )
-		{
-			_tcscpy_s(m_SoundCard.m_tszProductName, _countof(m_SoundCard.m_tszProductName), wavCaps.szPname);
-
-			GetAudioDevCompanyName(wavCaps.wMid, tszCompany);
-			_tcscpy_s(m_SoundCard.m_tszCompanyName, _countof(m_SoundCard.m_tszCompanyName), tszCompany);
-
-			m_SoundCard.m_bHasSeparateLRVolCtrl = (wavCaps.dwSupport & WAVECAPS_VOLUME) ? TRUE : FALSE;
-			m_SoundCard.m_bHasVolCtrl = (wavCaps.dwSupport & AUXCAPS_VOLUME) ? TRUE : FALSE;
-		}
-	}
-
-	return bIsInstalled;
+    return bIsInstalled;
 }
 
 //***************************************************************************
-//
-void CSoundCardInfo::GetAudioDevCompanyName(int nCompany, TCHAR *ptszCompany) const
+// @brief   오디오 제조사 ID 코드를 기업 이름 문자열로 해석합니다.
+// @param   nCompany Windows Multimedia Manufacturer ID
+// @return  _tstring 오디오 제조사명 문자열
+//***************************************************************************
+_tstring CSoundCardInfo::GetAudioDevCompanyName(int nCompany) const
 {
-	switch( nCompany )
-	{
-		case MM_MICROSOFT:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Microsoft Corporation"));
-			break;
-		case MM_CREATIVE:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Creative Labs, Inc"));
-			break;
-		case MM_MEDIAVISION:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Media Vision, Inc."));
-			break;
-		case MM_FUJITSU:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Fujitsu Corp."));
-			break;
-		case MM_ARTISOFT:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Artisoft, Inc."));
-			break;
-		case MM_TURTLE_BEACH:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Turtle Beach, Inc."));
-			break;
-		case MM_IBM:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("IBM Corporation"));
-			break;
-		case MM_VOCALTEC:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Vocaltec LTD."));
-			break;
-		case MM_ROLAND:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Roland"));
-			break;
-		case MM_DSP_SOLUTIONS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("DSP Solutions, Inc."));
-			break;
-		case MM_NEC:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("NEC"));
-			break;
-		case MM_ATI:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("ATI"));
-			break;
-		case MM_WANGLABS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Wang Laboratories, Inc"));
-			break;
-		case MM_TANDY:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Tandy Corporation"));
-			break;
-		case MM_VOYETRA:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Voyetra"));
-			break;
-		case MM_ANTEX:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Antex Electronics Corporation"));
-			break;
-		case MM_ICL_PS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("ICL Personal Systems"));
-			break;
-		case MM_INTEL:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Intel Corporation"));
-			break;
-		case MM_GRAVIS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Advanced Gravis"));
-			break;
-		case MM_VAL:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Video Associates Labs, Inc."));
-			break;
-		case MM_INTERACTIVE:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("InterActive Inc"));
-			break;
-		case MM_YAMAHA:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Yamaha Corporation of America"));
-			break;
-		case MM_EVEREX:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Everex Systems, Inc"));
-			break;
-		case MM_ECHO:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Echo Speech Corporation"));
-			break;
-		case MM_SIERRA:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Sierra Semiconductor Corp"));
-			break;
-		case MM_CAT:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Computer Aided Technologies"));
-			break;
-		case MM_APPS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("APPS Software International"));
-			break;
-		case MM_DSP_GROUP:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("DSP Group, Inc"));
-			break;
-		case MM_MELABS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("MicroEngineering Labs"));
-			break;
-		case MM_COMPUTER_FRIENDS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Computer Friends, Inc."));
-			break;
-		case MM_ESS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("ESS Technology"));
-			break;
-		case MM_AUDIOFILE:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Audio, Inc."));
-			break;
-		case MM_MOTOROLA:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Motorola, Inc."));
-		case MM_CANOPUS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Canopus, co., Ltd."));
-			break;
-		case MM_EPSON:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Seiko Epson Corporation"));
-			break;
-		case MM_TRUEVISION:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Truevision"));
-			break;
-		case MM_AZTECH:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Aztech Labs, Inc."));
-			break;
-		case MM_VIDEOLOGIC:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Videologic"));
-			break;
-		case MM_SCALACS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("SCALACS"));
-			break;
-		case MM_KORG:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Korg Inc."));
-			break;
-		case MM_APT:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Audio Processing Technology"));
-			break;
-		case MM_ICS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Integrated Circuit Systems, Inc."));
-			break;
-		case MM_ITERATEDSYS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Iterated Systems, Inc."));
-			break;
-		case MM_METHEUS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Metheus"));
-			break;
-		case MM_LOGITECH:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Logitech, Inc."));
-			break;
-		case MM_WINNOV:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Winnov, Inc."));
-			break;
-		case MM_NCR:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("NCR Corporation"));
-			break;
-		case MM_EXAN:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("EXAN"));
-			break;
-		case MM_AST:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("AST Research Inc."));
-			break;
-		case MM_WILLOWPOND:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Willow Pond Corporation"));
-			break;
-		case MM_SONICFOUNDRY:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Sonic Foundry"));
-			break;
-		case MM_VITEC:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Vitec Multimedia"));
-			break;
-		case MM_MOSCOM:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("MOSCOM Corporation"));
-			break;
-		case MM_SILICONSOFT:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Silicon Soft, Inc."));
-			break;
-		case MM_SUPERMAC:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Supermac"));
-			break;
-		case MM_AUDIOPT:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Audio Processing Technology"));
-			break;
-		case MM_SPEECHCOMP:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Speech Compression"));
-			break;
-		case MM_AHEAD:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Ahead, Inc."));
-			break;
-		case MM_DOLBY:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Dolby Laboratories"));
-			break;
-		case MM_OKI:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("OKI"));
-			break;
-		case MM_AURAVISION:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("AuraVision Corporation"));
-			break;
-		case MM_OLIVETTI:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Ing C. Olivetti & C., S.p.A."));
-			break;
-		case MM_IOMAGIC:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("I/O Magic Corporation"));
-			break;
-		case MM_MATSUSHITA:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Matsushita Electric Industrial Co., LTD."));
-			break;
-		case MM_CONTROLRES:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Control Resources Limited"));
-			break;
-		case MM_XEBEC:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Xebec Multimedia Solutions Limited"));
-			break;
-		case MM_NEWMEDIA:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("New Media Corporation"));
-			break;
-		case MM_NMS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Natural MicroSystems"));
-			break;
-		case MM_LYRRUS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Lyrrus Inc."));
-			break;
-		case MM_COMPUSIC:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Compusic"));
-			break;
-		case MM_OPTI:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("OPTI Computers Inc."));
-			break;
-		case MM_ADLACC:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Adlib Accessories Inc."));
-			break;
-		case MM_COMPAQ:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Compaq Computer Corp."));
-			break;
-		case MM_DIALOGIC:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Dialogic Corporation"));
-			break;
-		case MM_INSOFT:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("InSoft, Inc."));
-			break;
-		case MM_MPTUS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("M.P. Technologies, Inc."));
-			break;
-		case MM_WEITEK:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Weitek"));
-			break;
-		case MM_LERNOUT_AND_HAUSPIE:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Lernout & Hauspie"));
-			break;
-		case MM_QCIAR:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Quanta Computer Inc."));
-			break;
-		case MM_APPLE:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Apple Computer, Inc."));
-			break;
-		case MM_DIGITAL:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Digital Equipment Corporation"));
-			break;
-		case MM_MOTU:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Mark of the Unicorn"));
-			break;
-		case MM_WORKBIT:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Workbit Corporation"));
-			break;
-		case MM_OSITECH:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Ositech Communications Inc."));
-			break;
-		case MM_MIRO:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("miro Computer Products AG"));
-			break;
-		case MM_CIRRUSLOGIC:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Cirrus Logic"));
-			break;
-		case MM_ISOLUTION:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("ISOLUTION  B.V."));
-			break;
-		case MM_HORIZONS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Horizons Technology, Inc"));
-			break;
-		case MM_CONCEPTS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Computer Concepts Ltd"));
-			break;
-		case MM_VTG:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Voice Technologies Group, Inc."));
-			break;
-		case MM_RADIUS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Radius"));
-			break;
-		case MM_ROCKWELL:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Rockwell International"));
-			break;
-			//case MM_XYZ:
-			//	_tcscpy( ptszCompany, _T("Co. XYZ for testing") );
-			//	break;
-		case MM_OPCODE:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Opcode Systems"));
-			break;
-		case MM_VOXWARE:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Voxware Inc"));
-			break;
-		case MM_NORTHERN_TELECOM:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Northern Telecom Limited"));
-			break;
-		case MM_APICOM:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("APICOM"));
-			break;
-		case MM_GRANDE:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Grande Software"));
-			break;
-		case MM_ADDX:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("ADDX"));
-			break;
-		case MM_WILDCAT:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Wildcat Canyon Software"));
-			break;
-		case MM_RHETOREX:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Rhetorex Inc"));
-			break;
-		case MM_BROOKTREE:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Brooktree Corporation"));
-			break;
-		case MM_ENSONIQ:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("ENSONIQ Corporation"));
-			break;
-		case MM_FAST:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("///FAST Multimedia AG"));
-			break;
-		case MM_NVIDIA:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("NVidia Corporation"));
-			break;
-		case MM_OKSORI:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("OKSORI Co., Ltd."));
-			break;
-		case MM_DIACOUSTICS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("DiAcoustics, Inc."));
-			break;
-		case MM_GULBRANSEN:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Gulbransen, Inc."));
-			break;
-		case MM_KAY_ELEMETRICS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Kay Elemetrics, Inc."));
-			break;
-		case MM_CRYSTAL:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Crystal Semiconductor Corporation"));
-			break;
-		case MM_SPLASH_STUDIOS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Splash Studios"));
-			break;
-		case MM_QUARTERDECK:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Quarterdeck Corporation"));
-			break;
-		case MM_TDK:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("TDK Corporation"));
-			break;
-		case MM_DIGITAL_AUDIO_LABS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Digital Audio Labs, Inc."));
-			break;
-		case MM_SEERSYS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Seer Systems, Inc."));
-			break;
-		case MM_PICTURETEL:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("PictureTel Corporation"));
-			break;
-		case MM_ATT_MICROELECTRONICS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("AT&T Microelectronics"));
-			break;
-		case MM_OSPREY:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Osprey Technologies, Inc."));
-			break;
-		case MM_MEDIATRIX:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Mediatrix Peripherals"));
-			break;
-		case MM_SOUNDESIGNS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("SounDesignS M.C.S. Ltd."));
-			break;
-		case MM_ALDIGITAL:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("A.L. Digital Ltd."));
-			break;
-		case MM_SPECTRUM_SIGNAL_PROCESSING:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Spectrum Signal Processing, Inc."));
-			break;
-		case MM_ECS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Electronic Courseware Systems, Inc."));
-			break;
-		case MM_AMD:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("AMD"));
-			break;
-		case MM_COREDYNAMICS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Core Dynamics"));
-			break;
-		case MM_CANAM:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("CANAM Computers"));
-			break;
-		case MM_SOFTSOUND:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Softsound, Ltd."));
-			break;
-		case MM_NORRIS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Norris Communications, Inc."));
-			break;
-		case MM_DDD:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Danka Data Devices"));
-			break;
-		case MM_EUPHONICS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("EuPhonics"));
-			break;
-		case MM_PRECEPT:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Precept Software, Inc."));
-			break;
-		case MM_CRYSTAL_NET:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Crystal Net Corporation"));
-			break;
-		case MM_CHROMATIC:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Chromatic Research, Inc"));
-			break;
-		case MM_VOICEINFO:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Voice Information Systems, Inc"));
-			break;
-		case MM_VIENNASYS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Vienna Systems"));
-			break;
-		case MM_CONNECTIX:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Connectix Corporation"));
-			break;
-		case MM_GADGETLABS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Gadget Labs LLC"));
-			break;
-		case MM_FRONTIER:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Frontier Design Group LLC"));
-			break;
-		case MM_VIONA:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Viona Development GmbH"));
-			break;
-		case MM_CASIO:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Casio Computer Co., LTD"));
-			break;
-		case MM_DIAMONDMM:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Diamond Multimedia"));
-			break;
-		case MM_S3:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("S3"));
-			break;
-		case MM_FRAUNHOFER_IIS:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Fraunhofer"));
-			break;
-		default:
-			_tcscpy_s(ptszCompany, SOUNDCARD_COMPANYNAME_STRLEN, _T("Unknown"));
-			break;
-	}
+    switch( nCompany )
+    {
+    case MM_MICROSOFT:      return _T("Microsoft Corporation");
+    case MM_CREATIVE:       return _T("Creative Labs, Inc");
+    case MM_MEDIAVISION:    return _T("Media Vision, Inc.");
+    case MM_FUJITSU:        return _T("Fujitsu Corp.");
+    case MM_ARTISOFT:       return _T("Artisoft, Inc.");
+    case MM_TURTLE_BEACH:   return _T("Turtle Beach, Inc.");
+    case MM_IBM:            return _T("IBM Corporation");
+    case MM_VOCALTEC:       return _T("Vocaltec LTD.");
+    case MM_ROLAND:         return _T("Roland");
+    case MM_DSP_SOLUTIONS:  return _T("DSP Solutions, Inc.");
+    case MM_NEC:            return _T("NEC");
+    case MM_ATI:            return _T("ATI");
+    case MM_WANGLABS:       return _T("Wang Laboratories, Inc");
+    case MM_TANDY:          return _T("Tandy Corporation");
+    case MM_VOYETRA:        return _T("Voyetra");
+    case MM_ANTEX:          return _T("Antex Electronics Corporation");
+    case MM_ICL_PS:         return _T("ICL Personal Systems");
+    case MM_INTEL:          return _T("Intel Corporation");
+    case MM_GRAVIS:         return _T("Advanced Gravis");
+    case MM_VAL:            return _T("Video Associates Labs, Inc.");
+    case MM_INTERACTIVE:    return _T("InterActive Inc");
+    case MM_YAMAHA:         return _T("Yamaha Corporation of America");
+    case MM_EVEREX:         return _T("Everex Systems, Inc");
+    case MM_ECHO:           return _T("Echo Speech Corporation");
+    case MM_SIERRA:         return _T("Sierra Semiconductor Corp");
+    case MM_CAT:            return _T("Computer Aided Technologies");
+    case MM_APPS:           return _T("APPS Software International");
+    case MM_DSP_GROUP:      return _T("DSP Group, Inc");
+    case MM_MELABS:         return _T("MicroEngineering Labs");
+    case MM_COMPUTER_FRIENDS: return _T("Computer Friends, Inc.");
+    case MM_ESS:            return _T("ESS Technology");
+    case MM_AUDIOFILE:      return _T("Audio, Inc.");
+    case MM_MOTOROLA:       return _T("Motorola, Inc.");
+    case MM_CANOPUS:        return _T("Canopus, co., Ltd.");
+    case MM_EPSON:          return _T("Seiko Epson Corporation");
+    case MM_TRUEVISION:     return _T("Truevision");
+    case MM_AZTECH:         return _T("Aztech Labs, Inc.");
+    case MM_VIDEOLOGIC:     return _T("Videologic");
+    case MM_SCALACS:        return _T("SCALACS");
+    case MM_KORG:           return _T("Korg Inc.");
+    case MM_APT:            return _T("Audio Processing Technology");
+    case MM_ICS:            return _T("Integrated Circuit Systems, Inc.");
+    case MM_ITERATEDSYS:    return _T("Iterated Systems, Inc.");
+    case MM_METHEUS:        return _T("Metheus");
+    case MM_LOGITECH:       return _T("Logitech, Inc.");
+    case MM_WINNOV:         return _T("Winnov, Inc.");
+    case MM_NCR:            return _T("NCR Corporation");
+    case MM_EXAN:           return _T("EXAN");
+    case MM_AST:            return _T("AST Research Inc.");
+    case MM_WILLOWPOND:     return _T("Willow Pond Corporation");
+    case MM_SONICFOUNDRY:   return _T("Sonic Foundry");
+    case MM_VITEC:          return _T("Vitec Multimedia");
+    case MM_MOSCOM:         return _T("MOSCOM Corporation");
+    case MM_SILICONSOFT:    return _T("Silicon Soft, Inc.");
+    case MM_SUPERMAC:       return _T("Supermac");
+    case MM_AUDIOPT:        return _T("Audio Processing Technology");
+    case MM_SPEECHCOMP:     return _T("Speech Compression");
+    case MM_AHEAD:          return _T("Ahead, Inc.");
+    case MM_DOLBY:          return _T("Dolby Laboratories");
+    case MM_OKI:            return _T("OKI");
+    case MM_AURAVISION:     return _T("AuraVision Corporation");
+    case MM_OLIVETTI:       return _T("Ing C. Olivetti & C., S.p.A.");
+    case MM_IOMAGIC:        return _T("I/O Magic Corporation");
+    case MM_MATSUSHITA:     return _T("Matsushita Electric Industrial Co., LTD.");
+    case MM_CONTROLRES:     return _T("Control Resources Limited");
+    case MM_XEBEC:          return _T("Xebec Multimedia Solutions Limited");
+    case MM_NEWMEDIA:       return _T("New Media Corporation");
+    case MM_NMS:            return _T("Natural MicroSystems");
+    case MM_LYRRUS:         return _T("Lyrrus Inc.");
+    case MM_COMPUSIC:       return _T("Compusic");
+    case MM_OPTI:           return _T("OPTI Computers Inc.");
+    case MM_ADLACC:         return _T("Adlib Accessories Inc.");
+    case MM_COMPAQ:         return _T("Compaq Computer Corp.");
+    case MM_DIALOGIC:       return _T("Dialogic Corporation");
+    case MM_INSOFT:         return _T("InSoft, Inc.");
+    case MM_MPTUS:          return _T("M.P. Technologies, Inc.");
+    case MM_WEITEK:         return _T("Weitek");
+    case MM_LERNOUT_AND_HAUSPIE: return _T("Lernout & Hauspie");
+    case MM_QCIAR:          return _T("Quanta Computer Inc.");
+    case MM_APPLE:          return _T("Apple Computer, Inc.");
+    case MM_DIGITAL:        return _T("Digital Equipment Corporation");
+    case MM_MOTU:           return _T("Mark of the Unicorn");
+    case MM_WORKBIT:        return _T("Workbit Corporation");
+    case MM_OSITECH:        return _T("Ositech Communications Inc.");
+    case MM_MIRO:           return _T("miro Computer Products AG");
+    case MM_CIRRUSLOGIC:    return _T("Cirrus Logic");
+    case MM_ISOLUTION:      return _T("ISOLUTION B.V.");
+    case MM_HORIZONS:       return _T("Horizons Technology, Inc");
+    case MM_CONCEPTS:       return _T("Computer Concepts Ltd");
+    case MM_VTG:            return _T("Voice Technologies Group, Inc.");
+    case MM_RADIUS:         return _T("Radius");
+    case MM_ROCKWELL:       return _T("Rockwell International");
+    case MM_OPCODE:         return _T("Opcode Systems");
+    case MM_VOXWARE:        return _T("Voxware Inc");
+    case MM_NORTHERN_TELECOM: return _T("Northern Telecom Limited");
+    case MM_APICOM:         return _T("APICOM");
+    case MM_GRANDE:         return _T("Grande Software");
+    case MM_ADDX:           return _T("ADDX");
+    case MM_WILDCAT:        return _T("Wildcat Canyon Software");
+    case MM_RHETOREX:       return _T("Rhetorex Inc");
+    case MM_BROOKTREE:      return _T("Brooktree Corporation");
+    case MM_ENSONIQ:        return _T("ENSONIQ Corporation");
+    case MM_FAST:           return _T("///FAST Multimedia AG");
+    case MM_NVIDIA:         return _T("NVidia Corporation");
+    case MM_OKSORI:         return _T("OKSORI Co., Ltd.");
+    case MM_DIACOUSTICS:    return _T("DiAcoustics, Inc.");
+    case MM_GULBRANSEN:     return _T("Gulbransen, Inc.");
+    case MM_KAY_ELEMETRICS: return _T("Kay Elemetrics, Inc.");
+    case MM_CRYSTAL:        return _T("Crystal Semiconductor Corporation");
+    case MM_SPLASH_STUDIOS: return _T("Splash Studios");
+    case MM_QUARTERDECK:    return _T("Quarterdeck Corporation");
+    case MM_TDK:            return _T("TDK Corporation");
+    case MM_DIGITAL_AUDIO_LABS: return _T("Digital Audio Labs, Inc.");
+    case MM_SEERSYS:        return _T("Seer Systems, Inc.");
+    case MM_PICTURETEL:     return _T("PictureTel Corporation");
+    case MM_ATT_MICROELECTRONICS: return _T("AT&T Microelectronics");
+    case MM_OSPREY:         return _T("Osprey Technologies, Inc.");
+    case MM_MEDIATRIX:      return _T("Mediatrix Peripherals");
+    case MM_SOUNDESIGNS:    return _T("SounDesignS M.C.S. Ltd.");
+    case MM_ALDIGITAL:      return _T("A.L. Digital Ltd.");
+    case MM_SPECTRUM_SIGNAL_PROCESSING: return _T("Spectrum Signal Processing, Inc.");
+    case MM_ECS:            return _T("Electronic Courseware Systems, Inc.");
+    case MM_AMD:            return _T("AMD");
+    case MM_COREDYNAMICS:   return _T("Core Dynamics");
+    case MM_CANAM:          return _T("CANAM Computers");
+    case MM_SOFTSOUND:      return _T("Softsound, Ltd.");
+    case MM_NORRIS:         return _T("Norris Communications, Inc.");
+    case MM_DDD:            return _T("Danka Data Devices");
+    case MM_EUPHONICS:      return _T("EuPhonics");
+    case MM_PRECEPT:        return _T("Precept Software, Inc.");
+    case MM_CRYSTAL_NET:    return _T("Crystal Net Corporation");
+    case MM_CHROMATIC:      return _T("Chromatic Research, Inc");
+    case MM_VOICEINFO:      return _T("Voice Information Systems, Inc");
+    case MM_VIENNASYS:      return _T("Vienna Systems");
+    case MM_CONNECTIX:      return _T("Connectix Corporation");
+    case MM_GADGETLABS:     return _T("Gadget Labs LLC");
+    case MM_FRONTIER:       return _T("Frontier Design Group LLC");
+    case MM_VIONA:          return _T("Viona Development GmbH");
+    case MM_CASIO:          return _T("Casio Computer Co., LTD");
+    case MM_DIAMONDMM:      return _T("Diamond Multimedia");
+    case MM_S3:             return _T("S3");
+    case MM_FRAUNHOFER_IIS: return _T("Fraunhofer");
+    default:                return _T("Unknown");
+    }
 }
 
 //***************************************************************************
-// Construction/Destruction
+// CVideoCardInfo
 //***************************************************************************
 
+//***************************************************************************
+// @brief   CVideoCardInfo 클래스 생성자입니다.
+// @param   없음
+// @return  없음
+// @detail  비디오 카드 객체 생성을 담당합니다.
+//***************************************************************************
 CVideoCardInfo::CVideoCardInfo()
 {
 }
 
+//***************************************************************************
+// @brief   CVideoCardInfo 클래스 소멸자입니다.
+// @param   없음
+// @return  없음
+// @detail  std::vector에 저장된 비디오 카드 객체들을 순회하며 동적 할당 해제합니다.
+//***************************************************************************
 CVideoCardInfo::~CVideoCardInfo()
 {
-	HWINFO_VIDEOCARD		*pVideoCard = NULL;
-
-	for( int i = 0; i < m_sVideoCardArray.GetCount(); i++ )
-	{
-		pVideoCard = m_sVideoCardArray.At(i);
-
-		if( pVideoCard )
-		{
-			delete pVideoCard;
-			pVideoCard = NULL;
-		}
-	}
+    for( HWINFO_VIDEOCARD* pVideoCard : m_sVideoCardArray )
+    {
+        delete pVideoCard;
+    }
+    m_sVideoCardArray.clear();
 }
 
 //***************************************************************************
-//
+// @brief   레지스트리 경로 탐색을 통해 그래픽 카드 정보를 분석/가져옵니다.
+// @param   없음
+// @return  BOOL 성공 시 TRUE, 실패 시 FALSE
+// @detail  Windows 레지스트리의 DEVICEMAP\\VIDEO에서 디바이스 CLSID를 파싱하여 그래픽 드라이버명, 메모리 크기 등을 파악하고 std::vector에 저장합니다.
+//***************************************************************************
 BOOL CVideoCardInfo::GetInformation()
 {
-	HKEY	hSubKey;
-	HKEY	hKeyProperty;
-
-	bool	bIsAdd = true;
-
-	TCHAR	tszSubKey[REGISTRY_KEY_STRLEN];
-
-	TCHAR   tszDeviceName[REGISTRY_NAME_STRLEN];
-	TCHAR   tszDeviceValue[REGISTRY_VALUE_STRLEN];
-	TCHAR   tszVideoName[REGISTRY_NAME_STRLEN];
-	TCHAR   tszVideoValue[REGISTRY_VALUE_STRLEN];
-
-	TCHAR   tszValue[REGISTRY_VALUE_STRLEN];
-	TCHAR	tszDeviceDesc[REGISTRY_VALUE_STRLEN];
-	TCHAR	tszDriverDesc[REGISTRY_VALUE_STRLEN];
-	TCHAR	tszDescription[REGISTRY_VALUE_STRLEN];
-	TCHAR	tszAdapterString[REGISTRY_VALUE_STRLEN];
-	TCHAR	tszChipType[REGISTRY_VALUE_STRLEN];
-	TCHAR	tszDacType[REGISTRY_VALUE_STRLEN];
-	TCHAR   tszDisplayDrivers[REGISTRY_VALUE_STRLEN];
-
-	TCHAR	*ptszDeviceClsid = NULL;
-
-	DWORD  	dwNameLen = 0;
-	DWORD	dwValueLen = 0;
-	DWORD   dwValueNumber = 0;
-	DWORD	dwValueCount = 0;
-	DWORD	dwPropValueNumber = 0;
-	DWORD	dwPropValueCount = 0;
-	DWORD	dwType = 0;
-	DWORD	dwCount = 0;
-	DWORD	dwMemorySize = 0;
-	long	lRetCode = 0;
-	long	lMemorySize = 0;
-
-	FILETIME	MyFileTime;
-
-	HWINFO_VIDEOCARD	*pVideoCard = NULL;
-
-	if( IsWindowVersion(-1, -1, VER_PLATFORM_WIN32_WINDOWS) )
-	{
-		lRetCode = RegOpenKeyEx(HKEY_LOCAL_MACHINE, WIN_DEVICEMAP_VIDEO_KEY, 0, KEY_READ, &hSubKey);
-		if( lRetCode == ERROR_SUCCESS )
-		{
-			lRetCode = RegQueryInfoKey(hSubKey, NULL, 0, 0, NULL, NULL, NULL, &dwValueNumber, NULL, NULL, NULL, &MyFileTime);
-			if( lRetCode == ERROR_SUCCESS )
-			{
-				while( dwValueNumber > dwValueCount )
-				{
-					dwNameLen = sizeof(tszDeviceName);
-					dwValueLen = sizeof(tszDeviceValue);
-
-					tszDeviceName[0] = '\0';
-					tszDeviceValue[0] = '\0';
-
-					lRetCode = RegEnumValue(hSubKey, dwValueCount, tszDeviceName, &dwNameLen, NULL, NULL, (LPBYTE)tszDeviceValue, &dwValueLen);
-					if( (lRetCode != ERROR_SUCCESS) || (dwValueLen > REGISTRY_VALUE_STRLEN) )
-					{
-						tszDeviceName[0] = '\0';
-						tszDeviceValue[0] = '\0';
-					}
-
-					if( (ptszDeviceClsid = _tcsstr(tszDeviceValue, WIN_CONTROL_VIDEO_REGEX)) != NULL )
-					{
-						ptszDeviceClsid = ptszDeviceClsid + _tcslen(WIN_CONTROL_VIDEO_REGEX);
-
-						_stprintf_s(tszSubKey, _countof(tszSubKey), _T("%s\\%s"), WIN_CONTROL_VIDEO_KEY, ptszDeviceClsid);
-
-						tszDeviceDesc[0] = '\0';
-						tszDriverDesc[0] = '\0';
-						tszAdapterString[0] = '\0';
-						tszChipType[0] = '\0';
-						tszDacType[0] = '\0';
-						tszDisplayDrivers[0] = '\0';
-
-						lRetCode = RegOpenKeyEx(HKEY_LOCAL_MACHINE, tszSubKey, 0, KEY_READ, &hKeyProperty);
-						if( lRetCode == ERROR_SUCCESS )
-						{
-							dwPropValueNumber = 0;
-							dwPropValueCount = 0;
-							if( RegQueryInfoKey(hKeyProperty, NULL, 0, 0, NULL, NULL, NULL, &dwPropValueNumber, NULL, NULL, NULL, &MyFileTime) == ERROR_SUCCESS )
-							{
-								while( dwPropValueNumber > dwPropValueCount )
-								{
-									dwNameLen = sizeof(tszVideoName);
-									dwValueLen = sizeof(tszVideoValue);
-
-									tszVideoName[0] = '\0';
-									tszVideoValue[0] = '\0';
-
-									lRetCode = RegEnumValue(hKeyProperty, dwPropValueCount, tszVideoName, &dwNameLen, NULL, &dwType, (LPBYTE)tszVideoValue, &dwValueLen);
-									if( (lRetCode != ERROR_SUCCESS) || (dwValueLen > REGISTRY_VALUE_STRLEN) )
-									{
-										tszVideoName[0] = '\0';
-										tszVideoValue[0] = '\0';
-									}
-									else
-									{
-										tszValue[0] = '\0';
-										switch( dwType )
-										{
-											case REG_BINARY:
-											{
-												if( tszVideoValue && _tcslen(tszVideoValue) > 0 )
-												{
-													dwCount = 0;
-													while( dwCount < dwValueLen )
-													{
-														_stprintf_s(tszValue, _countof(tszValue), _T("%s%c"), tszValue, *(tszVideoValue + dwCount));
-														dwCount++;
-													}
-												}
-												break;
-											}
-											case REG_SZ:
-											{
-												_tcscpy_s(tszValue, _countof(tszValue), tszVideoValue);
-												break;
-											}
-											case REG_MULTI_SZ:
-											{
-												_tcscpy_s(tszValue, _countof(tszValue), tszVideoValue);
-												break;
-											}
-											default:
-												break;
-										}
-									}
-
-									if( _tcscmp(tszVideoName, WIN_VIDEO_DEVICEDESC_NAME) == 0 )
-										_tcscpy_s(tszDeviceDesc, _countof(tszDeviceDesc), tszValue);
-
-									if( _tcscmp(tszVideoName, WIN_VIDEO_DRIVERDESC_NAME) == 0 )
-										_tcscpy_s(tszDriverDesc, _countof(tszDriverDesc), tszValue);
-
-									if( _tcscmp(tszVideoName, WIN_VIDEO_ADAPTERSTRING_NAME) == 0 )
-										_tcscpy_s(tszAdapterString, _countof(tszAdapterString), tszValue);
-
-									if( _tcscmp(tszVideoName, WIN_VIDEO_CHIPTYPE_NAME) == 0 )
-										_tcscpy_s(tszChipType, _countof(tszChipType), tszValue);
-
-									if( _tcscmp(tszVideoName, WIN_VIDEO_DACTYPE_NAME) == 0 )
-										_tcscpy_s(tszDacType, _countof(tszDacType), tszValue);
-
-									if( _tcscmp(tszVideoName, WIN_VIDEO_INSTALLEDDISPLAYDRIVERS_NAME) == 0 )
-										_tcscpy_s(tszDisplayDrivers, _countof(tszDisplayDrivers), tszValue);
-
-									if( _tcscmp(tszVideoName, WIN_VIDEO_MEMORYSIZE_NAME) == 0 )
-									{
-										dwNameLen = sizeof(tszVideoName);
-										dwValueLen = sizeof(dwMemorySize);
-
-										lRetCode = RegQueryValueEx(hKeyProperty, tszVideoName, NULL, &dwNameLen, (LPBYTE)&dwMemorySize, &dwValueLen);
-										if( lRetCode == ERROR_SUCCESS )
-											lMemorySize = dwMemorySize / (1024 * 1024);
-										else lMemorySize = -1;
-									}
-
-									dwPropValueCount++;
-								}
-
-								if( tszDeviceDesc && _tcslen(tszDeviceDesc) > 0 )
-									_tcscpy_s(tszDescription, _countof(tszDescription), tszDeviceDesc);
-
-								if( tszDriverDesc && _tcslen(tszDriverDesc) > 0 )
-									_tcscpy_s(tszDescription, _countof(tszDescription), tszDriverDesc);
-
-								if( tszAdapterString && _tcslen(tszAdapterString) > 0 )
-								{
-									pVideoCard = new HWINFO_VIDEOCARD;
-
-									_tcscpy_s(pVideoCard->m_tszDescription, _countof(pVideoCard->m_tszDescription), tszDescription);
-									_tcscpy_s(pVideoCard->m_tszAdapterString, _countof(pVideoCard->m_tszAdapterString), tszAdapterString);
-									_tcscpy_s(pVideoCard->m_tszChipType, _countof(pVideoCard->m_tszChipType), tszChipType);
-									_tcscpy_s(pVideoCard->m_tszDacType, _countof(pVideoCard->m_tszDacType), tszDacType);
-									_tcscpy_s(pVideoCard->m_tszDisplayDrivers, _countof(pVideoCard->m_tszDisplayDrivers), tszDisplayDrivers);
-
-									pVideoCard->m_lMemorySize = lMemorySize;
-
-									bIsAdd = true;
-									for( int i = 0; i < m_sVideoCardArray.GetCount(); i++ )
-									{
-										if( _tcscmp(m_sVideoCardArray.At(i)->m_tszAdapterString, pVideoCard->m_tszAdapterString) == 0 )
-										{
-											bIsAdd = false;
-											break;
-										}
-									}
-
-									if( bIsAdd )
-									{
-										m_sVideoCardArray.Add(pVideoCard);
-									}
-									else
-									{
-										delete pVideoCard;
-										pVideoCard = NULL;
-									}
-								}
-							}
-						}
-
-						RegCloseKey(hKeyProperty);
-					}
-
-					dwValueCount++;
-				}
-
-				RegCloseKey(hSubKey);
-			}
-		}
-	}
-	else if( IsWindowVersion(-1, -1, VER_PLATFORM_WIN32_NT) )
-	{
-		lRetCode = RegOpenKeyEx(HKEY_LOCAL_MACHINE, NT_DEVICEMAP_VIDEO_KEY, 0, KEY_READ, &hSubKey);
-		if( lRetCode == ERROR_SUCCESS )
-		{
-			lRetCode = RegQueryInfoKey(hSubKey, NULL, 0, 0, NULL, NULL, NULL, &dwValueNumber, NULL, NULL, NULL, &MyFileTime);
-			if( lRetCode == ERROR_SUCCESS )
-			{
-				while( dwValueNumber > dwValueCount )
-				{
-					dwNameLen = sizeof(tszDeviceName);
-					dwValueLen = sizeof(tszDeviceValue);
-
-					tszDeviceName[0] = '\0';
-					tszDeviceValue[0] = '\0';
-
-					lRetCode = RegEnumValue(hSubKey, dwValueCount, tszDeviceName, &dwNameLen, NULL, NULL, (LPBYTE)tszDeviceValue, &dwValueLen);
-					if( (lRetCode != ERROR_SUCCESS) || (dwValueLen > REGISTRY_VALUE_STRLEN) )
-					{
-						tszDeviceName[0] = '\0';
-						tszDeviceValue[0] = '\0';
-					}
-
-					if( (ptszDeviceClsid = _tcsstr(tszDeviceValue, NT_CONTROL_VIDEO_REGEX)) != NULL )
-					{
-						ptszDeviceClsid = ptszDeviceClsid + _tcslen(NT_CONTROL_VIDEO_REGEX);
-
-						_stprintf_s(tszSubKey, _countof(tszSubKey), _T("%s\\%s"), NT_CONTROL_VIDEO_KEY, ptszDeviceClsid);
-
-						tszDeviceDesc[0] = '\0';
-						tszDriverDesc[0] = '\0';
-						tszAdapterString[0] = '\0';
-						tszChipType[0] = '\0';
-						tszDacType[0] = '\0';
-						tszDisplayDrivers[0] = '\0';
-
-						lRetCode = RegOpenKeyEx(HKEY_LOCAL_MACHINE, tszSubKey, 0, KEY_READ, &hKeyProperty);
-						if( lRetCode == ERROR_SUCCESS )
-						{
-							dwPropValueNumber = 0;
-							dwPropValueCount = 0;
-
-							lRetCode = RegQueryInfoKey(hKeyProperty, NULL, 0, 0, NULL, NULL, NULL, &dwPropValueNumber, NULL, NULL, NULL, &MyFileTime);
-							if( lRetCode == ERROR_SUCCESS )
-							{
-								while( dwPropValueNumber > dwPropValueCount )
-								{
-									dwNameLen = sizeof(tszVideoName);
-									dwValueLen = sizeof(tszVideoValue);
-
-									tszVideoName[0] = '\0';
-									tszVideoValue[0] = '\0';
-
-									lRetCode = RegEnumValue(hKeyProperty, dwPropValueCount, tszVideoName, &dwNameLen, NULL, &dwType, (LPBYTE)tszVideoValue, &dwValueLen);
-									if( (lRetCode != ERROR_SUCCESS) || (dwValueLen > REGISTRY_VALUE_STRLEN) )
-									{
-										tszVideoName[0] = '\0';
-										tszVideoValue[0] = '\0';
-									}
-									else
-									{
-										tszValue[0] = '\0';
-										switch( dwType )
-										{
-											case REG_BINARY:
-											{
-												if( tszVideoValue && _tcslen(tszVideoValue) > 0 )
-												{
-													dwCount = 0;
-													while( dwCount < dwValueLen )
-													{
-														_stprintf_s(tszValue, _countof(tszValue), _T("%s%c"), tszValue, *(tszVideoValue + dwCount));
-														dwCount++;
-													}
-												}
-												break;
-											}
-											case REG_SZ:
-											{
-												_tcscpy_s(tszValue, _countof(tszValue), tszVideoValue);
-												break;
-											}
-											case REG_MULTI_SZ:
-											{
-												_tcscpy_s(tszValue, _countof(tszValue), tszVideoValue);
-												break;
-											}
-											default:
-												break;
-										}
-									}
-
-									if( _tcscmp(tszVideoName, NT_VIDEO_DEVICEDESC_NAME) == 0 )
-										_tcscpy_s(tszDeviceDesc, _countof(tszDeviceDesc), tszValue);
-
-									if( _tcscmp(tszVideoName, NT_VIDEO_DRIVERDESC_NAME) == 0 )
-										_tcscpy_s(tszDriverDesc, _countof(tszDriverDesc), tszValue);
-
-									if( _tcscmp(tszVideoName, NT_VIDEO_ADAPTERSTRING_NAME) == 0 )
-										_tcscpy_s(tszAdapterString, _countof(tszAdapterString), tszValue);
-
-									if( _tcscmp(tszVideoName, NT_VIDEO_CHIPTYPE_NAME) == 0 )
-										_tcscpy_s(tszChipType, _countof(tszChipType), tszValue);
-
-									if( _tcscmp(tszVideoName, NT_VIDEO_DACTYPE_NAME) == 0 )
-										_tcscpy_s(tszDacType, _countof(tszDacType), tszValue);
-
-									if( _tcscmp(tszVideoName, NT_VIDEO_INSTALLEDDISPLAYDRIVERS_NAME) == 0 )
-										_tcscpy_s(tszDisplayDrivers, _countof(tszDisplayDrivers), tszValue);
-
-									if( _tcscmp(tszVideoName, NT_VIDEO_MEMORYSIZE_NAME) == 0 )
-									{
-										dwNameLen = sizeof(tszVideoName);
-										dwValueLen = sizeof(dwMemorySize);
-
-										lRetCode = RegQueryValueEx(hKeyProperty, tszVideoName, NULL, &dwNameLen, (LPBYTE)&dwMemorySize, &dwValueLen);
-										if( lRetCode == ERROR_SUCCESS )
-											lMemorySize = dwMemorySize / (1024 * 1024);
-										else lMemorySize = -1;
-									}
-
-									dwPropValueCount++;
-								}
-
-								if( tszDeviceDesc && _tcslen(tszDeviceDesc) > 0 )
-									_tcscpy_s(tszDescription, _countof(tszDescription), tszDeviceDesc);
-
-								if( tszDriverDesc && _tcslen(tszDriverDesc) > 0 )
-									_tcscpy_s(tszDescription, _countof(tszDescription), tszDriverDesc);
-
-								if( tszAdapterString && _tcslen(tszAdapterString) > 0 )
-								{
-									pVideoCard = new HWINFO_VIDEOCARD;
-
-									_tcscpy_s(pVideoCard->m_tszDescription, _countof(pVideoCard->m_tszDescription), tszDescription);
-									_tcscpy_s(pVideoCard->m_tszAdapterString, _countof(pVideoCard->m_tszAdapterString), tszAdapterString);
-									_tcscpy_s(pVideoCard->m_tszChipType, _countof(pVideoCard->m_tszChipType), tszChipType);
-									_tcscpy_s(pVideoCard->m_tszDacType, _countof(pVideoCard->m_tszDacType), tszDacType);
-									_tcscpy_s(pVideoCard->m_tszDisplayDrivers, _countof(pVideoCard->m_tszDisplayDrivers), tszDisplayDrivers);
-
-									pVideoCard->m_lMemorySize = lMemorySize;
-
-									bIsAdd = true;
-									for( int i = 0; i < m_sVideoCardArray.GetCount(); i++ )
-									{
-										if( _tcscmp(m_sVideoCardArray.At(i)->m_tszAdapterString, pVideoCard->m_tszAdapterString) == 0 )
-										{
-											bIsAdd = false;
-											break;
-										}
-									}
-
-									if( bIsAdd )
-									{
-										m_sVideoCardArray.Add(pVideoCard);
-									}
-									else
-									{
-										delete pVideoCard;
-										pVideoCard = NULL;
-									}
-								}
-							}
-						}
-
-						RegCloseKey(hKeyProperty);
-					}
-
-					dwValueCount++;
-				}
-
-				RegCloseKey(hSubKey);
-			}
-		}
-	}
-
-	return true;
+    const TCHAR* szKeyPath = IsWindowVersion(-1, -1, VER_PLATFORM_WIN32_WINDOWS) ? WIN_DEVICEMAP_VIDEO_KEY : NT_DEVICEMAP_VIDEO_KEY;
+    const TCHAR* szRegex = IsWindowVersion(-1, -1, VER_PLATFORM_WIN32_WINDOWS) ? WIN_CONTROL_VIDEO_REGEX : NT_CONTROL_VIDEO_REGEX;
+    const TCHAR* szControl = IsWindowVersion(-1, -1, VER_PLATFORM_WIN32_WINDOWS) ? WIN_CONTROL_VIDEO_KEY : NT_CONTROL_VIDEO_KEY;
+
+    HKEY hSubKey = NULL;
+    if( RegOpenKeyEx(HKEY_LOCAL_MACHINE, szKeyPath, 0, KEY_READ, &hSubKey) != ERROR_SUCCESS )
+    {
+        return FALSE;
+    }
+
+    DWORD dwValueNumber = 0;
+    FILETIME ftLastWrite;
+    if( RegQueryInfoKey(hSubKey, NULL, 0, 0, NULL, NULL, NULL, &dwValueNumber, NULL, NULL, NULL, &ftLastWrite) == ERROR_SUCCESS )
+    {
+        for( DWORD i = 0; i < dwValueNumber; i++ )
+        {
+            TCHAR tszDeviceName[REGISTRY_NAME_STRLEN] = { 0 };
+            TCHAR tszDeviceValue[REGISTRY_VALUE_STRLEN] = { 0 };
+            DWORD dwNameLen = sizeof(tszDeviceName);
+            DWORD dwValueLen = sizeof(tszDeviceValue);
+
+            if( RegEnumValue(hSubKey, i, tszDeviceName, &dwNameLen, NULL, NULL, (LPBYTE)tszDeviceValue, &dwValueLen) == ERROR_SUCCESS )
+            {
+                TCHAR* ptszDeviceClsid = _tcsstr(tszDeviceValue, szRegex);
+                if( ptszDeviceClsid != NULL )
+                {
+                    ptszDeviceClsid += _tcslen(szRegex);
+
+                    TCHAR tszSubKey[REGISTRY_KEY_STRLEN] = { 0 };
+                    _stprintf_s(tszSubKey, _countof(tszSubKey), _T("%s\\%s"), szControl, ptszDeviceClsid);
+
+                    HKEY hKeyProperty = NULL;
+                    if( RegOpenKeyEx(HKEY_LOCAL_MACHINE, tszSubKey, 0, KEY_READ, &hKeyProperty) == ERROR_SUCCESS )
+                    {
+                        DWORD dwPropValueNumber = 0;
+                        if( RegQueryInfoKey(hKeyProperty, NULL, 0, 0, NULL, NULL, NULL, &dwPropValueNumber, NULL, NULL, NULL, &ftLastWrite) == ERROR_SUCCESS )
+                        {
+                            TCHAR tszDeviceDesc[REGISTRY_VALUE_STRLEN] = { 0 };
+                            TCHAR tszDriverDesc[REGISTRY_VALUE_STRLEN] = { 0 };
+                            TCHAR tszAdapterString[REGISTRY_VALUE_STRLEN] = { 0 };
+                            TCHAR tszChipType[REGISTRY_VALUE_STRLEN] = { 0 };
+                            TCHAR tszDacType[REGISTRY_VALUE_STRLEN] = { 0 };
+                            TCHAR tszDisplayDrivers[REGISTRY_VALUE_STRLEN] = { 0 };
+                            long  lMemorySize = -1;
+
+                            for( DWORD j = 0; j < dwPropValueNumber; j++ )
+                            {
+                                TCHAR tszVideoName[REGISTRY_NAME_STRLEN] = { 0 };
+                                TCHAR tszVideoValue[REGISTRY_VALUE_STRLEN] = { 0 };
+                                DWORD dwType = 0;
+                                dwNameLen = sizeof(tszVideoName);
+                                dwValueLen = sizeof(tszVideoValue);
+
+                                if( RegEnumValue(hKeyProperty, j, tszVideoName, &dwNameLen, NULL, &dwType, (LPBYTE)tszVideoValue, &dwValueLen) == ERROR_SUCCESS )
+                                {
+                                    if( dwType == REG_SZ || dwType == REG_MULTI_SZ )
+                                    {
+                                        if( _tcscmp(tszVideoName, WIN_VIDEO_DEVICEDESC_NAME) == 0 )             _tcscpy_s(tszDeviceDesc, tszVideoValue);
+                                        if( _tcscmp(tszVideoName, WIN_VIDEO_DRIVERDESC_NAME) == 0 )             _tcscpy_s(tszDriverDesc, tszVideoValue);
+                                        if( _tcscmp(tszVideoName, WIN_VIDEO_ADAPTERSTRING_NAME) == 0 )          _tcscpy_s(tszAdapterString, tszVideoValue);
+                                        if( _tcscmp(tszVideoName, WIN_VIDEO_CHIPTYPE_NAME) == 0 )               _tcscpy_s(tszChipType, tszVideoValue);
+                                        if( _tcscmp(tszVideoName, WIN_VIDEO_DACTYPE_NAME) == 0 )                _tcscpy_s(tszDacType, tszVideoValue);
+                                        if( _tcscmp(tszVideoName, WIN_VIDEO_INSTALLEDDISPLAYDRIVERS_NAME) == 0 ) _tcscpy_s(tszDisplayDrivers, tszVideoValue);
+                                    }
+                                }
+
+                                if( _tcscmp(tszVideoName, WIN_VIDEO_MEMORYSIZE_NAME) == 0 )
+                                {
+                                    DWORD dwMemorySize = 0;
+                                    dwValueLen = sizeof(dwMemorySize);
+                                    if( RegQueryValueEx(hKeyProperty, tszVideoName, NULL, NULL, (LPBYTE)&dwMemorySize, &dwValueLen) == ERROR_SUCCESS )
+                                    {
+                                        lMemorySize = dwMemorySize / (1024 * 1024);
+                                    }
+                                }
+                            }
+
+                            if( _tcslen(tszAdapterString) > 0 )
+                            {
+                                HWINFO_VIDEOCARD* pVideoCard = new HWINFO_VIDEOCARD;
+
+                                TCHAR tszDescription[REGISTRY_VALUE_STRLEN] = { 0 };
+                                if( _tcslen(tszDeviceDesc) > 0 )      _tcscpy_s(tszDescription, tszDeviceDesc);
+                                else if( _tcslen(tszDriverDesc) > 0 ) _tcscpy_s(tszDescription, tszDriverDesc);
+
+                                _tcscpy_s(pVideoCard->m_tszDescription, tszDescription);
+                                _tcscpy_s(pVideoCard->m_tszAdapterString, tszAdapterString);
+                                _tcscpy_s(pVideoCard->m_tszChipType, tszChipType);
+                                _tcscpy_s(pVideoCard->m_tszDacType, tszDacType);
+                                _tcscpy_s(pVideoCard->m_tszDisplayDrivers, tszDisplayDrivers);
+                                pVideoCard->m_lMemorySize = lMemorySize;
+
+                                bool bIsAdd = true;
+                                for( HWINFO_VIDEOCARD* pExistCard : m_sVideoCardArray )
+                                {
+                                    if( _tcscmp(pExistCard->m_tszAdapterString, pVideoCard->m_tszAdapterString) == 0 )
+                                    {
+                                        bIsAdd = false;
+                                        break;
+                                    }
+                                }
+
+                                if( bIsAdd ) m_sVideoCardArray.push_back(pVideoCard);
+                                else delete pVideoCard;
+                            }
+                        }
+                        RegCloseKey(hKeyProperty);
+                    }
+                }
+            }
+        }
+        RegCloseKey(hSubKey);
+    }
+
+    return TRUE;
 }
 
 //***************************************************************************
-// Construction/Destruction
+// CNetworkCardInfo
 //***************************************************************************
 
+//***************************************************************************
+// @brief   CNetworkCardInfo 클래스 생성자입니다.
+// @param   없음
+// @return  없음
+// @detail  네트워크 카드를 다루는 객체를 생성합니다.
+//***************************************************************************
 CNetworkCardInfo::CNetworkCardInfo()
 {
 }
 
+//***************************************************************************
+// @brief   CNetworkCardInfo 클래스 소멸자입니다.
+// @param   없음
+// @return  없음
+// @detail  std::vector 내부의 네트워크 카드 객체 메모리를 수동 해제합니다.
+//***************************************************************************
 CNetworkCardInfo::~CNetworkCardInfo()
 {
-	HWINFO_NETWORKCARD		*pNetworkCard = NULL;
-
-	for( int i = 0; i < m_sNetworkCardArray.GetCount(); i++ )
-	{
-		pNetworkCard = m_sNetworkCardArray.At(i);
-
-		if( pNetworkCard )
-		{
-			delete pNetworkCard;
-			pNetworkCard = NULL;
-		}
-	}
+    for( HWINFO_NETWORKCARD* pNetworkCard : m_sNetworkCardArray )
+    {
+        delete pNetworkCard;
+    }
+    m_sNetworkCardArray.clear();
 }
 
 //***************************************************************************
-//
-BOOL CNetworkCardInfo::GetInformation(CWmi &Wmi)
+// @brief   WMI를 통해 활성화된 네트워크 어댑터를 검색합니다.
+// @param   Wmi WMI 모듈 참조
+// @return  BOOL 성공 시 TRUE, 실패 시 FALSE
+// @detail  Win32_NetworkAdapterConfiguration 클래스에서 IPEnabled 속성이 참인 어댑터만 선별하여 저장합니다.
+//***************************************************************************
+BOOL CNetworkCardInfo::GetInformation(CWmi& Wmi)
 {
-	USES_CONVERSION;
+    int nIndex = Wmi.ExecQuery(_T("Win32_NetworkAdapterConfiguration"));
+    if( nIndex < 0 ) return FALSE;
 
-	int		nIndex = 0;
+    for( int i = 0; i < nIndex; i++ )
+    {
+        CVariantGuard vtProp;
+        Wmi.GetProperties(i, _T("IPEnabled"), vtProp);
 
-	VARIANT		vtProp;
-	VARIANT		vtDescription;
+        if( vtProp.vt == VT_BOOL && vtProp.bVal != 0 )
+        {
+            HWINFO_NETWORKCARD* pNetworkCard = new HWINFO_NETWORKCARD;
+            FetchWmiString(Wmi, i, _T("Description"), pNetworkCard->m_tszDescription);
+            m_sNetworkCardArray.push_back(pNetworkCard);
+        }
+    }
 
-	HWINFO_NETWORKCARD	*pNetworkCard = NULL;
-
-	nIndex = Wmi.ExecQuery(_T("Win32_NetworkAdapterConfiguration"));
-	if( nIndex < 0 ) return false;
-
-	for( int i = 0; i < nIndex; i++ )
-	{
-		VariantInit(&vtProp);
-
-		Wmi.GetProperties(i, _T("IPEnabled"), vtProp);
-
-		if( vtProp.vt == VT_BOOL && vtProp.bVal != 0 )
-		{
-			pNetworkCard = new HWINFO_NETWORKCARD;
-
-			VariantInit(&vtDescription);
-
-			Wmi.GetProperties(i, _T("Description"), vtDescription);
-
-			if( vtDescription.vt == VT_BSTR )
-			{
-#ifdef _UNICODE	
-				_tcscpy_s(pNetworkCard->m_tszDescription, _countof(pNetworkCard->m_tszDescription), OLE2W(vtDescription.bstrVal));
-#else
-				_tcscpy_s(pNetworkCard->m_tszDescription, _countof(pNetworkCard->m_tszDescription), OLE2A(vtDescription.bstrVal));
-#endif
-			}
-
-			VariantClear(&vtDescription);
-
-			m_sNetworkCardArray.Add(pNetworkCard);
-		}
-
-		VariantClear(&vtProp);
-	}
-
-	return true;
+    return TRUE;
 }
 
 //***************************************************************************
-// Construction/Destruction
+// CCdromInfo
 //***************************************************************************
 
+//***************************************************************************
+// @brief   CCdromInfo 클래스 생성자입니다.
+// @param   없음
+// @return  없음
+// @detail  CD-ROM 드라이브 제어 클래스를 초기화합니다.
+//***************************************************************************
 CCdromInfo::CCdromInfo()
 {
 }
 
+//***************************************************************************
+// @brief   CCdromInfo 클래스 소멸자입니다.
+// @param   없음
+// @return  없음
+// @detail  std::vector 내부의 CD-ROM 정보 메모리를 자동 비웁니다.
+//***************************************************************************
 CCdromInfo::~CCdromInfo()
 {
-	HWINFO_CDROM		*pCdrom = NULL;
-
-	for( int i = 0; i < m_sCdromArray.GetCount(); i++ )
-	{
-		pCdrom = m_sCdromArray.At(i);
-
-		if( pCdrom )
-		{
-			delete pCdrom;
-			pCdrom = NULL;
-		}
-	}
+    for( HWINFO_CDROM* pCdrom : m_sCdromArray )
+    {
+        delete pCdrom;
+    }
+    m_sCdromArray.clear();
 }
 
 //***************************************************************************
-//
-BOOL CCdromInfo::GetInformation(CWmi &Wmi)
+// @brief   WMI를 통해 CD-ROM/광학 드라이브 정보를 조회합니다.
+// @param   Wmi WMI 모듈 참조
+// @return  BOOL 성공 시 TRUE, 실패 시 FALSE
+// @detail  Win32_CDROMDrive 쿼리를 실행하여 기기명, 제조사명, 설명 정보를 배열에 수집합니다.
+//***************************************************************************
+BOOL CCdromInfo::GetInformation(CWmi& Wmi)
 {
-	USES_CONVERSION;
+    int nIndex = Wmi.ExecQuery(_T("Win32_CDROMDrive"));
+    if( nIndex < 0 ) return FALSE;
 
-	int		nIndex = 0;
+    for( int i = 0; i < nIndex; i++ )
+    {
+        HWINFO_CDROM* pCdrom = new HWINFO_CDROM;
 
-	VARIANT		vtName;
-	VARIANT		vtManufacturer;
-	VARIANT		vtDescription;
+        FetchWmiString(Wmi, i, _T("Name"), pCdrom->m_tszName);
+        FetchWmiString(Wmi, i, _T("Manufacturer"), pCdrom->m_tszManufacturer);
+        FetchWmiString(Wmi, i, _T("Description"), pCdrom->m_tszDescription);
 
-	HWINFO_CDROM	*pCdrom = NULL;
+        m_sCdromArray.push_back(pCdrom);
+    }
 
-	nIndex = Wmi.ExecQuery(_T("Win32_CDROMDrive"));
-	if( nIndex < 0 ) return false;
-
-	for( int i = 0; i < nIndex; i++ )
-	{
-		pCdrom = new HWINFO_CDROM;
-
-		VariantInit(&vtName);
-
-		Wmi.GetProperties(i, _T("Name"), vtName);
-
-		if( vtName.vt == VT_BSTR )
-		{
-#ifdef _UNICODE	
-			_tcscpy_s(pCdrom->m_tszName, _countof(pCdrom->m_tszName), OLE2W(vtName.bstrVal));
-#else
-			_tcscpy_s(pCdrom->m_tszName, _countof(pCdrom->m_tszName), OLE2A(vtName.bstrVal));
-#endif
-		}
-
-		VariantClear(&vtName);
-
-		VariantInit(&vtManufacturer);
-
-		Wmi.GetProperties(i, _T("Manufacturer"), vtManufacturer);
-
-		if( vtManufacturer.vt == VT_BSTR )
-		{
-#ifdef _UNICODE	
-			_tcscpy_s(pCdrom->m_tszManufacturer, _countof(pCdrom->m_tszManufacturer), OLE2W(vtManufacturer.bstrVal));
-#else
-			_tcscpy_s(pCdrom->m_tszManufacturer, _countof(pCdrom->m_tszManufacturer), OLE2A(vtManufacturer.bstrVal));
-#endif
-		}
-
-		VariantClear(&vtManufacturer);
-
-		VariantInit(&vtDescription);
-
-		Wmi.GetProperties(i, _T("Description"), vtDescription);
-
-		if( vtDescription.vt == VT_BSTR )
-		{
-#ifdef _UNICODE	
-			_tcscpy_s(pCdrom->m_tszDescription, _countof(pCdrom->m_tszDescription), OLE2W(vtDescription.bstrVal));
-#else
-			_tcscpy_s(pCdrom->m_tszDescription, _countof(pCdrom->m_tszDescription), OLE2A(vtDescription.bstrVal));
-#endif
-		}
-
-		VariantClear(&vtDescription);
-
-		m_sCdromArray.Add(pCdrom);
-	}
-
-	return true;
+    return TRUE;
 }
 
 //***************************************************************************
-// Construction/Destruction
+// CKeyBoardInfo
 //***************************************************************************
 
+//***************************************************************************
+// @brief   CKeyBoardInfo 클래스 생성자입니다.
+// @param   없음
+// @return  없음
+// @detail  멤버 변수 m_KeyBoard를 초기화합니다.
+//***************************************************************************
 CKeyBoardInfo::CKeyBoardInfo()
 {
-	ZeroMemory(&m_KeyBoard, sizeof(HWINFO_KEYBOARD));
+    ZeroMemory(&m_KeyBoard, sizeof(HWINFO_KEYBOARD));
 }
 
+//***************************************************************************
+// @brief   CKeyBoardInfo 클래스 소멸자입니다.
+// @param   없음
+// @return  없음
+// @detail  키보드 정보 클래스의 객체 소멸 처리를 수행합니다.
+//***************************************************************************
 CKeyBoardInfo::~CKeyBoardInfo()
 {
 }
 
 //***************************************************************************
-//
-BOOL CKeyBoardInfo::GetInformation(CWmi &Wmi)
+// @brief   WMI 및 Win32 API를 기반으로 키보드 정보를 조회합니다.
+// @param   Wmi WMI 모듈 참조
+// @return  BOOL 성공 시 TRUE, 실패 시 FALSE
+// @detail  Win32_Keyboard의 설명 정보와 Win32 API인 GetKeyboardType 결과값을 융합 수집합니다.
+//***************************************************************************
+BOOL CKeyBoardInfo::GetInformation(CWmi& Wmi)
 {
-	USES_CONVERSION;
+    int nIndex = Wmi.ExecQuery(_T("Win32_Keyboard"));
+    if( nIndex < 0 ) return FALSE;
 
-	int		nIndex = 0;
+    FetchWmiString(Wmi, 0, _T("Description"), m_KeyBoard.m_tszDescription);
+    DetectKbType();
 
-	VARIANT		vtDescription;
-
-	nIndex = Wmi.ExecQuery(_T("Win32_Keyboard"));
-	if( nIndex < 0 ) return false;
-
-	VariantInit(&vtDescription);
-
-	Wmi.GetProperties(0, _T("Description"), vtDescription);
-
-	if( vtDescription.vt == VT_BSTR )
-	{
-#ifdef _UNICODE	
-		_tcscpy_s(m_KeyBoard.m_tszDescription, _countof(m_KeyBoard.m_tszDescription), OLE2W(vtDescription.bstrVal));
-#else
-		_tcscpy_s(m_KeyBoard.m_tszDescription, _countof(m_KeyBoard.m_tszDescription), OLE2A(vtDescription.bstrVal));
-#endif
-	}
-
-	VariantClear(&vtDescription);
-
-	DetectKbType();
-
-	return true;
+    return TRUE;
 }
 
 //***************************************************************************
-//
+// @brief   Win32 API(GetKeyboardType)를 이용해 연결된 키보드의 물리적 레이아웃 타입을 판별합니다.
+// @param   없음
+// @return  void
+// @detail  타입 번호(1~8)에 대응되는 정밀 키보드 명칭 문자열을 설정합니다.
+//***************************************************************************
 void CKeyBoardInfo::DetectKbType()
 {
-	int		nRetType = 0;
-	TCHAR	tszKeyBoardType[KEYBOARD_TYPE_STRLEN];
+    int nRetType = ::GetKeyboardType(0);
+    TCHAR tszKeyBoardType[KEYBOARD_TYPE_STRLEN] = { 0 };
 
-	nRetType = ::GetKeyboardType(0);
+    switch( nRetType )
+    {
+    case 1:  _tcscpy_s(tszKeyBoardType, _T("IBM PC/XT or compatible (83-key)")); break;
+    case 2:  _tcscpy_s(tszKeyBoardType, _T("Olivetti \"ICO\" (102-key)")); break;
+    case 3:  _tcscpy_s(tszKeyBoardType, _T("IBM PC/AT (84-key) or similar")); break;
+    case 4:  _tcscpy_s(tszKeyBoardType, _T("IBM enhanced (101- or 102-key)")); break;
+    case 5:  _tcscpy_s(tszKeyBoardType, _T("Nokia 1050 and similar")); break;
+    case 6:  _tcscpy_s(tszKeyBoardType, _T("Nokia 9140 and similar")); break;
+    case 7:  _tcscpy_s(tszKeyBoardType, _T("Japanese")); break;
+    case 8:  _tcscpy_s(tszKeyBoardType, _T("IBM PC/AT or compatible (101-key)")); break;
+    default: _tcscpy_s(tszKeyBoardType, _T("Unknown")); break;
+    }
 
-	switch( nRetType )
-	{
-		case 1:
-			_tcscpy_s(tszKeyBoardType, _countof(tszKeyBoardType), _T("IBM PC/XT or compatible (83-key)"));
-			break;
-		case 2:
-			_tcscpy_s(tszKeyBoardType, _countof(tszKeyBoardType), _T("Olivetti \"ICO\" (102-key)"));
-			break;
-		case 3:
-			_tcscpy_s(tszKeyBoardType, _countof(tszKeyBoardType), _T("IBM PC/AT (84-key) or similar"));
-			break;
-		case 4:
-			_tcscpy_s(tszKeyBoardType, _countof(tszKeyBoardType), _T("IBM enhanced (101- or 102-key)"));
-			break;
-		case 5:
-			_tcscpy_s(tszKeyBoardType, _countof(tszKeyBoardType), _T("Nokia 1050 and similar"));
-			break;
-		case 6:
-			_tcscpy_s(tszKeyBoardType, _countof(tszKeyBoardType), _T("Nokia 9140 and similar"));
-			break;
-		case 7:
-			_tcscpy_s(tszKeyBoardType, _countof(tszKeyBoardType), _T("Japanese"));
-			break;
-		case 8:
-			_tcscpy_s(tszKeyBoardType, _countof(tszKeyBoardType), _T("IBM PC/AT or compatible (101-key)"));
-			break;
-		default:
-			_tcscpy_s(tszKeyBoardType, _countof(tszKeyBoardType), _T("Unknown"));
-	}
-
-	_tcscpy_s(m_KeyBoard.m_tszType, _countof(m_KeyBoard.m_tszType), tszKeyBoardType);
+    _tcscpy_s(m_KeyBoard.m_tszType, tszKeyBoardType);
 }
 
 //***************************************************************************
-// Construction/Destruction
+// CMouseInfo
 //***************************************************************************
 
+//***************************************************************************
+// @brief   CMouseInfo 클래스 생성자입니다.
+// @param   없음
+// @return  없음
+// @detail  멤버 변수 m_Mouse를 초기화합니다.
+//***************************************************************************
 CMouseInfo::CMouseInfo()
 {
-	ZeroMemory(&m_Mouse, sizeof(HWINFO_MOUSE));
+    ZeroMemory(&m_Mouse, sizeof(HWINFO_MOUSE));
 }
 
+//***************************************************************************
+// @brief   CMouseInfo 클래스 소멸자입니다.
+// @param   없음
+// @return  없음
+// @detail  마우스 클래스 소멸 처리를 수행합니다.
+//***************************************************************************
 CMouseInfo::~CMouseInfo()
 {
 }
 
 //***************************************************************************
-//
-BOOL CMouseInfo::GetInformation(CWmi &Wmi)
+// @brief   WMI를 통해 마우스/포인팅 장치 정보를 검색합니다.
+// @param   Wmi WMI 모듈 참조
+// @return  BOOL 성공 시 TRUE, 실패 시 FALSE
+// @detail  Win32_PointingDevice 클래스를 조회해 마우스 제품명과 제조사 항목을 읽어옵니다.
+//***************************************************************************
+BOOL CMouseInfo::GetInformation(CWmi& Wmi)
 {
-	USES_CONVERSION;
+    int nIndex = Wmi.ExecQuery(_T("Win32_PointingDevice"));
+    if( nIndex < 0 ) return FALSE;
 
-	int		nIndex = 0;
+    FetchWmiString(Wmi, 0, _T("Name"), m_Mouse.m_tszName);
+    FetchWmiString(Wmi, 0, _T("Manufacturer"), m_Mouse.m_tszManufacturer);
+    FetchWmiString(Wmi, 0, _T("Description"), m_Mouse.m_tszDescription);
 
-	VARIANT		vtName;
-	VARIANT		vtManufacturer;
-	VARIANT		vtDescription;
-
-	nIndex = Wmi.ExecQuery(_T("Win32_PointingDevice"));
-	if( nIndex < 0 ) return false;
-
-	VariantInit(&vtName);
-
-	Wmi.GetProperties(0, _T("Name"), vtName);
-
-	if( vtName.vt == VT_BSTR )
-	{
-#ifdef _UNICODE	
-		_tcscpy_s(m_Mouse.m_tszName, _countof(m_Mouse.m_tszName), OLE2W(vtName.bstrVal));
-#else
-		_tcscpy_s(m_Mouse.m_tszName, _countof(m_Mouse.m_tszName), OLE2A(vtName.bstrVal));
-#endif
-	}
-
-	VariantClear(&vtName);
-
-	VariantInit(&vtManufacturer);
-
-	Wmi.GetProperties(0, _T("Manufacturer"), vtManufacturer);
-
-	if( vtManufacturer.vt == VT_BSTR )
-	{
-#ifdef _UNICODE	
-		_tcscpy_s(m_Mouse.m_tszManufacturer, _countof(m_Mouse.m_tszManufacturer), OLE2W(vtManufacturer.bstrVal));
-#else
-		_tcscpy_s(m_Mouse.m_tszManufacturer, _countof(m_Mouse.m_tszManufacturer), OLE2A(vtManufacturer.bstrVal));
-#endif
-	}
-
-	VariantClear(&vtManufacturer);
-
-	VariantInit(&vtDescription);
-
-	Wmi.GetProperties(0, _T("Description"), vtDescription);
-
-	if( vtDescription.vt == VT_BSTR )
-	{
-#ifdef _UNICODE	
-		_tcscpy_s(m_Mouse.m_tszDescription, _countof(m_Mouse.m_tszDescription), OLE2W(vtDescription.bstrVal));
-#else
-		_tcscpy_s(m_Mouse.m_tszDescription, _countof(m_Mouse.m_tszDescription), OLE2A(vtDescription.bstrVal));
-#endif
-	}
-
-	VariantClear(&vtDescription);
-
-	return true;
+    return TRUE;
 }
 
 //***************************************************************************
-// Construction/Destruction
+// CMonitorInfo
 //***************************************************************************
 
+//***************************************************************************
+// @brief   CMonitorInfo 클래스 생성자입니다.
+// @param   없음
+// @return  없음
+// @detail  디스플레이 모니터 정보 집합체를 초기화합니다.
+//***************************************************************************
 CMonitorInfo::CMonitorInfo()
 {
 }
 
+//***************************************************************************
+// @brief   CMonitorInfo 클래스 소멸자입니다.
+// @param   없음
+// @return  없음
+// @detail  std::vector에 저장되어 있는 모니터 정보 구조체들을 메모리 해제합니다.
+//***************************************************************************
 CMonitorInfo::~CMonitorInfo()
 {
-	HWINFO_MONITOR	*pMonitor = NULL;
-
-	for( int i = 0; i < m_sMonitorArray.GetCount(); i++ )
-	{
-		pMonitor = m_sMonitorArray.At(i);
-
-		if( pMonitor )
-		{
-			delete pMonitor;
-			pMonitor = NULL;
-		}
-	}
+    for( HWINFO_MONITOR* pMonitor : m_sMonitorArray )
+    {
+        delete pMonitor;
+    }
+    m_sMonitorArray.clear();
 }
 
 //***************************************************************************
-//
-BOOL CMonitorInfo::GetInformation(CWmi &Wmi)
+// @brief   WMI를 통해 연결된 모니터 장치 정보를 가져옵니다.
+// @param   Wmi WMI 모듈 참조
+// @return  BOOL 성공 시 TRUE, 실패 시 FALSE
+// @detail  Win32_DesktopMonitor를 검색하여 수집된 제조사 정보와 설명을 std::vector에 추가합니다.
+//***************************************************************************
+BOOL CMonitorInfo::GetInformation(CWmi& Wmi)
 {
-	USES_CONVERSION;
+    int nIndex = Wmi.ExecQuery(_T("Win32_DesktopMonitor"));
+    if( nIndex < 0 ) return FALSE;
 
-	int		nIndex = 0;
+    for( int i = 0; i < nIndex; i++ )
+    {
+        HWINFO_MONITOR* pMonitor = new HWINFO_MONITOR;
 
-	VARIANT		vtManufacturer;
-	VARIANT		vtDescription;
+        FetchWmiString(Wmi, i, _T("MonitorManufacturer"), pMonitor->m_tszManufacturer);
+        FetchWmiString(Wmi, i, _T("Description"), pMonitor->m_tszDescription);
 
-	HWINFO_MONITOR	*pMonitor = NULL;
+        m_sMonitorArray.push_back(pMonitor);
+    }
 
-	nIndex = Wmi.ExecQuery(_T("Win32_DesktopMonitor"));
-	if( nIndex < 0 ) return false;
-
-	for( int i = 0; i < nIndex; i++ )
-	{
-		pMonitor = new HWINFO_MONITOR;
-
-		VariantInit(&vtManufacturer);
-
-		Wmi.GetProperties(i, _T("MonitorManufacturer"), vtManufacturer);
-
-		if( vtManufacturer.vt == VT_BSTR )
-		{
-#ifdef _UNICODE	
-			_tcscpy_s(pMonitor->m_tszManufacturer, _countof(pMonitor->m_tszManufacturer), OLE2W(vtManufacturer.bstrVal));
-#else
-			_tcscpy_s(pMonitor->m_tszManufacturer, _countof(pMonitor->m_tszManufacturer), OLE2A(vtManufacturer.bstrVal));
-#endif
-		}
-
-		VariantClear(&vtManufacturer);
-
-		VariantInit(&vtDescription);
-
-		Wmi.GetProperties(i, _T("Description"), vtDescription);
-
-		if( vtDescription.vt == VT_BSTR )
-		{
-#ifdef _UNICODE	
-			_tcscpy_s(pMonitor->m_tszDescription, _countof(pMonitor->m_tszDescription), OLE2W(vtDescription.bstrVal));
-#else
-			_tcscpy_s(pMonitor->m_tszDescription, _countof(pMonitor->m_tszDescription), OLE2A(vtDescription.bstrVal));
-#endif
-		}
-
-		VariantClear(&vtDescription);
-
-		m_sMonitorArray.Add(pMonitor);
-	}
-
-	return true;
+    return TRUE;
 }
-
-
-

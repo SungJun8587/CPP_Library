@@ -8,14 +8,14 @@
 #include "RioEchoSession.h"
 
 //***************************************************************************
-// @brief CRioEchoServerSession 객체를 생성합니다.
+// @brief CRioEchoSession 객체를 생성합니다.
 //***************************************************************************
 CRioEchoServerSession::CRioEchoServerSession()
 {
 }
 
 //***************************************************************************
-// @brief CRioEchoServerSession 객체를 소멸합니다.
+// @brief CRioEchoSession 객체를 소멸합니다.
 //***************************************************************************
 CRioEchoServerSession::~CRioEchoServerSession()
 {
@@ -27,7 +27,10 @@ CRioEchoServerSession::~CRioEchoServerSession()
 void CRioEchoServerSession::OnConnected()
 {
 	CRioSession::OnConnected();
-	LOG_INFO(_T("[RIO Session] Connected!"));
+
+	uint64 sessionId = GetSessionId();
+
+	LOG_INFO(_T("[RIO Session] Connected! (Session ID: %llu)"), sessionId);
 }
 
 //***************************************************************************
@@ -46,6 +49,8 @@ void CRioEchoServerSession::OnDisconnected(Rio::CloseReason reason)
 //***************************************************************************
 void CRioEchoServerSession::OnDataReceived()
 {
+	uint64 sessionId = GetSessionId();
+
 	auto& recvBuffer = GetRecvBuffer();
 
 	int64 dataSize = recvBuffer.GetSizeUsed();
@@ -59,7 +64,7 @@ void CRioEchoServerSession::OnDataReceived()
 	{
 		if( outDequeueSize > 0 )
 		{
-			LOG_DEBUG(_T("[RIO Session Received] %s (Len: %lld)"), tempBuffer.data(), outDequeueSize);
+			LOG_DEBUG(_T("[RIO Session ID(%llu) Received] %s (Len: %lld)"), sessionId, tempBuffer.data(), outDequeueSize);
 
 			// 받은 데이터를 그대로 클라이언트에게 전송 (Echo)
 			Send(tempBuffer.data(), static_cast<uint16_t>(outDequeueSize));
@@ -104,8 +109,20 @@ void CRioEchoClientSession::OnDataReceived()
 	{
 		if( outDequeueSize > 0 )
 		{
-			std::string message(tempBuffer.data(), static_cast<size_t>(outDequeueSize));
-			LOG_DEBUG(_T("[RIO Client Received] %s"), message.c_str());
+			// 1. UTF-8 바이트를 유니코드(_tstring / std::wstring)로 변환
+			int wlen = MultiByteToWideChar(CP_UTF8, 0, tempBuffer.data(), static_cast<int>(outDequeueSize), nullptr, 0);
+			_tstring message;
+			if( wlen > 0 )
+			{
+				message.resize(wlen);
+				MultiByteToWideChar(CP_UTF8, 0, tempBuffer.data(), static_cast<int>(outDequeueSize), &message[0], wlen);
+			}
+
+			// 2. 로그 출력 (원하시는 형식 반영)
+			LOG_DEBUG(_T("[RIO Client Received] %s (Len: %d)"), message.c_str(), static_cast<int>(outDequeueSize));
 		}
 	}
+
+	// 대기 플래그를 해제하여 메인 루프가 다음 입력을 받도록 허용
+	_waitingForEcho = false;
 }

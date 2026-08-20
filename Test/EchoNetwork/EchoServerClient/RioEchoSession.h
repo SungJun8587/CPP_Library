@@ -63,6 +63,13 @@ public:
 	// @brief 서버로부터 데이터 수신 시 호출되는 오버라이드 함수입니다.
 	//***************************************************************************
 	virtual void OnDataReceived() override;
+
+	// 응답 대기 상태 설정 및 확인 함수
+	void SetWaitingForEcho(bool waiting) { _waitingForEcho = waiting; }
+	bool IsWaitingForEcho() const { return _waitingForEcho; }
+
+private:
+	std::atomic<bool> _waitingForEcho{ false };
 };
 
 #endif // __RIOECHOSESSION_H__

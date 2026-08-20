@@ -1,6 +1,6 @@
 ﻿
 //***************************************************************************
-// Log.h : interface for the CNewLog class.
+// Log.h : interface for the CLog class.
 //
 //***************************************************************************
 
@@ -65,6 +65,9 @@ enum class ELOG_TYPE_COLOR : short
 // @brief 개별 로그 파일 생성, 파일 쓰기 및 콘솔 출력을 관리하는 클래스입니다.
 // @detail 디렉토리와 파일 접두사를 설정받아 형식별 로그 파일을 생성하고,
 //         스레드 안전(Thread-safe)하게 파일과 콘솔에 로그를 기록합니다.
+//         콘솔은 프로세스 전역 자원이므로, 파일 쓰기용 락(_mutex)과는
+//         별도로 모든 CLog 인스턴스가 공유하는 정적 락(s_consoleMutex)으로
+//         색상 설정~출력~복원 구간을 원자적으로 보호합니다.
 //***************************************************************************
 class CLog
 {
@@ -99,7 +102,8 @@ private:
 	void SetTextColor(short sColor);
 
 private:
-	std::mutex _mutex; // 동기화를 위한 뮤텍스 객체
+	std::mutex _mutex; // 파일 쓰기 동기화용 뮤텍스 (인스턴스별 = 로그 타입별)
+	static std::mutex s_consoleMutex; // 콘솔 출력 동기화용 뮤텍스 (전역, 모든 CLog 인스턴스 공유)
 
 	TCHAR _tszDirectory[DIRECTORY_STRLEN]; // 로그 디렉토리 경로 저장 버퍼
 	TCHAR _tszFileNamePrefix[FILENAME_STRLEN - DATETIME_STRLEN]; // 로그 파일명 접두사 저장 버퍼

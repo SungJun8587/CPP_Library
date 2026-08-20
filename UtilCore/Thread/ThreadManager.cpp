@@ -41,13 +41,15 @@ bool CThreadManager::CreateThread(std::function<void(void)> fncCallback)
 
     if( _bShuttingDown.load() ) return false;
 
-    _threads.emplace_back([=]() {
+    _threads.emplace_back([this, fncCallback]() {
         InitTLS();
         try {
             fncCallback();
         }
         catch( ... ) {
-            // 예외 발생 시에도 TLS 정리 보장
+            // 예외 발생 시에도 TLS 정리 보장.
+            // 아래 재던지는 std::thread 진입 함수를 벗어나므로 std::terminate()로
+            // 이어진다(로그 없이 프로세스 종료). 콜백 내부 예외는 콜백에서 직접 처리할 것.
             DestroyTLS();
             throw;
         }

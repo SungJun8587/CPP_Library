@@ -1,5 +1,4 @@
-
-//***************************************************************************
+﻿//***************************************************************************
 // SoftwareInfo.cpp: implementation of the Software Information Class.
 //
 //***************************************************************************
@@ -8,17 +7,22 @@
 #include "SoftwareInfo.h"
 
 //***************************************************************************
-//
-BOOL GetVersionLangOfFile(TCHAR *ptszAppName, TCHAR *ptszVersion, TCHAR *ptszLanguage)
+// @brief   지정된 파일의 리소스 정보에서 버전 및 언어 정보를 추출합니다.
+// @param   ptszAppName 버전을 조회할 파일의 경로
+// @param   ptszVersion 추출된 버전 문자열을 전달받을 버퍼 포인터
+// @param   ptszLanguage 추출된 언어 명칭 문자열을 전달받을 버퍼 포인터
+// @return  BOOL 추출 성공 여부 (TRUE: 성공, FALSE: 실패)
+//***************************************************************************
+BOOL GetVersionLangOfFile(TCHAR* ptszAppName, TCHAR* ptszVersion, TCHAR* ptszLanguage)
 {
 	BOOL		bResult = false;
 	DWORD		dwScratch = 0;
 	DWORD		dwInfSize = 0;
-	DWORD		*pdwLangChar;
+	DWORD* pdwLangChar;
 	UINT		uSize = 0;
-	BYTE		*pbInfBuff = NULL;
+	BYTE* pbInfBuff = NULL;
 	TCHAR		tszResource[MAX_BUFFER_SIZE];
-	TCHAR		*ptszTempVersion = NULL;
+	TCHAR* ptszTempVersion = NULL;
 
 	dwInfSize = GetFileVersionInfoSize(ptszAppName, &dwScratch);
 	if( dwInfSize )
@@ -52,29 +56,33 @@ BOOL GetVersionLangOfFile(TCHAR *ptszAppName, TCHAR *ptszVersion, TCHAR *ptszLan
 }
 
 //***************************************************************************
-// Construction/Destruction
+// @brief   CIeInfo 클래스 생성자
 //***************************************************************************
-
 CIeInfo::CIeInfo()
 {
 	ZeroMemory(&m_Ie, sizeof(SWINFO_IE));
 }
 
+//***************************************************************************
+// @brief   CIeInfo 클래스 소멸자
+//***************************************************************************
 CIeInfo::~CIeInfo()
 {
 }
 
 //***************************************************************************
-//
+// @brief   레지스트리를 조회하여 Internet Explorer의 버전 및 빌드 정보를 수집합니다.
+// @return  BOOL 정보 수집 성공 여부 (TRUE: 성공, FALSE: 실패)
+//***************************************************************************
 BOOL CIeInfo::GetInformation()
 {
 	DWORD	dwNameLen = 0;
-	DWORD   dwValueLen = 0;
+	DWORD	dwValueLen = 0;
 	long	lRetCode = 0;
 
 	TCHAR	tszSubKey[REGISTRY_KEY_STRLEN];
-	TCHAR   tszBuild[IE_BUILD_STRLEN];
-	TCHAR   tszVersion[IE_VERSION_STRLEN];
+	TCHAR	tszBuild[IE_BUILD_STRLEN];
+	TCHAR	tszVersion[IE_VERSION_STRLEN];
 
 	HKEY	hKeyIE;
 
@@ -145,31 +153,35 @@ BOOL CIeInfo::GetInformation()
 }
 
 //***************************************************************************
-// Construction/Destruction
+// @brief   CDirectXInfo 클래스 생성자
 //***************************************************************************
-
 CDirectXInfo::CDirectXInfo()
 {
 	ZeroMemory(&m_DirectX, sizeof(SWINFO_DIRECTX));
 }
 
+//***************************************************************************
+// @brief   CDirectXInfo 클래스 소멸자
+//***************************************************************************
 CDirectXInfo::~CDirectXInfo()
 {
 }
 
 //***************************************************************************
-//
+// @brief   레지스트리를 탐색하여 시스템에 설치된 DirectX 정보 및 버전을 수집합니다.
+// @return  BOOL 정보 수집 성공 여부 (TRUE: 성공, FALSE: 실패)
+//***************************************************************************
 BOOL CDirectXInfo::GetInformation()
 {
 	DWORD	dwNameLen = 0;
-	DWORD   dwValueLen = 0;
+	DWORD	dwValueLen = 0;
 	long	lRetCode = 0;
 	__int64 qwInstallVersion = 0;
 
 	TCHAR	tszSubKey[REGISTRY_KEY_STRLEN];
-	TCHAR   tszVersion[DIRECTX_VERSION_STRLEN];
-	TCHAR   tszInstallVersion[DIRECTX_INSTALLVERSION_STRLEN];
-	TCHAR   tszDescription[DIRECTX_DESCRIPTION_STRLEN];
+	TCHAR	tszVersion[DIRECTX_VERSION_STRLEN];
+	TCHAR	tszInstallVersion[DIRECTX_INSTALLVERSION_STRLEN];
+	TCHAR	tszDescription[DIRECTX_DESCRIPTION_STRLEN];
 
 	HKEY	hKeyDirectX;
 
@@ -264,19 +276,24 @@ BOOL CDirectXInfo::GetInformation()
 }
 
 //***************************************************************************
-// Construction/Destruction
+// @brief   CJavaVMInfo 클래스 생성자
 //***************************************************************************
-
 CJavaVMInfo::CJavaVMInfo()
 {
+	m_nIsJVM = 0;
 }
 
+//***************************************************************************
+// @brief   CJavaVMInfo 클래스 소멸자
+//***************************************************************************
 CJavaVMInfo::~CJavaVMInfo()
 {
 }
 
 //***************************************************************************
-//
+// @brief   레지스트리 및 파일 탐색을 통해 MS/Sun JVM 설치 여부를 검사하고 유형을 결정합니다.
+// @return  BOOL 정보 수집 성공 여부 (TRUE: 성공, FALSE: 실패)
+//***************************************************************************
 BOOL CJavaVMInfo::GetInformation()
 {
 	BOOL	bIsSunJVM = false;
@@ -285,21 +302,21 @@ BOOL CJavaVMInfo::GetInformation()
 	BOOL	bIsSunCompany = false;
 
 	DWORD	dwNameLen = 0;
-	DWORD   dwValueLen = 0;
+	DWORD	dwValueLen = 0;
 	DWORD	dwIndexEnum = 0;
 	long	lRetCode = 0;
 
 	TCHAR	tszSubKey[REGISTRY_KEY_STRLEN];
 	TCHAR	tszGroupName[REGISTRY_NAME_STRLEN];
-	TCHAR   tszMsJVMRuntimeLibPath[FULLPATH_STRLEN];
-	TCHAR   tszSunJVMRuntimeLibPath[FULLPATH_STRLEN];
+	TCHAR	tszMsJVMRuntimeLibPath[FULLPATH_STRLEN];
+	TCHAR	tszSunJVMRuntimeLibPath[FULLPATH_STRLEN];
 
 	HKEY	hKeyEnum;
 	HKEY	hKeyJavaVm;
 
 	FILETIME MyFileTime;
 
- 	if( IsWindowVersion(-1, -1, VER_PLATFORM_WIN32_WINDOWS) )
+	if( IsWindowVersion(-1, -1, VER_PLATFORM_WIN32_WINDOWS) )
 	{
 		_stprintf_s(tszSubKey, _countof(tszSubKey), _T("%s"), WIN_MS_JAVAVM_KEY);
 
@@ -466,29 +483,27 @@ BOOL CJavaVMInfo::GetInformation()
 	{
 		if( _tcslen(tszSunJVMRuntimeLibPath) > 0 )
 		{
-			int		nCount = 0;
-			TCHAR	tszBuffer[FULLPATH_STRLEN];
-			TCHAR	*ptszBuffer = NULL;
+			GetSystemDirectory(tszWindowSystemDir, _countof(tszWindowSystemDir));
 
-			CMemBuffer<TCHAR> TDestination1;
-			CMemBuffer<TCHAR> TDestination2;
+			// CMemBuffer 대신 _tstring 활용
+			_tstring strPath = tszSunJVMRuntimeLibPath;
 
-			GetSystemDirectory(tszWindowSystemDir, sizeof(tszWindowSystemDir));
-
-			_tcscpy_s(tszBuffer, _countof(tszBuffer), tszSunJVMRuntimeLibPath);
-			ptszBuffer = _tcschr(tszBuffer, ';');
-
-			if( ptszBuffer )
+			// ';' 구분자가 포함된 경우 첫 번째 경로만 추출 (기존 StrLeft 대체)
+			size_t nPos = strPath.find(_T(';'));
+			if( nPos != _tstring::npos )
 			{
-				nCount = (int)(_tcslen(tszSunJVMRuntimeLibPath) - _tcslen(ptszBuffer));
-				StrLeft(TDestination1, tszSunJVMRuntimeLibPath, nCount);
-
-				StrReplace(TDestination2, TDestination1.GetBuffer(), _T("%systemroot%"), tszWindowSystemDir);
+				strPath = strPath.substr(0, nPos);
 			}
-			else
-				StrReplace(TDestination2, tszSunJVMRuntimeLibPath, _T("%systemroot%"), tszWindowSystemDir);
 
-			hFindFile = FindFirstFile(TDestination2.GetBuffer(), &FindData);
+			// %systemroot% 문자열을 시스템 디렉터리 경로로 치환 (기존 StrReplace 대체)
+			const _tstring strTarget = _T("%systemroot%");
+			size_t nReplacePos = strPath.find(strTarget);
+			if( nReplacePos != _tstring::npos )
+			{
+				strPath.replace(nReplacePos, strTarget.length(), tszWindowSystemDir);
+			}
+
+			hFindFile = FindFirstFile(strPath.c_str(), &FindData);
 
 			// Check if sub folders exists.
 			if( INVALID_HANDLE_VALUE != hFindFile )
@@ -515,8 +530,11 @@ BOOL CJavaVMInfo::GetInformation()
 }
 
 //***************************************************************************
-//
-BOOL CJavaVMInfo::GetVersionMsJVM(TCHAR *ptszMsJVMVersion)
+// @brief   Microsoft JVM 모듈 파일에서 버전을 구하여 전달합니다.
+// @param   ptszMsJVMVersion 추출된 버전 정보를 저장할 문자열 버퍼
+// @return  BOOL 구하기 성공 여부 (TRUE: 성공, FALSE: 실패)
+//***************************************************************************
+BOOL CJavaVMInfo::GetVersionMsJVM(TCHAR* ptszMsJVMVersion)
 {
 	TCHAR	tszVersion[MAX_BUFFER_SIZE];
 	TCHAR	tszLanguage[MAX_BUFFER_SIZE];
@@ -561,13 +579,16 @@ BOOL CJavaVMInfo::GetVersionMsJVM(TCHAR *ptszMsJVMVersion)
 }
 
 //***************************************************************************
-//
-BOOL CJavaVMInfo::GetVersionSunJVM(TCHAR *ptszSunJVMVersion)
+// @brief   레지스트리 플러그인 키를 조회하여 Sun JVM의 설치 버전을 구합니다.
+// @param   ptszSunJVMVersion 추출된 버전 정보를 저장할 문자열 버퍼
+// @return  BOOL 구하기 성공 여부 (TRUE: 성공, FALSE: 실패)
+//***************************************************************************
+BOOL CJavaVMInfo::GetVersionSunJVM(TCHAR* ptszSunJVMVersion)
 {
 	HKEY	hKeyEnum;
 
 	DWORD	dwNameLen = 0;
-	DWORD   dwValueLen = 0;
+	DWORD	dwValueLen = 0;
 	DWORD	dwIndexEnum = 0;
 	long	lRetCode = 0;
 
@@ -575,7 +596,6 @@ BOOL CJavaVMInfo::GetVersionSunJVM(TCHAR *ptszSunJVMVersion)
 	TCHAR	tszGroupName[REGISTRY_NAME_STRLEN] = { 0, };
 
 	FILETIME MyFileTime;
-
 
 	if( IsWindowVersion(-1, -1, VER_PLATFORM_WIN32_WINDOWS) )
 	{
@@ -617,7 +637,7 @@ BOOL CJavaVMInfo::GetVersionSunJVM(TCHAR *ptszSunJVMVersion)
 
 		RegCloseKey(hKeyEnum);
 	}
-	else 
+	else
 	{
 		tszGroupName[0] = '\0';
 	}
@@ -633,20 +653,22 @@ BOOL CJavaVMInfo::GetVersionSunJVM(TCHAR *ptszSunJVMVersion)
 }
 
 //***************************************************************************
-// Construction/Destruction
+// @brief   CInstallSwInfo 클래스 생성자
 //***************************************************************************
-
 CInstallSwInfo::CInstallSwInfo()
 {
 }
 
+//***************************************************************************
+// @brief   CInstallSwInfo 클래스 소멸자 (동적 할당된 설치 정보 메모리를 해제합니다)
+//***************************************************************************
 CInstallSwInfo::~CInstallSwInfo()
 {
-	INSTALL_SWINFO	*pInstallSwInfo = NULL;
+	INSTALL_SWINFO* pInstallSwInfo = NULL;
 
-	for( int i = 0; i < m_sInstallSwInfoArray.GetCount(); i++ )
+	for( size_t i = 0; i < m_sInstallSwInfoArray.size(); i++ )
 	{
-		pInstallSwInfo = m_sInstallSwInfoArray.At(i);
+		pInstallSwInfo = m_sInstallSwInfoArray[i];
 
 		if( pInstallSwInfo )
 		{
@@ -654,10 +676,13 @@ CInstallSwInfo::~CInstallSwInfo()
 			pInstallSwInfo = NULL;
 		}
 	}
+	m_sInstallSwInfoArray.clear();
 }
 
 //***************************************************************************
-//
+// @brief   Windows 언인스톨 레지스트리를 스캔하여 설치된 소프트웨어 목록을 수집합니다.
+// @return  BOOL 정보 수집 성공 여부 (TRUE: 성공, FALSE: 실패)
+//***************************************************************************
 BOOL CInstallSwInfo::GetInformation()
 {
 	HKEY	hSubKey;
@@ -667,15 +692,15 @@ BOOL CInstallSwInfo::GetInformation()
 
 	TCHAR	tszSubKey[REGISTRY_KEY_STRLEN];
 
-	TCHAR   tszSubKeyName[REGISTRY_NAME_STRLEN];
-	TCHAR   tszSubKeyValue[REGISTRY_VALUE_STRLEN];
+	TCHAR	tszSubKeyName[REGISTRY_NAME_STRLEN];
+	TCHAR	tszSubKeyValue[REGISTRY_VALUE_STRLEN];
 
-	TCHAR   tszValue[REGISTRY_VALUE_STRLEN];
+	TCHAR	tszValue[REGISTRY_VALUE_STRLEN];
 	TCHAR	tszDisplayName[REGISTRY_VALUE_STRLEN];
 	TCHAR	tszInstallSource[REGISTRY_VALUE_STRLEN];
 	TCHAR	tszUninstallString[REGISTRY_VALUE_STRLEN];
 
-	DWORD  	dwNameLen = 0;
+	DWORD	dwNameLen = 0;
 	DWORD	dwValueLen = 0;
 	DWORD	dwIndexEnum = 0;
 	DWORD	dwPropValueNumber = 0;
@@ -686,7 +711,7 @@ BOOL CInstallSwInfo::GetInformation()
 
 	FILETIME	MyFileTime;
 
-	INSTALL_SWINFO	*pInstallSwInfo = NULL;
+	INSTALL_SWINFO* pInstallSwInfo = NULL;
 
 	lRetCode = RegOpenKeyEx(HKEY_LOCAL_MACHINE, WIN_SOFTWARE_UNINSTALL_KEY, 0, KEY_READ, &hSubKey);
 	if( lRetCode == ERROR_SUCCESS )
@@ -729,31 +754,31 @@ BOOL CInstallSwInfo::GetInformation()
 							tszValue[0] = '\0';
 							switch( dwType )
 							{
-								case REG_BINARY:
+							case REG_BINARY:
+							{
+								if( tszSubKeyValue && _tcslen(tszSubKeyValue) > 0 )
 								{
-									if( tszSubKeyValue && _tcslen(tszSubKeyValue) > 0 )
+									dwCount = 0;
+									while( dwCount < dwValueLen )
 									{
-										dwCount = 0;
-										while( dwCount < dwValueLen )
-										{
-											_stprintf_s(tszValue, _countof(tszValue), _T("%s%c"), tszValue, *(tszSubKeyValue + dwCount));
-											dwCount++;
-										}
+										_stprintf_s(tszValue, _countof(tszValue), _T("%s%c"), tszValue, *(tszSubKeyValue + dwCount));
+										dwCount++;
 									}
-									break;
 								}
-								case REG_SZ:
-								{
-									_tcscpy_s(tszValue, _countof(tszValue), tszSubKeyValue);
-									break;
-								}
-								case REG_MULTI_SZ:
-								{
-									_tcscpy_s(tszValue, _countof(tszValue), tszSubKeyValue);
-									break;
-								}
-								default:
-									break;
+								break;
+							}
+							case REG_SZ:
+							{
+								_tcscpy_s(tszValue, _countof(tszValue), tszSubKeyValue);
+								break;
+							}
+							case REG_MULTI_SZ:
+							{
+								_tcscpy_s(tszValue, _countof(tszValue), tszSubKeyValue);
+								break;
+							}
+							default:
+								break;
 							}
 						}
 
@@ -772,9 +797,9 @@ BOOL CInstallSwInfo::GetInformation()
 					if( tszDisplayName && _tcslen(tszDisplayName) > 0 )
 					{
 						bIsAdd = true;
-						for( int i = 0; i < m_sInstallSwInfoArray.GetCount(); i++ )
+						for( size_t i = 0; i < m_sInstallSwInfoArray.size(); i++ )
 						{
-							if( _tcscmp(m_sInstallSwInfoArray.At(i)->m_tszDisplayName, tszDisplayName) == 0 )
+							if( _tcscmp(m_sInstallSwInfoArray[i]->m_tszDisplayName, tszDisplayName) == 0 )
 							{
 								bIsAdd = false;
 								break;
@@ -789,7 +814,7 @@ BOOL CInstallSwInfo::GetInformation()
 							_tcscpy_s(pInstallSwInfo->m_tszInstallSource, _countof(pInstallSwInfo->m_tszInstallSource), tszInstallSource);
 							_tcscpy_s(pInstallSwInfo->m_tszUninstallString, _countof(pInstallSwInfo->m_tszUninstallString), tszUninstallString);
 
-							m_sInstallSwInfoArray.Add(pInstallSwInfo);
+							m_sInstallSwInfoArray.push_back(pInstallSwInfo);
 						}
 					}
 				}

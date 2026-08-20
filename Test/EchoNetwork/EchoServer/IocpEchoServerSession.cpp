@@ -31,9 +31,6 @@ void CIocpEchoServerSession::OnConnected()
 
     uint64 sessionId = GetSessionId();
 
-    // 세션 종료 사유 가져오기
-    Iocp::CloseReason reason = GetCloseReason();
-
     LOG_INFO(_T("[IOCP Session] Connected! (Session ID: %llu)"), sessionId);
 }
 
@@ -75,6 +72,8 @@ void CIocpEchoServerSession::OnDisconnected()
 //***************************************************************************
 int32 CIocpEchoServerSession::OnRecv(BYTE* buffer, int32 len)
 {
+    uint64 sessionId = GetSessionId();
+
     // 1. UTF-8 바이트를 유니코드(UTF-16 / std::wstring)로 올바르게 변환
     int wlen = MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<char*>(buffer), len, nullptr, 0);
     _tstring receivedStr;
@@ -83,7 +82,7 @@ int32 CIocpEchoServerSession::OnRecv(BYTE* buffer, int32 len)
         receivedStr.resize(wlen);
         MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<char*>(buffer), len, &receivedStr[0], wlen);
     }
-    LOG_DEBUG(_T("[IOCP Session Received] %s (Len: %d)"), receivedStr.c_str(), len);
+    LOG_DEBUG(_T("[IOCP Session ID(%llu) Received] %s (Len: %d)"), sessionId, receivedStr.c_str(), len);
 
     // 받은 데이터를 그대로 클라이언트에게 전송 (Echo)
     Send(buffer, static_cast<uint16_t>(len));

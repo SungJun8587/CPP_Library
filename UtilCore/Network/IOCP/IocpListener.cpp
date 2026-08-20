@@ -89,11 +89,8 @@ bool CIocpListener::StartAccept(CIocpCoreRef iocpCore, CNetAddress netAddr, Iocp
 //***************************************************************************
 void CIocpListener::CloseSocket()
 {
-    if( _listenSocket != INVALID_SOCKET )
-    {
-        CSocketUtils::Close(_listenSocket);
-        _listenSocket = INVALID_SOCKET;
-    }
+    CSocketUtils::Close(_listenSocket);
+    _listenSocket = INVALID_SOCKET;
 }
 
 //***************************************************************************

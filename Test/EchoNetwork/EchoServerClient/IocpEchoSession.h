@@ -68,6 +68,13 @@ public:
 	// @return 처리한 데이터의 바이트 길이를 반환합니다.
 	//***************************************************************************
 	virtual int32 OnRecv(BYTE* buffer, int32 len) override;
+
+	// 응답 대기 상태 설정 및 확인 함수
+	void SetWaitingForEcho(bool waiting) { _waitingForEcho = waiting; }
+	bool IsWaitingForEcho() const { return _waitingForEcho; }
+
+private:
+	std::atomic<bool> _waitingForEcho{ false };
 };
 
 #endif // __IOCPECHOSESSION_H__

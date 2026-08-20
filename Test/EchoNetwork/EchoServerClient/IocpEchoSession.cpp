@@ -27,8 +27,11 @@ CIocpEchoServerSession::~CIocpEchoServerSession()
 //***************************************************************************
 void CIocpEchoServerSession::OnConnected()
 {
-	CIocpSession::OnConnected();
-	LOG_INFO(_T("[IOCP Session] Connected!"));
+    CIocpSession::OnConnected();
+
+    uint64 sessionId = GetSessionId();
+
+    LOG_INFO(_T("[IOCP Session] Connected! (Session ID: %llu)"), sessionId);
 }
 
 //***************************************************************************
@@ -37,8 +40,26 @@ void CIocpEchoServerSession::OnConnected()
 //***************************************************************************
 void CIocpEchoServerSession::OnDisconnected()
 {
-	CIocpSession::OnDisconnected();
-	LOG_INFO(_T("[IOCP Session] Disconnected!"));
+    CIocpSession::OnDisconnected();
+
+    uint64 sessionId = GetSessionId();
+
+    // 세션 종료 사유 가져오기
+    Iocp::CloseReason reason = GetCloseReason();
+
+    // 사유를 문자열(또는 정수 코드로) 변환해서 함께 출력
+    LPCTSTR reasonStr = _T("Unknown");
+    switch( reason )
+    {
+    case Iocp::CloseReason::None:               reasonStr = _T("None"); break;
+    case Iocp::CloseReason::RemoteClosed:       reasonStr = _T("RemoteClosed (Client Disconnected)"); break;
+    case Iocp::CloseReason::SocketError:        reasonStr = _T("SocketError"); break;
+    case Iocp::CloseReason::RingBufferOverflow: reasonStr = _T("RingBufferOverflow"); break;
+    case Iocp::CloseReason::ForcedClose:        reasonStr = _T("ForcedClose (Server Initiated)"); break;
+    case Iocp::CloseReason::InternalError:      reasonStr = _T("InternalError"); break;
+    }
+
+    LOG_INFO(_T("[IOCP Session] Disconnected! (Session ID: %llu, Reason: %s)"), sessionId, reasonStr);
 }
 
 //***************************************************************************
@@ -51,6 +72,8 @@ void CIocpEchoServerSession::OnDisconnected()
 //***************************************************************************
 int32 CIocpEchoServerSession::OnRecv(BYTE* buffer, int32 len)
 {
+    uint64 sessionId = GetSessionId();
+
     // 1. UTF-8 바이트를 유니코드(UTF-16 / std::wstring)로 올바르게 변환
     int wlen = MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<char*>(buffer), len, nullptr, 0);
     _tstring receivedStr;
@@ -59,7 +82,7 @@ int32 CIocpEchoServerSession::OnRecv(BYTE* buffer, int32 len)
         receivedStr.resize(wlen);
         MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<char*>(buffer), len, &receivedStr[0], wlen);
     }
-    LOG_DEBUG(_T("[IOCP Session Received] %s (Len: %d)"), receivedStr.c_str(), len);
+    LOG_DEBUG(_T("[IOCP Session ID(%llu) Received] %s (Len: %d)"), sessionId, receivedStr.c_str(), len);
 
     // 받은 데이터를 그대로 클라이언트에게 전송 (Echo)
     Send(buffer, static_cast<uint16_t>(len));
@@ -73,7 +96,7 @@ int32 CIocpEchoServerSession::OnRecv(BYTE* buffer, int32 len)
 //***************************************************************************
 void CIocpEchoServerSession::OnSend(int32 len)
 {
-	// 전송 완료 후 추가 처리 (필요시 구현)
+    // 전송 완료 후 추가 처리 (필요시 구현)
 }
 
 //***************************************************************************
@@ -81,8 +104,8 @@ void CIocpEchoServerSession::OnSend(int32 len)
 //***************************************************************************
 void CIocpEchoClientSession::OnConnected()
 {
-	CIocpSession::OnConnected();
-	LOG_INFO(_T("[Client] Connected to Server!"));
+    CIocpSession::OnConnected();
+    LOG_INFO(_T("[Client] Connected to Server!"));
 }
 
 //***************************************************************************
@@ -93,7 +116,9 @@ void CIocpEchoClientSession::OnConnected()
 //***************************************************************************
 int32 CIocpEchoClientSession::OnRecv(BYTE* buffer, int32 len)
 {
-    // 1. UTF-8 바이트를 유니코드(UTF-16 / std::wstring)로 올바르게 변환
+    if( len <= 0 ) return len;
+
+    // 1. UTF-8 바이트를 유니코드(UTF-16 / std::wstring)로 변환
     int wlen = MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<char*>(buffer), len, nullptr, 0);
     _tstring message;
     if( wlen > 0 )
@@ -101,9 +126,12 @@ int32 CIocpEchoClientSession::OnRecv(BYTE* buffer, int32 len)
         message.resize(wlen);
         MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<char*>(buffer), len, &message[0], wlen);
     }
-    LOG_DEBUG(_T("[Client Received] %s"), message.c_str());
+
+    LOG_WRITE(ELOG_TYPE::LOG_TYPE_DEBUG, false, _T("[Client Received] %s (Len: %d)"), message.c_str(), len);
+
+    // 대기 플래그를 해제하여 메인 루프가 다음 입력을 받도록 허용
+    _waitingForEcho = false;
 
     return len;
 }
-
 

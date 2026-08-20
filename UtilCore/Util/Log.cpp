@@ -11,6 +11,8 @@
 // Construction/Destruction 
 //***************************************************************************
 
+std::mutex CLog::s_consoleMutex; // 콘솔 출력 동기화용 정적 뮤텍스 정의
+
 //***************************************************************************
 // @brief CLog 클래스의 생성자입니다.
 // @detail 멤버 변수를 초기화하고 디렉토리 및 파일명 버퍼를 0으로 설정합니다.
@@ -65,25 +67,6 @@ void CLog::Write(const ELOG_TYPE p_nType, const TCHAR* ptszLog, const bool bFlag
 	std::lock_guard<std::mutex> lockGuard(_mutex);
 
 #ifdef _FILE_LOG
-	switch( p_nType )
-	{
-	case ELOG_TYPE::LOG_TYPE_DEBUG:
-		_cLogFmt = LOG_FMT_DAILY;
-		break;
-	case ELOG_TYPE::LOG_TYPE_TRACE:
-		_cLogFmt = LOG_FMT_DAILY;
-		break;
-	case ELOG_TYPE::LOG_TYPE_INFO:
-		_cLogFmt = LOG_FMT_DAILY;
-		break;
-	case ELOG_TYPE::LOG_TYPE_WARNING:
-		_cLogFmt = LOG_FMT_DAILY;
-		break;
-	case ELOG_TYPE::LOG_TYPE_ERROR:
-		_cLogFmt = LOG_FMT_DAILY;
-		break;
-	}
-
 	switch( _cLogFmt )
 	{
 	case LOG_FMT_SEC:
@@ -119,41 +102,45 @@ void CLog::Write(const ELOG_TYPE p_nType, const TCHAR* ptszLog, const bool bFlag
 #endif
 
 #ifdef _CONSOLE_LOG
-	short sConsoleTextColor = WHITE;
-
-	if( bFlag )
-		_sntprintf_s(tszLogFormat, _countof(tszLogFormat), _TRUNCATE, _T("[%02d-%02d-%02d %02d:%02d:%02d] # %s"), stime.wYear, stime.wMonth, stime.wDay, stime.wHour, stime.wMinute, stime.wSecond, ptszLog);
-	else _sntprintf_s(tszLogFormat, _countof(tszLogFormat), _TRUNCATE, _T("%s"), ptszLog);
-
-	switch( p_nType )
 	{
-	case ELOG_TYPE::LOG_TYPE_DEBUG:
-		sConsoleTextColor = static_cast<short>(ELOG_TYPE_COLOR::LOG_TYPE_DEBUG_COLOR);
-		break;
-	case ELOG_TYPE::LOG_TYPE_TRACE:
-		sConsoleTextColor = static_cast<short>(ELOG_TYPE_COLOR::LOG_TYPE_TRACE_COLOR);
-		break;
-	case ELOG_TYPE::LOG_TYPE_INFO:
-		sConsoleTextColor = static_cast<short>(ELOG_TYPE_COLOR::LOG_TYPE_INFO_COLOR);
-		break;
-	case ELOG_TYPE::LOG_TYPE_WARNING:
-		sConsoleTextColor = static_cast<short>(ELOG_TYPE_COLOR::LOG_TYPE_WARNING_COLOR);
-		break;
-	case ELOG_TYPE::LOG_TYPE_ERROR:
-		sConsoleTextColor = static_cast<short>(ELOG_TYPE_COLOR::LOG_TYPE_ERROR_COLOR);
-		break;
-	}
+		std::lock_guard<std::mutex> consoleLock(s_consoleMutex);
 
-	if( sConsoleTextColor != WHITE )
-		SetTextColor(sConsoleTextColor);
+		short sConsoleTextColor = WHITE;
+
+		if( bFlag )
+			_sntprintf_s(tszLogFormat, _countof(tszLogFormat), _TRUNCATE, _T("[%02d-%02d-%02d %02d:%02d:%02d] # %s"), stime.wYear, stime.wMonth, stime.wDay, stime.wHour, stime.wMinute, stime.wSecond, ptszLog);
+		else _sntprintf_s(tszLogFormat, _countof(tszLogFormat), _TRUNCATE, _T("%s"), ptszLog);
+
+		switch( p_nType )
+		{
+		case ELOG_TYPE::LOG_TYPE_DEBUG:
+			sConsoleTextColor = static_cast<short>(ELOG_TYPE_COLOR::LOG_TYPE_DEBUG_COLOR);
+			break;
+		case ELOG_TYPE::LOG_TYPE_TRACE:
+			sConsoleTextColor = static_cast<short>(ELOG_TYPE_COLOR::LOG_TYPE_TRACE_COLOR);
+			break;
+		case ELOG_TYPE::LOG_TYPE_INFO:
+			sConsoleTextColor = static_cast<short>(ELOG_TYPE_COLOR::LOG_TYPE_INFO_COLOR);
+			break;
+		case ELOG_TYPE::LOG_TYPE_WARNING:
+			sConsoleTextColor = static_cast<short>(ELOG_TYPE_COLOR::LOG_TYPE_WARNING_COLOR);
+			break;
+		case ELOG_TYPE::LOG_TYPE_ERROR:
+			sConsoleTextColor = static_cast<short>(ELOG_TYPE_COLOR::LOG_TYPE_ERROR_COLOR);
+			break;
+		}
+
+		if( sConsoleTextColor != WHITE )
+			SetTextColor(sConsoleTextColor);
 
 #ifdef _UNICODE
-	std::wcout << tszLogFormat << std::endl;
+		std::wcout << tszLogFormat << std::endl;
 #else
-	std::cout << tszLogFormat << std::endl;
+		std::cout << tszLogFormat << std::endl;
 #endif
 
-	SetTextColor(WHITE);
+		SetTextColor(WHITE);
+	}
 #endif
 
 #ifdef _OUTPUT_LOG

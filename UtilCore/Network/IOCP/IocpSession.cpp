@@ -27,6 +27,7 @@ CIocpSession::CIocpSession() : _recvBuffer(Iocp::BUFFER_SIZE_DEFAULT)
 CIocpSession::~CIocpSession()
 {
 	CSocketUtils::Close(_socket);
+	_socket = INVALID_SOCKET;
 }
 
 //***************************************************************************

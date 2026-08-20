@@ -11,6 +11,7 @@
 #include <limits>
 
 thread_local CRioCore* CRioCore::_tlsDispatchCore = nullptr;
+thread_local CRioCore* CRioCore::_tlsWorkerCore = nullptr;
 
 //***************************************************************************
 // @brief 기본 생성자
@@ -117,9 +118,14 @@ bool CRioCore::Initialize(SOCKET socket, ULONG maxCompletionResults, ULONG_PTR c
     //    (RIO_EVENT_COMPLETION 또는 RIO_IOCP_COMPLETION) 중 선택인데, 이
     //    클래스는 IOCP 기반(RIO_IOCP_COMPLETION)을 사용합니다 — 이 방식에서는
     //    RIONotify() 호출 시점에 지정한 OVERLAPPED가 GetQueuedCompletionStatus()로
-    //    완료 통지됩니다. 마지막 파라미터 1은 동시성 값(NumberOfConcurrentThreads)으로,
-    //    이 IOCP는 이 CRioCore 전용 단일 워커 스레드로만 소비되므로 1로 고정합니다.
-    HANDLE tempIocp = ::CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, 1);
+    //    완료 통지됩니다. Concurrency는 이 CRioCore가 나중에 몇 개의 워커
+    //    스레드로 소비되든(StartWorkers(N)) 안전하게 동작하도록 시스템 논리
+    //    코어 수로 고정합니다 — StartWorkers()가 만드는 실제 워커 개수와는
+    //    완전히 독립적인 값이며, 워커 수가 이 값보다 많아도 안전합니다
+    //    (초과분은 커널 스케줄러가 컨텍스트 스위칭으로 조절).
+    const DWORD concurrency = (std::max)(1u, std::thread::hardware_concurrency());
+
+    HANDLE tempIocp = ::CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, concurrency);
     if( tempIocp == nullptr )
     {
         _state.store(Rio::State::Uninitialized, std::memory_order_release);
@@ -131,11 +137,9 @@ bool CRioCore::Initialize(SOCKET socket, ULONG maxCompletionResults, ULONG_PTR c
     ZeroMemory(&_receiveNotification, sizeof(_receiveNotification));
     ZeroMemory(&_sendNotification, sizeof(_sendNotification));
 
-    // 6. Receive/Send 각각의 RIO_NOTIFICATION_COMPLETION(Type=RIO_IOCP_COMPLETION)을
-    //    구성합니다. CompletionKey에 Receive/Send 구분 태그를 섞어 넣는 이유는,
-    //    MS 문서상 GetQueuedCompletionStatus()가 돌려주는 CompletionKey/Overlapped
-    //    조합만으로는 "어느 RIO_CQ의 알림인지" 구분할 표준 방법이 없기 때문에,
-    //    자체적으로 CompletionKey에 식별 태그를 실어 보내는 패턴입니다.
+    // 6. Receive/Send 각각의 IOCP Notification 구성 (Completion Key에
+    //    Receive/Send 구분 태그를 섞어서, IOCP에서 어느 쪽 CQ의 알림인지
+    //    바로 식별 가능하게 합니다).
     _receiveNotification.Type = RIO_IOCP_COMPLETION;
     _receiveNotification.Iocp.IocpHandle = tempIocp;
     _receiveNotification.Iocp.CompletionKey = reinterpret_cast<void*>(cqIdentifier | Rio::kReceiveCompletionTag);
@@ -185,13 +189,14 @@ bool CRioCore::Initialize(SOCKET socket, ULONG maxCompletionResults, ULONG_PTR c
     _sendCqCorrupted.store(false, std::memory_order_relaxed);
     _workerFaulted.store(false, std::memory_order_relaxed);
     _workerRunning.store(false, std::memory_order_relaxed);
-    _workerThreadId.store(std::thread::id{}, std::memory_order_relaxed);
+    _activeWorkerCount.store(0, std::memory_order_relaxed);
+    _targetWorkerCount.store(0, std::memory_order_relaxed);
 
     _shutdownInProgress = false;
     _shutdownDone = false;
     _lastShutdownResult = Rio::ShutdownResult::Success;
 
-    // 10. Initialized로 전이 — 이제 StartWorker() 호출이 가능한 상태
+    // 10. Initialized로 전이 — 이제 StartWorkers() 호출이 가능한 상태
     _state.store(Rio::State::Initialized, std::memory_order_release);
     return true;
 }
@@ -214,7 +219,44 @@ void CRioCore::RequestStop()
 }
 
 //***************************************************************************
+// @brief 대기 중인 멀티 워커 스레드 전체에 IOCP Wake-up(Stop) 패킷을 포스팅합니다.
+// @param workerCount 깨울 목표 워커 스레드 수
+//***************************************************************************
+void CRioCore::WakeWorkers(uint32_t workerCount) noexcept
+{
+    HANDLE iocp = _iocpHandle;
+
+    if( iocp == NULL || workerCount == 0 ) return;
+
+    // completionKey=0, overlapped=nullptr인 "빈" completion packet을 워커 수만큼
+    // 큐잉해서 깨웁니다. MS 문서: PostQueuedCompletionStatus()로 임의의 사용자
+    // 정의 패킷을 IOCP에 직접 넣을 수 있으며, 이는 실제 I/O 완료와 무관하게
+    // 대기 중인 GetQueuedCompletionStatus() 호출 하나를 즉시 깨우는 표준적인
+    // "wake-up" 패턴입니다. 이 패킷은 IsStopPacket()에서 completionKey==0 &&
+    // overlapped==nullptr 조합으로 식별됩니다(RIO 자신의 completion은 항상
+    // 유효한 CompletionKey/Overlapped 쌍을 가지므로 이 조합과 충돌하지 않음).
+    for( uint32_t i = 0; i < workerCount; ++i )
+    {
+        if( !::PostQueuedCompletionStatus(iocp, 0, 0, nullptr) )
+        {
+            _workerFaulted.store(true, std::memory_order_release);
+            break;
+        }
+    }
+}
+
+//***************************************************************************
 // @brief 내부 정지 로직을 수행합니다.
+// @details 제출 권한을 닫고 _targetWorkerCount(최종적으로 존재할 전체 워커 수)
+//          기준으로 WakeWorkers를 호출합니다. _activeWorkerCount(현재까지 실제로
+//          fetch_add를 실행한 워커 수)를 쓰지 않는 이유: StartWorkers(N) 직후
+//          아직 일부 워커가 자기 람다에 진입해 _activeWorkerCount를 올리기 전인
+//          좁은 시간대에 여기가 호출되면 activeCount가 실제보다 적게 관측될 수
+//          있고, 그 값만큼만 wake 패킷을 포스팅하면 아직 GQCS()에 도달하지
+//          못한 나머지 스레드가 영원히 깨어날 패킷을 못 받아 Shutdown()의 전체
+//          Join이 데드락에 빠질 수 있습니다. _targetWorkerCount로 통일하면
+//          초과분은 무해하게 버려질 뿐 부족한 일은 없습니다(MarkFaulted()도
+//          동일 정책).
 //***************************************************************************
 void CRioCore::StopInternal()
 {
@@ -238,21 +280,11 @@ void CRioCore::StopInternal()
         return;
     }
 
-    // 2. 워커가 IOCP GetQueuedCompletionStatus()에서 블로킹 대기 중일 수 있으므로,
-    //    completionKey=0, overlapped=nullptr인 "빈" completion packet을 하나
-    //    큐잉해서 깨웁니다. MS 문서: PostQueuedCompletionStatus()로 임의의
-    //    사용자 정의 패킷을 IOCP에 직접 넣을 수 있으며, 이는 실제 I/O 완료와
-    //    무관하게 대기 중인 GetQueuedCompletionStatus() 호출 하나를 즉시
-    //    깨우는 표준적인 "wake-up" 패턴입니다. 이 패킷은 IsStopPacket()에서
-    //    completionKey==0 && overlapped==nullptr 조합으로 식별됩니다(RIO
-    //    자신의 completion은 항상 유효한 CompletionKey/Overlapped 쌍을
-    //    가지므로 이 조합과 충돌하지 않습니다).
-    if( _iocpHandle != NULL && _workerRunning.load(std::memory_order_acquire) )
+    // 2. 워커들이 IOCP GetQueuedCompletionStatus()에서 블로킹 대기 중일 수
+    //    있으므로, 목표 워커 수 전체 기준으로 깨웁니다.
+    if( _workerRunning.load(std::memory_order_acquire) )
     {
-        if( !::PostQueuedCompletionStatus(_iocpHandle, 0, 0, nullptr) )
-        {
-            MarkFaulted(false, false);
-        }
+        WakeWorkers(_targetWorkerCount.load(std::memory_order_acquire));
     }
 }
 
@@ -272,7 +304,8 @@ void CRioCore::FaultInternal() noexcept
 int32 CRioCore::DispatchBatch(Rio::DispatchMode mode)
 {
     // Dispatch Gate를 shared로 잡아, Shutdown()의 리소스 파괴 구간(exclusive)과
-    // 겹치지 않도록 보장합니다.
+    // 겹치지 않도록 보장합니다. 멀티 워커가 동시에 이 shared lock을 잡는 건
+    // 허용됩니다.
     std::shared_lock<std::shared_mutex> dispatchGateLock(_dispatchGate);
 
     // 현재 스레드를 이 CRioCore의 Dispatch Context로 표시 —
@@ -339,8 +372,10 @@ bool CRioCore::NotifyCompletionQueue(RIO_CQ cq) noexcept
 //      [CQ Consumer Lock 범위]
 //      "CQ Lock 획득 -> Dequeue만" 하고 즉시 락을 풀어, 그 결과를 lock 밖에서
 //      DispatchResults()(=무거운 사용자 Dispatch 콜백 포함)로 넘깁니다. 이렇게
-//      해야 무거운 Dispatch가 실행되는 동안 다른 CQ(Receive/Send)를 소비하려는
-//      스레드가 차단되지 않습니다. 아래 6개 CQ 접근 지점(Receive/Send 각각의
+//      해야 무거운 Dispatch가 실행되는 동안 다른 워커가 같은 CQ 또는 반대편
+//      CQ를 소비하려는 시도가 차단되지 않습니다. Receive/Send CQ 락을 분리해둔
+//      덕에(_recvCqMutex/_sendCqMutex) 서로 다른 워커가 Receive CQ와 Send CQ를
+//      동시에 소비하는 것도 가능합니다. 아래 6개 CQ 접근 지점(Receive/Send 각각의
 //      Drain, Notify+Drain, 그리고 IOCP wake-up 후 Target CQ Drain) 전부
 //      동일한 패턴을 따릅니다.
 //
@@ -352,7 +387,8 @@ bool CRioCore::NotifyCompletionQueue(RIO_CQ cq) noexcept
 //      특성상 등록 시점 이후의 completion만 통지받기 때문에, 이미 도착해
 //      있는 결과를 그냥 Dequeue만으로 빠르게 처리하는 게 더 효율적이기
 //      때문입니다. 아래 1~2단계(우선 Dequeue) -> 4~5단계(Notify+Dequeue)
-//      -> 7단계(IOCP Wait)가 이 패턴을 그대로 구현한 것입니다.
+//      -> 7단계(IOCP Wait)가 이 패턴을 그대로 구현한 것이며, 멀티 워커에서도
+//      각 워커가 독립적으로 이 루프를 반복합니다.
 //***************************************************************************
 int32 CRioCore::_DispatchBatchImpl(Rio::DispatchMode mode)
 {
@@ -363,13 +399,12 @@ int32 CRioCore::_DispatchBatchImpl(Rio::DispatchMode mode)
     }
 
     // Wait 모드는 워커 스레드가 IOCP에서 블로킹 대기할 수 있으므로,
-    // 반드시 그 워커 스레드 자신만 호출해야 합니다.
+    // 반드시 이 CRioCore 소속 워커 스레드만 호출해야 합니다.
     if( mode == Rio::DispatchMode::Wait )
     {
-        const std::thread::id workerId = _workerThreadId.load(std::memory_order_acquire);
-        if( workerId == std::thread::id{} || std::this_thread::get_id() != workerId )
+        if( _tlsWorkerCore != this )
         {
-            assert(false && "DispatchBatch(Wait) must only be called from worker thread");
+            assert(false && "DispatchBatch(Wait) must only be called from CRioCore worker thread");
             return Rio::kInvalidCompletion;
         }
     }
@@ -384,7 +419,7 @@ int32 CRioCore::_DispatchBatchImpl(Rio::DispatchMode mode)
         bool drainSucceeded = false;
 
         {
-            std::unique_lock<std::mutex> cqLock(_cqConsumerMutex);
+            std::unique_lock<std::mutex> cqLock(_recvCqMutex);
             drainSucceeded = DrainCompletionQueue(_receiveCq, results, numResults);
         }
 
@@ -405,7 +440,7 @@ int32 CRioCore::_DispatchBatchImpl(Rio::DispatchMode mode)
         bool drainSucceeded = false;
 
         {
-            std::unique_lock<std::mutex> cqLock(_cqConsumerMutex);
+            std::unique_lock<std::mutex> cqLock(_sendCqMutex);
             drainSucceeded = DrainCompletionQueue(_sendCq, results, numResults);
         }
 
@@ -444,7 +479,7 @@ int32 CRioCore::_DispatchBatchImpl(Rio::DispatchMode mode)
         bool drainSucceeded = false;
 
         {
-            std::unique_lock<std::mutex> cqLock(_cqConsumerMutex);
+            std::unique_lock<std::mutex> cqLock(_recvCqMutex);
 
             notifySucceeded = NotifyCompletionQueue(_receiveCq);
 
@@ -475,7 +510,7 @@ int32 CRioCore::_DispatchBatchImpl(Rio::DispatchMode mode)
         bool drainSucceeded = false;
 
         {
-            std::unique_lock<std::mutex> cqLock(_cqConsumerMutex);
+            std::unique_lock<std::mutex> cqLock(_sendCqMutex);
 
             notifySucceeded = NotifyCompletionQueue(_sendCq);
 
@@ -509,10 +544,8 @@ int32 CRioCore::_DispatchBatchImpl(Rio::DispatchMode mode)
     }
 
     // 7. 진짜로 처리할 게 없으므로 IOCP에서 블로킹 대기 (Wait 모드 전용 경로).
-    //    두 CQ 모두 4~5단계에서 RIONotify()로 알림을 등록해뒀으므로, 그 뒤에
-    //    어느 쪽이든 completion이 발생하면 그때 등록해둔 OVERLAPPED
-    //    (_receiveOverlapped 또는 _sendOverlapped)와 CompletionKey가 실려
-    //    이 GetQueuedCompletionStatus() 호출을 깨웁니다.
+    //    N개 워커 중 이 대기에 걸린 임의의 하나가, 등록해둔 알림 조건 중
+    //    무엇이든 완료되는 즉시 깨어납니다.
     DWORD bytesTransferred = 0;
     ULONG_PTR completionKey = 0;
     LPOVERLAPPED overlapped = nullptr;
@@ -534,7 +567,8 @@ int32 CRioCore::_DispatchBatchImpl(Rio::DispatchMode mode)
         return Rio::kIocpError;
     }
 
-    // 8. Stop packet(StopInternal()이 깨우기 위해 큐잉한 빈 패킷)인지 확인
+    // 8. Stop packet(StopInternal()/MarkFaulted()가 깨우기 위해 큐잉한 빈
+    //    패킷)인지 확인
     if( IsStopPacket(completionKey, overlapped) )
     {
         state = _state.load(std::memory_order_acquire);
@@ -584,12 +618,14 @@ int32 CRioCore::_DispatchBatchImpl(Rio::DispatchMode mode)
     //     CQ에 처리할 completion이 최소 1개 이상 있다"는 신호일 뿐, MS
     //     문서상 그 정확한 개수는 알려주지 않으므로 반드시 RIODequeueCompletion()으로
     //     실제 다시 Dequeue해야 합니다(이 Drain 호출 자체가 그 처리입니다).
+    //     타겟 CQ에 맞는 전용 뮤텍스만 잡아, 반대편 CQ를 소비 중인 다른
+    //     워커와는 경합하지 않습니다.
     {
         ULONG numResults = 0;
         bool drainSucceeded = false;
 
         {
-            std::unique_lock<std::mutex> cqLock(_cqConsumerMutex);
+            std::unique_lock<std::mutex> cqLock((targetCqType == Rio::RioCqType::Receive) ? _recvCqMutex : _sendCqMutex);
             drainSucceeded = DrainCompletionQueue(targetCq, results, numResults);
         }
 
@@ -727,10 +763,13 @@ Rio::ShutdownResult CRioCore::Shutdown(std::chrono::milliseconds drainTimeout)
 
     if( drainTimeout < std::chrono::milliseconds::zero() ) drainTimeout = std::chrono::milliseconds::zero();
 
-    std::thread threadToJoin;
+    std::vector<std::thread> threadsToJoin;
 
+    //=========================================================================
     // Phase 1. Admission Close — 신규 제출 차단 및 정지 요청, 중복/동시
-    //          Shutdown() 호출을 단일 흐름으로 직렬화합니다.
+    //          Shutdown() 호출을 단일 흐름으로 직렬화하고, 멀티 워커 스레드
+    //          그룹의 소유권을 이 함수로 이관합니다.
+    //=========================================================================
     {
         std::unique_lock<std::mutex> lifecycleLock(_lifecycleMutex);
 
@@ -757,39 +796,55 @@ Rio::ShutdownResult CRioCore::Shutdown(std::chrono::milliseconds drainTimeout)
             return _lastShutdownResult;
         }
 
-        if( _workerThread.joinable() && _workerThread.get_id() == std::this_thread::get_id() )
+        // Self-join 검증 (호출 스레드가 멀티 워커 벡터 내에 존재하는지 검사)
+        for( const auto& thread : _workerThreads )
         {
-            assert(false && "Shutdown() self-join");
-            _lastShutdownResult = Rio::ShutdownResult::InvalidCall;
-            return _lastShutdownResult;
+            if( thread.get_id() == std::this_thread::get_id() )
+            {
+                assert(false && "Shutdown() self-join");
+                _lastShutdownResult = Rio::ShutdownResult::InvalidCall;
+                return _lastShutdownResult;
+            }
         }
 
         _shutdownInProgress = true;
         StopInternal();
 
-        if( _workerThread.joinable() ) threadToJoin = std::move(_workerThread);
+        threadsToJoin = std::move(_workerThreads);
     }
 
-    // Phase 2. Dispatch Domain Exclusive — 이 시점부터는 다른 스레드가
-    //          DispatchBatch()에 새로 진입할 수 없습니다(진행 중이던 것은
-    //          완료될 때까지 여기서 대기).
-    std::unique_lock<std::shared_mutex> dispatchGateLock(_dispatchGate);
-
-    // Phase 3. Worker Join — 워커가 완전히 멈췄음을 확인. 이 뒤에야 outstanding
-    //          I/O를 안전하게 드레인할 수 있습니다.
-    if( threadToJoin.joinable() ) threadToJoin.join();
+    //=========================================================================
+    // Phase 2. Worker 스레드 전체 Join (Deadlock 차단을 위해 Lock 밖에서 진행).
+    //          워커들이 완전히 멈췄음을 확인. 이 뒤에야 outstanding I/O를
+    //          안전하게 드레인할 수 있습니다.
+    //=========================================================================
+    for( auto& thread : threadsToJoin )
+    {
+        if( thread.joinable() ) thread.join();
+    }
 
     _workerRunning.store(false, std::memory_order_release);
-    _workerThreadId.store(std::thread::id{}, std::memory_order_release);
+    _activeWorkerCount.store(0, std::memory_order_release);
+    _targetWorkerCount.store(0, std::memory_order_release);
 
-    // Phase 4. CQ Drain — 워커가 멈췄으니 이제 이 스레드가 직접
-    //          _DispatchBatchImpl(Drain)을 반복 호출해 outstanding I/O가
-    //          0이 될 때까지(또는 타임아웃/손상 발생까지) 잔여 completion을 처리합니다.
-    //          MS 문서상 이미 제출된 RIOSend/RIOSendEx/RIOReceive/RIOReceiveEx
-    //          요청은 취소 API가 없으므로, 소켓/CQ를 닫기 전 반드시 그
-    //          completion이 CQ로 돌아올 때까지 명시적으로 기다려야 합니다
-    //          (그러지 않고 CQ/IOCP를 먼저 닫으면 나중에 도착할 completion이
-    //          이미 해제된 자원을 참조하는 UAF로 이어질 수 있음).
+    //=========================================================================
+    // Phase 3. Dispatch Domain Exclusive Lock — 이 시점부터는 다른 스레드가
+    //          DispatchBatch()에 새로 진입할 수 없습니다(진행 중이던 것은
+    //          완료될 때까지 여기서 대기).
+    //=========================================================================
+    std::unique_lock<std::shared_mutex> dispatchGateLock(_dispatchGate);
+
+    //=========================================================================
+    // Phase 4. 단일 스레드 CQ Drain (Shutdown 호출 주체가 독점 처리). 워커가
+    //          멈췄으니 이제 이 스레드가 직접 _DispatchBatchImpl(Drain)을
+    //          반복 호출해 outstanding I/O가 0이 될 때까지(또는 타임아웃/손상
+    //          발생까지) 잔여 completion을 처리합니다. MS 문서상 이미 제출된
+    //          RIOSend/RIOSendEx/RIOReceive/RIOReceiveEx 요청은 취소 API가
+    //          없으므로, 소켓/CQ를 닫기 전 반드시 그 completion이 CQ로
+    //          돌아올 때까지 명시적으로 기다려야 합니다(그러지 않고 CQ/IOCP를
+    //          먼저 닫으면 나중에 도착할 completion이 이미 해제된 자원을
+    //          참조하는 UAF로 이어질 수 있음).
+    //=========================================================================
     Rio::ShutdownResult finalResult = Rio::ShutdownResult::Success;
 
     {
@@ -850,7 +905,9 @@ Rio::ShutdownResult CRioCore::Shutdown(std::chrono::milliseconds drainTimeout)
         }
     }
 
+    //=========================================================================
     // Phase 5. Drain Validation — 루프를 빠져나온 사유를 최종 결과에 반영합니다.
+    //=========================================================================
     if( finalResult == Rio::ShutdownResult::Success )
     {
         if( _outstandingIo.load(std::memory_order_acquire) != 0 ) finalResult = Rio::ShutdownResult::DrainTimeout;
@@ -858,6 +915,7 @@ Rio::ShutdownResult CRioCore::Shutdown(std::chrono::milliseconds drainTimeout)
         else if( _workerFaulted.load(std::memory_order_acquire) ) finalResult = Rio::ShutdownResult::DispatchError;
     }
 
+    //=========================================================================
     // Phase 6. Resource Destruction — outstanding I/O가 확실히 0일 때만
     //          CQ/IOCP를 실제로 파괴합니다. 0이 아니면(드레인 실패) 리소스를
     //          그대로 남겨둬서, 아직 완료 안 된 요청이 이미 해제된 자원을
@@ -865,11 +923,13 @@ Rio::ShutdownResult CRioCore::Shutdown(std::chrono::milliseconds drainTimeout)
     //          이 CQ를 참조하는 RIO_RQ가 아직 존재하는 상태에서 CQ를 닫는
     //          동작은 정의되어 있지 않으므로, 반드시 outstanding이 0임을
     //          먼저 확인한 뒤에만 호출해야 합니다.
+    //=========================================================================
     bool resourceDestroySucceeded = false;
 
     if( _outstandingIo.load(std::memory_order_acquire) == 0 )
     {
-        std::unique_lock<std::mutex> cqLock(_cqConsumerMutex);
+        std::unique_lock<std::mutex> recvLock(_recvCqMutex);
+        std::unique_lock<std::mutex> sendLock(_sendCqMutex);
 
         if( _outstandingIo.load(std::memory_order_acquire) != 0 )
         {
@@ -900,7 +960,8 @@ Rio::ShutdownResult CRioCore::Shutdown(std::chrono::milliseconds drainTimeout)
 
             _outstandingIo.store(0, std::memory_order_relaxed);
             _workerRunning.store(false, std::memory_order_release);
-            _workerThreadId.store(std::thread::id{}, std::memory_order_release);
+            _activeWorkerCount.store(0, std::memory_order_release);
+            _targetWorkerCount.store(0, std::memory_order_release);
 
             ZeroMemory(&_rioTable, sizeof(_rioTable));
             ZeroMemory(&_receiveOverlapped, sizeof(_receiveOverlapped));
@@ -912,11 +973,15 @@ Rio::ShutdownResult CRioCore::Shutdown(std::chrono::milliseconds drainTimeout)
         }
     }
 
+    //=========================================================================
     // Phase 7. Dispatch Domain Release
+    //=========================================================================
     dispatchGateLock.unlock();
 
+    //=========================================================================
     // Phase 8. Lifecycle Commit — 최종 상태를 확정하고 대기 중이던 다른
     //          Shutdown() 호출자들에게 통지합니다.
+    //=========================================================================
     {
         std::unique_lock<std::mutex> lifecycleLock(_lifecycleMutex);
 
@@ -936,7 +1001,9 @@ Rio::ShutdownResult CRioCore::Shutdown(std::chrono::milliseconds drainTimeout)
         _lastShutdownResult = finalResult;
     }
 
+    //=========================================================================
     // Phase 9. Notify Waiters
+    //=========================================================================
     _shutdownCv.notify_all();
 
     return finalResult;
@@ -1127,13 +1194,9 @@ void CRioCore::MarkFaulted(bool receiveCqCorrupt, bool sendCqCorrupt) noexcept
         }
     }
 
-    // 워커가 IOCP 대기 중일 수 있으므로 깨워서 Faulted 상태를 인지하게 합니다.
-    HANDLE iocp = _iocpHandle;
-
-    if( iocp != NULL )
-    {
-        ::PostQueuedCompletionStatus(iocp, 0, 0, nullptr);
-    }
+    // 모든 워커가 IOCP 대기 중일 수 있으므로, 목표 워커 수 전체를 깨워서
+    // Faulted 상태를 인지하게 합니다(StopInternal()과 동일한 정책).
+    WakeWorkers(_targetWorkerCount.load(std::memory_order_acquire));
 
     _shutdownCv.notify_all();
 }

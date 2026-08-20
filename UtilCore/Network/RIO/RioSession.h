@@ -53,6 +53,17 @@ class CRioBuffer;
 //          서로 다른 메모리가 되어 RIOSendEx()가 실패합니다(과거에 실제로 겪은 문제).
 //          그래서 Init()에서 이 세션 자신이 _sendBuffer를 등록하고, FinalizeClose()/
 //          소멸자에서 해제합니다.
+//
+//      [멀티 워커 스레드 안전성]
+//          CRioCore가 멀티 워커로 동작해도, 이 클래스는 별도 수정 없이 안전합니다.
+//          _ioSubmitLock이 receive/send 제출과 Close/FinalizeClose 간 상호 배제를,
+//          _sendLock이 송신 링버퍼 접근을 보호합니다. 세션당 receive는 항상 1개만
+//          in-flight이므로 OnReceiveCompleted()끼리는 서로 동시 실행되지 않지만,
+//          다른 워커가 처리하는 OnSendCompleted()와는 동시에 실행될 수 있습니다 —
+//          다만 그 경우도 위 두 락으로 이미 안전합니다. 단, OnDataReceived()를
+//          구현하는 상위 클래스가 세션 밖의 공유 가변 상태(예: 다른 세션과 공유하는
+//          게임 로직 상태)를 건드리는 경우엔 그 상태 자체를 상위 계층에서 별도로
+//          동기화해야 합니다(이 클래스가 보장하는 범위 밖).
 //***************************************************************************
 class CRioSession : public CSession, public CRioObject
 {
@@ -82,12 +93,22 @@ public:
 
 	//***************************************************************************
 	// @brief 세션을 초기화하고 이 세션 소유의 송신 버퍼를 RIO에 등록합니다.
+	// @param sessionId 고유 세션 ID
+	// @param core RIO Core 객체 포인터
+	// @param globalRecvBufferPool 전역 수신 버퍼 풀 포인터
+	// @param socket 클라이언트 소켓 핸들
+	// @param requestQueue RIO Request Queue 핸들
 	// @return bool 초기화(및 송신 버퍼 등록) 성공 시 true.
 	//         false를 반환하면 세션은 Active로 전이하지 않으며, 호출자가
 	//         clientSocket/requestQueue를 직접 정리해야 합니다(세션이 아직
 	//         Active가 아니므로 Close()로 자기 자신을 정리시킬 수 없음).
 	//***************************************************************************
 	bool Init(uint64_t sessionId, CRioCore* core, CRioBuffer* globalRecvBufferPool, SOCKET socket, RIO_RQ requestQueue) noexcept;
+
+	//***************************************************************************
+	// @brief 지정된 사유로 세션 종료를 요청합니다.
+	// @param reason 세션 종료 사유
+	//***************************************************************************
 	void Close(Rio::CloseReason reason) noexcept;
 
 	//***************************************************************************
@@ -95,7 +116,18 @@ public:
 	//***************************************************************************
 	void Close() noexcept { Close(Rio::CloseReason::ForcedClose); }
 
+	//***************************************************************************
+	// @brief 최초 비동기 수신(Receive) 요청을 게시합니다.
+	// @return 게시 성공 시 true, 실패 시 false
+	//***************************************************************************
 	bool PostInitialReceive() noexcept;
+
+	//***************************************************************************
+	// @brief 데이터를 송신 버퍼에 큐잉하고 RIO 전송을 진행합니다.
+	// @param data 전송할 데이터 버퍼 포인터
+	// @param size 전송할 데이터 크기 (바이트)
+	// @return 전송 큐잉 및 처리 성공 시 true, 실패 시 false
+	//***************************************************************************
 	bool Send(const void* data, uint16_t size) noexcept;
 
 	//***************************************************************************
@@ -184,6 +216,10 @@ protected:
 	virtual void OnDataReceived() = 0;
 
 private:
+	//***************************************************************************
+	// @brief 세션의 모든 리소스(RIO_RQ, 소켓, 송신 버퍼 등록 등)를 안전하게 해제하고
+	//        연결 해제 콜백을 호출합니다.
+	//***************************************************************************
 	void FinalizeClose() noexcept;
 
 	//***************************************************************************
@@ -216,7 +252,18 @@ private:
 	//***************************************************************************
 	void UnregisterSendBuffer() noexcept;
 
+	//***************************************************************************
+	// @brief 수신 완료 비동기 이벤트를 처리합니다.
+	// @param rioEvent 완료된 RIO 이벤트 포인터
+	// @param bytesTransferred 수신된 바이트 수
+	//***************************************************************************
 	void OnReceiveCompleted(CRioEvent* rioEvent, DWORD bytesTransferred) noexcept;
+
+	//***************************************************************************
+	// @brief 송신 완료 비동기 이벤트를 처리합니다.
+	// @param rioEvent 완료된 송신 RIO 이벤트 포인터
+	// @param bytesTransferred 전송된 바이트 수
+	//***************************************************************************
 	void OnSendCompleted(CRioEvent* rioEvent, DWORD bytesTransferred) noexcept;
 
 private:

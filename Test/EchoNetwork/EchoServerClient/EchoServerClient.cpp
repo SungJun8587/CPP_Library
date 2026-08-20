@@ -179,35 +179,33 @@ int IocpRioTest()
 	std::cout << " Network Engine: " << (kTestEngineType == ENetworkEngineType::RIO ? "RIO (Registered I/O)" : "IOCP") << "\n";
 	std::cout << "========================================\n";
 
+	// 서버 워커 스레드 개수 설정 (0 입력 시 하드웨어 코어 수 기반 자동 산정)
+	uint32_t serverThreadWorkerCount = 2;
+
+	// 클라이언트 워커 스레드 개수 설정 가이드:
+	// - 1개(또는 소수)의 세션으로 테스트하는 경우: 1 또는 2 설정 (자원 낭비 및 불필요한 컨텍스트 스위칭 방지)
+	// - 수백~수천 개 세션을 동시에 처리하는 대규모 부하/스트레스 테스트인 경우: 0 설정 (하드웨어 코어 수 기반 자동 병렬 처리)
+	uint32_t clientThreadWorkerCount = 1;
+
 	// 2. 엔진별 코어 및 서비스 생성
 	if( kTestEngineType == ENetworkEngineType::IOCP )
 	{
 		iocpCore = std::make_shared<CIocpCore>();
 
-		// IOCP 워커 스레드 생성 (GetQueuedCompletionStatus 폴링)
-		int32 workerThreadCount = 2;
-		for( int32 i = 0; i < workerThreadCount; ++i )
-		{
-			std::thread([iocpCore]() {
-				while( true )
-				{
-					iocpCore->Dispatch();
-				}
-				}).detach();
-		}
+		// [수정] 메인에서의 수동 Dispatch 스레드 생정 코드는 제거됨 (서비스 내부에 위임)
 
-		// 서버 서비스 생성
+		// 서버 서비스 생성 (인자 순서: 엔진타입, 주소, 팩토리, 최대세션수, 워커스레드수, 코어참조)
 		serverService = CNetworkFactory::CreateServerService(
 			ENetworkEngineType::IOCP, serverAddress,
 			[]() { return std::make_shared<CIocpEchoServerSession>(); },
-			10, &iocpCore
+			10, serverThreadWorkerCount, &iocpCore
 		);
 
 		// 클라이언트 서비스 생성
 		clientService = CNetworkFactory::CreateClientService(
 			ENetworkEngineType::IOCP, serverAddress,
 			[]() { return std::make_shared<CIocpEchoClientSession>(); },
-			1, &iocpCore
+			1, clientThreadWorkerCount, &iocpCore
 		);
 	}
 	else if( kTestEngineType == ENetworkEngineType::RIO )
@@ -218,14 +216,14 @@ int IocpRioTest()
 		serverService = CNetworkFactory::CreateServerService(
 			ENetworkEngineType::RIO, serverAddress,
 			[]() { return std::make_shared<CRioEchoServerSession>(); },
-			10, &rioCore
+			10, serverThreadWorkerCount, &rioCore
 		);
 
 		// 클라이언트 서비스 생성 (RIO)
 		clientService = CNetworkFactory::CreateClientService(
 			ENetworkEngineType::RIO, serverAddress,
 			[]() { return std::make_shared<CRioEchoClientSession>(); },
-			1, &rioCore
+			1, clientThreadWorkerCount, &rioCore
 		);
 	}
 

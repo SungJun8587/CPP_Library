@@ -21,6 +21,7 @@
 // @param address 서버 바인딩 주소 정보
 // @param factory 세션 생성용 팩토리 콜백
 // @param maxSessionCount 최대 수용 세션 수
+// @param workerThreadCount 워커 스레드 개수 (기본값: 0)
 // @param engineCoreRef 엔진 코어 포인터
 // @return std::shared_ptr<CNetService> 생성된 서비스 객체 포인터 (실패 시 nullptr)
 //***************************************************************************
@@ -29,6 +30,7 @@ CNetServiceRef CNetworkFactory::CreateServerService(
 	CNetAddress address,
 	SessionFactory factory,
 	int32 maxSessionCount,
+	uint32_t workerThreadCount,
 	void* engineCoreRef)
 {
 	switch( engineType )
@@ -39,7 +41,7 @@ CNetServiceRef CNetworkFactory::CreateServerService(
 				return nullptr;
 
 			auto iocpCore = *static_cast<CIocpCoreRef*>(engineCoreRef);
-			return std::make_shared<CIocpServerService>(address, iocpCore, factory, maxSessionCount);
+			return std::make_shared<CIocpServerService>(address, iocpCore, factory, maxSessionCount, workerThreadCount);
 		}
 		case ENetworkEngineType::RIO:
 		{
@@ -47,7 +49,7 @@ CNetServiceRef CNetworkFactory::CreateServerService(
 				return nullptr;
 
 			auto rioCore = *static_cast<CRioCoreRef*>(engineCoreRef);
-			return std::make_shared<CRioServerService>(address, rioCore, factory, maxSessionCount);
+			return std::make_shared<CRioServerService>(address, rioCore, factory, maxSessionCount, workerThreadCount);
 		}
 	}
 	return nullptr;
@@ -59,6 +61,7 @@ CNetServiceRef CNetworkFactory::CreateServerService(
 // @param address 원격 서버 주소 정보
 // @param factory 세션 생성용 팩토리 콜백
 // @param maxSessionCount 생성할 세션 수
+// @param workerThreadCount 워커 스레드 개수 (기본값: 0)
 // @param engineCoreRef 엔진 코어 포인터
 // @return std::shared_ptr<CNetService> 생성된 서비스 객체 포인터 (실패 시 nullptr)
 //***************************************************************************
@@ -67,6 +70,7 @@ CNetServiceRef CNetworkFactory::CreateClientService(
 	CNetAddress address,
 	SessionFactory factory,
 	int32 maxSessionCount,
+	uint32_t workerThreadCount,
 	void* engineCoreRef)
 {
 	switch( engineType )
@@ -77,7 +81,7 @@ CNetServiceRef CNetworkFactory::CreateClientService(
 				return nullptr;
 
 			auto iocpCore = *static_cast<CIocpCoreRef*>(engineCoreRef);
-			return std::make_shared<CIocpClientService>(address, iocpCore, factory, maxSessionCount);
+			return std::make_shared<CIocpClientService>(address, iocpCore, factory, maxSessionCount, workerThreadCount);
 		}
 		case ENetworkEngineType::RIO:
 		{
@@ -85,7 +89,7 @@ CNetServiceRef CNetworkFactory::CreateClientService(
 				return nullptr;
 
 			auto rioCore = *static_cast<CRioCoreRef*>(engineCoreRef);
-			return std::make_shared<CRioClientService>(address, rioCore, factory, maxSessionCount);
+			return std::make_shared<CRioClientService>(address, rioCore, factory, maxSessionCount, workerThreadCount);
 		}
 	}
 	return nullptr;

@@ -27,7 +27,10 @@ CRioEchoServerSession::~CRioEchoServerSession()
 void CRioEchoServerSession::OnConnected()
 {
 	CRioSession::OnConnected();
-	LOG_INFO(_T("[RIO Session] Connected!"));
+
+	uint64 sessionId = GetSessionId();
+
+	LOG_INFO(_T("[RIO Session] Connected! (Session ID: %llu)"), sessionId);
 }
 
 //***************************************************************************
@@ -46,6 +49,8 @@ void CRioEchoServerSession::OnDisconnected(Rio::CloseReason reason)
 //***************************************************************************
 void CRioEchoServerSession::OnDataReceived()
 {
+	uint64 sessionId = GetSessionId();
+
 	auto& recvBuffer = GetRecvBuffer();
 
 	int64 dataSize = recvBuffer.GetSizeUsed();
@@ -59,7 +64,7 @@ void CRioEchoServerSession::OnDataReceived()
 	{
 		if( outDequeueSize > 0 )
 		{
-			LOG_DEBUG(_T("[RIO Session Received] %s (Len: %lld)"), tempBuffer.data(), outDequeueSize);
+			LOG_DEBUG(_T("[RIO Session ID(%llu) Received] %s (Len: %lld)"), sessionId, tempBuffer.data(), outDequeueSize);
 
 			// 받은 데이터를 그대로 클라이언트에게 전송 (Echo)
 			Send(tempBuffer.data(), static_cast<uint16_t>(outDequeueSize));
