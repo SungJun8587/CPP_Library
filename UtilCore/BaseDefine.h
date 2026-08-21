@@ -138,9 +138,6 @@
 #define DEADLOCK_STAMP_FREQ				(5*1000)			// Dead Lock 인지 체크 주기 (5 sec.)
 #define DEADLOCK_STAMP_CNT				10					// DEADLOCK_STAMP_FREQ(5초)주기로 10번 체크하여 Count가 0이 되면 서버 강제종료(30 sec.)
 
-#define _CONSOLE_LOG
-//#define _FILE_LOG
-
 #define MAX_FILENAME_CONVERT_INDEX_NUM		10000
 
 //End************************************************************************

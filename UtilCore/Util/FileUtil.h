@@ -1,6 +1,6 @@
 ﻿
 //***************************************************************************
-// FileUtil.h : interface for the FileUtil Functions.
+// FileUtil.h: interface for the FileUtil Functions.
 //
 //***************************************************************************
 

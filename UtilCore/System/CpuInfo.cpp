@@ -1,10 +1,13 @@
-﻿//***************************************************************************
-// CpuInfo.cpp: implementation of the CCpuInfo class.
+﻿
+//***************************************************************************
+// CpuInfo.cpp: CPU 정보 수집 및 CPUID 관련 C++ 구현부 (x86/x64 매크로 분기) 및 CCpuInfo 클래스 구현부
 //
 //***************************************************************************
 
 #include "pch.h"
 #include "CpuInfo.h"
+
+#include <cstring>
 
 #define SUPPORT_MMX				0x0001
 #define SUPPORT_3DNOW			0x0002
@@ -15,8 +18,8 @@
 // Construction/Destruction
 //***************************************************************************
 
-// - https://www.prowaretech.com/articles/current/assembly
-// - https://sean.tistory.com/148
+// - https://www.prowaretech.com/articles/current/assembly[cite: 1]
+// - https://sean.tistory.com/148[cite: 1]
 //***************************************************************************
 // @brief CCpuInfo 클래스의 생성자로, 내부 변수를 초기화합니다.
 //***************************************************************************
@@ -54,24 +57,26 @@ CCpuInfo::~CCpuInfo()
 //***************************************************************************
 BOOL CCpuInfo::GetInformation()
 {
-	DWORD		dwCpuId = 0;
-	int			nFamily = 0;
-	int			nModel = 0;
-	int			nStepping = 0;
-	int			nFamilyEx = 0;
-	int			nModelEx = 0;
+	DWORD dwCpuId = 0;
+	int nFamily = 0;
+	int nModel = 0;
+	int nStepping = 0;
+	int nFamilyEx = 0;
+	int nModelEx = 0;
 
-	if( cpu_id_supported() < 1 ) return false;
+	if( cpu_id_supported() < 1 ) return FALSE;
 
-	dwCpuId = GetHighestCpuId();
+	// GetHighestCpuId를 호출하여 최고 CPUID 값(dwCpuId) 수집
+	GetHighestCpuId(dwCpuId);
+
 	switch( dwCpuId )
 	{
-	case 0:				// don't do anything funky; return
+	case 0: // don't do anything funky; return
 		break;
-	case 1:				// x86 cpu's do processor identification here
+	case 1: // x86 cpu's do processor identification here
 		GetCpuIdentification();
 		break;
-	case 2:				// intel cpu's find cache information here
+	case 2: // intel cpu's find cache information here
 		GetIntelCacheInfo();
 		GetCpuIdentification();
 		break;
@@ -82,8 +87,9 @@ BOOL CCpuInfo::GetInformation()
 	DetectCpuGenInfo();
 	DetectCpuDescInfo();
 	DetectCpuSpeed();
+	DetectVendorName();
 
-	return true;
+	return TRUE;
 }
 
 //***************************************************************************
@@ -94,7 +100,13 @@ void CCpuInfo::DetectCpuGenInfo()
 	DWORD dwLargestExtendedFeature = 0;
 
 	if( _tcscmp(m_Cpu.m_tszVendorName, VENDOR_INTEL_STR) == 0 )
-		GetOldIntelName();
+	{
+		_tstring strOldIntelName = GetOldIntelName();
+		if( !strOldIntelName.empty() )
+		{
+			_tcsncpy_s(m_Cpu.m_tszProcessorName, _countof(m_Cpu.m_tszProcessorName), strOldIntelName.c_str(), _TRUNCATE);
+		}
+	}
 
 	dwLargestExtendedFeature = GetLargestExtendedFeature();
 	if( dwLargestExtendedFeature >= AMD_L2CACHE_FEATURE )
@@ -186,28 +198,46 @@ void CCpuInfo::DetectCpuSpeed()
 }
 
 //***************************************************************************
-// @brief 최고 지원 CPUID 기능 ID 및 제조사(Vendor)명을 가져옵니다.
-// @return 최고 지원 CPUID 값 (실패 시 0)
+// @brief CPU 제조사 이름을 감지하여 멤버 변수(m_Cpu.m_tszVendorName)에 저장합니다.
 //***************************************************************************
-DWORD CCpuInfo::GetHighestCpuId()
+void CCpuInfo::DetectVendorName()
 {
 	DWORD dwHighest = 0;
-	char szTemp[CPU_VENDOR_STRLEN] = { 0, };
+	std::string strVendor = GetHighestCpuId(dwHighest);
 
-	if( !cpu_vendor(&dwHighest, szTemp) ) return 0;
-
-	if( dwHighest != 0 )
+	if( dwHighest > 0 && !strVendor.empty() )
 	{
 #ifdef _UNICODE
-		int nLength = MultiByteToWideChar(CP_ACP, 0, (LPSTR)szTemp, -1, NULL, 0);
-		if( nLength == 0 || CPU_VENDOR_STRLEN < nLength ) return false;
-		if( MultiByteToWideChar(CP_ACP, 0, (LPSTR)szTemp, -1, m_Cpu.m_tszVendorName, nLength) == 0 ) return false;
+		// ANSI 문자열을 유니코드(WideChar)로 변환
+		int nLength = MultiByteToWideChar(CP_ACP, 0, strVendor.c_str(), -1, NULL, 0);
+		if( nLength > 0 && nLength <= CPU_VENDOR_STRLEN )
+		{
+			MultiByteToWideChar(CP_ACP, 0, strVendor.c_str(), -1, m_Cpu.m_tszVendorName, nLength);
+		}
 #else
-		strncpy_s(m_Cpu.m_tszVendorName, CPU_VENDOR_STRLEN, szTemp, _TRUNCATE);
+		// 멀티바이트 환경 버퍼 복사
+		strncpy_s(m_Cpu.m_tszVendorName, _countof(m_Cpu.m_tszVendorName), strVendor.c_str(), _TRUNCATE);
 #endif
 	}
+}
 
-	return dwHighest;
+//***************************************************************************
+// @brief 최고 지원 CPUID 기능 ID를 수집하고 CPU 제조사(Vendor) 문자열을 반환합니다.
+// @param dwHighest [out] 최고 지원 CPUID Leaf 값을 전달받을 DWORD 참조 변수
+// @return std::string CPU 제조사 ANSI 문자열 (실패 시 빈 문자열)
+//***************************************************************************
+std::string CCpuInfo::GetHighestCpuId(DWORD& dwHighest) const
+{
+	dwHighest = 0;
+	char szTemp[CPU_VENDOR_STRLEN] = { 0, };
+
+	// CPUID 호출 및 제조사 문자열 수집
+	if( !cpu_vendor(&dwHighest, szTemp) )
+	{
+		return "";
+	}
+
+	return std::string(szTemp);
 }
 
 //***************************************************************************
@@ -328,155 +358,133 @@ void CCpuInfo::GetNameString()
 }
 
 //***************************************************************************
-// @brief 구형 Intel CPU 명칭을 감지하고 분류합니다.
+// @brief 구형 Intel CPU 명칭을 감지하여 대응하는 문자열로 변환합니다.
+// @return _tstring 프로세서 이름 문자열 (해당되지 않거나 실패 시 빈 문자열)
 //***************************************************************************
-void CCpuInfo::GetOldIntelName()
+_tstring CCpuInfo::GetOldIntelName() const
 {
-	BOOL	bIsCeleron = false;
-	BOOL	bIsXeon = false;
-	int		nFamily = 0;
-	int		nModel = 0;
-	TCHAR	tszCpuName[CPU_GENNAME_STRLEN];
+	DWORD dwHighest = 0;
+	GetHighestCpuId(dwHighest); // 변경된 시그니처(DWORD& 파라미터)에 맞게 호출
 
-	struct brand_entry
+	if( dwHighest >= NAMESTRING_FEATURE )
 	{
-		long	lBrandValue;
-		const TCHAR* pszBrand;
-	};
-
-	struct brand_entry brand_table[BRANDTABLESIZE] =
-	{
-		1, _T("Genuine Intel Celeron(TM) processor"),
-		2, _T("Genuine Intel Pentium(R) III processor"),
-		3, _T("Genuine Intel Pentium(R) III Xeon(TM) processor"),
-		8, _T("Genuine Intel Pentium(R) 4 processor")
-	};
-
-	tszCpuName[0] = '\0';
-	if( GetHighestCpuId() < NAMESTRING_FEATURE )
-	{
-		nFamily = (m_dwSignature >> 8) & 0xF;
-		nModel = (m_dwSignature >> 4) & 0xF;
-
-		switch( nFamily )
-		{
-		case 4:		// 486
-			switch( nModel )
-			{
-			case 0:
-			case 1:
-				_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel486(TM) DX processor"));
-				break;
-			case 2:
-				_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel486(TM) SX processor"));
-				break;
-			case 3:
-				_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("IntelDX2(TM) processor"));
-				break;
-			case 4:
-				_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel486(TM) processor"));
-				break;
-			case 5:
-				_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("IntelSX2(TM) processor"));
-				break;
-			case 7:
-				_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Writeback Enhanced IntelDX2(TM) processor"));
-				break;
-			case 8:
-				_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("IntelDX4(TM) processor"));
-				break;
-			default:
-				_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel 486 processor"));
-				break;
-			}
-			break;
-		case 5:		// pentium
-			_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel Pentium(R) processor"));
-			break;
-		case 6:		// pentium II and family
-			switch( nModel )
-			{
-			case 1:
-				_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel Pentium(R) Pro processor"));
-				break;
-			case 3:
-				_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel Pentium(R) II processor, model 3"));
-				break;
-			case 5:
-			case 7:
-				bIsCeleron = false;
-				bIsXeon = false;
-
-				GetCeleronAndXeon(m_dwSignature, &bIsCeleron, &bIsXeon, true);
-				GetCeleronAndXeon(m_dwFeatureEbx, &bIsCeleron, &bIsXeon);
-				GetCeleronAndXeon(m_dwFeatureEcx, &bIsCeleron, &bIsXeon);
-				GetCeleronAndXeon(m_dwFeatures, &bIsCeleron, &bIsXeon);
-
-				if( bIsCeleron )
-				{
-					_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel Celeron(TM) processor, model 5"));
-				}
-				else
-				{
-					if( bIsXeon )
-					{
-						if( nModel == 5 )
-						{
-							_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel Pentium(R) II Xeon(TM) processor"));
-						}
-						else
-						{
-							_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel Pentium(R) III Xeon(TM) processor"));
-						}
-					}
-					else
-					{
-						if( nModel == 5 )
-						{
-							_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel Pentium(R) II processor, model 5"));
-						}
-						else
-						{
-							_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel Pentium(R) III processor"));
-						}
-					}
-				}
-				break;
-			case 6:
-				_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel Celeron(TM) processor, model 6"));
-				break;
-			case 8:
-				_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Intel Pentium(R) III Coppermine processor"));
-				break;
-			default:
-			{
-				int nBrandIndex = 0;
-
-				while( (nBrandIndex < BRANDTABLESIZE) && ((long)(m_dwFeatureEbx & 0xff) != brand_table[nBrandIndex].lBrandValue) )
-				{
-					nBrandIndex++;
-				}
-
-				if( nBrandIndex < BRANDTABLESIZE )
-				{
-					_tcscpy_s(tszCpuName, _countof(tszCpuName), brand_table[nBrandIndex].pszBrand);
-				}
-				else
-				{
-					_tcscpy_s(tszCpuName, _countof(tszCpuName), _T("Unknown Genuine Intel processor"));
-				}
-				break;
-			}
-			}
-		}
-
-		if( (m_dwSignature & MMX_FLAG) == MMX_FLAG )
-		{
-			if( tszCpuName && _tcslen(tszCpuName) > 0 )
-				_stprintf_s(m_Cpu.m_tszProcessorName, _countof(m_Cpu.m_tszProcessorName), _T("%s with MMX"), tszCpuName);
-			else m_Cpu.m_tszProcessorName[0] = '\0';
-		}
+		return _T("");
 	}
+
+	const int nFamily = (m_dwSignature >> 8) & 0xF;
+	const int nModel = (m_dwSignature >> 4) & 0xF;
+	_tstring strCpuName;
+
+	switch( nFamily )
+	{
+	case 4: // 486 Series
+		switch( nModel )
+		{
+		case 0:
+		case 1:  strCpuName = _T("Intel486(TM) DX processor"); break;
+		case 2:  strCpuName = _T("Intel486(TM) SX processor"); break;
+		case 3:  strCpuName = _T("IntelDX2(TM) processor"); break;
+		case 4:  strCpuName = _T("Intel486(TM) processor"); break;
+		case 5:  strCpuName = _T("IntelSX2(TM) processor"); break;
+		case 7:  strCpuName = _T("Writeback Enhanced IntelDX2(TM) processor"); break;
+		case 8:  strCpuName = _T("IntelDX4(TM) processor"); break;
+		default: strCpuName = _T("Intel 486 processor"); break;
+		}
+		break;
+
+	case 5: // Pentium Series
+		strCpuName = _T("Intel Pentium(R) processor");
+		break;
+
+	case 6: // Pentium II / III / Pro / Celeron / Xeon Series
+		switch( nModel )
+		{
+		case 1:
+			strCpuName = _T("Intel Pentium(R) Pro processor");
+			break;
+		case 3:
+			strCpuName = _T("Intel Pentium(R) II processor, model 3");
+			break;
+		case 5:
+		case 7:
+		{
+			BOOL bIsCeleron = false;
+			BOOL bIsXeon = false;
+
+			GetCeleronAndXeon(m_dwSignature, &bIsCeleron, &bIsXeon, true);
+			GetCeleronAndXeon(m_dwFeatureEbx, &bIsCeleron, &bIsXeon);
+			GetCeleronAndXeon(m_dwFeatureEcx, &bIsCeleron, &bIsXeon);
+			GetCeleronAndXeon(m_dwFeatures, &bIsCeleron, &bIsXeon);
+
+			if( bIsCeleron )
+			{
+				strCpuName = _T("Intel Celeron(TM) processor, model 5");
+			}
+			else if( bIsXeon )
+			{
+				strCpuName = (nModel == 5) ? _T("Intel Pentium(R) II Xeon(TM) processor")
+					: _T("Intel Pentium(R) III Xeon(TM) processor");
+			}
+			else
+			{
+				strCpuName = (nModel == 5) ? _T("Intel Pentium(R) II processor, model 5")
+					: _T("Intel Pentium(R) III processor");
+			}
+		}
+		break;
+		case 6:
+			strCpuName = _T("Intel Celeron(TM) processor, model 6");
+			break;
+		case 8:
+			strCpuName = _T("Intel Pentium(R) III Coppermine processor");
+			break;
+		default:
+		{
+			struct brand_entry
+			{
+				long lBrandValue;
+				const TCHAR* pszBrand;
+			};
+
+			static const brand_entry brand_table[BRANDTABLESIZE] = {
+				{ 1, _T("Genuine Intel Celeron(TM) processor") },
+				{ 2, _T("Genuine Intel Pentium(R) III processor") },
+				{ 3, _T("Genuine Intel Pentium(R) III Xeon(TM) processor") },
+				{ 8, _T("Genuine Intel Pentium(R) 4 processor") }
+			};
+
+			const long lBrandVal = static_cast<long>(m_dwFeatureEbx & 0xFF);
+			bool bFound = false;
+
+			for( int i = 0; i < BRANDTABLESIZE; ++i )
+			{
+				if( lBrandVal == brand_table[i].lBrandValue )
+				{
+					strCpuName = brand_table[i].pszBrand;
+					bFound = true;
+					break;
+				}
+			}
+
+			if( !bFound )
+			{
+				strCpuName = _T("Unknown Genuine Intel processor");
+			}
+		}
+		break;
+		}
+		break;
+
+	default:
+		return _T("");
+	}
+
+	if( !strCpuName.empty() && ((m_dwSignature & MMX_FLAG) == MMX_FLAG) )
+	{
+		strCpuName += _T(" with MMX");
+	}
+
+	return strCpuName;
 }
 
 //***************************************************************************
@@ -486,7 +494,7 @@ void CCpuInfo::GetOldIntelName()
 // @param pbIsXeon Xeon 판별 결과를 저장할 포인터
 // @param bIsEax EAX 레지스터 여부 (기본값: false)
 //***************************************************************************
-void CCpuInfo::GetCeleronAndXeon(DWORD dwRegisterCache, BOOL* pbIsCeleron, BOOL* pbIsXeon, BOOL bIsEax)
+void CCpuInfo::GetCeleronAndXeon(DWORD dwRegisterCache, BOOL* pbIsCeleron, BOOL* pbIsXeon, BOOL bIsEax) const
 {
 	DWORD dwCacheTemp;
 
@@ -666,7 +674,7 @@ __int64 CCpuInfo::GetCpuSpeedFromRegistry() const
 //***************************************************************************
 __int64 CCpuInfo::GetTimeStamp() const
 {
-	return __rdtsc();
+	return cpu_read_tsc();
 }
 
 //***************************************************************************

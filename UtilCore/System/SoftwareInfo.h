@@ -10,11 +10,11 @@
 #include <vector>
 
 #ifndef __SYSTEMBASEDEFINE_H__
-#include <SystemBaseDefine.h>
+#include <System/SystemBaseDefine.h>
 #endif
 
 #ifndef __OSINFO_H__
-#include <OsInfo.h>
+#include <System/OsInfo.h>
 #endif
 
 BOOL GetVersionLangOfFile(TCHAR* ptszAppName, TCHAR* ptszVersion, TCHAR* ptszLanguage);

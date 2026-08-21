@@ -1,4 +1,5 @@
-﻿//***************************************************************************
+﻿
+//***************************************************************************
 // Wmi.h: interface for the CWmi class.
 //
 //***************************************************************************
@@ -44,7 +45,7 @@ public:
 		if( !pwszName ) return FALSE;
 
 #ifdef _UNICODE
-		_tcscpy_s(m_tszName, _countof(m_tszName), pwszName);
+		_tcsncpy_s(m_tszName, _countof(m_tszName), pwszName, _TRUNCATE);
 #else
 		std::string strAnsi = UnicodeToAnsi(pwszName);
 		strcpy_s(m_tszName, _countof(m_tszName), strAnsi.c_str());
@@ -72,13 +73,39 @@ public:
 	~CWmi();
 
 	//***************************************************************************
-	// @brief WMI 서비스에 연결합니다.
+	// @brief WMI 서비스에 연결합니다. 이미 연결되어 있던 경우 기존 연결을 먼저 해제합니다.
 	// @param ptszHost 접속할 호스트명 또는 IP 주소 (NULL일 경우 로컬 컴퓨터)
-	// @param ptszUserName 접속할 사용자 계정명 (NULL일 경우 현재 사용자)
-	// @param ptszUserPass 접속할 사용자 비밀번호 (NULL일 경우 현재 사용자)
-	// @return 성공 시 TRUE, 실패 시 FALSE
+	// @param ptszUserName 접속할 사용자 계정명 (NULL일 경우 현재 사용자 보안 컨텍스트)
+	// @param ptszUserPass 접속할 사용자 비밀번호 (NULL일 경우 현재 사용자 보안 컨텍스트)
+	// @return 성공 시 TRUE, 실패 시 FALSE. 실패 원인은 GetLastResult()로 확인 가능합니다.
+	// @note   세 파라미터는 서로 독립적으로 NULL을 허용합니다(예: 호스트만 지정하고
+	//         자격증명은 생략해 현재 사용자로 원격 접속 시도 가능).
 	//***************************************************************************
 	BOOL	Connect(TCHAR* ptszHost = NULL, TCHAR* ptszUserName = NULL, TCHAR* ptszUserPass = NULL);
+
+	//***************************************************************************
+	// @brief 현재 연결을 해제하고 보유 중인 모든 WMI 인터페이스/결과 오브젝트를 정리합니다.
+	// @return void
+	// @note   연결되어 있지 않은 상태에서 호출해도 안전합니다(idempotent). 소멸자에서도 호출됩니다.
+	//***************************************************************************
+	void	Disconnect();
+
+	//***************************************************************************
+	// @brief 현재 WMI 서비스에 연결되어 있는지 여부를 반환합니다.
+	// @return BOOL 연결되어 있으면 TRUE
+	//***************************************************************************
+	BOOL	IsConnected() const {
+		return m_pIWbemServices != NULL;
+	}
+
+	//***************************************************************************
+	// @brief 가장 최근에 수행된 Connect/ExecQuery/GetProperties 호출의 HRESULT를 반환합니다.
+	// @return HRESULT 마지막 연산 결과 (성공 시 SUCCEEDED(hr) == TRUE)
+	// @details BOOL 반환값만으로는 알 수 없는 실패 원인을 진단할 때 사용합니다.
+	//***************************************************************************
+	HRESULT	GetLastResult() const {
+		return m_hrLastError;
+	}
 
 	//***************************************************************************
 	// @brief WQL 쿼리를 실행하여 WMI 오브젝트 목록을 수집합니다.
@@ -88,11 +115,23 @@ public:
 	int		ExecQuery(const TCHAR* ptszQuery);
 
 	//***************************************************************************
+	// @brief 가장 최근 ExecQuery() 호출로 수집된 결과 오브젝트 개수를 반환합니다.
+	// @return size_t 결과 개수
+	//***************************************************************************
+	size_t	GetResultCount() const {
+		return m_vecClassObject.size();
+	}
+
+	//***************************************************************************
 	// @brief 특정 인덱스의 오브젝트에서 속성 값을 VARIANT 형태로 가져옵니다.
 	// @param nIndex 오브젝트 인덱스 (0-based)
 	// @param ptszProperty 가져올 속성명
 	// @param vtVal 결과를 전달받을 VARIANT 참조
 	// @return 성공 시 TRUE, 실패 시 FALSE
+	// @note   vtVal은 호출 전 반드시 VariantInit() 되어 있어야 합니다(예: CVariantGuard 사용).
+	//         이 함수는 vtVal을 초기화하거나 정리(VariantClear)하지 않습니다 — 이미 값이
+	//         담긴 VARIANT를 재사용하면 리소스가 누수될 수 있으므로, 속성마다 새 VARIANT를
+	//         사용하십시오.
 	//***************************************************************************
 	BOOL	GetProperties(int nIndex, const TCHAR* ptszProperty, VARIANT& vtVal);
 
@@ -120,6 +159,8 @@ private:
 	CComPtr<IWbemServices> m_pIWbemServices;					// WMI Services 인터페이스 포인터
 
 	std::vector<CComPtr<IWbemClassObject>> m_vecClassObject;	// 조회된 WMI 오브젝트 컨테이너
+
+	HRESULT m_hrLastError;										// 가장 최근 연산의 HRESULT (진단용)
 };
 
 #endif // ndef __WMI_H__

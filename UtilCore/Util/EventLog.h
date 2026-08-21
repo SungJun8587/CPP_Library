@@ -62,4 +62,4 @@ private:
 	size_t			  m_nCount;
 };
 
-#endif //__EVENTLOG_H__
+#endif // ndef __EVENTLOG_H__

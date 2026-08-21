@@ -4,7 +4,8 @@
 
 #pragma once
 
-#define WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN		// 자주 사용하지 않는 API의 일부를 제외하여 Win32 헤더 파일의 크기를 줄이기 위해 설정(빌드 시간 단축 목적)
+#define _HAS_STD_BYTE 0			// c++17 옵션을 활성화 시 std::byte 를 비활성 하는 옵션
 
 #include <windows.h>
 #include <process.h>
@@ -51,6 +52,7 @@ using namespace std;
 #include <Util/BaseFile.h>
 #include <Util/EventLog.h>
 #include <Util/Log.h>
+#include <Util/ConsoleUtil.h>
 
 #include <Memory/RawAllocator.h>
 #include <Memory/Allocator.h>
@@ -121,6 +123,17 @@ using namespace std;
 #include <Util/BufferReader.h>
 #include <Util/BufferWriter.h>
 #include <Util/TypeCast.h>
+
+#include <System/SystemBaseDefine.h>
+#include <System/PDHPerformanceObject.h>
+#include <System/CrashDumpHandler.h>
+#include <System/CpuInfo.h>
+#include <System/BoardInfo.h>
+#include <System/PciInfo.h>
+#include <System/Wmi.h>
+#include <System/HardwareInfo.h>
+#include <System/OsInfo.h>
+#include <System/SoftwareInfo.h>
 
 #include <Excel/XlntUtil.h>
 

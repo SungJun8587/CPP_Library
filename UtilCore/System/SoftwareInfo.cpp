@@ -1,4 +1,5 @@
-﻿//***************************************************************************
+﻿
+//***************************************************************************
 // SoftwareInfo.cpp: implementation of the Software Information Class.
 //
 //***************************************************************************
@@ -36,13 +37,16 @@ BOOL GetVersionLangOfFile(TCHAR* ptszAppName, TCHAR* ptszVersion, TCHAR* ptszLan
 			{
 				if( VerQueryValue(pbInfBuff, _T("\\VarFileInfo\\Translation"), (void**)(&pdwLangChar), &uSize) )
 				{
-					if( VerLanguageName(LOWORD(*pdwLangChar), tszResource, sizeof(tszResource)) )
-						_tcscpy_s(ptszLanguage, MAX_BUFFER_SIZE, tszResource);
+					// [수정] VerLanguageName의 3번째 인자(cchLangName)는 문자 개수를 요구합니다.
+					// sizeof(tszResource)(바이트)를 넘기면 UNICODE 빌드에서 실제 버퍼 크기의
+					// 2배 값이 전달되어 오버플로우 위험이 있습니다.
+					if( VerLanguageName(LOWORD(*pdwLangChar), tszResource, _countof(tszResource)) )
+						_tcsncpy_s(ptszLanguage, MAX_BUFFER_SIZE, tszResource, _TRUNCATE);
 
 					_stprintf_s(tszResource, _countof(tszResource), _T("\\StringFileInfo\\%04X%04X\\FileVersion"), LOWORD(*pdwLangChar), HIWORD(*pdwLangChar));
 
 					if( VerQueryValue(pbInfBuff, tszResource, (void**)(&ptszTempVersion), &uSize) )
-						_tcscpy_s(ptszVersion, MAX_BUFFER_SIZE, ptszTempVersion);
+						_tcsncpy_s(ptszVersion, MAX_BUFFER_SIZE, ptszTempVersion, _TRUNCATE);
 
 					bResult = true;
 				}
@@ -86,6 +90,13 @@ BOOL CIeInfo::GetInformation()
 
 	HKEY	hKeyIE;
 
+	// [수정] RegOpenKeyEx가 실패해 아래 두 분기의 내부 if 블록이 전혀 실행되지 않는
+	// 경우(레지스트리 키가 없는 시스템 등), tszBuild/tszVersion이 초기화되지 않은
+	// 채로 이후 _tcsncpy_s(m_Ie...)에 그대로 복사되던 버그를 방지하기 위해
+	// 분기 진입 전에 기본값으로 초기화합니다.
+	_tcsncpy_s(tszBuild, _countof(tszBuild), _T("UnKnown"), _TRUNCATE);
+	_tcsncpy_s(tszVersion, _countof(tszVersion), _T("UnKnown"), _TRUNCATE);
+
 	if( IsWindowVersion(-1, -1, VER_PLATFORM_WIN32_WINDOWS) )
 	{
 		_stprintf_s(tszSubKey, _countof(tszSubKey), _T("%s\\%s"), WIN_MICROSOFT_KEY, WIN_IE_KEY);
@@ -99,8 +110,11 @@ BOOL CIeInfo::GetInformation()
 			tszBuild[0] = '\0';
 
 			lRetCode = RegQueryValueEx(hKeyIE, WIN_IE_BUILD_NAME, NULL, &dwNameLen, (LPBYTE)tszBuild, &dwValueLen);
-			if( !((lRetCode != ERROR_SUCCESS) || (dwValueLen > REGISTRY_VALUE_STRLEN)) )
-				_tcscpy_s(tszBuild, _countof(tszBuild), _T("UnKnown"));
+			// [수정] 기존 조건 `!((lRetCode != ERROR_SUCCESS) || (dwValueLen > REGISTRY_VALUE_STRLEN))`은
+			// 드모르간 전개 시 "성공 && 길이정상"일 때 "UnKnown"으로 덮어쓰는 반대 논리였습니다.
+			// 아래 NT 분기와 동일하게 "실패 시에만" UnKnown으로 대체하도록 부정(!)을 제거했습니다.
+			if( (lRetCode != ERROR_SUCCESS) || (dwValueLen > REGISTRY_VALUE_STRLEN) )
+				_tcsncpy_s(tszBuild, _countof(tszBuild), _T("UnKnown"), _TRUNCATE);
 
 			dwNameLen = sizeof(WIN_IE_VERSION_NAME);
 			dwValueLen = sizeof(tszVersion);
@@ -108,8 +122,11 @@ BOOL CIeInfo::GetInformation()
 			tszVersion[0] = '\0';
 
 			lRetCode = RegQueryValueEx(hKeyIE, WIN_IE_VERSION_NAME, NULL, &dwNameLen, (LPBYTE)tszVersion, &dwValueLen);
-			if( !((lRetCode != ERROR_SUCCESS) || (dwValueLen > REGISTRY_VALUE_STRLEN)) )
-				_tcscpy_s(tszVersion, _countof(tszVersion), _T("UnKnown"));
+			if( (lRetCode != ERROR_SUCCESS) || (dwValueLen > REGISTRY_VALUE_STRLEN) )
+				_tcsncpy_s(tszVersion, _countof(tszVersion), _T("UnKnown"), _TRUNCATE);
+
+			// [수정] 기존에는 이 분기에서 hKeyIE를 닫는 코드가 아예 없어 핸들이 누수되었습니다.
+			RegCloseKey(hKeyIE);
 		}
 	}
 	else if( IsWindowVersion(-1, -1, VER_PLATFORM_WIN32_NT) )
@@ -126,7 +143,7 @@ BOOL CIeInfo::GetInformation()
 
 			lRetCode = RegQueryValueEx(hKeyIE, NT_IE_BUILD_NAME, NULL, &dwNameLen, (LPBYTE)tszBuild, &dwValueLen);
 			if( (lRetCode != ERROR_SUCCESS) || (dwValueLen > REGISTRY_VALUE_STRLEN) )
-				_tcscpy_s(tszBuild, _countof(tszBuild), _T("UnKnown"));
+				_tcsncpy_s(tszBuild, _countof(tszBuild), _T("UnKnown"), _TRUNCATE);
 
 			dwNameLen = sizeof(NT_IE_VERSION_NAME);
 			dwValueLen = sizeof(tszVersion);
@@ -135,19 +152,21 @@ BOOL CIeInfo::GetInformation()
 
 			lRetCode = RegQueryValueEx(hKeyIE, NT_IE_VERSION_NAME, NULL, &dwNameLen, (LPBYTE)tszVersion, &dwValueLen);
 			if( (lRetCode != ERROR_SUCCESS) || (dwValueLen > REGISTRY_VALUE_STRLEN) )
-				_tcscpy_s(tszVersion, _countof(tszVersion), _T("UnKnown"));
-		}
+				_tcsncpy_s(tszVersion, _countof(tszVersion), _T("UnKnown"), _TRUNCATE);
 
-		RegCloseKey(hKeyIE);
+			// [수정] RegOpenKeyEx 실패 시(else) hKeyIE가 초기화되지 않은 채 RegCloseKey에
+			// 전달되던 버그를 막기 위해, 성공한 경우에만 닫도록 스코프를 좁혔습니다.
+			RegCloseKey(hKeyIE);
+		}
 	}
 	else
 	{
-		_tcscpy_s(tszBuild, _countof(tszBuild), _T("UnKnown"));
-		_tcscpy_s(tszVersion, _countof(tszVersion), _T("UnKnown"));
+		_tcsncpy_s(tszBuild, _countof(tszBuild), _T("UnKnown"), _TRUNCATE);
+		_tcsncpy_s(tszVersion, _countof(tszVersion), _T("UnKnown"), _TRUNCATE);
 	}
 
-	_tcscpy_s(m_Ie.m_tszBuild, _countof(m_Ie.m_tszBuild), tszBuild);
-	_tcscpy_s(m_Ie.m_tszVersion, _countof(m_Ie.m_tszVersion), tszVersion);
+	_tcsncpy_s(m_Ie.m_tszBuild, _countof(m_Ie.m_tszBuild), tszBuild, _TRUNCATE);
+	_tcsncpy_s(m_Ie.m_tszVersion, _countof(m_Ie.m_tszVersion), tszVersion, _TRUNCATE);
 
 	return true;
 }
@@ -185,6 +204,12 @@ BOOL CDirectXInfo::GetInformation()
 
 	HKEY	hKeyDirectX;
 
+	// [수정] RegOpenKeyEx가 실패해 두 분기의 내부 if 블록이 전혀 실행되지 않는 경우
+	// tszVersion/tszInstallVersion이 초기화되지 않은 채로 이후 _tcscmp/_tcscpy_s에
+	// 사용되던 버그를 방지하기 위해 분기 진입 전에 기본값으로 초기화합니다.
+	tszVersion[0] = '\0';
+	_tcsncpy_s(tszInstallVersion, _countof(tszInstallVersion), _T("UnKnown"), _TRUNCATE);
+
 	if( IsWindowVersion(-1, -1, VER_PLATFORM_WIN32_WINDOWS) )
 	{
 		_stprintf_s(tszSubKey, _countof(tszSubKey), _T("%s\\%s"), WIN_MICROSOFT_KEY, WIN_DIRECTX_KEY);
@@ -203,17 +228,19 @@ BOOL CDirectXInfo::GetInformation()
 					LOBYTE(HIWORD(qwInstallVersion)),
 					HIBYTE(HIWORD(qwInstallVersion)));
 			}
-			else _tcscpy_s(tszInstallVersion, _countof(tszInstallVersion), _T("UnKnown"));
+			else _tcsncpy_s(tszInstallVersion, _countof(tszInstallVersion), _T("UnKnown"), _TRUNCATE);
 
 			dwNameLen = sizeof(WIN_DIRECTX_VERSION_NAME);
 			dwValueLen = sizeof(tszVersion);
 
 			lRetCode = RegQueryValueEx(hKeyDirectX, WIN_DIRECTX_VERSION_NAME, NULL, &dwNameLen, (LPBYTE)tszVersion, &dwValueLen);
 			if( (lRetCode != ERROR_SUCCESS) || (dwValueLen > REGISTRY_VALUE_STRLEN) )
-				_tcscpy_s(tszVersion, _countof(tszVersion), _T("UnKnown"));
-		}
+				_tcsncpy_s(tszVersion, _countof(tszVersion), _T("UnKnown"), _TRUNCATE);
 
-		RegCloseKey(hKeyDirectX);
+			// [수정] RegOpenKeyEx 실패 시 초기화되지 않은 hKeyDirectX가 RegCloseKey에
+			// 전달되던 버그를 막기 위해 성공한 경우에만 닫도록 스코프를 좁혔습니다.
+			RegCloseKey(hKeyDirectX);
+		}
 	}
 	else if( IsWindowVersion(-1, -1, VER_PLATFORM_WIN32_NT) )
 	{
@@ -225,7 +252,9 @@ BOOL CDirectXInfo::GetInformation()
 			dwNameLen = sizeof(NT_DIRECTX_INSTALLVER_NAME);
 			dwValueLen = sizeof(qwInstallVersion);
 
-			lRetCode = RegQueryValueEx(hKeyDirectX, WIN_DIRECTX_INSTALLVER_NAME, NULL, &dwNameLen, (LPBYTE)&qwInstallVersion, &dwValueLen);
+			// [수정] NT 분기인데 WIN(9x)용 상수 WIN_DIRECTX_INSTALLVER_NAME을 조회하던
+			// 복사-붙여넣기 실수를 NT_DIRECTX_INSTALLVER_NAME으로 바로잡았습니다.
+			lRetCode = RegQueryValueEx(hKeyDirectX, NT_DIRECTX_INSTALLVER_NAME, NULL, &dwNameLen, (LPBYTE)&qwInstallVersion, &dwValueLen);
 			if( lRetCode == ERROR_SUCCESS )
 			{
 				_stprintf_s(tszInstallVersion, _countof(tszInstallVersion), _T("%d.%d.%d.%d"), LOBYTE(LOWORD(qwInstallVersion)),
@@ -233,44 +262,44 @@ BOOL CDirectXInfo::GetInformation()
 					LOBYTE(HIWORD(qwInstallVersion)),
 					HIBYTE(HIWORD(qwInstallVersion)));
 			}
-			else _tcscpy_s(tszInstallVersion, _countof(tszInstallVersion), _T("UnKnown"));
+			else _tcsncpy_s(tszInstallVersion, _countof(tszInstallVersion), _T("UnKnown"), _TRUNCATE);
 
 			dwNameLen = sizeof(NT_DIRECTX_VERSION_NAME);
 			dwValueLen = sizeof(tszVersion);
 
 			lRetCode = RegQueryValueEx(hKeyDirectX, NT_DIRECTX_VERSION_NAME, NULL, &dwNameLen, (LPBYTE)tszVersion, &dwValueLen);
 			if( (lRetCode != ERROR_SUCCESS) || (dwValueLen > REGISTRY_VALUE_STRLEN) )
-				_tcscpy_s(tszVersion, _countof(tszVersion), _T("UnKnown"));
-		}
+				_tcsncpy_s(tszVersion, _countof(tszVersion), _T("UnKnown"), _TRUNCATE);
 
-		RegCloseKey(hKeyDirectX);
+			RegCloseKey(hKeyDirectX);
+		}
 	}
 
 	tszDescription[0] = '\0';
 	if( _tcscmp(tszVersion, _T("4.09.00.0900")) == 0 )
-		_tcscpy_s(tszDescription, _countof(tszDescription), _T("DirectX 9.0"));
+		_tcsncpy_s(tszDescription, _countof(tszDescription), _T("DirectX 9.0"), _TRUNCATE);
 	else if( _tcscmp(tszVersion, _T("4.09.00.0901")) == 0 )
-		_tcscpy_s(tszDescription, _countof(tszDescription), _T("DirectX 9.0a"));
+		_tcsncpy_s(tszDescription, _countof(tszDescription), _T("DirectX 9.0a"), _TRUNCATE);
 	else if( _tcscmp(tszVersion, _T("4.09.00.0902")) == 0 )
-		_tcscpy_s(tszDescription, _countof(tszDescription), _T("DirectX 9.0b"));
+		_tcsncpy_s(tszDescription, _countof(tszDescription), _T("DirectX 9.0b"), _TRUNCATE);
 	else if( _tcscmp(tszVersion, _T("4.09.00.0903")) == 0 )
-		_tcscpy_s(tszDescription, _countof(tszDescription), _T("DirectX 9.0c"));
+		_tcsncpy_s(tszDescription, _countof(tszDescription), _T("DirectX 9.0c"), _TRUNCATE);
 	else if( _tcscmp(tszVersion, _T("4.09.00.0904")) == 0 )
 	{
 		if( IsWindowVersion(-1, -1, VER_PLATFORM_WIN32_NT) )
 		{
 			if( IsWindowVersion(5, -1, -1) )
-				_tcscpy_s(tszDescription, _countof(tszDescription), _T("DirectX 9.0c"));
+				_tcsncpy_s(tszDescription, _countof(tszDescription), _T("DirectX 9.0c"), _TRUNCATE);
 			else if( IsWindowVersion(6, 0, -1) )
-				_tcscpy_s(tszDescription, _countof(tszDescription), _T("DirectX 10"));
+				_tcsncpy_s(tszDescription, _countof(tszDescription), _T("DirectX 10"), _TRUNCATE);
 			else if( IsWindowVersion(6, 1, -1) )
-				_tcscpy_s(tszDescription, _countof(tszDescription), _T("DirectX 11"));
+				_tcsncpy_s(tszDescription, _countof(tszDescription), _T("DirectX 11"), _TRUNCATE);
 		}
 	}
 
-	_tcscpy_s(m_DirectX.m_tszVersion, _countof(m_DirectX.m_tszVersion), tszVersion);
-	_tcscpy_s(m_DirectX.m_tszInstallVersion, _countof(m_DirectX.m_tszInstallVersion), tszInstallVersion);
-	_tcscpy_s(m_DirectX.m_tszDescription, _countof(m_DirectX.m_tszDescription), tszDescription);
+	_tcsncpy_s(m_DirectX.m_tszVersion, _countof(m_DirectX.m_tszVersion), tszVersion, _TRUNCATE);
+	_tcsncpy_s(m_DirectX.m_tszInstallVersion, _countof(m_DirectX.m_tszInstallVersion), tszInstallVersion, _TRUNCATE);
+	_tcsncpy_s(m_DirectX.m_tszDescription, _countof(m_DirectX.m_tszDescription), tszDescription, _TRUNCATE);
 
 	return true;
 }
@@ -331,15 +360,21 @@ BOOL CJavaVMInfo::GetInformation()
 			lRetCode = RegQueryValueEx(hKeyJavaVm, WIN_MS_JAVAVM_RUNTIMELIB_NAME, NULL, &dwNameLen, (LPBYTE)tszMsJVMRuntimeLibPath, &dwValueLen);
 			if( !((lRetCode != ERROR_SUCCESS) || (dwValueLen > REGISTRY_VALUE_STRLEN)) )
 				bIsMCompany = true;
+
+			// [수정] RegOpenKeyEx 실패 시 초기화되지 않은 hKeyJavaVm이 RegCloseKey에
+			// 전달되던 버그를 막기 위해 성공한 경우에만 닫도록 스코프를 좁혔습니다.
+			RegCloseKey(hKeyJavaVm);
 		}
-		RegCloseKey(hKeyJavaVm);
 
 		_stprintf_s(tszSubKey, _countof(tszSubKey), _T("%s"), WIN_SUN_JAVAVM_JRE_KEY);
 
 		lRetCode = RegOpenKeyEx(HKEY_LOCAL_MACHINE, tszSubKey, 0, KEY_READ, &hKeyEnum);
 		if( lRetCode == ERROR_SUCCESS )
 		{
-			dwNameLen = sizeof(tszGroupName);
+			// [수정] RegEnumKeyEx의 lpcchName은 문자 개수를 요구합니다. sizeof()(바이트)를
+			// 넘기면 UNICODE 빌드에서 실제 버퍼보다 큰 크기를 알려주게 되어 오버플로우
+			// 위험이 있습니다.
+			dwNameLen = _countof(tszGroupName);
 
 			tszGroupName[0] = '\0';
 
@@ -360,7 +395,11 @@ BOOL CJavaVMInfo::GetInformation()
 					{
 						// Cannot read the class name
 						RegCloseKey(hKeyJavaVm);
-						dwNameLen = sizeof(tszGroupName);
+						// [수정] 기존에는 여기서 바로 continue하여 아래쪽의 dwIndexEnum++를
+						// 건너뛰었고, 그 결과 같은 서브키를 무한히 재열거하는 행 위험이
+						// 있었습니다. continue 전에 인덱스를 반드시 증가시킵니다.
+						dwIndexEnum++;
+						dwNameLen = _countof(tszGroupName);
 						continue;
 					}
 
@@ -369,10 +408,11 @@ BOOL CJavaVMInfo::GetInformation()
 				}
 
 				dwIndexEnum++;
-				dwNameLen = sizeof(tszGroupName);
+				dwNameLen = _countof(tszGroupName);
 			}
+
+			RegCloseKey(hKeyEnum);
 		}
-		RegCloseKey(hKeyEnum);
 	}
 	else if( IsWindowVersion(-1, -1, VER_PLATFORM_WIN32_NT) )
 	{
@@ -389,15 +429,16 @@ BOOL CJavaVMInfo::GetInformation()
 			lRetCode = RegQueryValueEx(hKeyJavaVm, NT_MS_JAVAVM_RUNTIMELIB_NAME, NULL, &dwNameLen, (LPBYTE)tszMsJVMRuntimeLibPath, &dwValueLen);
 			if( !((lRetCode != ERROR_SUCCESS) || (dwValueLen > REGISTRY_VALUE_STRLEN)) )
 				bIsMCompany = true;
+
+			RegCloseKey(hKeyJavaVm);
 		}
-		RegCloseKey(hKeyJavaVm);
 
 		_stprintf_s(tszSubKey, _countof(tszSubKey), _T("%s"), NT_SUN_JAVAVM_JRE_KEY);
 
 		lRetCode = RegOpenKeyEx(HKEY_LOCAL_MACHINE, tszSubKey, 0, KEY_READ, &hKeyEnum);
 		if( lRetCode == ERROR_SUCCESS )
 		{
-			dwNameLen = sizeof(tszGroupName);
+			dwNameLen = _countof(tszGroupName);
 
 			tszGroupName[0] = '\0';
 
@@ -418,7 +459,8 @@ BOOL CJavaVMInfo::GetInformation()
 					{
 						// Cannot read the class name
 						RegCloseKey(hKeyJavaVm);
-						dwNameLen = sizeof(tszGroupName);
+						dwIndexEnum++;
+						dwNameLen = _countof(tszGroupName);
 						continue;
 					}
 
@@ -427,10 +469,11 @@ BOOL CJavaVMInfo::GetInformation()
 				}
 
 				dwIndexEnum++;
-				dwNameLen = sizeof(tszGroupName);
+				dwNameLen = _countof(tszGroupName);
 			}
+
+			RegCloseKey(hKeyEnum);
 		}
-		RegCloseKey(hKeyEnum);
 	}
 	else
 	{
@@ -447,7 +490,10 @@ BOOL CJavaVMInfo::GetInformation()
 
 	if( bIsMCompany )
 	{
-		GetSystemDirectory(tszWindowSystemDir, sizeof(tszWindowSystemDir));
+		// [수정] GetSystemDirectory의 2번째 인자는 문자 개수를 요구합니다.
+		// 바로 아래 bIsSunCompany 블록은 이미 _countof()를 올바르게 쓰고 있어
+		// 비일관성이 뚜렷했습니다.
+		GetSystemDirectory(tszWindowSystemDir, _countof(tszWindowSystemDir));
 		_stprintf_s(tszMsJVMRuntimeLibPath, _countof(tszMsJVMRuntimeLibPath), _T("%s\\*.*"), tszWindowSystemDir);
 
 		hFindFile = FindFirstFile(tszMsJVMRuntimeLibPath, &FindData);
@@ -556,7 +602,7 @@ BOOL CJavaVMInfo::GetVersionMsJVM(TCHAR* ptszMsJVMVersion)
 	}
 	else
 	{
-		GetSystemDirectory(tszWindowSystemDir, sizeof(tszWindowSystemDir));
+		GetSystemDirectory(tszWindowSystemDir, _countof(tszWindowSystemDir));
 		_stprintf_s(tszRuntimeLibFilePath, _countof(tszRuntimeLibFilePath), _T("%s\\%s"), tszWindowSystemDir, tszRuntimeLibFileName);
 
 		if( GetVersionLangOfFile(tszRuntimeLibFilePath, tszVersion, tszLanguage) )
@@ -566,7 +612,7 @@ BOOL CJavaVMInfo::GetVersionMsJVM(TCHAR* ptszMsJVMVersion)
 				ptszMsJVMVersion[0] = '\0';
 				return false;
 			}
-			else _tcscpy_s(ptszMsJVMVersion, JAVAVM_VERSION_STRLEN, tszVersion);
+			else _tcsncpy_s(ptszMsJVMVersion, JAVAVM_VERSION_STRLEN, tszVersion, _TRUNCATE);
 		}
 		else
 		{
@@ -604,18 +650,21 @@ BOOL CJavaVMInfo::GetVersionSunJVM(TCHAR* ptszSunJVMVersion)
 		lRetCode = RegOpenKeyEx(HKEY_LOCAL_MACHINE, tszSubKey, 0, KEY_READ, &hKeyEnum);
 		if( lRetCode == ERROR_SUCCESS )
 		{
-			dwNameLen = sizeof(tszGroupName);
+			// [수정] RegEnumKeyEx의 lpcchName은 문자 개수 단위입니다.
+			dwNameLen = _countof(tszGroupName);
 
 			tszGroupName[0] = '\0';
 
 			while( (lRetCode = RegEnumKeyEx(hKeyEnum, dwIndexEnum, tszGroupName, &dwNameLen, 0, NULL, 0, &MyFileTime)) == ERROR_SUCCESS )
 			{
 				dwIndexEnum++;
-				dwNameLen = sizeof(tszGroupName);
+				dwNameLen = _countof(tszGroupName);
 			}
-		}
 
-		RegCloseKey(hKeyEnum);
+			// [수정] RegOpenKeyEx 실패 시 초기화되지 않은 hKeyEnum이 RegCloseKey에
+			// 전달되던 버그를 막기 위해 성공한 경우에만 닫도록 스코프를 좁혔습니다.
+			RegCloseKey(hKeyEnum);
+		}
 	}
 	else if( IsWindowVersion(-1, -1, VER_PLATFORM_WIN32_NT) )
 	{
@@ -624,18 +673,18 @@ BOOL CJavaVMInfo::GetVersionSunJVM(TCHAR* ptszSunJVMVersion)
 		lRetCode = RegOpenKeyEx(HKEY_LOCAL_MACHINE, tszSubKey, 0, KEY_READ, &hKeyEnum);
 		if( lRetCode == ERROR_SUCCESS )
 		{
-			dwNameLen = sizeof(tszGroupName);
+			dwNameLen = _countof(tszGroupName);
 
 			tszGroupName[0] = '\0';
 
 			while( (lRetCode = RegEnumKeyEx(hKeyEnum, dwIndexEnum, tszGroupName, &dwNameLen, 0, NULL, 0, &MyFileTime)) == ERROR_SUCCESS )
 			{
 				dwIndexEnum++;
-				dwNameLen = sizeof(tszGroupName);
+				dwNameLen = _countof(tszGroupName);
 			}
-		}
 
-		RegCloseKey(hKeyEnum);
+			RegCloseKey(hKeyEnum);
+		}
 	}
 	else
 	{
@@ -647,7 +696,7 @@ BOOL CJavaVMInfo::GetVersionSunJVM(TCHAR* ptszSunJVMVersion)
 		ptszSunJVMVersion[0] = '\0';
 		return false;
 	}
-	else _tcscpy_s(ptszSunJVMVersion, JAVAVM_VERSION_STRLEN, tszGroupName);
+	else _tcsncpy_s(ptszSunJVMVersion, JAVAVM_VERSION_STRLEN, tszGroupName, _TRUNCATE);
 
 	return true;
 }
@@ -716,7 +765,8 @@ BOOL CInstallSwInfo::GetInformation()
 	lRetCode = RegOpenKeyEx(HKEY_LOCAL_MACHINE, WIN_SOFTWARE_UNINSTALL_KEY, 0, KEY_READ, &hSubKey);
 	if( lRetCode == ERROR_SUCCESS )
 	{
-		dwNameLen = sizeof(tszSubKeyName);
+		// [수정] RegEnumKeyEx의 lpcchName은 문자 개수 단위입니다.
+		dwNameLen = _countof(tszSubKeyName);
 
 		tszSubKeyName[0] = '\0';
 
@@ -737,7 +787,8 @@ BOOL CInstallSwInfo::GetInformation()
 				{
 					while( dwPropValueNumber > dwPropValueCount )
 					{
-						dwNameLen = sizeof(tszSubKeyName);
+						// [수정] RegEnumValue의 lpcchValueName도 문자 개수 단위입니다.
+						dwNameLen = _countof(tszSubKeyName);
 						dwValueLen = sizeof(tszSubKeyValue);
 
 						tszSubKeyName[0] = '\0';
@@ -756,25 +807,31 @@ BOOL CInstallSwInfo::GetInformation()
 							{
 							case REG_BINARY:
 							{
+								// [수정] 기존에는 매 바이트마다 _stprintf_s(tszValue, "%s%c", tszValue, ...)로
+								// tszValue 전체를 다시 포맷팅하여 O(N^2) 성능이었고, 목적지와 소스가
+								// 같은 버퍼를 가리키는 sprintf 계열 호출은 표준상 정의되지 않은 동작입니다.
+								// 바이트를 순회하며 직접 문자를 덧붙이는 단일 패스 방식으로 교체합니다.
 								if( tszSubKeyValue && _tcslen(tszSubKeyValue) > 0 )
 								{
-									dwCount = 0;
-									while( dwCount < dwValueLen )
+									DWORD dwMaxCount = dwValueLen;
+									if( dwMaxCount >= _countof(tszValue) ) dwMaxCount = _countof(tszValue) - 1;
+
+									for( dwCount = 0; dwCount < dwMaxCount; dwCount++ )
 									{
-										_stprintf_s(tszValue, _countof(tszValue), _T("%s%c"), tszValue, *(tszSubKeyValue + dwCount));
-										dwCount++;
+										tszValue[dwCount] = *(tszSubKeyValue + dwCount);
 									}
+									tszValue[dwMaxCount] = _T('\0');
 								}
 								break;
 							}
 							case REG_SZ:
 							{
-								_tcscpy_s(tszValue, _countof(tszValue), tszSubKeyValue);
+								_tcsncpy_s(tszValue, _countof(tszValue), tszSubKeyValue, _TRUNCATE);
 								break;
 							}
 							case REG_MULTI_SZ:
 							{
-								_tcscpy_s(tszValue, _countof(tszValue), tszSubKeyValue);
+								_tcsncpy_s(tszValue, _countof(tszValue), tszSubKeyValue, _TRUNCATE);
 								break;
 							}
 							default:
@@ -783,13 +840,13 @@ BOOL CInstallSwInfo::GetInformation()
 						}
 
 						if( _tcscmp(tszSubKeyName, WIN_SOFTWARE_UNINSTALL_DISPLAYNAME_NAME) == 0 )
-							_tcscpy_s(tszDisplayName, _countof(tszDisplayName), tszValue);
+							_tcsncpy_s(tszDisplayName, _countof(tszDisplayName), tszValue, _TRUNCATE);
 
 						if( _tcscmp(tszSubKeyName, WIN_SOFTWARE_UNINSTALL_INSTALLSOURCE_NAME) == 0 )
-							_tcscpy_s(tszInstallSource, _countof(tszInstallSource), tszValue);
+							_tcsncpy_s(tszInstallSource, _countof(tszInstallSource), tszValue, _TRUNCATE);
 
 						if( _tcscmp(tszSubKeyName, WIN_SOFTWARE_UNINSTALL_UNINSTALLSTRING_NAME) == 0 )
-							_tcscpy_s(tszUninstallString, _countof(tszUninstallString), tszValue);
+							_tcsncpy_s(tszUninstallString, _countof(tszUninstallString), tszValue, _TRUNCATE);
 
 						dwPropValueCount++;
 					}
@@ -810,24 +867,38 @@ BOOL CInstallSwInfo::GetInformation()
 						{
 							pInstallSwInfo = new INSTALL_SWINFO;
 
-							_tcscpy_s(pInstallSwInfo->m_tszDisplayName, _countof(pInstallSwInfo->m_tszDisplayName), tszDisplayName);
-							_tcscpy_s(pInstallSwInfo->m_tszInstallSource, _countof(pInstallSwInfo->m_tszInstallSource), tszInstallSource);
-							_tcscpy_s(pInstallSwInfo->m_tszUninstallString, _countof(pInstallSwInfo->m_tszUninstallString), tszUninstallString);
+							_tcsncpy_s(pInstallSwInfo->m_tszDisplayName, _countof(pInstallSwInfo->m_tszDisplayName), tszDisplayName, _TRUNCATE);
+							_tcsncpy_s(pInstallSwInfo->m_tszInstallSource, _countof(pInstallSwInfo->m_tszInstallSource), tszInstallSource, _TRUNCATE);
+							_tcsncpy_s(pInstallSwInfo->m_tszUninstallString, _countof(pInstallSwInfo->m_tszUninstallString), tszUninstallString, _TRUNCATE);
 
 							m_sInstallSwInfoArray.push_back(pInstallSwInfo);
 						}
 					}
 				}
 
-				dwIndexEnum++;
-				dwNameLen = sizeof(tszSubKeyName);
+				// [수정] hKeyProperty는 이 while 반복마다 새로 열리므로, 기존처럼 루프 밖에서
+				// 단 한 번만 닫으면 마지막을 제외한 모든 반복에서 핸들이 누수됩니다.
+				// 사용이 끝나는 시점(반복마다)에 바로 닫습니다.
+				RegCloseKey(hKeyProperty);
 			}
+
+			// [수정] 기존에는 이 두 줄이 위쪽 "if( lRetCode == ERROR_SUCCESS )"(hKeyProperty open)
+			// 블록 안에만 있어서, 해당 하위 키의 RegOpenKeyEx가 실패하면(권한 문제 등)
+			// dwIndexEnum이 증가하지 않고 dwNameLen도 재설정되지 않아 같은 서브키를
+			// 무한히 재열거하는(RegEnumKeyEx 무한 루프) 행 위험이 있었습니다.
+			// 이제 매 바깥쪽 반복마다 항상 실행되도록 if 블록 밖으로 옮겼습니다.
+			dwIndexEnum++;
+			dwNameLen = _countof(tszSubKeyName);
 		}
 
-		RegCloseKey(hKeyProperty);
+		RegCloseKey(hSubKey);
 	}
-
-	RegCloseKey(hSubKey);
+	else
+	{
+		// [수정] 기존에는 hSubKey를 여는 데 실패해도 아래쪽의 RegCloseKey(hSubKey)가
+		// 도달하지 않아 문제는 없었지만(원본은 if 블록 밖에서 무조건 hSubKey를 닫았음),
+		// 구조를 명확히 하기 위해 실패 처리를 명시적으로 분리했습니다.
+	}
 
 	return true;
 }

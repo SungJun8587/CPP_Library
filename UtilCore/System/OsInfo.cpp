@@ -1,4 +1,5 @@
-﻿//***************************************************************************
+﻿
+//***************************************************************************
 // OsInfo.cpp: implementation of the COsInfo class.
 //
 //***************************************************************************
@@ -48,11 +49,18 @@ BOOL GetVersionOS(OSVERSIONINFOEX* os)
 		os->wProductType = osw->wProductType;
 		os->dwOSVersionInfoSize = sizeof(*os);
 
-		DWORD sz = sizeof(os->szCSDVersion);
+		// [수정] 미사용 변수였던 sz를 실제 변환 루프의 경계값으로 사용합니다.
+		// 원본 소스가 널 종료되지 않은 극단적인 경우에도 os->szCSDVersion 배열의
+		// 끝을 넘어 쓰지 않도록 방어합니다.
+		DWORD sz = _countof(os->szCSDVersion);
 		WCHAR* src = osw->szCSDVersion;
 		unsigned char* dtc = (unsigned char*)os->szCSDVersion;
-		while( *src )
+		DWORD nCopied = 0;
+		while( *src && nCopied < sz - 1 )
+		{
 			*dtc++ = (unsigned char)*src++;
+			nCopied++;
+		}
 		*dtc = '\0';
 #endif
 
@@ -109,23 +117,42 @@ BOOL IsWindowVersion(int nMajorVersion, int nMinorVersion, int nPlatformId)
 }
 
 //***************************************************************************
-// @brief COsInfo 클래스의 생성자로, OS 정보 및 시스템 정보를 초기화 및 감지합니다.
+// @brief COsInfo 클래스의 생성자입니다.
+// @detail 멤버 변수를 안전한 기본값으로 초기화만 합니다. 실제 OS 정보 감지는
+//         GetInformation()에서 수행합니다.
 //***************************************************************************
 COsInfo::COsInfo()
 {
-	BOOL bIsCanDetect = TRUE;
-	PGetNativeSystemInfo pGNSI = NULL;
-
 	m_bOsVersionInfoEx = FALSE;
 	m_nWinVersion = Windows;
 	m_nWinEdition = EditionUnknown;
 	m_tszDescription[0] = '\0';
 	m_tszServicePack[0] = '\0';
 
-	// Try calling GetVersionEx using the OSVERSIONINFOEX structure.
 	ZeroMemory(&m_Osvi, sizeof(OSVERSIONINFOEX));
 	m_Osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
 
+	ZeroMemory(&m_Sysi, sizeof(SYSTEM_INFO));
+}
+
+//***************************************************************************
+// @brief COsInfo 클래스의 소멸자입니다.
+//***************************************************************************
+COsInfo::~COsInfo()
+{
+
+}
+
+//***************************************************************************
+// @brief OS 버전, 에디션, 서비스팩 등 전체 OS 정보를 감지합니다.
+// @return BOOL 정보 수집 성공 여부 (TRUE: 성공, FALSE: 버전 정보 조회 실패)
+//***************************************************************************
+BOOL COsInfo::GetInformation()
+{
+	BOOL bIsCanDetect = TRUE;
+	PGetNativeSystemInfo pGNSI = NULL;
+
+	// Try calling GetVersionEx using the OSVERSIONINFOEX structure.
 	if( !(m_bOsVersionInfoEx = GetVersionOS(&m_Osvi)) )
 	{
 		bIsCanDetect = FALSE;
@@ -142,14 +169,67 @@ COsInfo::COsInfo()
 		DetectWindowsServicePack();
 		DetectDescription();
 	}
+
+	return bIsCanDetect;
 }
 
 //***************************************************************************
-// @brief COsInfo 클래스의 소멸자입니다.
+// @brief OS가 NT 플랫폼 계열인지 확인합니다.
+// @return NT 플랫폼이면 true, 아니면 false
 //***************************************************************************
-COsInfo::~COsInfo()
+bool COsInfo::IsNTPlatform() const
 {
+	return m_Osvi.dwPlatformId == VER_PLATFORM_WIN32_NT;
+}
 
+//***************************************************************************
+// @brief OS가 Windows 9x 계열 플랫폼인지 확인합니다.
+// @return Windows 9x 계열 플랫폼이면 true, 아니면 false
+//***************************************************************************
+bool COsInfo::IsWindowsPlatform() const
+{
+	return m_Osvi.dwPlatformId == VER_PLATFORM_WIN32_WINDOWS;
+}
+
+//***************************************************************************
+// @brief OS가 Win32s 플랫폼인지 확인합니다.
+// @return Win32s 플랫폼이면 true, 아니면 false
+//***************************************************************************
+bool COsInfo::IsWin32sPlatform() const
+{
+	return m_Osvi.dwPlatformId == VER_PLATFORM_WIN32s;
+}
+
+//***************************************************************************
+// @brief 실행 중인 시스템 플랫폼이 32비트 환경인지 확인합니다.
+// @return 32비트 환경이면 true, 아니면 false
+//***************************************************************************
+bool COsInfo::Is32bitPlatform() const
+{
+	return !Is64bitPlatform();
+}
+
+//***************************************************************************
+// @brief 실행 중인 시스템 플랫폼이 64비트 환경인지 확인합니다.
+// @return 64비트 환경이면 true, 아니면 false
+//***************************************************************************
+bool COsInfo::Is64bitPlatform() const
+{
+	return (
+		m_Sysi.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_IA64 ||
+		m_Sysi.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 ||
+		m_Sysi.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_ALPHA64);
+}
+
+//***************************************************************************
+// @brief OS 버전 및 에디션 정보를 종합하여 설명 문자열을 생성합니다.
+//***************************************************************************
+void COsInfo::DetectDescription()
+{
+	_tstring strVer = GetWindowsVersionDesc();
+	_tstring strEdit = GetWindowsEditionDesc();
+
+	_stprintf_s(m_tszDescription, _countof(m_tszDescription), _T("%s [%s]"), strVer.c_str(), strEdit.c_str());
 }
 
 //***************************************************************************
@@ -394,9 +474,26 @@ void COsInfo::DetectWindowsVersion()
 		tszProductType[0] = '\0';
 
 		lRetCode = RegQueryValueEx(hKey, _T("ProductType"), NULL, NULL, (LPBYTE)tszProductType, &dwValueLen);
-		if( (lRetCode != ERROR_SUCCESS) || (dwValueLen > REGISTRY_VALUE_STRLEN) ) return;
+
+		// [수정] 기존에는 이 지점에서 실패 시(또는 길이 초과 시) RegCloseKey() 없이 바로
+		// return하여 레지스트리 핸들이 누수되었습니다. 반환 전에 항상 정리합니다.
+		if( (lRetCode != ERROR_SUCCESS) || (dwValueLen > sizeof(tszProductType)) )
+		{
+			RegCloseKey(hKey);
+			return;
+		}
 
 		RegCloseKey(hKey);
+
+		// [수정] RegQueryValueEx()는 레지스트리에 저장된 REG_SZ 값이 널 종료되지 않은
+		// 경우 결과 버퍼도 널로 끝난다고 보장하지 않습니다. 이후 _tcscmp()가 버퍼
+		// 끝을 넘어 읽는 것을 막기 위해 반환된 바이트 길이를 문자 개수로 환산해
+		// 명시적으로 널 종료합니다.
+		{
+			DWORD dwCharLen = dwValueLen / sizeof(TCHAR);
+			if( dwCharLen >= _countof(tszProductType) ) dwCharLen = _countof(tszProductType) - 1;
+			tszProductType[dwCharLen] = _T('\0');
+		}
 
 		if( _tcscmp(_T("WINNT"), tszProductType) == 0 )
 		{
@@ -771,20 +868,25 @@ void COsInfo::DetectWindowsServicePack()
 	// Display service pack (if any) and build number.
 	if( m_Osvi.dwMajorVersion == 4 && _tcscmp(m_Osvi.szCSDVersion, _T("Service Pack 6")) == 0 )
 	{
-		HKEY	hKey;
+		HKEY	hKey = NULL;
 
 		long	lRetCode = 0;
 
 		// Test for SP6 versus SP6a.
 		lRetCode = RegOpenKeyEx(HKEY_LOCAL_MACHINE, _T("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Hotfix\\Q246009"), 0, KEY_QUERY_VALUE, &hKey);
 		if( lRetCode == ERROR_SUCCESS )
+		{
 			_stprintf_s(m_tszServicePack, _countof(m_tszServicePack), _T("Service Pack 6a (Build %d)"), m_Osvi.dwBuildNumber & 0xFFFF);
+			// [수정] 기존에는 RegOpenKeyEx() 실패 시(else 분기)에도 이 아래의
+			// RegCloseKey(hKey)가 무조건 호출되어, 초기화되지 않은 hKey 값을
+			// CloseHandle류 API에 넘기는 정의되지 않은 동작이 발생했습니다.
+			// 성공한 경우에만 닫도록 스코프를 좁힙니다.
+			RegCloseKey(hKey);
+		}
 		else // Windows NT 4.0 prior to SP6a
 		{
 			_stprintf_s(m_tszServicePack, _countof(m_tszServicePack), _T("%s (Build %d)"), m_Osvi.szCSDVersion, m_Osvi.dwBuildNumber & 0xFFFF);
 		}
-
-		RegCloseKey(hKey);
 	}
 	else // Windows NT 3.51 and earlier or Windows 2000 and later
 	{
@@ -813,264 +915,89 @@ DWORD COsInfo::DetectProductInfo()
 }
 
 //***************************************************************************
-// @brief OS가 NT 플랫폼 계열인지 확인합니다.
-// @return NT 플랫폼이면 true, 아니면 false
+// @brief Windows 버전 열거형 ID 값을 문자열 설명으로 변환합니다.
+// @return _tstring OS 버전명 문자열
 //***************************************************************************
-bool COsInfo::IsNTPlatform() const
+_tstring COsInfo::GetWindowsVersionDesc() const
 {
-	return m_Osvi.dwPlatformId == VER_PLATFORM_WIN32_NT;
-}
-
-//***************************************************************************
-// @brief OS가 Windows 9x 계열 플랫폼인지 확인합니다.
-// @return Windows 9x 계열 플랫폼이면 true, 아니면 false
-//***************************************************************************
-bool COsInfo::IsWindowsPlatform() const
-{
-	return m_Osvi.dwPlatformId == VER_PLATFORM_WIN32_WINDOWS;
-}
-
-//***************************************************************************
-// @brief OS가 Win32s 플랫폼인지 확인합니다.
-// @return Win32s 플랫폼이면 true, 아니면 false
-//***************************************************************************
-bool COsInfo::IsWin32sPlatform() const
-{
-	return m_Osvi.dwPlatformId == VER_PLATFORM_WIN32s;
-}
-
-//***************************************************************************
-// @brief 실행 중인 시스템 플랫폼이 32비트 환경인지 확인합니다.
-// @return 32비트 환경이면 true, 아니면 false
-//***************************************************************************
-bool COsInfo::Is32bitPlatform() const
-{
-	return !Is64bitPlatform();
-}
-
-//***************************************************************************
-// @brief 실행 중인 시스템 플랫폼이 64비트 환경인지 확인합니다.
-// @return 64비트 환경이면 true, 아니면 false
-//***************************************************************************
-bool COsInfo::Is64bitPlatform() const
-{
-	return (
-		m_Sysi.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_IA64 ||
-		m_Sysi.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 ||
-		m_Sysi.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_ALPHA64);
-}
-
-//***************************************************************************
-// @brief OS 버전 및 에디션 정보를 종합하여 설명 문자열을 생성합니다.
-//***************************************************************************
-void COsInfo::DetectDescription()
-{
-	switch( GetWindowsVersion() )
+	switch( m_nWinVersion )
 	{
-	case Windows:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows"));
-		break;
-	case Windows32s:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 32s"));
-		break;
-	case Windows95:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 95"));
-		break;
-	case Windows95OSR2:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 95 SR2"));
-		break;
-	case Windows98:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 98"));
-		break;
-	case Windows98SE:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 98 SE"));
-		break;
-	case WindowsMillennium:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Me"));
-		break;
-	case WindowsNT351:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows NT 3.51"));
-		break;
-	case WindowsNT40:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows NT 4.0"));
-		break;
-	case WindowsNT40Server:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows NT 4.0 Server"));
-		break;
-	case Windows2000:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 2000"));
-		break;
-	case WindowsXP:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows XP"));
-		break;
-	case WindowsXPProfessionalx64:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows XP Professional x64"));
-		break;
-	case WindowsHomeServer:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Home Server"));
-		break;
-	case WindowsServer2003:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2003"));
-		break;
-	case WindowsServer2003R2:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2003 R2"));
-		break;
-	case WindowsVista:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Vista"));
-		break;
-	case WindowsVistaSP1:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Vista SP1"));
-		break;
-	case WindowsVistaSP2:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Vista SP2"));
-		break;
-	case WindowsServer2008:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2008"));
-		break;
-	case WindowsServer2008SP2:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2008 SP2"));
-		break;
-	case WindowsServer2008R2:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2008 R2"));
-		break;
-	case WindowsServer2008R2SP2:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2008 R2 SP2"));
-		break;
-	case Windows7:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 7"));
-		break;
-	case Windows7SP1:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 7 SP1"));
-		break;
-	case WindowsServer2012:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2012"));
-		break;
-	case Windows8:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 8"));
-		break;
-	case WindowsServer2012R2:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2012 R2"));
-		break;
-	case Windows81:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 8.1"));
-		break;
-	case Windows10:
-	case Windows10_1511:
-	case Windows10_1607:
-	case Windows10_1703:
-	case Windows10_1709:
-	case Windows10_1803:
-	case Windows10_1809:
-	case Windows10_1903:
-	case Windows10_1909:
-	case Windows10_2004:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 10"));
-		break;
-	case Windows10_20H2:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 10 20H2"));
-		break;
-	case Windows10_21H1:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 10 21H1"));
-		break;
-	case Windows10_21H2:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 10 21H2"));
-		break;
-	case Windows10_22H2:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 10 22H2"));
-		break;
-	case WindowsServer2016:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2016"));
-		break;
-	case WindowsServer2019:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2019"));
-		break;
-	case WindowsServer2022:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2022"));
-		break;
-	case WindowsServer2025:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows Server 2025"));
-		break;
-	case Windows11_21H2:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 11 21H2"));
-		break;
-	case Windows11_22H2:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 11 22H2"));
-		break;
-	case Windows11_23H2:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 11 23H2"));
-		break;
-	case Windows11_24H2:
-		_tcscpy_s(m_tszDescription, _countof(m_tszDescription), _T("Windows 11 24H2"));
-		break;
+	case Windows:                 return _T("Windows");
+	case Windows32s:              return _T("Windows 32s");
+	case Windows95:               return _T("Windows 95");
+	case Windows95OSR2:           return _T("Windows 95 SR2");
+	case Windows98:               return _T("Windows 98");
+	case Windows98SE:             return _T("Windows 98 SE");
+	case WindowsMillennium:       return _T("Windows Me");
+	case WindowsNT351:            return _T("Windows NT 3.51");
+	case WindowsNT40:             return _T("Windows NT 4.0");
+	case WindowsNT40Server:       return _T("Windows NT 4.0 Server");
+	case Windows2000:             return _T("Windows 2000");
+	case WindowsXP:               return _T("Windows XP");
+	case WindowsXPProfessionalx64: return _T("Windows XP Professional x64");
+	case WindowsHomeServer:       return _T("Windows Home Server");
+	case WindowsServer2003:       return _T("Windows Server 2003");
+	case WindowsServer2003R2:     return _T("Windows Server 2003 R2");
+	case WindowsVista:            return _T("Windows Vista");
+	case WindowsVistaSP1:         return _T("Windows Vista SP1");
+	case WindowsVistaSP2:         return _T("Windows Vista SP2");
+	case WindowsServer2008:       return _T("Windows Server 2008");
+	case WindowsServer2008SP2:    return _T("Windows Server 2008 SP2");
+	case WindowsServer2008R2:     return _T("Windows Server 2008 R2");
+	case WindowsServer2008R2SP2:  return _T("Windows Server 2008 R2 SP2");
+	case Windows7:                return _T("Windows 7");
+	case Windows7SP1:             return _T("Windows 7 SP1");
+	case WindowsServer2012:       return _T("Windows Server 2012");
+	case Windows8:                return _T("Windows 8");
+	case WindowsServer2012R2:     return _T("Windows Server 2012 R2");
+	case Windows81:               return _T("Windows 8.1");
+	case Windows10: case Windows10_1511: case Windows10_1607: case Windows10_1703:
+	case Windows10_1709: case Windows10_1803: case Windows10_1809: case Windows10_1903:
+	case Windows10_1909: case Windows10_2004: return _T("Windows 10");
+	case Windows10_20H2:          return _T("Windows 10 20H2");
+	case Windows10_21H1:          return _T("Windows 10 21H1");
+	case Windows10_21H2:          return _T("Windows 10 21H2");
+	case Windows10_22H2:          return _T("Windows 10 22H2");
+	case WindowsServer2016:       return _T("Windows Server 2016");
+	case WindowsServer2019:       return _T("Windows Server 2019");
+	case WindowsServer2022:       return _T("Windows Server 2022");
+	case WindowsServer2025:       return _T("Windows Server 2025");
+	case Windows11_21H2:          return _T("Windows 11 21H2");
+	case Windows11_22H2:          return _T("Windows 11 22H2");
+	case Windows11_23H2:          return _T("Windows 11 23H2");
+	case Windows11_24H2:          return _T("Windows 11 24H2");
+	default:                      return _T("Unknown");
 	}
+}
 
-	switch( GetWindowsEdition() )
+//***************************************************************************
+// @brief Windows 에디션 열거형 ID 값을 문자열 설명으로 변환합니다.
+// @return _tstring OS 에디션명 문자열
+//***************************************************************************
+_tstring COsInfo::GetWindowsEditionDesc() const
+{
+	switch( m_nWinEdition )
 	{
-	case EditionUnknown:
-		_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Edition unknown Edition]"));
-		break;
-	case Workstation:
-		_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Workstation Edition]"));
-		break;
-	case Server:
-		_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Server Edition]"));
-		break;
-	case AdvancedServer:
-		_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Advanced Server Edition]"));
-		break;
-	case Home:
-		_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Home Edition]"));
-		break;
-	case Ultimate:
-		_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Ultimate Edition]"));
-		break;
-	case HomeBasic:
-		_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Home Basic Edition]"));
-		break;
-	case HomePremium:
-		_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Home Premium Edition]"));
-		break;
-	case Enterprise:
-		_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Enterprise Edition]"));
-		break;
-	case HomeBasic_N:
-		_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Home Basic N Edition]"));
-		break;
-	case Business:
-		_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Business Edition]"));
-		break;
-	case Starter:
-		_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Starter Edition]"));
-		break;
-	case StandardServer:
-		_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Standard Server Edition]"));
-		break;
-	case EnterpriseServerCore:
-		_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Enterprise Server Core Edition]"));
-		break;
-	case EnterpriseServerIA64:
-		_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Enterprise Server IA64 Edition]"));
-		break;
-	case Business_N:
-		_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Business N Edition]"));
-		break;
-	case WebServer:
-		_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Web Server Edition]"));
-		break;
-	case ClusterServer:
-		_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Cluster Server Edition]"));
-		break;
-	case HomeServer:
-		_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Home Server Edition]"));
-		break;
-	case Professional:
-		_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Professional Edition]"));
-		break;
-	case Windows10Home_E:
-		_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Home Edition]"));
-		break;
-	case Windows10Education_E:
-		_tcscat_s(m_tszDescription, _countof(m_tszDescription), _T("[Education Edition]"));
-		break;
+	case Workstation:             return _T("Workstation Edition");
+	case Server:                  return _T("Server Edition");
+	case AdvancedServer:          return _T("Advanced Server Edition");
+	case Home:                    return _T("Home Edition");
+	case Ultimate:                return _T("Ultimate Edition");
+	case HomeBasic:               return _T("Home Basic Edition");
+	case HomePremium:             return _T("Home Premium Edition");
+	case Enterprise:              return _T("Enterprise Edition");
+	case HomeBasic_N:             return _T("Home Basic N Edition");
+	case Business:                return _T("Business Edition");
+	case StandardServer:          return _T("Standard Server Edition");
+	case EnterpriseServerCore:    return _T("Enterprise Server Core Edition");
+	case EnterpriseServerIA64:    return _T("Enterprise Server IA64 Edition");
+	case Business_N:              return _T("Business N Edition");
+	case WebServer:               return _T("Web Server Edition");
+	case ClusterServer:           return _T("Cluster Server Edition");
+	case HomeServer:              return _T("Home Server Edition");
+	case Professional:            return _T("Professional Edition");
+	case Windows10Home_E:         return _T("Home Edition");
+	case Windows10Education_E:    return _T("Education Edition");
+	default:                      return _T("Edition unknown Edition");
 	}
 }

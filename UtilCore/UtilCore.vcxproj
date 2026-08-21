@@ -111,6 +111,16 @@
     <ClInclude Include="pch.h" />
     <ClInclude Include="ServerConfig.h" />
     <ClInclude Include="ServerConnectInfo.h" />
+    <ClInclude Include="System\BoardInfo.h" />
+    <ClInclude Include="System\CpuInfo.h" />
+    <ClInclude Include="System\CrashDumpHandler.h" />
+    <ClInclude Include="System\HardwareInfo.h" />
+    <ClInclude Include="System\OsInfo.h" />
+    <ClInclude Include="System\PciInfo.h" />
+    <ClInclude Include="System\PDHPerformanceObject.h" />
+    <ClInclude Include="System\SoftwareInfo.h" />
+    <ClInclude Include="System\SystemBaseDefine.h" />
+    <ClInclude Include="System\Wmi.h" />
     <ClInclude Include="Thread\CacheAlignment.h" />
     <ClInclude Include="Thread\CriticalSection.h" />
     <ClInclude Include="Thread\DeadLockProfiler.h" />
@@ -124,6 +134,7 @@
     <ClInclude Include="Util\BufferWriter.h" />
     <ClInclude Include="Util\CalculatedElapsedTime.h" />
     <ClInclude Include="Util\CommonUtil.h" />
+    <ClInclude Include="Util\ConsoleUtil.h" />
     <ClInclude Include="Util\DirectoryUtil.h" />
     <ClInclude Include="Util\EncodingConvert.h" />
     <ClInclude Include="Util\TypeCast.h" />
@@ -201,6 +212,15 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="System\BoardInfo.cpp" />
+    <ClCompile Include="System\CpuInfo.cpp" />
+    <ClCompile Include="System\CrashDumpHandler.cpp" />
+    <ClCompile Include="System\HardwareInfo.cpp" />
+    <ClCompile Include="System\OsInfo.cpp" />
+    <ClCompile Include="System\PciInfo.cpp" />
+    <ClCompile Include="System\PDHPerformanceObject.cpp" />
+    <ClCompile Include="System\SoftwareInfo.cpp" />
+    <ClCompile Include="System\Wmi.cpp" />
     <ClCompile Include="Thread\DeadLockProfiler.cpp" />
     <ClCompile Include="Thread\SRWLock.cpp" />
     <ClCompile Include="Thread\ThreadManager.cpp" />
@@ -223,6 +243,27 @@
     <ClCompile Include="Util\WebUtil.cpp" />
     <ClCompile Include="WindowsServiceBase.cpp" />
     <ClCompile Include="XML\RapidXMLUtil.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- 86/64 ASM 파일 처리 설정 -->
+    <MASM Include="System\Asm\BoardInfo86.asm">
+      <ExcludedFromBuild Condition="'$(Platform)'=='x64'">true</ExcludedFromBuild>
+    </MASM>
+    <MASM Include="System\Asm\BoardInfo64.asm">
+      <ExcludedFromBuild Condition="'$(Platform)'=='Win32'">true</ExcludedFromBuild>
+    </MASM>
+    <MASM Include="System\Asm\CpuInfo86.asm">
+      <ExcludedFromBuild Condition="'$(Platform)'=='x64'">true</ExcludedFromBuild>
+    </MASM>
+    <MASM Include="System\Asm\CpuInfo64.asm">
+      <ExcludedFromBuild Condition="'$(Platform)'=='Win32'">true</ExcludedFromBuild>
+    </MASM>
+    <MASM Include="System\Asm\PciInfo86.asm">
+      <ExcludedFromBuild Condition="'$(Platform)'=='x64'">true</ExcludedFromBuild>
+    </MASM>
+    <MASM Include="System\Asm\PciInfo64.asm">
+      <ExcludedFromBuild Condition="'$(Platform)'=='Win32'">true</ExcludedFromBuild>
+    </MASM>
   </ItemGroup>
   <ItemGroup>
     <None Include="Containers\Map\ClusterSpinMap.inl" />
@@ -275,7 +316,9 @@
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <!-- MASM Extension Settings 추가 -->
   <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.props" />
   </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
@@ -403,6 +446,8 @@
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <!-- MASM Extension Targets 추가 -->
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.targets" />
   </ImportGroup>
 </Project>

@@ -1,14 +1,11 @@
-﻿//***************************************************************************
+﻿
+//***************************************************************************
 // Wmi.cpp: implementation of the CEventLog class.
 //
 //***************************************************************************
 
 #include "pch.h"
 #include "Wmi.h"
-
-#ifndef MAX_BUFFER_SIZE
-#define MAX_BUFFER_SIZE 512
-#endif
 
 //***************************************************************************
 // @brief CWmi 생성자 - WMI 인터페이스 포인터를 초기화합니다.
@@ -18,6 +15,7 @@
 //        CoInitializeEx()가 먼저 호출되어 있어야 합니다.
 //***************************************************************************
 CWmi::CWmi()
+	: m_hrLastError(S_OK)
 {
 	m_pIWbemLocator = NULL;
 	m_pIWbemServices = NULL;
@@ -30,6 +28,15 @@ CWmi::CWmi()
 //        CComPtr::Release()가 안전합니다.)
 //***************************************************************************
 CWmi::~CWmi()
+{
+	Disconnect();
+}
+
+//***************************************************************************
+// @brief 현재 연결을 해제하고 보유 중인 모든 WMI 인터페이스/결과 오브젝트를 정리합니다.
+// @return void
+//***************************************************************************
+void CWmi::Disconnect()
 {
 	m_vecClassObject.clear();
 	m_pIWbemServices.Release();
@@ -45,51 +52,63 @@ CWmi::~CWmi()
 //***************************************************************************
 BOOL CWmi::Connect(TCHAR* ptszHost, TCHAR* ptszUserName, TCHAR* ptszUserPass)
 {
+	// [수정] 재연결 시 기존에 보유하고 있던 WMI 인터페이스가 Release() 없이 덮어써져
+	// 누수되는 것을 방지하기 위해, 새 연결을 맺기 전에 기존 연결을 먼저 정리합니다.
+	Disconnect();
+
 	WCHAR   wszBuffer[MAX_BUFFER_SIZE] = { 0 };
 	wchar_t* pwszHost = NULL;
 	wchar_t* pwszUserName = NULL;
 	wchar_t* pwszUserPass = NULL;
 
-	HRESULT hr;
-
 	std::wstring strHost;
 	std::wstring strUserName;
 	std::wstring strUserPass;
 
-	if( ptszHost != NULL && ptszUserName != NULL && ptszUserPass != NULL )
-	{
+	// [수정] 기존에는 세 인자가 모두 채워져야만 원격 접속을 시도하고, 하나라도 비어 있으면
+	// 조용히 로컬 접속으로 전환되었습니다. 이는 "각 인자는 독립적으로 NULL 허용"이라는
+	// 헤더 문서와 어긋나며, 호스트만 지정하고 자격증명은 생략(현재 사용자 컨텍스트 사용)한
+	// 호출이 의도와 다르게 로컬 머신에 연결되는 조용한 오류로 이어질 수 있습니다.
+	// 이제 각 인자를 독립적으로 처리합니다.
 #ifdef _UNICODE
-		pwszHost = (wchar_t*)ptszHost;
-		pwszUserName = (wchar_t*)ptszUserName;
-		pwszUserPass = (wchar_t*)ptszUserPass;
+	pwszHost = ptszHost;
+	pwszUserName = ptszUserName;
+	pwszUserPass = ptszUserPass;
 #else
+	if( ptszHost != NULL )
+	{
 		strHost = AnsiToUnicode(ptszHost);
-		strUserName = AnsiToUnicode(ptszUserName);
-		strUserPass = AnsiToUnicode(ptszUserPass);
-
 		pwszHost = const_cast<wchar_t*>(strHost.c_str());
-		pwszUserName = const_cast<wchar_t*>(strUserName.c_str());
-		pwszUserPass = const_cast<wchar_t*>(strUserPass.c_str());
-#endif
 	}
+	if( ptszUserName != NULL )
+	{
+		strUserName = AnsiToUnicode(ptszUserName);
+		pwszUserName = const_cast<wchar_t*>(strUserName.c_str());
+	}
+	if( ptszUserPass != NULL )
+	{
+		strUserPass = AnsiToUnicode(ptszUserPass);
+		pwszUserPass = const_cast<wchar_t*>(strUserPass.c_str());
+	}
+#endif
 
 	// STEP 1. WMI에 대한 초기 locator를 획득한다.
-	hr = CoCreateInstance(
+	m_hrLastError = CoCreateInstance(
 		CLSID_WbemLocator,
 		0,
 		CLSCTX_INPROC_SERVER,
 		IID_IWbemLocator,
 		(LPVOID*)&m_pIWbemLocator
 	);
-	if( FAILED(hr) )
+	if( FAILED(m_hrLastError) )
 	{
 		return FALSE;
 	}
 
-	if( pwszHost == NULL || pwszUserName == NULL || pwszUserPass == NULL )
+	if( pwszHost == NULL )
 	{
 		// STEP 2. IWbemLocator::ConnectServer()를 이용해 로컬 WMI에 접속한다.
-		hr = m_pIWbemLocator->ConnectServer(
+		m_hrLastError = m_pIWbemLocator->ConnectServer(
 			_bstr_t(L"ROOT\\CIMV2"),
 			NULL,
 			NULL,
@@ -104,7 +123,9 @@ BOOL CWmi::Connect(TCHAR* ptszHost, TCHAR* ptszUserName, TCHAR* ptszUserPass)
 	{
 		swprintf_s(wszBuffer, _countof(wszBuffer), L"\\\\%s\\ROOT\\CIMV2", pwszHost);
 
-		hr = m_pIWbemLocator->ConnectServer(
+		// pwszUserName/pwszUserPass가 NULL이면 _bstr_t(NULL)은 null BSTR이 되어
+		// ConnectServer()가 현재 사용자 보안 컨텍스트를 사용하도록 합니다.
+		m_hrLastError = m_pIWbemLocator->ConnectServer(
 			_bstr_t(wszBuffer),
 			_bstr_t(pwszUserName),
 			_bstr_t(pwszUserPass),
@@ -116,14 +137,14 @@ BOOL CWmi::Connect(TCHAR* ptszHost, TCHAR* ptszUserName, TCHAR* ptszUserPass)
 		);
 	}
 
-	if( FAILED(hr) )
+	if( FAILED(m_hrLastError) )
 	{
 		m_pIWbemLocator.Release();
 		return FALSE;
 	}
 
 	// STEP 3. Proxy의 Security Level을 설정한다.
-	hr = CoSetProxyBlanket(
+	m_hrLastError = CoSetProxyBlanket(
 		m_pIWbemServices,
 		RPC_C_AUTHN_WINNT,
 		RPC_C_AUTHZ_NONE,
@@ -133,7 +154,7 @@ BOOL CWmi::Connect(TCHAR* ptszHost, TCHAR* ptszUserName, TCHAR* ptszUserPass)
 		NULL,
 		EOAC_NONE
 	);
-	if( FAILED(hr) )
+	if( FAILED(m_hrLastError) )
 	{
 		m_pIWbemServices.Release();
 		m_pIWbemLocator.Release();
@@ -151,46 +172,59 @@ BOOL CWmi::Connect(TCHAR* ptszHost, TCHAR* ptszUserName, TCHAR* ptszUserPass)
 //***************************************************************************
 int CWmi::ExecQuery(const TCHAR* ptszQuery)
 {
-	HRESULT hr;
-	ULONG ulCount = 1;
+	// 한 번의 Next() 호출로 가져올 오브젝트 개수. 1개씩 가져오는 대신 배치로
+	// 가져와 COM/RPC 왕복 횟수를 줄입니다(원격 WMI나 결과가 많은 클래스에서 유효).
+	const ULONG WMI_FETCH_BATCH_SIZE = 32;
+
 	ULONG ulRet = 0;
 	int nIndex = 0;
-	TCHAR tszReqQuery[256];
 
 	CComPtr<IEnumWbemClassObject> pEnum;
 
 	if( !m_pIWbemServices ) return -1;
 
-	_stprintf_s(tszReqQuery, _countof(tszReqQuery), _T("SELECT * FROM %s"), ptszQuery);
+	// [수정] 고정 크기 버퍼 + _stprintf_s 대신 동적 문자열 결합을 사용합니다.
+	// ptszQuery가 길어 고정 버퍼(예: 기존 256자)를 초과하면 _stprintf_s가
+	// invalid parameter handler를 호출해 비정상 종료로 이어질 수 있었습니다.
+	std::basic_string<TCHAR> strReqQuery = _T("SELECT * FROM ");
+	strReqQuery += ptszQuery;
 
-	hr = m_pIWbemServices->ExecQuery(
+	m_hrLastError = m_pIWbemServices->ExecQuery(
 		_bstr_t(L"WQL"),
-		_bstr_t(tszReqQuery),
+		_bstr_t(strReqQuery.c_str()),
 		WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY,
 		NULL,
 		&pEnum
 	);
-	if( FAILED(hr) ) return -1;
+	if( FAILED(m_hrLastError) ) return -1;
 
 	pEnum->Reset();
 
 	// 기존 저장소 초기화 (CComPtr vector이므로 자동 Release)
 	m_vecClassObject.clear();
 
-	// [수정] Loop 내부에서 CComPtr 객체 생성
+	IWbemClassObject* rawObjects[WMI_FETCH_BATCH_SIZE] = { NULL };
+
 	while( true )
 	{
-		CComPtr<IWbemClassObject> spClass;
+		m_hrLastError = pEnum->Next(WBEM_INFINITE, WMI_FETCH_BATCH_SIZE, rawObjects, &ulRet);
+		if( FAILED(m_hrLastError) || ulRet == 0 ) break;
 
-		// Next() 호출 시 &spClass를 통해 포인터 수집 (Ref Count = 1)
-		hr = pEnum->Next(WBEM_INFINITE, 1, &spClass, &ulRet);
-		if( FAILED(hr) || ulRet == 0 ) break;
+		for( ULONG i = 0; i < ulRet; i++ )
+		{
+			CComPtr<IWbemClassObject> spClass;
+			// Next()가 이미 AddRef한 참조 소유권을 그대로 넘겨받습니다(추가 AddRef 없음).
+			spClass.Attach(rawObjects[i]);
+			rawObjects[i] = NULL;
 
-		// vector에 추가 시 내부에서 AddRef() 실행 (Ref Count = 2)
-		m_vecClassObject.push_back(spClass);
-		nIndex++;
+			// vector에 추가 시 내부에서 AddRef() 실행 (Ref Count = 2)
+			m_vecClassObject.push_back(spClass);
+			nIndex++;
 
-		// 루프 블록이 끝나면서 spClass 소멸자가 Release() 호출 (Ref Count = 1 로 유지되며 vector가 소유권 유지)
+			// 루프 블록이 끝나면서 spClass 소멸자가 Release() 호출 (Ref Count = 1 로 유지되며 vector가 소유권 유지)
+		}
+
+		if( ulRet < WMI_FETCH_BATCH_SIZE ) break; // 마지막 배치
 	}
 
 	return nIndex;
@@ -205,7 +239,6 @@ int CWmi::ExecQuery(const TCHAR* ptszQuery)
 //***************************************************************************
 BOOL CWmi::GetProperties(int nIndex, const TCHAR* ptszProperty, VARIANT& vtVal)
 {
-	HRESULT	hr;
 	IWbemClassObject* pClass = NULL;
 
 	if( nIndex < 0 || static_cast<size_t>(nIndex) >= m_vecClassObject.size() ) return FALSE;
@@ -213,8 +246,8 @@ BOOL CWmi::GetProperties(int nIndex, const TCHAR* ptszProperty, VARIANT& vtVal)
 	pClass = m_vecClassObject[nIndex];
 	if( !pClass ) return FALSE;
 
-	hr = pClass->Get(_bstr_t(ptszProperty), 0L, &vtVal, 0L, 0L);
-	if( FAILED(hr) ) return FALSE;
+	m_hrLastError = pClass->Get(_bstr_t(ptszProperty), 0L, &vtVal, 0L, 0L);
+	if( FAILED(m_hrLastError) ) return FALSE;
 
 	return TRUE;
 }
@@ -229,7 +262,6 @@ BOOL CWmi::GetProperties(int nIndex, const TCHAR* ptszProperty, VARIANT& vtVal)
 //***************************************************************************
 BOOL CWmi::GetProperties(int nIndex, const TCHAR* ptszProperty, TCHAR* ptszValue, DWORD dwSize)
 {
-	HRESULT	hr;
 	VARIANT	vtVal;
 	IWbemClassObject* pClass = NULL;
 
@@ -242,16 +274,16 @@ BOOL CWmi::GetProperties(int nIndex, const TCHAR* ptszProperty, TCHAR* ptszValue
 
 	VariantInit(&vtVal);
 
-	hr = pClass->Get(_bstr_t(ptszProperty), 0L, &vtVal, 0L, 0L);
-	if( FAILED(hr) ) return FALSE;
+	m_hrLastError = pClass->Get(_bstr_t(ptszProperty), 0L, &vtVal, 0L, 0L);
+	if( FAILED(m_hrLastError) ) return FALSE;
 
 	if( vtVal.vt == VT_BSTR && vtVal.bstrVal != NULL )
 	{
 #ifdef _UNICODE	
-		_tcscpy_s(ptszValue, dwSize, vtVal.bstrVal);
+		_tcsncpy_s(ptszValue, dwSize, vtVal.bstrVal, _TRUNCATE);
 #else
 		std::string strAnsi = UnicodeToAnsi(vtVal.bstrVal);
-		_tcscpy_s(ptszValue, dwSize, strAnsi.c_str());
+		_tcsncpy_s(ptszValue, dwSize, strAnsi.c_str(), _TRUNCATE);
 #endif
 	}
 
@@ -269,7 +301,6 @@ BOOL CWmi::GetProperties(int nIndex, const TCHAR* ptszProperty, TCHAR* ptszValue
 //***************************************************************************
 BOOL CWmi::GetProperties(int nIndex, const TCHAR* ptszProperty, long* plValue)
 {
-	HRESULT	hr;
 	VARIANT	vtVal;
 	IWbemClassObject* pClass = NULL;
 
@@ -282,8 +313,8 @@ BOOL CWmi::GetProperties(int nIndex, const TCHAR* ptszProperty, long* plValue)
 
 	VariantInit(&vtVal);
 
-	hr = pClass->Get(_bstr_t(ptszProperty), 0L, &vtVal, 0L, 0L);
-	if( FAILED(hr) ) return FALSE;
+	m_hrLastError = pClass->Get(_bstr_t(ptszProperty), 0L, &vtVal, 0L, 0L);
+	if( FAILED(m_hrLastError) ) return FALSE;
 
 	if( vtVal.vt == VT_I4 )
 	{

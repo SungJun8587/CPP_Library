@@ -1,0 +1,76 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="CpuBoardPciAsmTest.cpp" />
+    <ClCompile Include="pch.cpp" />
+    <ClCompile Include="TestFunction.cpp" />
+    <ClCompile Include="..\..\UtilCore\System\BoardInfo.cpp">
+      <Filter>UtilCore\System</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\UtilCore\System\CpuInfo.cpp">
+      <Filter>UtilCore\System</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\UtilCore\System\PciInfo.cpp">
+      <Filter>UtilCore\System</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="TestFunction.h" />
+    <ClInclude Include="..\..\UtilCore\BaseDefine.h">
+      <Filter>UtilCore</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\UtilCore\BaseMacro.h">
+      <Filter>UtilCore</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\UtilCore\BaseRedefineDataType.h">
+      <Filter>UtilCore</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\UtilCore\System\BoardInfo.h">
+      <Filter>UtilCore\System</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\UtilCore\System\CpuInfo.h">
+      <Filter>UtilCore\System</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\UtilCore\System\PciInfo.h">
+      <Filter>UtilCore\System</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\UtilCore\Util\ConsoleUtil.h">
+      <Filter>UtilCore\Util</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="UtilCore">
+      <UniqueIdentifier>{2e2ba952-e35d-41d7-8b73-e578ffe75e2d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UtilCore\System">
+      <UniqueIdentifier>{6873d0e9-f7ab-40ec-9c91-6fe1ee6abcd9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UtilCore\System\Asm">
+      <UniqueIdentifier>{c4a0bced-963b-4561-9634-3024ae2eaf9e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="UtilCore\Util">
+      <UniqueIdentifier>{584e2542-3798-4415-9466-575214816156}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <MASM Include="..\..\UtilCore\System\Asm\CpuInfo86.asm">
+      <Filter>UtilCore\System\Asm</Filter>
+    </MASM>
+    <MASM Include="..\..\UtilCore\System\Asm\CpuInfo64.asm">
+      <Filter>UtilCore\System\Asm</Filter>
+    </MASM>
+    <MASM Include="..\..\UtilCore\System\Asm\BoardInfo86.asm">
+      <Filter>UtilCore\System\Asm</Filter>
+    </MASM>
+    <MASM Include="..\..\UtilCore\System\Asm\BoardInfo64.asm">
+      <Filter>UtilCore\System\Asm</Filter>
+    </MASM>
+    <MASM Include="..\..\UtilCore\System\Asm\PciInfo64.asm">
+      <Filter>UtilCore\System\Asm</Filter>
+    </MASM>
+    <MASM Include="..\..\UtilCore\System\Asm\PciInfo86.asm">
+      <Filter>UtilCore\System\Asm</Filter>
+    </MASM>
+  </ItemGroup>
+</Project>

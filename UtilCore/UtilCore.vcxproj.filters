@@ -55,6 +55,12 @@
     <Filter Include="Network\RIO">
       <UniqueIdentifier>{c142c5bc-6918-4f76-b809-911c286ec14d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="System">
+      <UniqueIdentifier>{6873d0e9-f7ab-40ec-9c91-6fe1ee6abcd9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="System\Asm">
+      <UniqueIdentifier>{c4a0bced-963b-4561-9634-3024ae2eaf9e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Memory\Containers.h">
@@ -400,6 +406,39 @@
     <ClInclude Include="Util\DirectoryUtil.h">
       <Filter>Util</Filter>
     </ClInclude>
+    <ClInclude Include="System\CpuInfo.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="System\HardwareInfo.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="System\OsInfo.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="System\PDHPerformanceObject.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="System\SoftwareInfo.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="System\SystemBaseDefine.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="System\Wmi.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="System\BoardInfo.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="System\PciInfo.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="System\CrashDumpHandler.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\ConsoleUtil.h">
+      <Filter>Util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">
@@ -620,6 +659,33 @@
     <ClCompile Include="Util\DirectoryUtil.cpp">
       <Filter>Util</Filter>
     </ClCompile>
+    <ClCompile Include="System\CpuInfo.cpp">
+      <Filter>System</Filter>
+    </ClCompile>
+    <ClCompile Include="System\HardwareInfo.cpp">
+      <Filter>System</Filter>
+    </ClCompile>
+    <ClCompile Include="System\OsInfo.cpp">
+      <Filter>System</Filter>
+    </ClCompile>
+    <ClCompile Include="System\PDHPerformanceObject.cpp">
+      <Filter>System</Filter>
+    </ClCompile>
+    <ClCompile Include="System\SoftwareInfo.cpp">
+      <Filter>System</Filter>
+    </ClCompile>
+    <ClCompile Include="System\Wmi.cpp">
+      <Filter>System</Filter>
+    </ClCompile>
+    <ClCompile Include="System\BoardInfo.cpp">
+      <Filter>System</Filter>
+    </ClCompile>
+    <ClCompile Include="System\PciInfo.cpp">
+      <Filter>System</Filter>
+    </ClCompile>
+    <ClCompile Include="System\CrashDumpHandler.cpp">
+      <Filter>System</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="DB\BaseODBC.inl">
@@ -664,5 +730,25 @@
     <None Include="Containers\Map\ClusterSpinMap.inl">
       <Filter>Containers\Map</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <MASM Include="System\Asm\BoardInfo64.asm">
+      <Filter>System\Asm</Filter>
+    </MASM>
+    <MASM Include="System\Asm\BoardInfo86.asm">
+      <Filter>System\Asm</Filter>
+    </MASM>
+    <MASM Include="System\Asm\CpuInfo64.asm">
+      <Filter>System\Asm</Filter>
+    </MASM>
+    <MASM Include="System\Asm\CpuInfo86.asm">
+      <Filter>System\Asm</Filter>
+    </MASM>
+    <MASM Include="System\Asm\PciInfo64.asm">
+      <Filter>System\Asm</Filter>
+    </MASM>
+    <MASM Include="System\Asm\PciInfo86.asm">
+      <Filter>System\Asm</Filter>
+    </MASM>
   </ItemGroup>
 </Project>
