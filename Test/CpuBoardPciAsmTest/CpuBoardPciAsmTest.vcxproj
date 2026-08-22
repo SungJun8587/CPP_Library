@@ -184,12 +184,6 @@
   </ItemGroup>
   <ItemGroup>
     <!-- 86/64 ASM 파일 처리 설정 -->
-    <MASM Include="..\..\UtilCore\System\Asm\BoardInfo86.asm">
-      <ExcludedFromBuild Condition="'$(Platform)'=='x64'">true</ExcludedFromBuild>
-    </MASM>
-    <MASM Include="..\..\UtilCore\System\Asm\BoardInfo64.asm">
-      <ExcludedFromBuild Condition="'$(Platform)'=='Win32'">true</ExcludedFromBuild>
-    </MASM>
     <MASM Include="..\..\UtilCore\System\Asm\CpuInfo86.asm">
       <ExcludedFromBuild Condition="'$(Platform)'=='x64'">true</ExcludedFromBuild>
     </MASM>
@@ -202,6 +196,18 @@
     <MASM Include="..\..\UtilCore\System\Asm\PciInfo64.asm">
       <ExcludedFromBuild Condition="'$(Platform)'=='Win32'">true</ExcludedFromBuild>
     </MASM>
+    <MASM Include="..\..\UtilCore\System\Asm\GetSmbiosString86.asm">
+      <ExcludedFromBuild Condition="'$(Platform)'=='x64'">true</ExcludedFromBuild>
+    </MASM>
+    <MASM Include="..\..\UtilCore\System\Asm\GetSmbiosString64.asm">
+      <ExcludedFromBuild Condition="'$(Platform)'=='Win32'">true</ExcludedFromBuild>
+    </MASM>   
+    <MASM Include="..\..\UtilCore\System\Asm\MemDiskDetail86.asm">
+      <ExcludedFromBuild Condition="'$(Platform)'=='x64'">true</ExcludedFromBuild>
+    </MASM>
+    <MASM Include="..\..\UtilCore\System\Asm\MemDiskDetail64.asm">
+      <ExcludedFromBuild Condition="'$(Platform)'=='Win32'">true</ExcludedFromBuild>
+    </MASM>        
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\UtilCore\BaseDefine.h" />

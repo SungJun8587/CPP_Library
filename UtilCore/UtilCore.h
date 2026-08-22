@@ -128,10 +128,11 @@ using namespace std;
 #include <System/PDHPerformanceObject.h>
 #include <System/CrashDumpHandler.h>
 #include <System/CpuInfo.h>
-#include <System/BoardInfo.h>
-#include <System/PciInfo.h>
 #include <System/Wmi.h>
-#include <System/HardwareInfo.h>
+#include <System/HwInfoStructs.h>
+#include <System/WmiHardwareInfo.h>
+#include <System/SmbiosHardwareInfo.h>
+#include <System/DeviceInfo.h>
 #include <System/OsInfo.h>
 #include <System/SoftwareInfo.h>
 

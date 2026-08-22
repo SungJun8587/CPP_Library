@@ -74,6 +74,7 @@ typedef uint64_t		uint64, time64;
 	#define _tcout						std::wcout
 	#define _tcerr						std::wcerr
 	typedef std::wstring				_tstring;
+	typedef std::wstring_view			_tstring_view;
 	typedef std::wstringstream			_tstringstream;
 	typedef std::wifstream				_tifstream;
 	typedef std::wofstream				_tofstream;
@@ -84,6 +85,7 @@ typedef uint64_t		uint64, time64;
 	#define _tcout						std::cout
 	#define _tcerr						std::cerr
 	typedef std::string					_tstring;
+	typedef std::string_view			_tstring_view;
 	typedef std::ostringstream			_tstringstream;
 	typedef std::ifstream				_tifstream;
 	typedef std::ofstream				_tofstream;

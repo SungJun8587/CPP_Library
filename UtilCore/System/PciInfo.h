@@ -94,4 +94,4 @@ extern "C" {
     int pci_get_nvme_list(PciDeviceInfo* out_nvmes, uint32_t max_count);
 }
 
-#endif // __PCIINFO_H__
+#endif // ndef __PCIINFO_H__
