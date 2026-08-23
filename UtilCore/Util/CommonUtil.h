@@ -455,6 +455,38 @@ __inline _tstring addCommas(int64 number)
 	return isNegative ? _T("-") + numStr : numStr;
 }
 
+//***************************************************************************
+// @brief std::error_code의 메시지를 현재 프로젝트의 문자셋(_UNICODE 여부)에 맞는
+//        _tstring 타입으로 안전하게 변환하는 헬퍼 함수
+// @param ec 변환할 std::error_code 객체
+// @return _UNICODE 환경에서는 std::wstring, 멀티바이트 환경에서는 std::string으로 변환된 문자열
+//***************************************************************************
+inline _tstring ErrorToString(const std::error_code& ec)
+{
+#ifdef _UNICODE
+	std::string narrow = ec.message();
+	return _tstring(narrow.begin(), narrow.end());
+#else
+	return ec.message();
+#endif
+}
+
+//***************************************************************************
+// @brief std::exception의 메시지를 현재 프로젝트의 문자셋(_UNICODE 여부)에 맞는
+//        _tstring 타입으로 안전하게 변환하는 헬퍼 함수
+// @param e 변환할 std::exception 객체
+// @return _UNICODE 환경에서는 std::wstring, 멀티바이트 환경에서는 std::string으로 변환된 문자열
+//***************************************************************************
+inline _tstring ExceptionToString(const std::exception& e)
+{
+#ifdef _UNICODE
+	std::string narrow = e.what();
+	return _tstring(narrow.begin(), narrow.end());
+#else
+	return e.what();
+#endif
+}
+
 // 데이터베이스 연결 및 텍스트 파싱 관련 함수 선언
 void		GetDBDSNString(TCHAR* ptszDSN, const EDBClass dbClass, const TCHAR* ptszDSNDriver, const TCHAR* ptszDBHost, const unsigned int nPort, const TCHAR* ptszDBUserId, const TCHAR* ptszDBPasswd, const TCHAR* ptszDBName);
 

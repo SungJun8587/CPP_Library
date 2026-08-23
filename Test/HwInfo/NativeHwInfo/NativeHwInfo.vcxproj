@@ -21,8 +21,8 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{a72d579d-4abc-4839-b7d4-aa5f3e6247ed}</ProjectGuid>
-    <RootNamespace>CpuBoardPciAsmTest</RootNamespace>
+    <ProjectGuid>{5a213d4d-10d4-40af-bf4e-5678b8b69614}</ProjectGuid>
+    <RootNamespace>NativeHwInfo</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -170,55 +170,56 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\UtilCore\System\BoardInfo.cpp" />
-    <ClCompile Include="..\..\UtilCore\System\CpuInfo.cpp" />
-    <ClCompile Include="..\..\UtilCore\System\PciInfo.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\System\CpuInfo.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\System\DeviceInfo.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\System\PciInfo.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\System\SmbiosHardwareInfo.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="CpuBoardPciAsmTest.cpp" />
-    <ClCompile Include="TestFunction.cpp" />
+    <ClCompile Include="NativeHwInfo.cpp" />
   </ItemGroup>
   <ItemGroup>
     <!-- 86/64 ASM 파일 처리 설정 -->
-    <MASM Include="..\..\UtilCore\System\Asm\CpuInfo86.asm">
+    <MASM Include="..\..\..\UtilCore\System\Asm\CpuInfo86.asm">
       <ExcludedFromBuild Condition="'$(Platform)'=='x64'">true</ExcludedFromBuild>
     </MASM>
-    <MASM Include="..\..\UtilCore\System\Asm\CpuInfo64.asm">
+    <MASM Include="..\..\..\UtilCore\System\Asm\CpuInfo64.asm">
       <ExcludedFromBuild Condition="'$(Platform)'=='Win32'">true</ExcludedFromBuild>
     </MASM>
-    <MASM Include="..\..\UtilCore\System\Asm\PciInfo86.asm">
+    <MASM Include="..\..\..\UtilCore\System\Asm\PciInfo86.asm">
       <ExcludedFromBuild Condition="'$(Platform)'=='x64'">true</ExcludedFromBuild>
     </MASM>
-    <MASM Include="..\..\UtilCore\System\Asm\PciInfo64.asm">
+    <MASM Include="..\..\..\UtilCore\System\Asm\PciInfo64.asm">
       <ExcludedFromBuild Condition="'$(Platform)'=='Win32'">true</ExcludedFromBuild>
     </MASM>
-    <MASM Include="..\..\UtilCore\System\Asm\GetSmbiosString86.asm">
+    <MASM Include="..\..\..\UtilCore\System\Asm\GetSmbiosString86.asm">
       <ExcludedFromBuild Condition="'$(Platform)'=='x64'">true</ExcludedFromBuild>
     </MASM>
-    <MASM Include="..\..\UtilCore\System\Asm\GetSmbiosString64.asm">
+    <MASM Include="..\..\..\UtilCore\System\Asm\GetSmbiosString64.asm">
       <ExcludedFromBuild Condition="'$(Platform)'=='Win32'">true</ExcludedFromBuild>
-    </MASM>   
-    <MASM Include="..\..\UtilCore\System\Asm\MemDiskDetail86.asm">
+    </MASM>
+    <MASM Include="..\..\..\UtilCore\System\Asm\MemDiskDetail86.asm">
       <ExcludedFromBuild Condition="'$(Platform)'=='x64'">true</ExcludedFromBuild>
     </MASM>
-    <MASM Include="..\..\UtilCore\System\Asm\MemDiskDetail64.asm">
+    <MASM Include="..\..\..\UtilCore\System\Asm\MemDiskDetail64.asm">
       <ExcludedFromBuild Condition="'$(Platform)'=='Win32'">true</ExcludedFromBuild>
-    </MASM>        
+    </MASM>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\UtilCore\BaseDefine.h" />
-    <ClInclude Include="..\..\UtilCore\BaseMacro.h" />
-    <ClInclude Include="..\..\UtilCore\BaseRedefineDataType.h" />
-    <ClInclude Include="..\..\UtilCore\System\BoardInfo.h" />
-    <ClInclude Include="..\..\UtilCore\System\CpuInfo.h" />
-    <ClInclude Include="..\..\UtilCore\System\PciInfo.h" />
-    <ClInclude Include="..\..\UtilCore\Util\ConsoleUtil.h" />
+    <ClInclude Include="..\..\..\UtilCore\BaseDefine.h" />
+    <ClInclude Include="..\..\..\UtilCore\BaseMacro.h" />
+    <ClInclude Include="..\..\..\UtilCore\BaseRedefineDataType.h" />
+    <ClInclude Include="..\..\..\UtilCore\System\CpuInfo.h" />
+    <ClInclude Include="..\..\..\UtilCore\System\DeviceInfo.h" />
+    <ClInclude Include="..\..\..\UtilCore\System\HwInfoStructs.h" />
+    <ClInclude Include="..\..\..\UtilCore\System\PciInfo.h" />
+    <ClInclude Include="..\..\..\UtilCore\System\SmbiosHardwareInfo.h" />
+    <ClInclude Include="..\..\..\UtilCore\Util\ConsoleUtil.h" />
     <ClInclude Include="pch.h" />
-    <ClInclude Include="TestFunction.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <!-- MASM Extension Targets 추가 -->

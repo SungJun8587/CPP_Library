@@ -12,7 +12,7 @@
 #endif
 
 #ifndef __ENCODINGCONVERT_H__
-#include <EncodingConvert.h>
+#include <Util/EncodingConvert.h>
 #endif
 
 #include <mysql.h>

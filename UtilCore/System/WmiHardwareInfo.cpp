@@ -99,6 +99,100 @@ void ChangeDataFormat(const __int64& nData, TCHAR* ptszFormat)
 }
 
 //***************************************************************************
+// CWmiProcessorInfo
+//***************************************************************************
+
+//***************************************************************************
+// @brief CWmiProcessorInfo 클래스 생성자입니다.
+// @param 없음
+// @return 없음
+// @detail 프로세서 정보 관리를 위한 객체를 초기화합니다.
+//***************************************************************************
+CWmiProcessorInfo::CWmiProcessorInfo()
+{
+}
+
+//***************************************************************************
+// @brief CWmiProcessorInfo 클래스 소멸자입니다.
+// @param 없음
+// @return 없음
+// @detail std::vector에 저장된 프로세서 동적 객체 메모리를 모두 해제합니다.
+//***************************************************************************
+CWmiProcessorInfo::~CWmiProcessorInfo()
+{
+    for( HWINFO_CPU* pCpu : m_sProcessorArray )
+    {
+        delete pCpu;
+    }
+    m_sProcessorArray.clear();
+}
+
+//***************************************************************************
+// @brief WMI를 통해 프로세서(CPU) 정보를 수집합니다.
+// @param Wmi WMI 모듈 참조
+// @return BOOL 성공 시 TRUE, 실패 시 FALSE
+// @detail Win32_Processor 클래스에서 Name/Manufacturer/ProcessorId 문자열 속성과
+//         NumberOfCores/NumberOfLogicalProcessors/MaxClockSpeed/L2CacheSize/
+//         L3CacheSize 정수 속성을 읽어 CCpuInfo(CpuInfo.h)와 공유하는 HWINFO_CPU
+//         필드(m_tszProcessorName/m_tszVendorName/m_nNumberCpus/m_nSpeed 등)에
+//         채웁니다.
+//***************************************************************************
+BOOL CWmiProcessorInfo::GetInformation(CWmi& Wmi)
+{
+    int nIndex = Wmi.ExecQuery(_T("Win32_Processor"));
+    if( nIndex < 0 ) return FALSE;
+
+    for( int i = 0; i < nIndex; i++ )
+    {
+        HWINFO_CPU* pCpu = new HWINFO_CPU;
+
+        FetchWmiString(Wmi, i, _T("Name"), pCpu->m_tszProcessorName);
+        FetchWmiString(Wmi, i, _T("Manufacturer"), pCpu->m_tszVendorName);
+        FetchWmiString(Wmi, i, _T("ProcessorId"), pCpu->m_tszProcessorId);
+
+        CVariantGuard vtCores;
+        Wmi.GetProperties(i, _T("NumberOfCores"), vtCores);
+        if( SUCCEEDED(VariantChangeType(&vtCores, &vtCores, 0, VT_I4)) )
+        {
+            pCpu->m_dwNumberOfCores = vtCores.lVal;
+        }
+
+        CVariantGuard vtLogical;
+        Wmi.GetProperties(i, _T("NumberOfLogicalProcessors"), vtLogical);
+        if( SUCCEEDED(VariantChangeType(&vtLogical, &vtLogical, 0, VT_I4)) )
+        {
+            pCpu->m_nNumberCpus = vtLogical.lVal;
+        }
+
+        CVariantGuard vtClock;
+        Wmi.GetProperties(i, _T("MaxClockSpeed"), vtClock);
+        if( SUCCEEDED(VariantChangeType(&vtClock, &vtClock, 0, VT_I4)) )
+        {
+            pCpu->m_nSpeed = vtClock.lVal;
+        }
+
+        CVariantGuard vtL2;
+        Wmi.GetProperties(i, _T("L2CacheSize"), vtL2);
+        if( SUCCEEDED(VariantChangeType(&vtL2, &vtL2, 0, VT_I4)) )
+        {
+            pCpu->m_dwL2CacheSize = vtL2.lVal;
+        }
+
+        CVariantGuard vtL3;
+        Wmi.GetProperties(i, _T("L3CacheSize"), vtL3);
+        if( SUCCEEDED(VariantChangeType(&vtL3, &vtL3, 0, VT_I4)) )
+        {
+            pCpu->m_dwL3CacheSize = vtL3.lVal;
+        }
+
+        m_sProcessorArray.push_back(pCpu);
+    }
+
+    return TRUE;
+}
+
+
+//***************************************************************************
 // CWmiBiosInfo
 //***************************************************************************
 
@@ -238,6 +332,7 @@ BOOL CWmiMemoryInfo::GetInformation(CWmi& Wmi)
         FetchWmiString(Wmi, i, _T("BankLabel"), pRam->m_tszBankLabel);
         FetchWmiString(Wmi, i, _T("Name"), pRam->m_tszName);
         FetchWmiString(Wmi, i, _T("DeviceLocator"), pRam->m_tszDeviceLocator);
+        FetchWmiString(Wmi, i, _T("Manufacturer"), pRam->m_tszManufacturer);
 
         // [수정] 개별 슬롯의 Capacity는 표시용으로만 저장하고, 전체 메모리 총량에는
         // 더 이상 합산하지 않습니다. LPDDR4/온보드(임베디드) 메모리는 물리 다이 1개가
@@ -307,14 +402,18 @@ BOOL CWmiMemoryInfo::GetInformation(CWmi& Wmi)
         m_Memory.m_nTotalMemSize = static_cast<__int64>(statex.ullTotalPhys);
     }
 
+    // [수정] Win32_OperatingSystem 조회가 실패해도 위에서 이미 수집한 RAM 슬롯 배열과
+    // 물리 메모리 총량(m_nTotalMemSize)은 유효하므로 그냥 버리지 않고 TRUE를 반환합니다.
+    // (가상 메모리/페이징 파일 통계만 0으로 남음)
     nIndex = Wmi.ExecQuery(_T("Win32_OperatingSystem"));
-    if( nIndex < 0 ) return FALSE;
-
-    m_Memory.m_nPhysicalMemSize += FetchWmiInt64(Wmi, 0, _T("FreePhysicalMemory"));
-    m_Memory.m_nTotalVirtualMemSize += FetchWmiInt64(Wmi, 0, _T("TotalVirtualMemorySize"));
-    m_Memory.m_nFreeVirtualMemSize += FetchWmiInt64(Wmi, 0, _T("FreeVirtualMemory"));
-    m_Memory.m_nTotalPageFileSize += FetchWmiInt64(Wmi, 0, _T("SizeStoredInPagingFiles"));
-    m_Memory.m_nFreePageFileSize += FetchWmiInt64(Wmi, 0, _T("FreeSpaceInPagingFiles"));
+    if( nIndex >= 0 )
+    {
+        m_Memory.m_nPhysicalMemSize += FetchWmiInt64(Wmi, 0, _T("FreePhysicalMemory"));
+        m_Memory.m_nTotalVirtualMemSize += FetchWmiInt64(Wmi, 0, _T("TotalVirtualMemorySize"));
+        m_Memory.m_nFreeVirtualMemSize += FetchWmiInt64(Wmi, 0, _T("FreeVirtualMemory"));
+        m_Memory.m_nTotalPageFileSize += FetchWmiInt64(Wmi, 0, _T("SizeStoredInPagingFiles"));
+        m_Memory.m_nFreePageFileSize += FetchWmiInt64(Wmi, 0, _T("FreeSpaceInPagingFiles"));
+    }
 
     return TRUE;
 }
@@ -456,6 +555,11 @@ BOOL CWmiHdDiskInfo::GetInformation(CWmi& Wmi)
         FetchWmiString(Wmi, i, _T("Name"), pHdDisk->m_tszName);
         FetchWmiString(Wmi, i, _T("Manufacturer"), pHdDisk->m_tszManufacturer);
         FetchWmiString(Wmi, i, _T("Description"), pHdDisk->m_tszDescription);
+        FetchWmiString(Wmi, i, _T("SerialNumber"), pHdDisk->m_tszSerialNumber);
+        // 주의: WMI InterfaceType은 storport 드라이버를 통하는 NVMe/SATA 디스크 대부분을
+        // 실제 버스와 무관하게 "SCSI"로 보고하는 경우가 많음(잘 알려진 WMI 한계) - Sm
+        // 버전(IOCTL_STORAGE_QUERY_PROPERTY 기반)만큼 정확한 NVMe/SATA 구분은 기대하기 어려움.
+        FetchWmiString(Wmi, i, _T("InterfaceType"), pHdDisk->m_tszBusType);
 
         pHdDisk->m_nTotalSize = FetchWmiInt64(Wmi, i, _T("Size"));
 
@@ -524,6 +628,157 @@ BOOL CWmiDriveInfo::GetInformation(CWmi& Wmi)
     }
 
     m_Drives.m_dwDriveCount = dwDriveCount;
+    return TRUE;
+}
+
+//***************************************************************************
+// CWmiSoundCardInfo
+//***************************************************************************
+
+//***************************************************************************
+// @brief CWmiSoundCardInfo 클래스 생성자입니다.
+// @param 없음
+// @return 없음
+// @detail 사운드 카드 정보 관리를 위한 객체를 초기화합니다.
+//***************************************************************************
+CWmiSoundCardInfo::CWmiSoundCardInfo()
+{
+}
+
+//***************************************************************************
+// @brief CWmiSoundCardInfo 클래스 소멸자입니다.
+// @param 없음
+// @return 없음
+// @detail std::vector에 저장된 사운드 카드 동적 객체 메모리를 모두 해제합니다.
+//***************************************************************************
+CWmiSoundCardInfo::~CWmiSoundCardInfo()
+{
+    for( HWINFO_SOUNDCARD* pSoundCard : m_sSoundCardArray )
+    {
+        delete pSoundCard;
+    }
+    m_sSoundCardArray.clear();
+}
+
+//***************************************************************************
+// @brief WMI 및 Win32 Multimedia API를 통해 사운드 카드 정보를 수집합니다.
+// @param Wmi WMI 모듈 참조
+// @return BOOL 성공 시 TRUE, 실패 시 FALSE
+// @detail Win32_SoundDevice 클래스를 조회하여 제품명, 제조사, PNPDeviceID를 읽어오며,
+//         볼륨 제어 관련 기능은 waveOutGetDevCaps API를 통해 확인합니다.
+//***************************************************************************
+BOOL CWmiSoundCardInfo::GetInformation(CWmi& Wmi)
+{
+    int nIndex = Wmi.ExecQuery(_T("Win32_SoundDevice"));
+    if( nIndex < 0 ) return FALSE;
+
+    // waveOut API를 이용해 볼륨 제어 지원 여부 확인 (기본 장치 기준)
+    WAVEOUTCAPS waveCaps = { 0 };
+    BOOL bHasVolCtrl = FALSE;
+    BOOL bHasSeparateLRVolCtrl = FALSE;
+
+    if( waveOutGetNumDevs() > 0 && waveOutGetDevCaps(0, &waveCaps, sizeof(WAVEOUTCAPS)) == MMSYSERR_NOERROR )
+    {
+        bHasVolCtrl = (waveCaps.dwSupport & WAVECAPS_VOLUME) ? TRUE : FALSE;
+        bHasSeparateLRVolCtrl = (waveCaps.dwSupport & WAVECAPS_LRVOLUME) ? TRUE : FALSE;
+    }
+
+    for( int i = 0; i < nIndex; i++ )
+    {
+        HWINFO_SOUNDCARD* pSoundCard = new HWINFO_SOUNDCARD;
+
+        pSoundCard->m_bHasVolCtrl = bHasVolCtrl;
+        pSoundCard->m_bHasSeparateLRVolCtrl = bHasSeparateLRVolCtrl;
+
+        FetchWmiString(Wmi, i, _T("ProductName"), pSoundCard->m_tszProductName);
+
+        // ProductName이 없는 경우 Name 속성을 대체로 읽어옵니다.
+        if( pSoundCard->m_tszProductName[0] == _T('\0') )
+        {
+            FetchWmiString(Wmi, i, _T("Name"), pSoundCard->m_tszProductName);
+        }
+
+        FetchWmiString(Wmi, i, _T("Manufacturer"), pSoundCard->m_tszCompanyName);
+        FetchWmiString(Wmi, i, _T("PNPDeviceID"), pSoundCard->m_tszHardwareId);
+
+        m_sSoundCardArray.push_back(pSoundCard);
+    }
+
+    return TRUE;
+}
+
+//***************************************************************************
+// CWmiVideoCardInfo
+//***************************************************************************
+
+//***************************************************************************
+// @brief CWmiVideoCardInfo 클래스 생성자입니다.
+// @param 없음
+// @return 없음
+// @detail 디스플레이 어댑터(비디오 카드) 정보 관리를 위한 객체를 초기화합니다.
+//***************************************************************************
+CWmiVideoCardInfo::CWmiVideoCardInfo()
+{
+}
+
+//***************************************************************************
+// @brief CWmiVideoCardInfo 클래스 소멸자입니다.
+// @param 없음
+// @return 없음
+// @detail std::vector에 저장된 비디오 카드 동적 객체 메모리를 모두 해제합니다.
+//***************************************************************************
+CWmiVideoCardInfo::~CWmiVideoCardInfo()
+{
+    for( HWINFO_VIDEOCARD* pVideoCard : m_sVideoCardArray )
+    {
+        delete pVideoCard;
+    }
+    m_sVideoCardArray.clear();
+}
+
+//***************************************************************************
+// @brief WMI를 통해 비디오 카드(그래픽 카드) 속성 및 VRAM 용량을 수집합니다.
+// @param Wmi WMI 모듈 참조
+// @return BOOL 성공 시 TRUE, 실패 시 FALSE
+// @detail Win32_VideoController 클래스를 조회하여 ChipType, DAC, Driver,
+//         VRAM 크기(AdapterRAM) 및 PNPDeviceID를 수집합니다.
+//***************************************************************************
+BOOL CWmiVideoCardInfo::GetInformation(CWmi& Wmi)
+{
+    int nIndex = Wmi.ExecQuery(_T("Win32_VideoController"));
+    if( nIndex < 0 ) return FALSE;
+
+    for( int i = 0; i < nIndex; i++ )
+    {
+        HWINFO_VIDEOCARD* pVideoCard = new HWINFO_VIDEOCARD;
+
+        FetchWmiString(Wmi, i, _T("Description"), pVideoCard->m_tszDescription);
+        FetchWmiString(Wmi, i, _T("Caption"), pVideoCard->m_tszAdapterString);
+        FetchWmiString(Wmi, i, _T("VideoProcessor"), pVideoCard->m_tszChipType);
+        FetchWmiString(Wmi, i, _T("AdapterDACType"), pVideoCard->m_tszDacType);
+        FetchWmiString(Wmi, i, _T("InstalledDrivers"), pVideoCard->m_tszDisplayDrivers);
+        FetchWmiString(Wmi, i, _T("AdapterCompatibility"), pVideoCard->m_tszManufacturer);
+        FetchWmiString(Wmi, i, _T("PNPDeviceID"), pVideoCard->m_tszHardwareId);
+
+        // VRAM 용량 파싱 (WMI의 AdapterRAM 속성은 uint32/int64 형태의 문자열 또는 수치로 전달됨)
+        CVariantGuard vtAdapterRam;
+        Wmi.GetProperties(i, _T("AdapterRAM"), vtAdapterRam);
+
+        if( SUCCEEDED(VariantChangeType(&vtAdapterRam, &vtAdapterRam, 0, VT_I8)) )
+        {
+            // Byte 단위를 MB 단위로 변환하여 할당
+            pVideoCard->m_lMemorySize = static_cast<long>(vtAdapterRam.llVal / (1024 * 1024));
+        }
+        else
+        {
+            // BSTR로 넘어오는 환경을 위한 폴백
+            __int64 nRamBytes = FetchWmiInt64(Wmi, i, _T("AdapterRAM"));
+            pVideoCard->m_lMemorySize = static_cast<long>(nRamBytes / (1024 * 1024));
+        }
+
+        m_sVideoCardArray.push_back(pVideoCard);
+    }
+
     return TRUE;
 }
 
@@ -799,6 +1054,72 @@ BOOL CWmiMonitorInfo::GetInformation(CWmi& Wmi)
         FetchWmiString(Wmi, i, _T("Description"), pMonitor->m_tszDescription);
 
         m_sMonitorArray.push_back(pMonitor);
+    }
+
+    return TRUE;
+}
+
+//***************************************************************************
+// CWmiPciInfo
+//***************************************************************************
+
+//***************************************************************************
+// @brief CWmiPciInfo 클래스 생성자입니다.
+// @param 없음
+// @return 없음
+// @detail PCI 장치 정보 관리를 위한 객체를 초기화합니다.
+//***************************************************************************
+CWmiPciInfo::CWmiPciInfo()
+{
+}
+
+//***************************************************************************
+// @brief CWmiPciInfo 클래스 소멸자입니다.
+// @param 없음
+// @return 없음
+// @detail std::vector에 저장된 PCI 장치 동적 객체 메모리를 모두 해제합니다.
+//***************************************************************************
+CWmiPciInfo::~CWmiPciInfo()
+{
+    for( HWINFO_PCIDEVICE* pDev : m_sPciArray )
+    {
+        delete pDev;
+    }
+    m_sPciArray.clear();
+}
+
+//***************************************************************************
+// @brief WMI를 통해 PCI 버스 장치 정보를 수집합니다.
+// @param Wmi WMI 모듈 참조
+// @return BOOL 성공 시 TRUE, 실패 시 FALSE
+// @detail Win32_PnPEntity를 PNPDeviceID가 "PCI"로 시작하는 것만 걸러서 조회합니다.
+//         Bus/Device/Function/Class Code에 대응하는 WMI 속성이 없어 그 필드들은
+//         기본값(0/Unknown)으로 남고, Description/Manufacturer/DeviceID(파싱한
+//         Vendor/Device ID)만 채웁니다.
+//***************************************************************************
+BOOL CWmiPciInfo::GetInformation(CWmi& Wmi)
+{
+    int nIndex = Wmi.ExecQuery(_T("Win32_PnPEntity WHERE PNPDeviceID LIKE 'PCI%'"));
+    if( nIndex < 0 ) return FALSE;
+
+    for( int i = 0; i < nIndex; i++ )
+    {
+        HWINFO_PCIDEVICE* pDev = new HWINFO_PCIDEVICE;
+
+        FetchWmiString(Wmi, i, _T("Description"), pDev->m_tszDescription);
+        FetchWmiString(Wmi, i, _T("Manufacturer"), pDev->m_tszVendorName);
+
+        TCHAR tszDeviceId[512] = { 0 };
+        FetchWmiString(Wmi, i, _T("PNPDeviceID"), tszDeviceId);
+
+        unsigned int vId = 0, dId = 0;
+        if( _stscanf_s(tszDeviceId, _T("PCI\\VEN_%04X&DEV_%04X"), &vId, &dId) == 2 )
+        {
+            pDev->m_wVendorId = (WORD)vId;
+            pDev->m_wDeviceId = (WORD)dId;
+        }
+
+        m_sPciArray.push_back(pDev);
     }
 
     return TRUE;

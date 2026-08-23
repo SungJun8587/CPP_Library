@@ -1,7 +1,16 @@
 ﻿
 //***************************************************************************
-// HwInfoStructs.h : WmiHardwareInfo(WMI)와 SmHardwareInfo(non-WMI)가 공유하는
+// HwInfoStructs.h: HardwareInfo(WMI)와 SmHardwareInfo(non-WMI)가 공유하는
 //                   하드웨어 정보 데이터 구조체 모음.
+//
+// 원래 HardwareInfo.h에 인라인으로 정의되어 있던 구조체들을 이 파일로 옮기고,
+// SmHardwareInfo쪽에서만 채우는 필드(HardwareId, RAM Manufacturer, HdDisk
+// BusType/SerialNumber, MainBoard Version)를 추가했습니다. 기존 필드는 이름/타입
+// 그대로라 HardwareInfo.cpp(WMI 채우는 쪽)는 전혀 수정할 필요 없고, 새로 추가된
+// 필드는 WMI 쪽에서는 그냥 기본값(빈 문자열)으로 남습니다.
+//
+// HardwareInfo.h와 SmHardwareInfo.h 양쪽에서 이 파일을 include해서 같은 타입
+// (HWINFO_BIOS, HWINFO_RAM, HWINFO_VIDEOCARD 등)을 그대로 주고받습니다.
 //***************************************************************************
 
 #ifndef __HWINFOSTRUCTS_H__
@@ -13,6 +22,54 @@
 #ifndef __SYSTEMBASEDEFINE_H__
 #include <System/SystemBaseDefine.h>
 #endif
+
+//***************************************************************************
+// @struct  _HWINFO_CPU
+// @brief CPU 하드웨어 상세 정보를 저장하는 구조체입니다. CCpuInfo(non-WMI, CPUID
+//        기반)와 CWmiProcessorInfo(WMI, Win32_Processor)가 공유합니다.
+// @details Family/Model/Stepping/FamilyEx/ModelEx/m_dwFeatures는 CPUID로만 얻을
+//          수 있어 WMI 쪽에서는 항상 기본값(0)으로 남습니다. 나머지 필드는 양쪽
+//          다 채웁니다.
+//***************************************************************************
+typedef struct _HWINFO_CPU
+{
+public:
+    _HWINFO_CPU() {
+        m_nSpeed = 0;
+        m_nNumberCpus = 0;
+        m_nFamily = 0;
+        m_nModel = 0;
+        m_nStepping = 0;
+        m_nFamilyEx = 0;
+        m_nModelEx = 0;
+        m_dwFeatures = 0;
+        m_dwNumberOfCores = 0;
+        m_dwL2CacheSize = 0;
+        m_dwL3CacheSize = 0;
+
+        m_tszVendorName[0] = '\0';
+        m_tszProcessorName[0] = '\0';
+        m_tszProcessorId[0] = '\0';
+    }
+
+    unsigned __int64	m_nSpeed; // CPU 속도 (MHz)
+    int			m_nNumberCpus; // 논리 프로세서(스레드) 개수
+    int			m_nFamily; // CPU 패밀리 (CPUID 전용, WMI 쪽은 항상 0)
+    int			m_nModel; // CPU 모델 (CPUID 전용, WMI 쪽은 항상 0)
+    int			m_nStepping; // CPU 스테핑 (CPUID 전용, WMI 쪽은 항상 0)
+    int			m_nFamilyEx; // 확장 패밀리 (CPUID 전용, WMI 쪽은 항상 0)
+    int			m_nModelEx; // 확장 모델 (CPUID 전용, WMI 쪽은 항상 0)
+
+    DWORD		m_dwFeatures; // CPU 기능 플래그 (CPUID 전용, WMI 쪽은 항상 0)
+    DWORD		m_dwNumberOfCores; // 물리 코어 수
+    DWORD		m_dwL2CacheSize; // L2 캐시 크기 (KB)
+    DWORD		m_dwL3CacheSize; // L3 캐시 크기 (KB)
+
+    TCHAR	m_tszVendorName[CPU_VENDOR_STRLEN]; // 제조사 이름
+    TCHAR	m_tszProcessorName[CPU_GENNAME_STRLEN]; // 프로세서 이름
+    TCHAR	m_tszProcessorId[32]; // CPU 식별 문자열(16진수)
+} HWINFO_CPU, * PHWINFO_CPU;
+
 
 //***************************************************************************
 // @struct  _HWINFO_BIOS
@@ -97,7 +154,7 @@ public:
     TCHAR		m_tszDeviceLocator[RAM_DEVICELOCATOR_STRLEN];   // 메인보드 내 슬롯 위치
     TCHAR		m_tszFormFactorDesc[RAM_FORMFACTORDESC_STRLEN]; // 폼팩터 문자열 설명 (Sm 쪽 미구현)
     TCHAR		m_tszMemoryTypeDesc[RAM_MEMORYTYPEDESC_STRLEN]; // 메모리 타입 문자열 설명 (Sm 쪽 미구현)
-    TCHAR		m_tszManufacturer[64];                          // [Sm 전용] SMBIOS Type17 offset 0x17. WMI 쪽은 항상 빈 문자열.
+    TCHAR		m_tszManufacturer[64];                          // RAM 제조사 (SMBIOS Type17 offset 0x17 / WMI Win32_PhysicalMemory.Manufacturer)
 
 } HWINFO_RAM, * PHWINFO_RAM;
 
@@ -156,8 +213,8 @@ public:
     TCHAR	m_tszName[HDDISK_NAME_STRLEN];                // 디스크 장치 식별 이름 (Sm 쪽 미구현)
     TCHAR	m_tszManufacturer[HDDISK_MANUFACTURER_STRLEN];// 스토리지 제조사 이름 (Sm 쪽 미구현 - Model에 벤더가 포함됨)
     TCHAR	m_tszDescription[HDDISK_DESCRIPTION_STRLEN];  // 스토리지 인터페이스/설명 (Sm 쪽 미구현)
-    TCHAR	m_tszSerialNumber[64];                         // [Sm 전용] IOCTL SerialNumberOffset. WMI 쪽은 항상 빈 문자열.
-    TCHAR	m_tszBusType[16];                              // [Sm 전용] 예: NVMe/SATA/USB. WMI 쪽은 항상 빈 문자열.
+    TCHAR	m_tszSerialNumber[64];                         // IOCTL SerialNumberOffset(Sm) / WMI Win32_DiskDrive.SerialNumber(신뢰도 낮음, 빈 값 흔함)
+    TCHAR	m_tszBusType[16];                              // 예: NVMe/SATA/USB(Sm, IOCTL 기반 정확) / WMI Win32_DiskDrive.InterfaceType(storport 경유 시 대부분 "SCSI"로 뭉뚱그려짐)
 
 } HWINFO_HDDISK, * PHWINFO_HDDISK;
 
@@ -373,5 +430,50 @@ public:
     TCHAR	m_tszHardwareId[256];                          // [Sm 전용] SPDRP_HARDWAREID. WMI 쪽은 항상 빈 문자열.
 
 } HWINFO_MONITOR, * PHWINFO_MONITOR;
+
+
+
+//***************************************************************************
+// @enum  PciDeviceClass
+// @brief PCI Class Code 기반 장치 분류 결과입니다. WMI로는 Class Code를 얻을 방법이
+//        없어 CWmiPciInfo는 항상 Unknown - CPciInfo(non-WMI)에서만 실제로 채워짐.
+//***************************************************************************
+enum class PciDeviceClass { Unknown, GPU, NVMe };
+
+//***************************************************************************
+// @struct  _HWINFO_PCIDEVICE
+// @brief PCI 버스 상의 개별 장치 정보를 저장하는 구조체입니다. CPciInfo(non-WMI,
+//        SetupAPI+PciInfo64.asm/32.asm)와 CWmiPciInfo(WMI, Win32_PnPEntity)가 공유.
+// @details WMI 버전은 Bus/Device/Function/Class Code에 대응하는 속성이 없어
+//          m_byBus/m_byDevice/m_byFunction/m_byBaseClass/m_bySubClass/m_byProgIf/
+//          m_eType은 기본값(0/Unknown)으로 남고, m_wVendorId/m_wDeviceId(DeviceID
+//          문자열 파싱)/m_tszVendorName(Manufacturer 속성)/m_tszDescription만 채움.
+//***************************************************************************
+typedef struct _HWINFO_PCIDEVICE
+{
+public:
+    _HWINFO_PCIDEVICE()
+    {
+        m_byBus = m_byDevice = m_byFunction = 0;
+        m_wVendorId = m_wDeviceId = 0;
+        m_byBaseClass = m_bySubClass = m_byProgIf = 0;
+        m_eType = PciDeviceClass::Unknown;
+        m_tszVendorName[0] = '\0';
+        m_tszDescription[0] = '\0';
+    }
+
+    BYTE	m_byBus;                // PCI 버스 번호
+    BYTE	m_byDevice;             // PCI 디바이스 번호
+    BYTE	m_byFunction;           // PCI 펑션 번호
+    WORD	m_wVendorId;            // Vendor ID (SPDRP_HARDWAREID 파싱)
+    WORD	m_wDeviceId;            // Device ID (SPDRP_HARDWAREID 파싱)
+    BYTE	m_byBaseClass;          // PCI Base Class Code
+    BYTE	m_bySubClass;           // PCI Sub Class Code
+    BYTE	m_byProgIf;             // PCI Programming Interface Code
+    PciDeviceClass m_eType;        // ClassifyPci()의 결과 (GPU/NVMe/Unknown)
+    TCHAR	m_tszVendorName[32];    // 내장 소규모 테이블 매칭 결과 - 없으면 빈 문자열(m_wVendorId로 직접 확인 필요)
+    TCHAR	m_tszDescription[128]; // SPDRP_DEVICEDESC
+
+} HWINFO_PCIDEVICE, * PHWINFO_PCIDEVICE;
 
 #endif // ndef __HWINFOSTRUCTS_H__

@@ -133,6 +133,7 @@ using namespace std;
 #include <System/WmiHardwareInfo.h>
 #include <System/SmbiosHardwareInfo.h>
 #include <System/DeviceInfo.h>
+#include <System/PciInfo.h>
 #include <System/OsInfo.h>
 #include <System/SoftwareInfo.h>
 

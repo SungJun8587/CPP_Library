@@ -116,6 +116,7 @@
     <ClInclude Include="System\DeviceInfo.h" />
     <ClInclude Include="System\HwInfoStructs.h" />
     <ClInclude Include="System\OsInfo.h" />
+    <ClInclude Include="System\PciInfo.h" />
     <ClInclude Include="System\PDHPerformanceObject.h" />
     <ClInclude Include="System\SmbiosHardwareInfo.h" />
     <ClInclude Include="System\SoftwareInfo.h" />
@@ -217,6 +218,7 @@
     <ClCompile Include="System\CrashDumpHandler.cpp" />
     <ClCompile Include="System\DeviceInfo.cpp" />
     <ClCompile Include="System\OsInfo.cpp" />
+    <ClCompile Include="System\PciInfo.cpp" />
     <ClCompile Include="System\PDHPerformanceObject.cpp" />
     <ClCompile Include="System\SmbiosHardwareInfo.cpp" />
     <ClCompile Include="System\SoftwareInfo.cpp" />

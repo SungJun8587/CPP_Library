@@ -409,9 +409,6 @@
     <ClInclude Include="System\CpuInfo.h">
       <Filter>System</Filter>
     </ClInclude>
-    <ClInclude Include="System\HardwareInfo.h">
-      <Filter>System</Filter>
-    </ClInclude>
     <ClInclude Include="System\OsInfo.h">
       <Filter>System</Filter>
     </ClInclude>
@@ -427,17 +424,26 @@
     <ClInclude Include="System\Wmi.h">
       <Filter>System</Filter>
     </ClInclude>
-    <ClInclude Include="System\BoardInfo.h">
-      <Filter>System</Filter>
-    </ClInclude>
-    <ClInclude Include="System\PciInfo.h">
-      <Filter>System</Filter>
-    </ClInclude>
     <ClInclude Include="System\CrashDumpHandler.h">
       <Filter>System</Filter>
     </ClInclude>
     <ClInclude Include="Util\ConsoleUtil.h">
       <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="System\DeviceInfo.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="System\HwInfoStructs.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="System\WmiHardwareInfo.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="System\SmbiosHardwareInfo.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="System\PciInfo.h">
+      <Filter>System</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -662,9 +668,6 @@
     <ClCompile Include="System\CpuInfo.cpp">
       <Filter>System</Filter>
     </ClCompile>
-    <ClCompile Include="System\HardwareInfo.cpp">
-      <Filter>System</Filter>
-    </ClCompile>
     <ClCompile Include="System\OsInfo.cpp">
       <Filter>System</Filter>
     </ClCompile>
@@ -677,13 +680,19 @@
     <ClCompile Include="System\Wmi.cpp">
       <Filter>System</Filter>
     </ClCompile>
-    <ClCompile Include="System\BoardInfo.cpp">
+    <ClCompile Include="System\CrashDumpHandler.cpp">
+      <Filter>System</Filter>
+    </ClCompile>
+    <ClCompile Include="System\DeviceInfo.cpp">
+      <Filter>System</Filter>
+    </ClCompile>
+    <ClCompile Include="System\WmiHardwareInfo.cpp">
+      <Filter>System</Filter>
+    </ClCompile>
+    <ClCompile Include="System\SmbiosHardwareInfo.cpp">
       <Filter>System</Filter>
     </ClCompile>
     <ClCompile Include="System\PciInfo.cpp">
-      <Filter>System</Filter>
-    </ClCompile>
-    <ClCompile Include="System\CrashDumpHandler.cpp">
       <Filter>System</Filter>
     </ClCompile>
   </ItemGroup>
@@ -732,12 +741,6 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <MASM Include="System\Asm\BoardInfo64.asm">
-      <Filter>System\Asm</Filter>
-    </MASM>
-    <MASM Include="System\Asm\BoardInfo86.asm">
-      <Filter>System\Asm</Filter>
-    </MASM>
     <MASM Include="System\Asm\CpuInfo64.asm">
       <Filter>System\Asm</Filter>
     </MASM>
@@ -748,6 +751,18 @@
       <Filter>System\Asm</Filter>
     </MASM>
     <MASM Include="System\Asm\PciInfo86.asm">
+      <Filter>System\Asm</Filter>
+    </MASM>
+    <MASM Include="System\Asm\GetSmbiosString64.asm">
+      <Filter>System\Asm</Filter>
+    </MASM>
+    <MASM Include="System\Asm\GetSmbiosString86.asm">
+      <Filter>System\Asm</Filter>
+    </MASM>
+    <MASM Include="System\Asm\MemDiskDetail64.asm">
+      <Filter>System\Asm</Filter>
+    </MASM>
+    <MASM Include="System\Asm\MemDiskDetail86.asm">
       <Filter>System\Asm</Filter>
     </MASM>
   </ItemGroup>

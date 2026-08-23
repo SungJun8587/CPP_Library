@@ -8,6 +8,7 @@
 #include "CpuInfo.h"
 
 #include <cstring>
+#include <vector>
 
 #define SUPPORT_MMX				0x0001
 #define SUPPORT_3DNOW			0x0002
@@ -88,6 +89,9 @@ BOOL CCpuInfo::GetInformation()
 	DetectCpuDescInfo();
 	DetectCpuSpeed();
 	DetectVendorName();
+	DetectCoreCount();
+	DetectCacheSizes();
+	DetectProcessorId();
 
 	return TRUE;
 }
@@ -219,6 +223,61 @@ void CCpuInfo::DetectVendorName()
 		strncpy_s(m_Cpu.m_tszVendorName, _countof(m_Cpu.m_tszVendorName), strVendor.c_str(), _TRUNCATE);
 #endif
 	}
+}
+
+//***************************************************************************
+// @brief GetLogicalProcessorInformationEx(RelationProcessorCore)를 통해
+//        물리 코어 수를 감지하여 m_Cpu.m_dwNumberOfCores에 저장합니다.
+// @details WMI(Win32_Processor.NumberOfCores) 없이 순수 WinAPI로 물리 코어
+//          개수를 얻습니다. 벤더별 CPUID 토폴로지 리프(Intel 0xB/0x1F, AMD
+//          0x8000001E)를 직접 파싱하는 것보다 안전합니다.
+//***************************************************************************
+void CCpuInfo::DetectCoreCount()
+{
+	DWORD dwLen = 0;
+	GetLogicalProcessorInformationEx(RelationProcessorCore, NULL, &dwLen);
+	if( dwLen == 0 ) return;
+
+	std::vector<BYTE> vecBuffer(dwLen);
+	PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX pInfoBase =
+		reinterpret_cast<PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX>(vecBuffer.data());
+
+	if( !GetLogicalProcessorInformationEx(RelationProcessorCore, pInfoBase, &dwLen) ) return;
+
+	DWORD dwOffset = 0;
+	DWORD dwCoreCount = 0;
+	while( dwOffset < dwLen )
+	{
+		PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX pCurrent =
+			reinterpret_cast<PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX>(vecBuffer.data() + dwOffset);
+
+		if( pCurrent->Relationship == RelationProcessorCore )
+		{
+			dwCoreCount++;
+		}
+		dwOffset += pCurrent->Size;
+	}
+
+	m_Cpu.m_dwNumberOfCores = dwCoreCount;
+}
+
+//***************************************************************************
+// @brief CPUID Leaf 4 기반 cpu_cache_size_kb()로 L2/L3 캐시 크기를 감지하여
+//        m_Cpu.m_dwL2CacheSize/m_dwL3CacheSize에 저장합니다.
+//***************************************************************************
+void CCpuInfo::DetectCacheSizes()
+{
+	m_Cpu.m_dwL2CacheSize = cpu_cache_size_kb(2);
+	m_Cpu.m_dwL3CacheSize = cpu_cache_size_kb(3);
+}
+
+//***************************************************************************
+// @brief CPUID Leaf 1의 EDX(기능 플래그)와 EAX(시그니처)를 16진수로 결합해
+//        m_Cpu.m_tszProcessorId에 저장합니다.
+//***************************************************************************
+void CCpuInfo::DetectProcessorId()
+{
+	_stprintf_s(m_Cpu.m_tszProcessorId, _countof(m_Cpu.m_tszProcessorId), _T("%08X%08X"), m_dwFeatures, m_dwSignature);
 }
 
 //***************************************************************************

@@ -16,7 +16,7 @@
 #pragma comment(lib, "setupapi.lib")
 #pragma comment(lib, "iphlpapi.lib")
 
-namespace 
+namespace
 {
     //***************************************************************************
     // @struct RawDeviceInfo
@@ -287,7 +287,7 @@ CSoundCardInfo::~CSoundCardInfo()
 // @brief SetupAPI를 통해 오디오 장치 목록을 수집합니다.
 // @return BOOL 정보 수집 성공 여부 (TRUE: 성공, FALSE: 실패)
 // @detail GUID_DEVCLASS_MEDIA로 열거한 뒤 Description/Manufacturer를 HWINFO_SOUNDCARD의
-//         ProductName/CompanyName 필드로 옮겨 담습니다 (원본 WMI 버전과 필드명이 다름).
+//         ProductName/CompanyName 필드로 옮겨 담습니다 (WMI 버전과 필드명이 다름).
 //***************************************************************************
 BOOL CSoundCardInfo::GetInformation()
 {

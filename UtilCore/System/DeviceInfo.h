@@ -2,6 +2,9 @@
 //***************************************************************************
 // DeviceInfo.h : interface for Non-WMI Hardware Information Classes.
 //
+// 이 파일의 클래스들은 SetupAPI/WinAPI/IP Helper API 기반입니다. SMBIOS/IOCTL
+// 기반 클래스(CSmbiosBiosInfo, CSmbiosMemoryInfo, CHdDiskInfo 등)는
+// SmbiosHardwareInfo.h에 있습니다.
 //***************************************************************************
 
 #ifndef __DEVICEINFO_H__
@@ -14,7 +17,7 @@
 #endif
 
 //***************************************************************************
-// 하드웨어 정보 데이터 구조체(HWINFO_BIOS 등)는 SmHardwareInfo.h(non-WMI 버전)와
+// 하드웨어 정보 데이터 구조체(HWINFO_BIOS 등)는 WmiHardwareInfo.h(WMI 버전)와
 // 공유하기 위해 HwInfoStructs.h로 이동했습니다.
 //***************************************************************************
 #ifndef __HWINFOSTRUCTS_H__
@@ -25,7 +28,7 @@
 //***************************************************************************
 // @class CDriveInfo
 // @brief GetLogicalDrives + GetDiskFreeSpaceEx로 논리 드라이브를 조회하는 클래스입니다.
-//        CDriveInfo(WMI 버전)의 non-WMI 대응. 로컬 고정 드라이브(DRIVE_FIXED)만 포함.
+//        CWmiDriveInfo(WMI 버전)의 non-WMI 대응. 로컬 고정 드라이브(DRIVE_FIXED)만 포함.
 //        HWINFO_DRIVE는 WMI 버전과 필드가 완전히 동일함(추가 필드 없음).
 //***************************************************************************
 class CDriveInfo
@@ -94,8 +97,8 @@ private:
 //***************************************************************************
 // @class CVideoCardInfo
 // @brief SetupAPI(GUID_DEVCLASS_DISPLAY)로 디스플레이 어댑터를 열거하는 클래스입니다.
-//        CVideoCardInfo(HardwareInfo.h)의 non-WMI 대응 (원본도 이미 non-WMI: 레지스트리
-//        기반. 이 클래스는 SetupAPI 기반이라 방식만 다름).
+//        CWmiVideoCardInfo(WMI 버전)의 non-WMI 대응 (WMI 버전은 Win32_VideoController
+//        쿼리, 이 클래스는 SetupAPI 기반이라 방식만 다름).
 // @details ChipType/DacType/AdapterString/DisplayDrivers는 SetupAPI 표준 속성으로
 //          못 얻어 빈 문자열로 남음. Manufacturer/HardwareId는 HWINFO_VIDEOCARD의
 //          Sm 전용 필드. m_lMemorySize는 원본과 단위(MB) 통일.
@@ -129,11 +132,11 @@ private:
 //***************************************************************************
 // @class CSoundCardInfo
 // @brief SetupAPI(GUID_DEVCLASS_MEDIA)로 오디오 장치를 열거하는 클래스입니다.
-//        CSoundCardInfo(HardwareInfo.h)의 non-WMI 대응.
-// @details 원본은 waveOutGetDevCaps로 장치 1개(볼륨 제어 지원 bool 포함)만 조회하는
-//          구조였지만, 이 클래스는 SetupAPI로 전체 오디오 장치를 배열로 조회함
-//          (HasVolCtrl/HasSeparateLRVolCtrl은 SetupAPI 표준 속성에 없어 미제공,
-//          HardwareId는 HWINFO_SOUNDCARD의 Sm 전용 필드).
+//        CWmiSoundCardInfo(WMI 버전)의 non-WMI 대응.
+// @details WMI 버전은 waveOutGetDevCaps로 볼륨 제어 지원 bool도 채우지만, 이 클래스는
+//          SetupAPI로 전체 오디오 장치를 배열로 조회하는 대신 HasVolCtrl/
+//          HasSeparateLRVolCtrl은 SetupAPI 표준 속성에 없어 미제공(기본값 FALSE).
+//          HardwareId는 HWINFO_SOUNDCARD의 Sm 전용 필드.
 //***************************************************************************
 class CSoundCardInfo
 {
@@ -164,7 +167,7 @@ private:
 //***************************************************************************
 // @class CNetworkCardInfo
 // @brief GetAdaptersAddresses로 네트워크 어댑터를 열거하는 클래스입니다.
-//        CNetworkCardInfo(HardwareInfo.h)의 non-WMI 대응.
+//        CWmiNetworkCardInfo(WMI 버전)의 non-WMI 대응.
 // @details HWINFO_NETWORKCARD의 Sm 전용 필드 m_tszHardwareId 자리에 MAC 주소가
 //          들어감 (다른 구조체와 필드 의미가 다름).
 //***************************************************************************
@@ -197,7 +200,7 @@ private:
 //***************************************************************************
 // @class CCdromInfo
 // @brief SetupAPI(GUID_DEVCLASS_CDROM)로 광학 드라이브를 열거하는 클래스입니다.
-//        CCdromInfo(HardwareInfo.h)의 non-WMI 대응.
+//        CWmiCdromInfo(WMI 버전)의 non-WMI 대응.
 // @details HWINFO_CDROM의 Name(드라이브 문자 매핑)은 미구현, HardwareId는 Sm 전용 필드.
 //***************************************************************************
 class CCdromInfo
@@ -229,7 +232,7 @@ private:
 //***************************************************************************
 // @class CKeyBoardInfo
 // @brief SetupAPI(GUID_DEVCLASS_KEYBOARD)로 키보드 장치를 열거하는 클래스입니다.
-//        CKeyBoardInfo(HardwareInfo.h)의 non-WMI 대응.
+//        CWmiKeyBoardInfo(WMI 버전)의 non-WMI 대응.
 // @details 원본은 단일 장치(GetDescription/GetType)만 다뤘지만, 이 클래스는
 //          SetupAPI로 검출되는 모든 키보드를 배열로 제공함. GetKeyboardType()
 //          기반 유형 판별(HWINFO_KEYBOARD::m_tszType)은 미구현, HardwareId는 Sm 전용 필드.
@@ -263,7 +266,7 @@ private:
 //***************************************************************************
 // @class CMouseInfo
 // @brief SetupAPI(GUID_DEVCLASS_MOUSE)로 마우스 장치를 열거하는 클래스입니다.
-//        CMouseInfo(HardwareInfo.h)의 non-WMI 대응 (원본은 단일 장치, 이 클래스는 배열).
+//        CWmiMouseInfo(WMI 버전)의 non-WMI 대응 (원본은 단일 장치, 이 클래스는 배열).
 // @details HWINFO_MOUSE의 Name은 미구현, HardwareId는 Sm 전용 필드.
 //***************************************************************************
 class CMouseInfo
@@ -295,7 +298,7 @@ private:
 //***************************************************************************
 // @class CMonitorInfo
 // @brief SetupAPI(GUID_DEVCLASS_MONITOR)로 모니터 장치를 열거하는 클래스입니다.
-//        CMonitorInfo(HardwareInfo.h)의 non-WMI 대응.
+//        CWmiMonitorInfo(WMI 버전)의 non-WMI 대응.
 // @details HardwareId는 HWINFO_MONITOR의 Sm 전용 필드.
 //***************************************************************************
 class CMonitorInfo
@@ -322,5 +325,6 @@ public:
 private:
     std::vector<HWINFO_MONITOR*> m_sMonitorArray;
 };
+
 
 #endif // ndef __DEVICEINFO_H__

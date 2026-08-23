@@ -6,6 +6,12 @@ TITLE get_smbios_string_32.asm
 ; x86은 비휘발 레지스터(ebx/esi/edi)가 3개뿐이라 호출 간 유지해야 할 상태가 많으므로
 ; 전부 스택 지역변수에 보관하고, 레지스터는 각 구간에서 스크래치 용도로만 사용한다.
 ;
+;   smbios_cache_open_32() -> 1/0
+;       SMBIOS 테이블을 한 번 가져와 전역에 캐시. 이후 get_smbios_string_32 호출들은
+;       매번 새로 fetch하지 않고 캐시를 재사용함. 스레드 안전하지 않음(전역 상태).
+;   smbios_cache_close_32() -> 없음
+;       캐시 해제. open을 불렀으면 반드시 짝을 맞춰 호출해야 함.
+;
 ; Kernel32.lib 링크 필요.
 
 EXTERN GetSystemFirmwareTable@16 : PROC
@@ -13,7 +19,104 @@ EXTERN GetProcessHeap@0 : PROC
 EXTERN HeapAlloc@12 : PROC
 EXTERN HeapFree@12 : PROC
 
+.data
+; 스레드 안전하지 않음(멀티스레드에서 쓰려면 호출부가 직접 동기화해야 함).
+g_pSmbiosCache32   DWORD 0    ; 캐시된 raw SMBIOS 버퍼 포인터 (0=캐시 없음)
+g_dwSmbiosCacheLen32 DWORD 0  ; 캐시된 테이블 데이터 길이(RawSMBIOSData.Length)
+g_hSmbiosCacheHeap32 DWORD 0  ; 캐시 버퍼를 할당한 힙 핸들
+
 .CODE
+
+;***************************************************************************
+; smbios_cache_open_32() -> int(1/0)
+; @detail 이미 열려있으면(재진입) 그냥 성공(1)을 반환한다.
+;***************************************************************************
+smbios_cache_open_32 PROC
+    cmp DWORD PTR [g_pSmbiosCache32], 0
+    jne sco32_success
+
+    push ebp
+    mov ebp, esp
+    sub esp, 16
+
+    push 0
+    push 0
+    push 0
+    push 052534D42h
+    call GetSystemFirmwareTable@16
+    test eax, eax
+    jz sco32_fail
+    mov [ebp-4], eax                  ; 필요 크기
+
+    call GetProcessHeap@0
+    mov [ebp-8], eax                  ; heap handle
+
+    push DWORD PTR [ebp-4]
+    push 0
+    push DWORD PTR [ebp-8]
+    call HeapAlloc@12
+    test eax, eax
+    jz sco32_fail
+    mov [ebp-12], eax                 ; 할당된 버퍼
+
+    push DWORD PTR [ebp-4]
+    push DWORD PTR [ebp-12]
+    push 0
+    push 052534D42h
+    call GetSystemFirmwareTable@16
+    test eax, eax
+    jz sco32_fail_free
+
+    mov eax, [ebp-12]
+    mov edx, DWORD PTR [eax+4]        ; Length
+    mov DWORD PTR [g_dwSmbiosCacheLen32], edx
+    mov ecx, [ebp-8]
+    mov DWORD PTR [g_hSmbiosCacheHeap32], ecx
+    mov DWORD PTR [g_pSmbiosCache32], eax
+
+    mov eax, 1
+    jmp sco32_exit
+
+sco32_fail_free:
+    push DWORD PTR [ebp-12]
+    push 0
+    push DWORD PTR [ebp-8]
+    call HeapFree@12
+
+sco32_fail:
+    xor eax, eax
+
+sco32_exit:
+    mov esp, ebp
+    pop ebp
+    ret
+
+sco32_success:
+    mov eax, 1
+    ret
+smbios_cache_open_32 ENDP
+
+
+;***************************************************************************
+; smbios_cache_close_32() -> 없음
+;***************************************************************************
+smbios_cache_close_32 PROC
+    cmp DWORD PTR [g_pSmbiosCache32], 0
+    je scc32_exit
+
+    push DWORD PTR [g_pSmbiosCache32]
+    push 0
+    push DWORD PTR [g_hSmbiosCacheHeap32]
+    call HeapFree@12
+
+    mov DWORD PTR [g_pSmbiosCache32], 0
+    mov DWORD PTR [g_hSmbiosCacheHeap32], 0
+    mov DWORD PTR [g_dwSmbiosCacheLen32], 0
+
+scc32_exit:
+    ret
+smbios_cache_close_32 ENDP
+
 
 get_smbios_string_32 PROC
     push ebp
@@ -28,12 +131,13 @@ get_smbios_string_32 PROC
     ; [ebp-8]  offset
     ; [ebp-12] out buffer
     ; [ebp-16] out buffer_size
-    ; [ebp-20] heap handle
-    ; [ebp-24] raw SMBIOS 데이터 버퍼 포인터
+    ; [ebp-20] heap handle (자체 fetch한 경우만 유효)
+    ; [ebp-24] raw SMBIOS 데이터 버퍼 포인터 (캐시 또는 자체 fetch)
     ; [ebp-28] 테이블 데이터 길이 (RawSMBIOSData.Length)
-    ; [ebp-32] GetSystemFirmwareTable 필요 크기(임시)
+    ; [ebp-32] GetSystemFirmwareTable 필요 크기(임시, 자체 fetch 경로에서만 사용)
     ; [ebp-36] 반환값 임시 저장(cleanup용)
     ; [ebp-40] 테이블 데이터 끝 포인터 (1회만 계산, 이후 불변)
+    ; [ebp-44] 버퍼 소유 여부(1=자체 fetch, HeapFree 필요 / 0=캐시 재사용, HeapFree 금지)
 
     mov eax, DWORD PTR [ebp+8]
     mov [ebp-4], eax
@@ -43,6 +147,19 @@ get_smbios_string_32 PROC
     mov [ebp-12], eax
     mov eax, DWORD PTR [ebp+20]
     mov [ebp-16], eax
+
+    cmp DWORD PTR [g_pSmbiosCache32], 0
+    je smbios32_fetch_own
+
+    mov eax, DWORD PTR [g_pSmbiosCache32]
+    mov [ebp-24], eax
+    mov eax, DWORD PTR [g_dwSmbiosCacheLen32]
+    mov [ebp-28], eax
+    mov DWORD PTR [ebp-44], 0
+    jmp smbios32_have_data
+
+smbios32_fetch_own:
+    mov DWORD PTR [ebp-44], 1
 
     ; 1차 호출: 필요한 버퍼 크기 조회
     push 0                            ; BufferSize = 0
@@ -79,6 +196,8 @@ get_smbios_string_32 PROC
     mov eax, DWORD PTR [esi+4]        ; Length
     mov [ebp-28], eax
 
+smbios32_have_data:
+    mov esi, [ebp-24]
     lea esi, [esi+8]                  ; 현재 구조체 포인터 (시작)
     mov eax, [ebp-24]
     add eax, 8
@@ -116,6 +235,9 @@ smbios32_find_string:
     cmp dl, bl
     je smbios32_string_found
 smbios32_skip_one_char:
+    mov ecx, [ebp-40]
+    cmp edi, ecx
+    jae smbios32_fail_free            ; 테이블 끝 도달 -> 손상 데이터
     cmp BYTE PTR [edi], 0
     je smbios32_skip_one_end
     inc edi
@@ -123,6 +245,9 @@ smbios32_skip_one_char:
 smbios32_skip_one_end:
     inc edi
     inc dl
+    mov ecx, [ebp-40]
+    cmp edi, ecx
+    jae smbios32_fail_free
     cmp BYTE PTR [edi], 0
     je smbios32_fail_free             ; 해당 번호의 문자열 없음
     jmp smbios32_find_string
@@ -134,6 +259,12 @@ smbios32_string_found:
 smbios32_copy_loop:
     cmp eax, ecx
     jae smbios32_copy_done
+    push ecx
+    mov ecx, [ebp-40]
+    lea edx, [edi+eax]
+    cmp edx, ecx
+    pop ecx
+    jae smbios32_copy_done            ; 테이블 끝 도달 -> 있는 데이터까지만 복사
     movzx edx, BYTE PTR [edi+eax]
     test dl, dl
     jz smbios32_copy_done
@@ -152,6 +283,10 @@ smbios32_copy_null_ok:
 smbios32_skip:
     lea edi, [esi+ecx]                ; 포맷 영역 끝 = 문자열 셋 시작
 smbios32_skip_scan:
+    mov edx, [ebp-40]
+    lea eax, [edi+1]
+    cmp eax, edx
+    jae smbios32_fail_free            ; 안전하게 읽을 수 있는 바이트가 없음 -> 손상 데이터
     cmp BYTE PTR [edi], 0
     jne smbios32_skip_adv
     cmp BYTE PTR [edi+1], 0
@@ -165,19 +300,25 @@ smbios32_skip_adv:
 smbios32_fail_free:
     xor eax, eax
     mov [ebp-36], eax
+    cmp DWORD PTR [ebp-44], 0
+    je smbios32_skip_free1
     push DWORD PTR [ebp-24]
     push 0
     push DWORD PTR [ebp-20]
     call HeapFree@12
+smbios32_skip_free1:
     mov eax, [ebp-36]
     jmp smbios32_exit
 
 smbios32_cleanup:
     mov [ebp-36], eax
+    cmp DWORD PTR [ebp-44], 0
+    je smbios32_skip_free2
     push DWORD PTR [ebp-24]
     push 0
     push DWORD PTR [ebp-20]
     call HeapFree@12
+smbios32_skip_free2:
     mov eax, [ebp-36]
     jmp smbios32_exit
 

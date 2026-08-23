@@ -1,71 +1,101 @@
 TITLE PciInfo64.asm
+; PCI Vendor ID -> 제조사명 조회 및 Class Code 기반 장치 분류 (x64).
+;
+;   pci_parse_vendor_name(vendor_id, buffer, buffer_size) -> 없음
+;   pci_classify_device(base_class, sub_class, prog_if) -> 0:Unknown 1:GPU 2:NVMe
+
+.data
+
+; pci_vendor_ids[i]에 대응하는 이름 포인터가 pci_vendor_names[i] - 두 배열은 반드시 같은 순서를 유지.
+pci_vendor_ids WORD 8086h, 8087h, 1022h, 1002h, 10DEh, 10ECh, 14E4h, 168Ch, 1B21h, 1106h
+               WORD 1039h, 144Dh, 1344h, 1C5Ch, 1B4Bh, 15ADh, 80EEh, 1414h, 1AB8h, 1179h
+PCI_VENDOR_COUNT = ($ - pci_vendor_ids) / 2
+
+str_intel      BYTE "Intel", 0
+str_amd        BYTE "AMD", 0
+str_amdati     BYTE "AMD/ATI", 0
+str_nvidia     BYTE "NVIDIA", 0
+str_realtek    BYTE "Realtek", 0
+str_broadcom   BYTE "Broadcom", 0
+str_qcomath    BYTE "Qualcomm Atheros", 0
+str_asmedia    BYTE "ASMedia", 0
+str_via        BYTE "VIA Technologies", 0
+str_sis        BYTE "SiS", 0
+str_samsung    BYTE "Samsung", 0
+str_micron     BYTE "Micron", 0
+str_skhynix    BYTE "SK hynix", 0
+str_marvell    BYTE "Marvell", 0
+str_vmware     BYTE "VMware", 0
+str_vbox       BYTE "Oracle VirtualBox", 0
+str_hyperv     BYTE "Microsoft (Hyper-V)", 0
+str_parallels  BYTE "Parallels", 0
+str_toshiba    BYTE "Toshiba", 0
+str_unknown    BYTE "Unknown", 0
+
+; pci_vendor_ids와 동일한 순서 (8086h, 8087h 둘 다 Intel)
+pci_vendor_names QWORD OFFSET str_intel, OFFSET str_intel, OFFSET str_amd, OFFSET str_amdati, OFFSET str_nvidia
+                 QWORD OFFSET str_realtek, OFFSET str_broadcom, OFFSET str_qcomath, OFFSET str_asmedia, OFFSET str_via
+                 QWORD OFFSET str_sis, OFFSET str_samsung, OFFSET str_micron, OFFSET str_skhynix, OFFSET str_marvell
+                 QWORD OFFSET str_vmware, OFFSET str_vbox, OFFSET str_hyperv, OFFSET str_parallels, OFFSET str_toshiba
 
 .code
 
 ;***************************************************************************
 ; @brief   PCI Vendor ID를 확인하여 제조사 식별 문자열을 작성합니다 (x64).
-; @param   RCX - vendor_id
+; @param   RCX - vendor_id (하위 16비트만 사용)
 ; @param   RDX - buffer*
 ; @param   R8D - buffer_size
 ; @return  없음
-; @detail  Direct Memory Access로 아스키 파싱 데이터를 복사합니다.
+; @detail  pci_vendor_ids/pci_vendor_names 병렬 테이블을 선형 검색하고, buffer_size를
+;          실제로 지키며 복사(초과분은 잘라내고 항상 널 종료)합니다. 매칭 실패 시 "Unknown".
 ;***************************************************************************
 pci_parse_vendor_name PROC
     test rdx, rdx
-    jz exit_null
+    jz pv_exit
     test r8d, r8d
-    jz exit_null
+    jz pv_exit
 
-    cmp cx, 10DEh          ; NVIDIA
-    je is_nvidia
-    cmp cx, 1002h          ; AMD
-    je is_amd
-    cmp cx, 8086h          ; Intel
-    je is_intel
-    cmp cx, 144Dh          ; Samsung
-    je is_samsung
-    jmp is_unknown
+    xor r9, r9                       ; 검색 인덱스
+    lea r10, [pci_vendor_ids]
+    lea r11, [pci_vendor_names]
 
-is_nvidia:
-    ; [수정] 기존 상수(4149564Eh, 00004144h)는 리틀엔디안으로 풀면
-    ; "NVIA"+"DA\0\0" = "NVIADA"가 되어 의도한 "NVIDIA"와 철자가 달랐습니다.
-    mov eax, 4449564Eh     ; "NVID"
-    mov DWORD PTR [rdx], eax
-    mov eax, 00004149h     ; "IA\0\0"
-    mov DWORD PTR [rdx+4], eax
-    ret
+pv_loop:
+    cmp r9, PCI_VENDOR_COUNT
+    jae pv_notfound
 
-is_amd:
-    mov eax, 20444D41h     ; "AMD "
-    mov DWORD PTR [rdx], eax
-    mov eax, 00000000h
-    mov DWORD PTR [rdx+4], eax
-    ret
+    movzx eax, WORD PTR [r10 + r9*2]
+    cmp ax, cx
+    je pv_found
 
-is_intel:
-    mov eax, 65746E49h     ; "Inte"
-    mov DWORD PTR [rdx], eax
-    mov eax, 0000006Ch     ; "l\0\0\0"
-    mov DWORD PTR [rdx+4], eax
-    ret
+    inc r9
+    jmp pv_loop
 
-is_samsung:
-    ; [수정] 두 번째 DWORD(676E7575h)는 리틀엔디안으로 풀면 "uung"이 되어
-    ; 주석("ung\0")과 실제 값이 달랐고, 결과적으로 "Samsuung"이 되어 널
-    ; 종료자도 빠져 있었습니다.
-    mov eax, 736D6153h     ; "Sams"
-    mov DWORD PTR [rdx], eax
-    mov eax, 00676E75h     ; "ung\0"
-    mov DWORD PTR [rdx+4], eax
-    ret
+pv_found:
+    mov rax, [r11 + r9*8]             ; 매칭된 문자열 포인터
+    jmp pv_copy
 
-is_unknown:
-    mov eax, 6E6B6E55h     ; "Unkn"
-    mov DWORD PTR [rdx], eax
-    mov eax, 006E776Fh     ; "own\0"
-    mov DWORD PTR [rdx+4], eax
+pv_notfound:
+    lea rax, [str_unknown]
 
-exit_null:
+pv_copy:
+    xor ecx, ecx                      ; 복사한 바이트 수
+pv_copy_loop:
+    cmp ecx, r8d
+    jae pv_copy_done
+    mov r9b, BYTE PTR [rax + rcx]
+    test r9b, r9b
+    jz pv_copy_done
+    mov BYTE PTR [rdx + rcx], r9b
+    inc ecx
+    jmp pv_copy_loop
+pv_copy_done:
+    cmp ecx, r8d
+    jb pv_null_ok
+    dec ecx                           ; buffer_size와 같으면 마지막 한 바이트를 null용으로 확보
+pv_null_ok:
+    mov BYTE PTR [rdx + rcx], 0
+
+pv_exit:
     ret
 pci_parse_vendor_name ENDP
 

@@ -30,8 +30,10 @@ using namespace std;
 
 #include <Util/ConsoleUtil.h>
 
+#include <System/HwInfoStructs.h>
 #include <System/CpuInfo.h>
-#include <System/BoardInfo.h>
+#include <System/DeviceInfo.h>
 #include <System/PciInfo.h>
+#include <System/SmbiosHardwareInfo.h>
 
 #endif // ndef PCH_H

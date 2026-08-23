@@ -39,6 +39,41 @@
 void ChangeDataFormat(const __int64& nData, TCHAR* ptszFormat);
 
 //***************************************************************************
+// @class CWmiProcessorInfo
+// @brief 시스템 프로세서(CPU) 정보를 WMI를 통해 수집하고 조회하는 관리 클래스입니다.
+//        CCpuInfo(non-WMI, CPUID 기반)와 HWINFO_CPU를 공유합니다.
+// @details Family/Model/Stepping/기능 플래그는 CPUID로만 얻을 수 있어 이 클래스는
+//          항상 기본값(0)으로 남깁니다 - 그 정보가 필요하면 CCpuInfo를 쓸 것.
+//***************************************************************************
+class CWmiProcessorInfo
+{
+public:
+	CWmiProcessorInfo();
+	~CWmiProcessorInfo();
+
+	//***************************************************************************
+	// @brief WMI를 통해 장착된 모든 프로세서 정보를 수집합니다.
+	// @param   Wmi 초기화된 WMI 인터페이스 객체 참조
+	// @return  BOOL 정보 수집 성공 여부 (TRUE: 성공, FALSE: 실패)
+	// @details Win32_Processor 클래스에서 Name/Manufacturer/ProcessorId/코어수/
+	//          스레드수/클럭속도/L2·L3 캐시 크기를 수집합니다.
+	//***************************************************************************
+	BOOL GetInformation(CWmi& Wmi);
+
+	//***************************************************************************
+	// @brief 수집된 프로세서 정보 구조체 배열의 포인터를 반환합니다.
+	// @return  const std::vector<HWINFO_CPU*>* 프로세서 포인터 벡터
+	//***************************************************************************
+	const std::vector<HWINFO_CPU*>* GetProcessorArray() const {
+		return &m_sProcessorArray;
+	}
+
+private:
+	std::vector<HWINFO_CPU*> m_sProcessorArray; // 프로세서 정보 포인터 배열
+};
+
+
+//***************************************************************************
 // @class CWmiBiosInfo
 // @brief 시스템 BIOS 정보를 WMI를 통해 수집하고 조회하는 관리 클래스입니다.
 //***************************************************************************
@@ -379,6 +414,74 @@ private:
 	std::vector<HWINFO_DRIVE*> m_sDriveArray; // 논리 드라이브별 상세 정보 배열
 };
 
+
+//***************************************************************************
+// @class CWmiSoundCardInfo
+// @brief 사운드 카드(오디오 장치) 정보를 WMI 및 Win32 Multimedia API를 통해
+//        수집하고 조회하는 관리 클래스입니다.
+//***************************************************************************
+class CWmiSoundCardInfo
+{
+public:
+	CWmiSoundCardInfo();
+	~CWmiSoundCardInfo();
+
+	//***************************************************************************
+	// @brief WMI 및 waveOutGetDevCaps API를 이용해 사운드 카드 정보를 수집합니다.
+	// @param   Wmi 초기화된 WMI 인터페이스 객체 참조
+	// @return  BOOL 정보 수집 성공 여부 (TRUE: 성공, FALSE: 실패)
+	// @details Win32_SoundDevice 클래스에서 ProductName(없으면 Name)/Manufacturer/
+	//          PNPDeviceID를, waveOutGetDevCaps로 볼륨 제어 지원 여부(기본 장치 기준)를
+	//          수집합니다.
+	//***************************************************************************
+	BOOL GetInformation(CWmi& Wmi);
+
+	//***************************************************************************
+	// @brief 수집된 사운드 카드 정보 구조체 배열의 포인터를 반환합니다.
+	// @return  const std::vector<HWINFO_SOUNDCARD*>* 사운드 카드 포인터 벡터
+	//***************************************************************************
+	const std::vector<HWINFO_SOUNDCARD*>* GetSoundCardArray() const {
+		return &m_sSoundCardArray;
+	}
+
+private:
+	std::vector<HWINFO_SOUNDCARD*> m_sSoundCardArray; // 사운드 카드 정보 포인터 배열
+};
+
+
+//***************************************************************************
+// @class CWmiVideoCardInfo
+// @brief 그래픽 카드(디스플레이 어댑터) 정보를 WMI를 통해 수집하고 조회하는
+//        관리 클래스입니다.
+//***************************************************************************
+class CWmiVideoCardInfo
+{
+public:
+	CWmiVideoCardInfo();
+	~CWmiVideoCardInfo();
+
+	//***************************************************************************
+	// @brief WMI를 통해 비디오 카드 속성 및 VRAM 용량을 수집합니다.
+	// @param   Wmi 초기화된 WMI 인터페이스 객체 참조
+	// @return  BOOL 정보 수집 성공 여부 (TRUE: 성공, FALSE: 실패)
+	// @details Win32_VideoController 클래스에서 ChipType/DAC/Driver/AdapterCompatibility/
+	//          PNPDeviceID 및 VRAM 용량(AdapterRAM, Byte -> MB 변환)을 수집합니다.
+	//***************************************************************************
+	BOOL GetInformation(CWmi& Wmi);
+
+	//***************************************************************************
+	// @brief 수집된 그래픽 카드 정보 구조체 배열의 포인터를 반환합니다.
+	// @return  const std::vector<HWINFO_VIDEOCARD*>* 그래픽 카드 포인터 벡터
+	//***************************************************************************
+	const std::vector<HWINFO_VIDEOCARD*>* GetVideoCardArray() const {
+		return &m_sVideoCardArray;
+	}
+
+private:
+	std::vector<HWINFO_VIDEOCARD*> m_sVideoCardArray; // 비디오 카드 정보 포인터 배열
+};
+
+
 //***************************************************************************
 // @class CWmiNetworkCardInfo
 // @brief 시스템 내 네트워크 인터페이스 카드를 수집 및 관리하는 클래스입니다.
@@ -563,6 +666,43 @@ public:
 
 private:
 	std::vector<HWINFO_MONITOR*> m_sMonitorArray; // 모니터 정보 포인터 배열
+};
+
+
+//***************************************************************************
+// @class CWmiPciInfo
+// @brief PCI 버스 장치 정보를 WMI를 통해 수집하고 조회하는 관리 클래스입니다.
+//        CPciInfo(non-WMI, SetupAPI+asm)와 HWINFO_PCIDEVICE를 공유함.
+// @details WMI는 Bus/Device/Function/Class Code에 대응하는 속성이 없어 이 필드들은
+//          항상 기본값(0/Unknown)으로 남음 - Description/Manufacturer/VendorID/
+//          DeviceID만 채움. 정확한 버스 위치/분류가 필요하면 CPciInfo를 쓸 것.
+//***************************************************************************
+class CWmiPciInfo
+{
+public:
+	CWmiPciInfo();
+	~CWmiPciInfo();
+
+	//***************************************************************************
+	// @brief WMI를 통해 PCI 버스에 연결된 장치 정보를 수집합니다.
+	// @param   Wmi 초기화된 WMI 인터페이스 객체 참조
+	// @return  BOOL 정보 수집 성공 여부 (TRUE: 성공, FALSE: 실패)
+	// @details Win32_PnPEntity를 PNPDeviceID가 "PCI"로 시작하는 것만 걸러서 조회하고,
+	//          Description/Manufacturer를 읽은 뒤 DeviceID 문자열("PCI\VEN_xxxx&DEV_xxxx&...")을
+	//          파싱해 Vendor/Device ID를 채웁니다.
+	//***************************************************************************
+	BOOL GetInformation(CWmi& Wmi);
+
+	//***************************************************************************
+	// @brief 수집된 PCI 장치 정보 구조체 배열의 포인터를 반환합니다.
+	// @return  const std::vector<HWINFO_PCIDEVICE*>* PCI 장치 포인터 벡터
+	//***************************************************************************
+	const std::vector<HWINFO_PCIDEVICE*>* GetPciDeviceArray() const {
+		return &m_sPciArray;
+	}
+
+private:
+	std::vector<HWINFO_PCIDEVICE*> m_sPciArray; // PCI 장치 정보 포인터 배열
 };
 
 #endif // ndef __WMIHARDWAREINFO_H__

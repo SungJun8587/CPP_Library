@@ -11,6 +11,10 @@
 #include <System/SystemBaseDefine.h>
 #endif
 
+#ifndef __HWINFOSTRUCTS_H__
+#include <System/HwInfoStructs.h>
+#endif
+
 #include <cstdint>
 #include <intrin.h>
 #include <mmsystem.h> // timeGetTime 정의 헤더 추가
@@ -95,46 +99,9 @@ extern "C" {
 }
 
 // ==========================================================================
-// 2. Class Definitions and Data Structures
+// 2. Class Definitions
 // ==========================================================================
-
-//***************************************************************************
-// @brief CPU 하드웨어 상세 정보를 저장하는 구조체입니다.
-// @details CPU의 속도, 프로세서 수, 패밀리/모델/스테핑 정보, 기능 플래그 및 제조사/프로세서 명칭 등의 정보를 보유합니다.
-//***************************************************************************
-typedef struct _HWINFO_CPU
-{
-	//***************************************************************************
-	// @brief _HWINFO_CPU 구조체의 기본 생성자입니다.
-	// @details 모든 멤버 변수(속도, 카운트, 시그니처, 이름 문자열 등)를 초기화합니다.
-	//***************************************************************************
-	_HWINFO_CPU() {
-		m_nSpeed = 0;
-		m_nNumberCpus = 0;
-		m_nFamily = 0;
-		m_nModel = 0;
-		m_nStepping = 0;
-		m_nFamilyEx = 0;
-		m_nModelEx = 0;
-		m_dwFeatures = 0;
-
-		m_tszVendorName[0] = '\0';
-		m_tszProcessorName[0] = '\0';
-	}
-
-	unsigned __int64	m_nSpeed; // CPU 속도 (MHz)
-	int			m_nNumberCpus; // 프로세서 개수
-	int			m_nFamily; // CPU 패밀리
-	int			m_nModel; // CPU 모델
-	int			m_nStepping; // CPU 스테핑
-	int			m_nFamilyEx; // 확장 패밀리
-	int			m_nModelEx; // 확장 모델
-
-	DWORD		m_dwFeatures; // CPU 기능 플래그
-
-	TCHAR	m_tszVendorName[CPU_VENDOR_STRLEN]; // 제조사 이름
-	TCHAR	m_tszProcessorName[CPU_GENNAME_STRLEN]; // 프로세서 이름
-} HWINFO_CPU, * PHWINFO_CPU;
+// HWINFO_CPU 구조체는 HwInfoStructs.h에 있음 (CWmiProcessorInfo와 공유).
 
 
 //***************************************************************************
@@ -204,7 +171,9 @@ private:
 
 //***************************************************************************
 // @brief CPU 하드웨어 정보의 탐지 및 조회를 담당하는 클래스입니다.
-// @details CPU 제조사, 모델, 클럭 속도, 지원 명령어 집합(MMX, SSE, SSE2, 3DNow!) 등 다양한 정보를 수집하고 외부 인터페이스로 제공합니다.
+// @details CPU 제조사, 모델, 클럭 속도, 물리 코어 수, L2/L3 캐시 크기, 식별
+//          문자열, 지원 명령어 집합(MMX, SSE, SSE2, 3DNow!) 등 다양한 정보를
+//          CPUID/WinAPI만으로(WMI 없이) 수집하고 외부 인터페이스로 제공합니다.
 //***************************************************************************
 class CCpuInfo
 {
@@ -281,6 +250,45 @@ public:
 		return m_Cpu.m_nStepping;
 	}
 
+	//***************************************************************************
+	// @brief 물리 코어 수를 반환합니다.
+	// @details GetLogicalProcessorInformationEx(RelationProcessorCore)로 감지된
+	//          물리 코어 개수를 반환합니다(논리 프로세서/스레드 수와는 다름).
+	// @return 물리 코어 수
+	//***************************************************************************
+	unsigned int GetNumberOfCores() const {
+		return m_Cpu.m_dwNumberOfCores;
+	}
+
+	//***************************************************************************
+	// @brief L2 캐시 크기를 반환합니다.
+	// @details cpu_cache_size_kb(2)로 감지된 L2 캐시 크기입니다.
+	// @return L2 캐시 크기 (KB)
+	//***************************************************************************
+	unsigned int GetL2CacheSize() const {
+		return m_Cpu.m_dwL2CacheSize;
+	}
+
+	//***************************************************************************
+	// @brief L3 캐시 크기를 반환합니다.
+	// @details cpu_cache_size_kb(3)로 감지된 L3 캐시 크기입니다.
+	// @return L3 캐시 크기 (KB)
+	//***************************************************************************
+	unsigned int GetL3CacheSize() const {
+		return m_Cpu.m_dwL3CacheSize;
+	}
+
+	//***************************************************************************
+	// @brief CPU 식별 문자열을 반환합니다.
+	// @details CPUID Leaf 1의 EDX(기능 플래그):EAX(시그니처)를 16진수로 결합한
+	//          문자열입니다. WMI의 ProcessorId도 같은 CPUID 원시 데이터에서 나온
+	//          값이라 형태가 유사하나, 정확히 동일한 포맷임이 검증된 것은 아닙니다.
+	// @return CPU 식별 문자열 포인터
+	//***************************************************************************
+	const TCHAR* GetProcessorId() const {
+		return m_Cpu.m_tszProcessorId;
+	}
+
 	BOOL IsMMXSupported() const;
 	BOOL IsSSESupported() const;
 	BOOL IsSSE2Supported() const;
@@ -293,6 +301,9 @@ private:
 	void	DetectCpuDescInfo();
 	void	DetectCpuSpeed();
 	void	DetectVendorName();
+	void	DetectCoreCount();
+	void	DetectCacheSizes();
+	void	DetectProcessorId();
 
 	std::string GetHighestCpuId(DWORD& dwHighest) const;
 	void	GetCpuIdentification();
