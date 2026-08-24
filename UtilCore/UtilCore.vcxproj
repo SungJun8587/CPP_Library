@@ -78,6 +78,15 @@
     <ClInclude Include="Memory\RefCountable.h" />
     <ClInclude Include="Memory\Singleton.h" />
     <ClInclude Include="Memory\Stream.h" />
+    <ClInclude Include="Network\HTTP\HttpClientCore.h" />
+    <ClInclude Include="Network\HTTP\HttpConnPool.h" />
+    <ClInclude Include="Network\HTTP\HttpConnPoolCommon.h" />
+    <ClInclude Include="Network\HTTP\HttpConnPoolFactory.h" />
+    <ClInclude Include="Network\HTTP\HttpConnPoolManager.h" />
+    <ClInclude Include="Network\HTTP\HttpPacketBuilder.h" />
+    <ClInclude Include="Network\HTTP\HttpResponseParser.h" />
+    <ClInclude Include="Network\HTTP\HttpSessionIocp.h" />
+    <ClInclude Include="Network\HTTP\HttpSessionRio.h" />
     <ClInclude Include="Network\IOCP\IocpCommon.h" />
     <ClInclude Include="Network\IOCP\IocpCore.h" />
     <ClInclude Include="Network\IOCP\IocpEvent.h" />
@@ -95,6 +104,8 @@
     <ClInclude Include="Network\RingBuffer.h" />
     <ClInclude Include="Network\RIO\RioBuffer.h" />
     <ClInclude Include="Network\RIO\RioCommon.h" />
+    <ClInclude Include="Network\RIO\RioConnectDispatcher.h" />
+    <ClInclude Include="Network\RIO\RioConnectEvent.h" />
     <ClInclude Include="Network\RIO\RioCore.h" />
     <ClInclude Include="Network\RIO\RioEvent.h" />
     <ClInclude Include="Network\RIO\RioEventPool.h" />
@@ -195,6 +206,7 @@
     <ClCompile Include="Network\NetworkFactory.cpp" />
     <ClCompile Include="Network\RingBuffer.cpp" />
     <ClCompile Include="Network\RIO\RioBuffer.cpp" />
+    <ClCompile Include="Network\RIO\RioConnectDispatcher.cpp" />
     <ClCompile Include="Network\RIO\RioCore.cpp" />
     <ClCompile Include="Network\RIO\RioEvent.cpp" />
     <ClCompile Include="Network\RIO\RioEventPool.cpp" />

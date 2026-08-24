@@ -27,6 +27,10 @@
 #include <Network/Rio/RioReceive.h>
 #endif
 
+#ifndef __RIOCONNECTEVENT_H__
+#include <Network/Rio/RioConnectEvent.h>
+#endif
+
 #ifndef __PLATFORMLOCK_H__
 #include <Thread/PlatformLock.h>
 #endif
@@ -37,6 +41,7 @@
 
 class CRioCore;
 class CRioBuffer;
+class CRioConnectDispatcher;
 
 //***************************************************************************
 // @class CRioSession
@@ -64,6 +69,17 @@ class CRioBuffer;
 //          구현하는 상위 클래스가 세션 밖의 공유 가변 상태(예: 다른 세션과 공유하는
 //          게임 로직 상태)를 건드리는 경우엔 그 상태 자체를 상위 계층에서 별도로
 //          동기화해야 합니다(이 클래스가 보장하는 범위 밖).
+//
+//      [클라이언트 전용 비동기 연결(ConnectAsync)]
+//          RIO CQ 완료(RIODequeueCompletion 기반)와 ConnectEx 완료(일반 OVERLAPPED/
+//          IOCP 기반)는 완전히 다른 통로입니다 — CRioCore::DispatchBatch()에
+//          ConnectEx 완료를 섞으면 IsValidCompletionPacket() 검증에 걸려 CRioCore
+//          전체가 Faulted로 죽습니다(진단 이력 참고). 그래서 ConnectAsync()는
+//          CRioCore와 무관한 별도의 CRioConnectDispatcher(전용 IOCP + 워커 스레드 1개)를
+//          통해 완료 통지를 받고, ProcessConnectEx()가 그 완료를 받아 이어서
+//          RIOCreateRequestQueue() -> Init() -> PostInitialReceive() 순서로 세션을
+//          완성시킵니다. 이 흐름은 호출자(CRioClientService::ConnectOneMoreSession())가
+//          오케스트레이션합니다.
 //***************************************************************************
 class CRioSession : public CSession, public CRioObject
 {
@@ -104,6 +120,32 @@ public:
 	//         Active가 아니므로 Close()로 자기 자신을 정리시킬 수 없음).
 	//***************************************************************************
 	bool Init(uint64_t sessionId, CRioCore* core, CRioBuffer* globalRecvBufferPool, SOCKET socket, RIO_RQ requestQueue) noexcept;
+
+	//***************************************************************************
+	// @brief ConnectEx로 비동기 연결을 게시합니다 (클라이언트 측 전용).
+	// @param dispatcher 완료 통지를 받을 전용 디스패처(CRioCore와 무관, 호출자가
+	//        소유하며 이 세션 수명보다 오래 살아있어야 함 — 보통 서비스가 소유)
+	// @param sessionId 고유 세션 ID (연결 성공 시 Init()에 그대로 전달됨)
+	// @param core RIO Core 객체 포인터 (연결 성공 시 RIOCreateRequestQueue와 Init에 사용)
+	// @param globalRecvBufferPool 전역 수신 버퍼 풀 포인터
+	// @param remoteAddr 접속할 원격 주소
+	// @return bool "게시 시도"가 정상적으로 이뤄졌는지 여부입니다 — 연결 성공
+	//         여부가 절대 아닙니다(IOCP의 CIocpSession::ConnectAsync()와 동일한
+	//         계약). 이 함수의 모든 실패 경로는 FailConnect()를 호출해
+	//         OnDisconnected()까지 통지를 완료하므로, 호출부는 반환값이 false여도
+	//         별도로 정리할 것이 없습니다. 최종 연결 성공/실패는 항상
+	//         OnConnected()/OnDisconnected(reason) 오버라이드로 비동기 통지됩니다.
+	//***************************************************************************
+	bool ConnectAsync(CRioConnectDispatcher& dispatcher, uint64_t sessionId, CRioCore* core,
+		CRioBuffer* globalRecvBufferPool, const CNetAddress& remoteAddr);
+
+	//***************************************************************************
+	// @brief ConnectEx 완료 통지 처리. CRioConnectDispatcher의 워커 스레드가 호출합니다.
+	// @details 일반 사용자 코드에서 직접 호출할 일은 없지만, CRioConnectDispatcher가
+	//          CRioSession의 내부 구현 세부사항(RIOCreateRequestQueue 순서 등)을
+	//          몰라도 되도록 이 함수만 public으로 노출합니다.
+	//***************************************************************************
+	void ProcessConnectEx();
 
 	//***************************************************************************
 	// @brief 지정된 사유로 세션 종료를 요청합니다.
@@ -266,6 +308,26 @@ private:
 	//***************************************************************************
 	void OnSendCompleted(CRioEvent* rioEvent, DWORD bytesTransferred) noexcept;
 
+	//***************************************************************************
+	// @brief ConnectEx 비동기 연결을 실제로 게시합니다 (ConnectAsync() 내부에서 호출).
+	//***************************************************************************
+	void RegisterConnect(const CNetAddress& remoteAddr);
+
+	//***************************************************************************
+	// @brief connect 실패(또는 그 이전 단계인 소켓 생성/bind/RQ 생성 실패) 시
+	//        정리 전용 경로.
+	// @param reason 실패 사유
+	// @details Close(reason)을 재사용하지 않는 이유: 그 함수는 Active 상태에서
+	//          Closing으로의 CAS 전이를 전제로 하는데, connect 실패 시점엔
+	//          _state가 한 번도 Active였던 적이 없어(Init()이 아직 성공적으로
+	//          끝나지 않음) 그 전이가 실패해 조용히 return하고 아무 정리도 안
+	//          됩니다(소켓 leak). 이 함수는 상태와 무관하게 항상 소켓을 닫고
+	//          통지 콜백을 호출한 뒤 _state를 직접 Closed로 확정합니다(Active->
+	//          Closing->Closed의 정상 파이프라인을 거치지 않는 예외 경로임을
+	//          명시적으로 표시).
+	//***************************************************************************
+	void FailConnect(Rio::CloseReason reason) noexcept;
+
 private:
 	uint64_t _sessionId{ 0 };                           // 고유 세션 ID
 
@@ -295,6 +357,8 @@ private:
 
 	CRingBuffer _sendBuffer{ Rio::kSendRingBufferSize };    // 64KB 송신 링버퍼 (세션 독자 소유 메모리)
 	CRingBuffer _recvBuffer{ Rio::kRecvRingBufferSize };    // 64KB 수신 링버퍼
+
+	RioConnectEvent _connectEvent;                      // ConnectEx 요청 및 완료 처리를 위한 OVERLAPPED 이벤트 객체 (클라이언트 전용)
 };
 
 #endif // ndef __RIOSESSION_H__

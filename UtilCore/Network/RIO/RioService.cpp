@@ -1,4 +1,5 @@
-﻿//***************************************************************************
+﻿
+//***************************************************************************
 // RioService.cpp: implementation of the CRioService classes.
 //
 //***************************************************************************
@@ -225,7 +226,77 @@ CRioClientService::CRioClientService(CNetAddress address, CRioCoreRef rioCore, S
 }
 
 //***************************************************************************
-// @brief 클라이언트 구동 및 세션 할당
+// @brief 이미 구동 중인 서비스에 세션 하나를 추가로 연결 "게시"합니다.
+// @details 세션 생성 → 서비스/세션매니저 즉시 등록 → CRioSession::ConnectAsync()로
+//          ConnectEx 비동기 게시. RIOCreateRequestQueue/Init()/PostInitialReceive()는
+//          더 이상 여기서 하지 않고 CRioSession::ProcessConnectEx()가 연결 완료
+//          통지(_connectDispatcher 워커 스레드)를 받은 뒤 이어서 수행합니다.
+//
+//          [비동기 전환] 과거 버전은 CSocketUtils::Connect()(완전 블로킹)를 사용해
+//          이 함수가 "연결까지 끝난 세션"을 그 자리에서 반환했습니다. 이는 세션
+//          N개를 완전 직렬로, RTT만큼씩 순서대로 연결하는 성능 특성을 가졌습니다.
+//          지금은 CRioSession::ConnectAsync()가 ConnectEx 기반 진짜 비동기라 그
+//          문제가 사라졌습니다 — 대신 이 함수의 반환값 의미가 바뀌었습니다(헤더의
+//          ConnectOneMoreSession() 주석 참고).
+//
+//          CreateSession() 실패 시 로컬 shared_ptr(session/rioSession)이 스코프를
+//          벗어나며 소멸자가 소켓을 정리하므로 별도 정리가 필요 없습니다.
+//          ConnectAsync() 자신의 모든 실패 경로는 내부에서 FailConnect()를 호출해
+//          정리 및 OnDisconnected(reason) 통지까지 완료합니다.
+// @return CRioSessionRef 세션 생성 + 서비스 등록 + ConnectEx 게시까지 성공하면
+//         세션 참조(연결 완료 보장 아님), 그 전 단계 실패 시 nullptr.
+//***************************************************************************
+CRioSessionRef CRioClientService::ConnectOneMoreSession()
+{
+	if( _rioCore == nullptr || _globalRecvBuffer == nullptr )
+		return nullptr;
+
+	CSessionRef session = CreateSession();
+	if( session == nullptr )
+		return nullptr;
+
+	CRioSessionRef rioSession = std::static_pointer_cast<CRioSession>(session);
+	if( rioSession == nullptr )
+		return nullptr;
+
+	rioSession->SetNetAddress(_address);
+
+	// 연결 완료를 기다리지 않고 즉시 추적 목록에 등록합니다. 연결이 실패하면
+	// CRioSession::FailConnect()가 호출하는 CSession::OnDisconnected()가
+	// DisconnectHandler(ReleaseSession 콜백)를 통해 자동으로 제거하므로,
+	// "연결 시도 중" 세션이 목록에 남는 leak은 없습니다.
+	AddSession(rioSession);
+
+	uint64_t sessionId = _sessionManager.GenerateSessionId();
+	_sessionManager.AddSession(sessionId, rioSession);
+
+	// ConnectAsync()의 반환값은 "게시 시도" 성공 여부일 뿐입니다 — false든 true든
+	// 최종 연결 결과는 세션의 OnConnected()/OnDisconnected(reason)으로 비동기
+	// 통지됩니다. 여기서는 게시 자체의 성공 여부만 보고합니다.
+	if( !rioSession->ConnectAsync(_connectDispatcher, sessionId, _rioCore.get(), _globalRecvBuffer.get(), _address) )
+		return nullptr;
+
+	return rioSession;
+}
+
+//***************************************************************************
+// @brief 클라이언트 구동, 이벤트 풀/코어/워커/수신 버퍼/ConnectEx 디스패처 초기화
+//        및 세션 연결 게시
+// @return bool 성공 여부. [중요] true를 반환해도 각 세션의 실제 TCP 연결이
+//         완료됐다는 뜻이 아닙니다 — Start()의 doc 주석 참고.
+// @details
+// - 1. 클라이언트 전용 이벤트 풀을 초기화합니다.
+// - 2. RIO 함수 테이블 조회용 더미 소켓으로 _rioCore를 초기화합니다.
+// - 3. 멀티 워커 스레드 그룹을 구동합니다(세션 등록 전에 코어가 Running 상태여야
+//      PostInitialReceive()가 정상 동작).
+// - 4. 글로벌 수신 버퍼를 초기화합니다.
+// - 5. ConnectEx 완료 통지 전용 디스패처(_connectDispatcher)를 시작합니다
+//      (CRioCore와 완전히 분리된 자기 소유 IOCP + 워커 스레드 1개 — 진단 이력 참고).
+// - 6. _maxSessionCount 개수만큼 ConnectOneMoreSession()을 호출해 세션을 생성하고
+//      ConnectEx 비동기 연결을 게시합니다. 세션 하나라도 "게시 시도" 자체가
+//      실패하면(세션 생성 실패 등) 즉시 Close()로 전체를 정리하고 false를
+//      반환합니다. 개별 연결 실패에 대한 배치 롤백은 더 이상 이 함수의 책임이
+//      아닙니다(각 세션이 비동기로 스스로 정리됨 — IOCP Start()와 동일한 설계).
 //***************************************************************************
 bool CRioClientService::Start()
 {
@@ -283,91 +354,25 @@ bool CRioClientService::Start()
 		return false;
 	}
 
-	std::vector<CRioSessionRef> connectedSessions;
-	connectedSessions.reserve(static_cast<size_t>(_maxSessionCount));
-
-	//***********************************************************************
-	// @brief 지금까지 연결에 성공한 세션들을 역순으로 Close()합니다.
-	//***********************************************************************
-	auto rollbackConnectedSessions = [&connectedSessions]()
-		{
-			for( auto it = connectedSessions.rbegin(); it != connectedSessions.rend(); ++it )
-			{
-				if( *it ) (*it)->Close(Rio::CloseReason::InternalError);
-			}
-			connectedSessions.clear();
-		};
-
-	// 5. 세션 연결 및 RQ 바인딩
-	for( int32 i = 0; i < _maxSessionCount; i++ )
+	// 5. ConnectEx 완료 통지 전용 디스패처 시작 (CRioCore와 무관한 별도 IOCP)
+	if( !_connectDispatcher.Start() )
 	{
-		CSessionRef session = CreateSession();
-		if( session == nullptr )
-		{
-			rollbackConnectedSessions();
-			return false;
-		}
-
-		CRioSessionRef rioSession = std::static_pointer_cast<CRioSession>(session);
-		if( rioSession == nullptr )
-		{
-			rollbackConnectedSessions();
-			return false;
-		}
-
-		SOCKET clientSocket = CSocketUtils::CreateRioSocket();
-		if( clientSocket == INVALID_SOCKET )
-		{
-			rollbackConnectedSessions();
-			return false;
-		}
-
-		if( !CSocketUtils::Connect(clientSocket, _address) )
-		{
-			CSocketUtils::Close(clientSocket);
-			LOG_ERROR(_T("[Client] Error: Connection failed!"));
-			rollbackConnectedSessions();
-			return false;
-		}
-
-		RIO_RQ requestQueue = rioTable.RIOCreateRequestQueue(
-			clientSocket,
-			Rio::kRequestQueueMaxReceiveOutstanding,
-			Rio::kRequestQueueMaxReceiveDataBuffers,
-			Rio::kRequestQueueMaxSendOutstanding,
-			Rio::kRequestQueueMaxSendDataBuffers,
-			_rioCore->GetReceiveQueue(),
-			_rioCore->GetSendQueue(),
-			nullptr
-		);
-
-		if( requestQueue == RIO_INVALID_RQ )
-		{
-			CSocketUtils::Close(clientSocket);
-			rollbackConnectedSessions();
-			return false;
-		}
-
-		uint64_t sessionId = _sessionManager.GenerateSessionId();
-
-		if( !rioSession->Init(sessionId, _rioCore.get(), _globalRecvBuffer.get(), clientSocket, requestQueue) )
-		{
-			LOG_ERROR(_T("[Client] Error: CRioSession::Init failed (send buffer registration)!"));
-			CSocketUtils::Close(clientSocket);
-			rollbackConnectedSessions();
-			return false;
-		}
-
-		rioSession->SetNetAddress(_address);
-		AddSession(rioSession);
-		_sessionManager.AddSession(sessionId, rioSession);
-
-		rioSession->PostInitialReceive();
-
-		connectedSessions.push_back(rioSession);
+		LOG_ERROR(_T("[Error] CRioConnectDispatcher Start failed!"));
+		_rioCore->RequestStop();
+		_rioCore->Shutdown();
+		return false;
 	}
 
-	LOG_INFO(_T("[RIO Client] Connected to Server!"));
+	// 6. 세션 연결 게시 (실제 절차는 ConnectOneMoreSession()에 위임)
+	for( int32 i = 0; i < _maxSessionCount; i++ )
+	{
+		if( ConnectOneMoreSession() == nullptr )
+		{
+			Close();
+			return false;
+		}
+	}
+
 	return true;
 }
 
@@ -377,6 +382,11 @@ bool CRioClientService::Start()
 void CRioClientService::Close()
 {
 	_sessionManager.BeginCloseAllSessions();
+
+	// ConnectEx 게시/완료 통지를 더 이상 처리하지 않도록 먼저 정지.
+	// _rioCore보다 먼저 멈춰도 안전한 이유: 이 디스패처는 _rioCore와 완전히
+	// 독립된 리소스(자체 IOCP)라 서로의 정지 순서에 의존성이 없음.
+	_connectDispatcher.Shutdown();
 
 	if( _rioCore )
 	{

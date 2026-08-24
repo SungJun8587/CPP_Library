@@ -33,4 +33,10 @@ USING_SHARED_PTR(CRioSession);
 USING_SHARED_PTR(CRioServerService);
 USING_SHARED_PTR(CRioClientService);
 
+USING_SHARED_PTR(CHttpRequestBuilderT);
+USING_SHARED_PTR(CHttpResponseBuilderT);
+USING_SHARED_PTR(IHttpConnPool);
+USING_SHARED_PTR(CHttpSessionIocp);
+USING_SHARED_PTR(CHttpSessionRio);
+
 #endif // ndef __NETWORKREDEFINEDATATYPE_H__

@@ -1,5 +1,4 @@
-﻿
-//***************************************************************************
+﻿//***************************************************************************
 // SocketUtils.cpp: implementation of the CSocketUtils class.
 //
 //***************************************************************************
@@ -322,6 +321,26 @@ bool CSocketUtils::SetUpdateConnectContext(SOCKET socket)
 {
 	return ::setsockopt(socket, SOL_SOCKET, SO_UPDATE_CONNECT_CONTEXT,
 		nullptr, 0) != SOCKET_ERROR;
+}
+
+//***************************************************************************
+// @brief SO_ERROR 옵션을 조회하여 non-blocking connect()/ConnectEx 완료 후
+//        실제 연결 성공 여부를 확인합니다.
+// @param socket 대상 소켓 핸들
+// @param outError [OUT] SO_ERROR 값 (0이면 연결 성공, 0이 아니면 실패 사유의
+//        Winsock 에러 코드)
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
+bool CSocketUtils::GetSocketError(SOCKET socket, int32& outError)
+{
+	int32 sockError = 0;
+	int32 optLen = sizeof(sockError);
+	if( ::getsockopt(socket, SOL_SOCKET, SO_ERROR,
+		reinterpret_cast<char*>(&sockError), &optLen) == SOCKET_ERROR )
+		return false;
+
+	outError = sockError;
+	return true;
 }
 
 // ---------- Connect / Bind / Listen / Close ----------

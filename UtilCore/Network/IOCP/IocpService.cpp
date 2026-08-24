@@ -1,4 +1,5 @@
-﻿//***************************************************************************
+﻿
+//***************************************************************************
 // IocpService.cpp: implementation of the CIocpService classes.
 //
 //***************************************************************************
@@ -164,11 +165,69 @@ CIocpClientService::CIocpClientService(CNetAddress address, CIocpCoreRef iocpCor
 }
 
 //***************************************************************************
-// @brief 클라이언트 구동, 워커 스레드 시작 및 세션 IOCP 등록
-// @return bool 성공 여부
+// @brief 이미 구동 중인 서비스에 세션 하나를 추가로 연결 "게시"합니다.
+// @details Start()의 접속 루프 본체와 동일한 절차(세션 생성 → IOCP Core 등록 →
+//          서비스에 즉시 등록 → ConnectEx 비동기 게시)를 그대로 수행합니다.
+//
+//          [비동기 전환] 과거 버전은 동기 connect()를 사용해 이 함수가 "연결까지
+//          끝난 세션"을 그 자리에서 반환했습니다. 그 과정에서 connect()가
+//          WSAEWOULDBLOCK을 반환해도 곧바로 ProcessConnect()를 호출해버려, TCP
+//          핸드셰이크가 실제로 끝나기 전에 WSARecv를 거는 버그가 있었습니다
+//          (select() 기반 유계 대기로 임시 수정했던 이력 있음). 지금은
+//          CIocpSession::ConnectAsync()가 ConnectEx 기반 진짜 비동기라 그 문제
+//          자체가 사라졌습니다 — 대신 이 함수의 반환값 의미가 바뀌었습니다.
+//          자세한 계약은 헤더의 ConnectOneMoreSession() 주석 참고.
+//
+//          Register()나 CreateSession() 실패 시 로컬 shared_ptr(session/
+//          iocpSession)이 스코프를 벗어나며 소멸자가 소켓을 정리하므로 별도
+//          정리가 필요 없습니다. ConnectAsync() 자신의 모든 실패 경로는 내부에서
+//          FailConnect()를 호출해 정리 및 OnDisconnected() 통지까지 완료합니다.
+// @return CIocpSessionRef 세션 생성 + IOCP 등록 + ConnectEx 게시까지 성공하면
+//         세션 참조(연결 완료 보장 아님), 그 전 단계 실패 시 nullptr.
+//***************************************************************************
+CIocpSessionRef CIocpClientService::ConnectOneMoreSession()
+{
+	if( _iocpCore == nullptr )
+		return nullptr;
+
+	CSessionRef session = CreateSession();
+	if( session == nullptr )
+		return nullptr;
+
+	CIocpSessionRef iocpSession = std::static_pointer_cast<CIocpSession>(session);
+	if( iocpSession == nullptr )
+		return nullptr;
+
+	if( _iocpCore->Register(iocpSession) == false )
+		return nullptr;
+
+	iocpSession->SetNetAddress(_address);
+
+	// 연결 완료를 기다리지 않고 즉시 추적 목록에 등록합니다. 연결이 실패하면
+	// CIocpSession::FailConnect()가 호출하는 CSession::OnDisconnected()가
+	// DisconnectHandler(ReleaseSession 콜백)를 통해 자동으로 제거하므로,
+	// "연결 시도 중" 세션이 목록에 남는 leak은 없습니다.
+	AddSession(iocpSession);
+
+	// ConnectAsync()의 반환값은 "게시 시도" 성공 여부일 뿐입니다 — false든 true든
+	// 최종 연결 결과는 세션의 OnConnected()/OnDisconnected()로 비동기 통지됩니다.
+	// 여기서는 게시 자체의 성공 여부만 보고합니다.
+	if( !iocpSession->ConnectAsync(_address) )
+		return nullptr;
+
+	return iocpSession;
+}
+
+//***************************************************************************
+// @brief 클라이언트 구동, 워커 스레드 시작 및 세션 IOCP 등록 + 연결 게시
+// @return bool 성공 여부. [중요] true를 반환해도 각 세션의 실제 TCP 연결이
+//         완료됐다는 뜻이 아닙니다 — Start()의 doc 주석 참고.
 // @details
 // - 1. 워커 스레드 풀을 구동하여 완료 이벤트를 처리할 준비를 합니다.
-// - 2. 요청된 수만큼 세션을 생성하고 IOCP Core에 등록한 뒤 원격 서버와 연결을 시도합니다.
+// - 2. _maxSessionCount 개수만큼 ConnectOneMoreSession()을 호출해 세션을 생성하고
+//      IOCP Core에 등록한 뒤 ConnectEx 비동기 연결을 게시합니다. 세션 하나라도
+//      "게시 시도" 자체가 실패하면(세션 생성/IOCP 등록 실패 등) 즉시 Close()로
+//      전체를 정리하고 false를 반환합니다.
 //***************************************************************************
 bool CIocpClientService::Start()
 {
@@ -199,41 +258,14 @@ bool CIocpClientService::Start()
 		}
 	}
 
-	// 2. 세션 생성 및 IOCP 등록 후 접속 시도
+	// 2. 세션 연결 게시 (실제 절차는 ConnectOneMoreSession()에 위임)
 	for( int32 i = 0; i < _maxSessionCount; i++ )
 	{
-		CSessionRef session = CreateSession();
-		if( session == nullptr )
+		if( ConnectOneMoreSession() == nullptr )
 		{
 			Close();
 			return false;
 		}
-
-		CIocpSessionRef iocpSession = std::static_pointer_cast<CIocpSession>(session);
-		if( iocpSession == nullptr )
-			return false;
-
-		if( _iocpCore->Register(iocpSession) == false )
-		{
-			Close();
-			return false;
-		}
-
-		SOCKET sock = iocpSession->GetSocket();
-		SOCKADDR_IN sockAddr = _address.GetSockAddr();
-		if( ::connect(sock, reinterpret_cast<SOCKADDR*>(&sockAddr), sizeof(sockAddr)) == SOCKET_ERROR )
-		{
-			int32 err = ::WSAGetLastError();
-			if( err != WSAEWOULDBLOCK && err != WSA_IO_PENDING )
-			{
-				Close();
-				return false;
-			}
-		}
-
-		iocpSession->SetNetAddress(_address);
-		iocpSession->ProcessConnect();
-		AddSession(iocpSession);
 	}
 
 	return true;

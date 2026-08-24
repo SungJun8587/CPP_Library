@@ -39,25 +39,28 @@ void CIocpSession::Dispatch(CIocpEvent* iocpEvent, int32 numOfBytes)
 {
 	switch( iocpEvent->eventType )
 	{
-		case Iocp::EventType::Connect:
-			ProcessConnect();
-			break;
+	case Iocp::EventType::Connect:
+		// numOfBytes는 Connect 이벤트에서 성공/실패 구분에 쓸 수 없어(성공/실패
+		// 둘 다 0바이트로 통지됨) 인자로 넘기지 않고 ProcessConnectEx() 내부에서
+		// getsockopt(SO_ERROR)로 직접 검증합니다.
+		ProcessConnectEx();
+		break;
 
-		case Iocp::EventType::Disconnect:
-			ProcessDisconnect();
-			break;
+	case Iocp::EventType::Disconnect:
+		ProcessDisconnect();
+		break;
 
-		case Iocp::EventType::Recv:
-			ProcessRecv(numOfBytes);
-			break;
+	case Iocp::EventType::Recv:
+		ProcessRecv(numOfBytes);
+		break;
 
-		case Iocp::EventType::Send:
-			ProcessSend(numOfBytes);
-			break;
+	case Iocp::EventType::Send:
+		ProcessSend(numOfBytes);
+		break;
 
-		default:
-			ASSERT_CRASH(false);
-			break;
+	default:
+		ASSERT_CRASH(false);
+		break;
 	}
 }
 
@@ -366,4 +369,108 @@ void CIocpSession::Disconnect(const TCHAR* cause)
 	Disconnect(Iocp::CloseReason::ForcedClose);
 }
 
+//***************************************************************************
+// @brief ConnectEx로 비동기 연결을 게시합니다 (클라이언트 측 전용).
+// @param remoteAddr 접속할 원격 주소
+// @return bool 게시 시도 자체의 성공 여부. 상세 계약은 헤더의 ConnectAsync()
+//         주석 참고 — 이 값이 true라고 해서 연결이 성공했다는 뜻이 아닙니다.
+// @details ConnectEx는 사전에 bind()된 소켓에서만 호출 가능합니다 — 클라이언트가
+//          로컬 포트를 지정할 이유가 없으므로 와일드카드(0.0.0.0:0)로 바인딩합니다.
+//          CNetAddress()의 기본 생성자는 SOCKADDR_IN을 전부 0으로 두는데,
+//          이러면 sin_family도 0이 되어 AF_INET 소켓에 bind()가 실패합니다
+//          (CNetAddress(ip, port) 생성자만 sin_family=AF_INET을 명시적으로
+//          세팅함 — NetAddress.h/.cpp 확인 후 발견/수정). 그래서 명시적으로
+//          CNetAddress(_T("0.0.0.0"), 0)을 사용합니다.
+//          이 함수의 모든 실패 경로는 FailConnect()를 호출해 OnDisconnected()까지
+//          통지를 완료하므로, 호출부는 반환값이 false여도 별도로 정리할 것이
+//          없습니다(FailConnect() 계약 — 헤더 주석 참고).
+//***************************************************************************
+bool CIocpSession::ConnectAsync(const CNetAddress& remoteAddr)
+{
+	if( _socket == INVALID_SOCKET )
+	{
+		FailConnect(Iocp::CloseReason::SocketError);
+		return false;
+	}
 
+	if( !CSocketUtils::Bind(_socket, CNetAddress(_T("0.0.0.0"), 0)) )
+	{
+		FailConnect(Iocp::CloseReason::SocketError);
+		return false;
+	}
+
+	// RegisterConnect() 내부에서 ConnectEx 게시가 즉시 실패하면 자체적으로
+	// FailConnect()를 호출합니다 — 그 경우도 이 함수는 true를 반환합니다(게시
+	// "시도" 자체는 정상적으로 이뤄졌고, 실패 통지는 OnDisconnected()로 이미
+	// 처리됐기 때문). 헤더의 ConnectAsync() 계약 설명 참고.
+	RegisterConnect(remoteAddr);
+	return true;
+}
+
+//***************************************************************************
+// @brief ConnectEx 비동기 연결을 실제로 게시합니다.
+//***************************************************************************
+void CIocpSession::RegisterConnect(const CNetAddress& remoteAddr)
+{
+	_connectEvent.Init();
+	_connectEvent.owner = GetIocpObjectPtr(); // 완료 통지까지 수명 보장 (Ref +1)
+
+	SOCKADDR_IN sockAddr = remoteAddr.GetSockAddr();
+	DWORD bytesSent = 0;
+
+	if( CSocketUtils::ConnectEx(_socket, reinterpret_cast<SOCKADDR*>(&sockAddr), sizeof(sockAddr),
+		nullptr, 0, &bytesSent, static_cast<LPOVERLAPPED>(&_connectEvent)) == FALSE )
+	{
+		int32 errorCode = ::WSAGetLastError();
+		if( errorCode != WSA_IO_PENDING )
+		{
+			// 게시 자체가 즉시 실패 — IOCP 완료 통지가 오지 않으므로 여기서 직접 정리.
+			_connectEvent.owner = nullptr;
+			FailConnect(Iocp::CloseReason::SocketError);
+		}
+	}
+}
+
+//***************************************************************************
+// @brief ConnectEx 완료 통지 처리 (Dispatch가 호출).
+//***************************************************************************
+void CIocpSession::ProcessConnectEx()
+{
+	_connectEvent.owner = nullptr; // Ref -1
+
+	int32 sockError = 0;
+	bool getOptOk = CSocketUtils::GetSocketError(_socket, sockError);
+
+	if( !getOptOk || sockError != 0 )
+	{
+		FailConnect(Iocp::CloseReason::SocketError);
+		return;
+	}
+
+	// ConnectEx로 연결된 소켓은 SO_UPDATE_CONNECT_CONTEXT를 걸어야
+	// getpeername/setsockopt(TCP_NODELAY 등)/getsockname이 정상 동작합니다.
+	if( !CSocketUtils::SetUpdateConnectContext(_socket) )
+	{
+		FailConnect(Iocp::CloseReason::SocketError);
+		return;
+	}
+
+	// 이후는 accept 경로와 완전히 동일한 공통 처리
+	// (_connected 플래그 세팅, OnConnected(), 첫 RegisterRecv())
+	ProcessConnect();
+}
+
+//***************************************************************************
+// @brief connect 실패 시 정리 전용 경로.
+// @param reason 실패 사유
+//***************************************************************************
+void CIocpSession::FailConnect(Iocp::CloseReason reason)
+{
+	_closeReason.store(reason, std::memory_order_release);
+
+	CSocketUtils::Close(_socket);
+	_socket = INVALID_SOCKET;
+
+	OnDisconnected();            // 상위 콘텐츠 레이어 훅 (protected virtual)
+	CSession::OnDisconnected();  // 서비스의 ReleaseSession 콜백 연동
+}

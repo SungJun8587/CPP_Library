@@ -48,6 +48,17 @@
 #include <Network/RIO/RioSessionManager.h>
 #include <Network/RIO/RioService.h>
 
+#include <Network/HTTP/HttpResponseParser.h>
+#include <Network/HTTP/HttpPacketBuilder.h>
+#include <Network/HTTP/HttpClientCore.h>
+#include <Network/HTTP/HttpConnPoolCommon.h>
+#include <Network/HTTP/HttpConnPool.h>
+#include <Network/HTTP/HttpSessionIocp.h>
+#include <Network/HTTP/HttpSessionRio.h>
+#include <Network/HTTP/HttpConnPoolManager.h>
+#include <Network/HTTP/HttpConnPoolFactory.h>
+
 #include <Network/NetworkFactory.h>
+
 
 #endif // ndef __NETWORKCOMMON_H__

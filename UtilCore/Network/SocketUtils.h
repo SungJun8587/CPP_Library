@@ -1,5 +1,4 @@
-﻿
-//***************************************************************************
+﻿//***************************************************************************
 // SocketUtils.h : interface for the CSocketUtils class.
 //
 //***************************************************************************
@@ -73,9 +72,11 @@ public:
 	static bool     SetSendBufferSize(SOCKET socket, int32 size);
 	static bool     SetUpdateAcceptContext(SOCKET clientSocket, SOCKET listenSocket);
 	static bool     SetUpdateConnectContext(SOCKET socket);
+	static bool     GetSocketError(SOCKET socket, int32& outError);
 
-	// ---------- Bind / Listen / Close ----------
+	// ---------- Connect / Bind / Listen / Close ----------
 	static bool     Connect(SOCKET socket, CNetAddress netAddr);
+
 	static bool     Bind(SOCKET socket, CNetAddress netAddr);
 	static bool     Listen(SOCKET socket, int32 backlog = SOMAXCONN);
 	static void     Close(SOCKET socket);

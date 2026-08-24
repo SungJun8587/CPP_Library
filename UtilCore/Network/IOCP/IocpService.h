@@ -1,4 +1,5 @@
-﻿//***************************************************************************
+﻿
+//***************************************************************************
 // IocpService.h : interface for the CIocpServerService & CIocpClientService.
 //
 //***************************************************************************
@@ -111,8 +112,16 @@ public:
 	virtual ~CIocpClientService() = default;
 
 	//***************************************************************************
-	// @brief IOCP 클라이언트 구동 (워커 스레드 시작, 세션 생성 및 IOCP 등록, 접속 시도)
-	// @return bool 구동 성공 여부
+	// @brief IOCP 클라이언트 구동 (워커 스레드 시작, 세션 생성 및 ConnectEx 비동기 접속 게시)
+	// @return bool _maxSessionCount개 세션 전부의 연결 "게시"가 성공하면 true.
+	//         [중요] ConnectAsync()가 진짜 비동기(ConnectEx)로 바뀌면서, 이 함수가
+	//         true를 반환해도 실제 TCP 연결이 전부(혹은 하나라도) 완료됐다는 보장이
+	//         없습니다 — 연결 성공/실패는 각 세션의 OnConnected()/OnDisconnected()
+	//         오버라이드로 나중에 비동기 통지됩니다. Start()는 오직 "N개 세션 생성 +
+	//         IOCP 등록 + ConnectEx 게시"까지만 동기로 보장하고 리턴합니다(과거
+	//         버전은 동기 connect() 기반이라 true 반환 = 실제 연결 완료를 의미했으나
+	//         이제는 아닙니다). 세션 하나를 연결 게시하는 실제 절차는
+	//         ConnectOneMoreSession()에 있습니다.
 	//***************************************************************************
 	virtual bool	Start() override;
 
@@ -126,6 +135,35 @@ public:
 	// @return CIocpCoreRef IOCP Core 참조
 	//***************************************************************************
 	CIocpCoreRef	GetIocpCore() const { return _iocpCore; }
+
+	//***************************************************************************
+	// @brief 이미 구동 중인 서비스에 세션 하나를 추가로 연결 "게시"합니다.
+	// @details Start()의 접속 루프가 세션 하나당 수행하는 것과 동일한 절차(세션
+	//          생성 → IOCP Core 등록 → 서비스에 즉시 등록 → ConnectEx 비동기 게시)를
+	//          재사용 가능한 단위로 분리한 것입니다. 커넥션 풀의 재연결 로직 등,
+	//          서비스 기동 이후 세션을 개별적으로 보충해야 하는 호출부를 위해 존재하며
+	//          _maxSessionCount 상한 체크는 하지 않으므로 호출자가 책임집니다.
+	//
+	//          [중요 — 반환값의 의미가 "연결 완료"가 아님] CIocpSession::ConnectAsync()가
+	//          ConnectEx 기반 진짜 비동기이기 때문에, 이 함수는 "세션을 만들고 연결
+	//          시도를 게시하는 데까지 성공했는지"만 동기로 알려줍니다. 실제 TCP 연결
+	//          성공/실패는 반환된 세션의 OnConnected()/OnDisconnected() 오버라이드로
+	//          나중에 비동기 통지됩니다 — 호출부(예: HTTP 커넥션 풀)는 반환된
+	//          CIocpSessionRef를 즉시 "사용 가능한 커넥션"으로 취급해서는 안 되고,
+	//          세션 서브클래스가 OnConnected()/OnDisconnected()를 오버라이드해 그
+	//          결과를 콜백 등으로 상위에 알리는 방식으로 연동해야 합니다.
+	//
+	//          세션은 ConnectEx 게시 이전에 이미 AddSession()으로 서비스의 추적
+	//          목록에 들어갑니다(과거 버전은 연결 성공 후에만 등록했으나, 비동기
+	//          전환으로 "연결 시도 중"인 세션도 추적할 필요가 있어짐). 연결이 실패하면
+	//          CIocpSession::FailConnect()가 호출하는 CSession::OnDisconnected() →
+	//          DisconnectHandler → CNetService::ReleaseSession() 경로로 자동
+	//          제거되므로, 실패한 세션이 목록에 남는 leak은 없습니다.
+	// @return CIocpSessionRef 세션 생성 + IOCP 등록 + ConnectEx 게시 "시도" 자체가
+	//         전부 성공하면 세션 참조(단, 위 설명대로 아직 연결 완료 보장 아님),
+	//         그 전 단계(세션 생성, IOCP 등록)에서 실패하면 nullptr.
+	//***************************************************************************
+	CIocpSessionRef	ConnectOneMoreSession();
 
 private:
 	CIocpCoreRef			_iocpCore = nullptr;    // 연동된 IOCP 코어 객체 참조

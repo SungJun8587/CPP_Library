@@ -61,6 +61,9 @@
     <Filter Include="System\Asm">
       <UniqueIdentifier>{c4a0bced-963b-4561-9634-3024ae2eaf9e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Network\HTTP">
+      <UniqueIdentifier>{2b514dd2-3ce0-49d3-b75a-e16af477a84c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Memory\Containers.h">
@@ -445,6 +448,39 @@
     <ClInclude Include="System\PciInfo.h">
       <Filter>System</Filter>
     </ClInclude>
+    <ClInclude Include="Network\RIO\RioConnectDispatcher.h">
+      <Filter>Network\RIO</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\RIO\RioConnectEvent.h">
+      <Filter>Network\RIO</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\HTTP\HttpClientCore.h">
+      <Filter>Network\HTTP</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\HTTP\HttpConnPool.h">
+      <Filter>Network\HTTP</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\HTTP\HttpConnPoolCommon.h">
+      <Filter>Network\HTTP</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\HTTP\HttpConnPoolFactory.h">
+      <Filter>Network\HTTP</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\HTTP\HttpPacketBuilder.h">
+      <Filter>Network\HTTP</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\HTTP\HttpResponseParser.h">
+      <Filter>Network\HTTP</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\HTTP\HttpSessionIocp.h">
+      <Filter>Network\HTTP</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\HTTP\HttpSessionRio.h">
+      <Filter>Network\HTTP</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\HTTP\HttpConnPoolManager.h">
+      <Filter>Network\HTTP</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">
@@ -694,6 +730,9 @@
     </ClCompile>
     <ClCompile Include="System\PciInfo.cpp">
       <Filter>System</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\RIO\RioConnectDispatcher.cpp">
+      <Filter>Network\RIO</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

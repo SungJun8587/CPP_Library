@@ -79,6 +79,177 @@ bool CRioSession::Init(uint64_t sessionId, CRioCore* core, CRioBuffer* globalRec
 }
 
 //***************************************************************************
+// @brief ConnectEx로 비동기 연결을 게시합니다 (클라이언트 측 전용).
+// @param dispatcher 완료 통지를 받을 전용 디스패처
+// @param sessionId 고유 세션 ID
+// @param core RIO Core 객체 포인터
+// @param globalRecvBufferPool 전역 수신 버퍼 풀 포인터
+// @param remoteAddr 접속할 원격 주소
+// @return bool 게시 시도 자체의 성공 여부. 상세 계약은 헤더 주석 참고.
+// @details 이 시점에 RIO 전용 소켓을 직접 생성한다(기존 동기 흐름에서는
+//          CRioClientService가 CSocketUtils::CreateRioSocket()으로 미리 만들어
+//          Init()에 넘겼지만, 비동기 흐름에서는 이 함수가 그 시점을 흡수한다).
+//          ConnectEx는 사전에 bind()된 소켓에서만 호출 가능하므로 와일드카드
+//          (0.0.0.0:0)로 바인딩한 뒤, 이 소켓을 dispatcher의 전용 IOCP에 연결하고
+//          ConnectEx를 게시한다. 와일드카드 바인딩에 기본 생성된 CNetAddress()가
+//          아니라 CNetAddress(_T("0.0.0.0"), 0)을 명시적으로 쓰는 이유: 기본
+//          생성자는 SOCKADDR_IN을 전부 0으로 두어 sin_family도 0이 되고, 이러면
+//          AF_INET 소켓에 bind()가 실패한다(CNetAddress(ip, port) 생성자만
+//          sin_family=AF_INET을 명시적으로 세팅함 — NetAddress.h/.cpp 확인 후 발견/수정).
+//***************************************************************************
+bool CRioSession::ConnectAsync(CRioConnectDispatcher& dispatcher, uint64_t sessionId, CRioCore* core,
+    CRioBuffer* globalRecvBufferPool, const CNetAddress& remoteAddr)
+{
+    assert(_state.load(std::memory_order_acquire) == Rio::SessionState::Created);
+
+    if( core == nullptr || globalRecvBufferPool == nullptr )
+    {
+        FailConnect(Rio::CloseReason::InternalError);
+        return false;
+    }
+
+    SOCKET socket = CSocketUtils::CreateRioSocket();
+    if( socket == INVALID_SOCKET )
+    {
+        FailConnect(Rio::CloseReason::SocketError);
+        return false;
+    }
+
+    _socket.store(socket, std::memory_order_release);
+    _core = core;
+    _globalRecvBufferPool = globalRecvBufferPool;
+    _sessionId = sessionId;
+
+    if( !CSocketUtils::Bind(socket, CNetAddress(_T("0.0.0.0"), 0)) )
+    {
+        FailConnect(Rio::CloseReason::SocketError);
+        return false;
+    }
+
+    if( !dispatcher.RegisterSocket(socket) )
+    {
+        FailConnect(Rio::CloseReason::SocketError);
+        return false;
+    }
+
+    // RegisterConnect() 내부에서 ConnectEx 게시가 즉시 실패하면 자체적으로
+    // FailConnect()를 호출합니다 — 그 경우도 이 함수는 true를 반환합니다(게시
+    // "시도" 자체는 정상적으로 이뤄졌고, 실패 통지는 OnDisconnected()로 이미
+    // 처리됐기 때문). 헤더의 ConnectAsync() 계약 설명 참고.
+    RegisterConnect(remoteAddr);
+    return true;
+}
+
+//***************************************************************************
+// @brief ConnectEx 비동기 연결을 실제로 게시합니다.
+//***************************************************************************
+void CRioSession::RegisterConnect(const CNetAddress& remoteAddr)
+{
+    _connectEvent.Init();
+
+    // 완료 통지까지 세션 수명을 보장 (IOCP RecvEvent/SendEvent의 owner와 동일한
+    // 역할). CSession::shared_from_this()가 shared_ptr<CSession>을 반환하므로,
+    // GetRioObjectPtr()와 동일한 aliasing 패턴으로 CRioSessionRef로 변환한다.
+    _connectEvent.owner = CRioSessionRef(shared_from_this(), this);
+
+    SOCKADDR_IN sockAddr = remoteAddr.GetSockAddr();
+    DWORD bytesSent = 0;
+    SOCKET socket = GetSocket();
+
+    if( CSocketUtils::ConnectEx(socket, reinterpret_cast<SOCKADDR*>(&sockAddr), sizeof(sockAddr),
+        nullptr, 0, &bytesSent, static_cast<LPOVERLAPPED>(&_connectEvent)) == FALSE )
+    {
+        int32 errorCode = ::WSAGetLastError();
+        if( errorCode != WSA_IO_PENDING )
+        {
+            // 게시 자체가 즉시 실패 — IOCP 완료 통지가 오지 않으므로 여기서 직접 정리.
+            _connectEvent.owner = nullptr;
+            FailConnect(Rio::CloseReason::SocketError);
+        }
+    }
+}
+
+//***************************************************************************
+// @brief ConnectEx 완료 통지 처리. CRioConnectDispatcher의 워커 스레드가 호출합니다.
+// @details 성공 확인 후 SO_UPDATE_CONNECT_CONTEXT -> RIOCreateRequestQueue() ->
+//          Init() -> PostInitialReceive() 순서로 세션을 완성시킵니다. Init()이
+//          내부적으로 OnConnected()를 호출하므로 여기서 별도로 부를 필요는 없습니다.
+//***************************************************************************
+void CRioSession::ProcessConnectEx()
+{
+    SOCKET socket = GetSocket();
+
+    int32 sockError = 0;
+    bool getOptOk = CSocketUtils::GetSocketError(socket, sockError);
+
+    if( !getOptOk || sockError != 0 )
+    {
+        FailConnect(Rio::CloseReason::SocketError);
+        return;
+    }
+
+    // ConnectEx로 연결된 소켓은 SO_UPDATE_CONNECT_CONTEXT를 걸어야
+    // getpeername/setsockopt/RIOCreateRequestQueue 등이 정상 동작합니다.
+    if( !CSocketUtils::SetUpdateConnectContext(socket) )
+    {
+        FailConnect(Rio::CloseReason::SocketError);
+        return;
+    }
+
+    if( _core == nullptr )
+    {
+        FailConnect(Rio::CloseReason::InternalError);
+        return;
+    }
+
+    const RIO_EXTENSION_FUNCTION_TABLE& rioTable = _core->GetRioTable();
+
+    RIO_RQ requestQueue = rioTable.RIOCreateRequestQueue(
+        socket,
+        Rio::kRequestQueueMaxReceiveOutstanding,
+        Rio::kRequestQueueMaxReceiveDataBuffers,
+        Rio::kRequestQueueMaxSendOutstanding,
+        Rio::kRequestQueueMaxSendDataBuffers,
+        _core->GetReceiveQueue(),
+        _core->GetSendQueue(),
+        nullptr
+    );
+
+    if( requestQueue == RIO_INVALID_RQ )
+    {
+        FailConnect(Rio::CloseReason::InternalError);
+        return;
+    }
+
+    if( !Init(_sessionId, _core, _globalRecvBufferPool, socket, requestQueue) )
+    {
+        FailConnect(Rio::CloseReason::InternalError);
+        return;
+    }
+
+    PostInitialReceive();
+}
+
+//***************************************************************************
+// @brief connect 실패(또는 그 이전 단계 실패) 시 정리 전용 경로.
+// @param reason 실패 사유
+//***************************************************************************
+void CRioSession::FailConnect(Rio::CloseReason reason) noexcept
+{
+    _closeReason.store(reason, std::memory_order_release);
+
+    // Active를 거친 적 없는 예외 경로이므로 Close()의 Active->Closing CAS를
+    // 우회하고 직접 Closed로 확정한다 (헤더의 FailConnect() 주석 참고).
+    _state.store(Rio::SessionState::Closed, std::memory_order_release);
+
+    CloseSocketInternal();  // idempotent
+    UnregisterSendBuffer(); // 보통 미등록 상태지만(Init 전) idempotent라 방어적으로 호출
+
+    OnDisconnected(reason);      // 상위 콘텐츠 레이어 훅 (protected virtual)
+    CSession::OnDisconnected();  // 서비스의 ReleaseSession 콜백 연동
+}
+
+//***************************************************************************
 // @brief 이 세션 소유의 _sendBuffer 메모리를 RIORegisterBuffer()로 등록합니다.
 // @return 이미 등록됐거나 새로 등록 성공 시 true, 실패 시 false
 //***************************************************************************
