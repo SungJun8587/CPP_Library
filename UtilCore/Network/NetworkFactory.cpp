@@ -7,14 +7,6 @@
 #include "pch.h"
 #include "NetworkFactory.h"
 
-// IOCP 관련 헤더
-#include <Network/IOCP/IocpCore.h>
-#include <Network/IOCP/IocpService.h>
-
-// RIO 관련 헤더
-#include <Network/RIO/RioCore.h>
-#include <Network/RIO/RioService.h>
-
 //***************************************************************************
 // @brief 지정된 엔진 유형에 맞는 서버 서비스 객체를 동적으로 생성합니다.
 // @param engineType 네트워크 엔진 타입 (IOCP 또는 RIO)
@@ -40,16 +32,20 @@ CNetServiceRef CNetworkFactory::CreateServerService(
 			if( engineCoreRef == nullptr )
 				return nullptr;
 
+#if defined(USE_NETWORK_IOCP)
 			auto iocpCore = *static_cast<CIocpCoreRef*>(engineCoreRef);
 			return std::make_shared<CIocpServerService>(address, iocpCore, factory, maxSessionCount, workerThreadCount);
+#endif
 		}
 		case ENetworkEngineType::RIO:
 		{
 			if( engineCoreRef == nullptr )
 				return nullptr;
 
+#if defined(USE_NETWORK_RIO)
 			auto rioCore = *static_cast<CRioCoreRef*>(engineCoreRef);
 			return std::make_shared<CRioServerService>(address, rioCore, factory, maxSessionCount, workerThreadCount);
+#endif
 		}
 	}
 	return nullptr;
@@ -80,16 +76,20 @@ CNetServiceRef CNetworkFactory::CreateClientService(
 			if( engineCoreRef == nullptr )
 				return nullptr;
 
+#if defined(USE_NETWORK_IOCP)
 			auto iocpCore = *static_cast<CIocpCoreRef*>(engineCoreRef);
 			return std::make_shared<CIocpClientService>(address, iocpCore, factory, maxSessionCount, workerThreadCount);
+#endif
 		}
 		case ENetworkEngineType::RIO:
 		{
 			if( engineCoreRef == nullptr )
 				return nullptr;
 
+#if defined(USE_NETWORK_RIO)
 			auto rioCore = *static_cast<CRioCoreRef*>(engineCoreRef);
 			return std::make_shared<CRioClientService>(address, rioCore, factory, maxSessionCount, workerThreadCount);
+#endif
 		}
 	}
 	return nullptr;

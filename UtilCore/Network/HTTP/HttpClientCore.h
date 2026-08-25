@@ -102,11 +102,11 @@ public:
 		if( m_state != EHttpClientState::AwaitingResponse )
 			return false; // 요청도 안 했는데 온 데이터 — 프로토콜 위반, 상위에서 별도 처리
 
-		EHttpParseState st = m_parser.Feed(data, len);
-		if( st != EHttpParseState::Complete && st != EHttpParseState::Error )
+		HTTP::EParseState st = m_parser.Feed(data, len);
+		if( st != HTTP::EParseState::Complete && st != HTTP::EParseState::Error )
 			return false; // 아직 더 필요
 
-		bool success = (st == EHttpParseState::Complete);
+		bool success = (st == HTTP::EParseState::Complete);
 		m_state = EHttpClientState::Idle;
 
 		if( m_onComplete )
@@ -127,8 +127,8 @@ public:
 	bool IsConnectionCloseRequested() const noexcept { return m_parser.IsConnectionCloseRequested(); }
 
 private:
-	EHttpClientState m_state = EHttpClientState::Idle;	// 요청/응답 진행 상태
-	CHttpResponseParser m_parser;						// 응답 파서 (Idle 전이 시 재사용)
+	EHttpClientState m_state = EHttpClientState::Idle; // 요청/응답 진행 상태
+	CHttpResponseParser m_parser;                      // 응답 파서 (Idle 전이 시 재사용)
 	HttpRequestCompletionHandler m_onComplete;          // 진행 중인 요청의 완료 콜백
 };
 

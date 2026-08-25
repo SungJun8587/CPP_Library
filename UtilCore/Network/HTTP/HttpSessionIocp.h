@@ -15,6 +15,10 @@
 #include <Network/IOCP/IocpSession.h>
 #endif
 
+#ifndef	__HTTPCONNPOOLCOMMON_H__
+#include <Network/HTTP/HttpConnPoolCommon.h>
+#endif
+
 #ifndef	__HTTPCLIENTCORE_H__
 #include <Network/HTTP/HttpClientCore.h>
 #endif

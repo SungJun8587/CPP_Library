@@ -105,8 +105,11 @@
     <ClCompile Include="..\..\..\UtilCore\BaseGlobal.cpp">
       <Filter>UtilCore</Filter>
     </ClCompile>
-    <ClCompile Include="IocpEchoSession.cpp" />
-    <ClCompile Include="RioEchoSession.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioConnectDispatcher.cpp">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClCompile>
+    <ClCompile Include="IocpEchoClientSession.cpp" />
+    <ClCompile Include="RioEchoClientSession.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="UtilCore">
@@ -289,8 +292,17 @@
     <ClInclude Include="..\..\..\UtilCore\BaseGlobal.h">
       <Filter>UtilCore</Filter>
     </ClInclude>
-    <ClInclude Include="IocpEchoSession.h" />
-    <ClInclude Include="RioEchoSession.h" />
+    <ClInclude Include="..\..\..\UtilCore\Util\ConsoleUtil.h">
+      <Filter>UtilCore\Util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioConnectDispatcher.h">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioConnectEvent.h">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClInclude>
+    <ClInclude Include="IocpEchoClientSession.h" />
+    <ClInclude Include="RioEchoClientSession.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\UtilCore\Containers\Map\ClusterSpinMap.inl">

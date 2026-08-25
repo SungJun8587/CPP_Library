@@ -481,6 +481,27 @@
     <ClInclude Include="Network\HTTP\HttpConnPoolManager.h">
       <Filter>Network\HTTP</Filter>
     </ClInclude>
+    <ClInclude Include="Network\HTTP\HttpParseUtil.h">
+      <Filter>Network\HTTP</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\HTTP\HttpRequestParser.h">
+      <Filter>Network\HTTP</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\HTTP\HttpFormUtil.h">
+      <Filter>Network\HTTP</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\HTTP\HttpMultipartBuilder.h">
+      <Filter>Network\HTTP</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\HTTP\TlsFilter.h">
+      <Filter>Network\HTTP</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\HTTP\HttpsSessionIocp.h">
+      <Filter>Network\HTTP</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\HTTP\HttpsSessionRio.h">
+      <Filter>Network\HTTP</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">

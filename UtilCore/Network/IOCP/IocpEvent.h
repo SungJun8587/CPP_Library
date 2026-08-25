@@ -105,6 +105,14 @@ public:
 //     
 //     이 구조 덕분에 연결 완료 즉시 세션 객체가 준비되어 있어
 //     accept 지연 없이 즉시 처리 가능.
+//
+// retryCount 멤버 [신규]:
+//     RegisterAccept()(세션 소켓 생성 실패/AcceptEx 즉시 실패)와
+//     ProcessAccept()(SetUpdateAcceptContext/IOCP Register 실패) 양쪽의
+//     실패 경로가 전부 이 카운터 하나를 공유해 증가시킨다. 두 경로는 서로
+//     다른 시점(동기 재시도 vs 비동기 완료 통지 이후)에 실행되므로 로컬
+//     변수로는 값을 이어받을 수 없어 이벤트에 상태로 들고 있는다.
+//     Accept가 최종적으로 성공하면(ProcessAccept 4단계) 0으로 리셋한다.
 //***************************************************************************
 class AcceptEvent : public CIocpEvent
 {
@@ -125,6 +133,10 @@ public:
 
     // AcceptEx 주소 정보 파싱용 내부 버퍼 (IPv4/IPv6 주소 및 여유 공간 포함 128 bytes)
     BYTE            acceptBuffer[128];
+
+    // RegisterAccept()/ProcessAccept() 실패 경로 전체가 공유하는 누적
+    // 연속 실패 횟수. kMaxAcceptRetry 초과 시 재등록을 포기한다.
+    int32           retryCount = 0;
 };
 
 //***************************************************************************

@@ -7,6 +7,10 @@
 #define WIN32_LEAN_AND_MEAN		// 자주 사용하지 않는 API의 일부를 제외하여 Win32 헤더 파일의 크기를 줄이기 위해 설정(빌드 시간 단축 목적)
 #define _HAS_STD_BYTE 0			// c++17 옵션을 활성화 시 std::byte 를 비활성 하는 옵션
 
+#define USE_GPMEMORY		// 메모리 최적화 활성화 
+#define USE_NETWORK_IOCP	// IOCP 네트워크 활성화
+#define USE_NETWORK_RIO		// RIO 네트워크 활성화
+
 #include <windows.h>
 #include <process.h>
 #include <assert.h>
@@ -99,6 +103,23 @@ using namespace std;
 #include <Job/GlobalQueue.h>
 
 #include <Network/NetworkCommon.h>
+
+#include <Network/HTTP/TlsFilter.h>
+#include <Network/HTTP/HttpParseUtil.h>
+#include <Network/HTTP/HttpRequestParser.h>
+#include <Network/HTTP/HttpResponseParser.h>
+#include <Network/HTTP/HttpPacketBuilder.h>
+#include <Network/HTTP/HttpClientCore.h>
+#include <Network/HTTP/HttpConnPoolCommon.h>
+#include <Network/HTTP/HttpConnPool.h>
+#include <Network/HTTP/HttpConnPoolManager.h>
+#include <Network/HTTP/HttpSessionIocp.h>
+#include <Network/HTTP/HttpSessionRio.h>
+#include <Network/HTTP/HttpsSessionIocp.h>
+#include <Network/HTTP/HttpsSessionRio.h>
+#include <Network/HTTP/HttpConnPoolFactory.h>
+#include <Network/HTTP/HttpFormUtil.h>
+#include <Network/HTTP/HttpMultipartBuilder.h>
 
 #include <BaseGlobal.h>
 #include <BaseTLS.h>

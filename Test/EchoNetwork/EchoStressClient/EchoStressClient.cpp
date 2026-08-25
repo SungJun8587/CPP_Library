@@ -2,8 +2,8 @@
 //
 
 #include "pch.h"
-#include "IocpEchoSession.h"
-#include "RioEchoSession.h"
+#include "IocpEchoClientSession.h"
+#include "RioEchoClientSession.h"
 
 #include <iostream>
 #include <conio.h>
@@ -17,10 +17,11 @@ int main()
 #endif
 
     // 1. 환경 설정 및 초기화
-    // 1-1. 유니코드 출력 로케일 설정
-    _tcout.imbue(std::locale("korean"));
+    // 1-1. C 런타임 로케일 설정 (printf, scanf 등 C 스타일 입출력 및 문자열 처리 함수가 UTF-8을 인식하도록 지정)
+    // 1-2. 콘솔 입출력 코드페이지를 UTF-8(65001)로 변경
+    InitUtf8Console();
 
-    // 1-2. 전역 시스템 초기화
+    // 1-3. 전역 시스템 초기화
     BaseGlobal::Init();
     CSocketUtils::Init();
 
@@ -148,5 +149,7 @@ int main()
     CSocketUtils::Clear();
 
     std::cout << "[System] Stress client terminated safely.\n";
+    CloseConsole();
+
     return 0;
 }

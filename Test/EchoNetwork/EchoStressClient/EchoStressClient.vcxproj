@@ -110,6 +110,7 @@
     <ClCompile Include="..\..\..\UtilCore\Network\NetworkFactory.cpp" />
     <ClCompile Include="..\..\..\UtilCore\Network\RingBuffer.cpp" />
     <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioBuffer.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioConnectDispatcher.cpp" />
     <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioCore.cpp" />
     <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioEvent.cpp" />
     <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioEventPool.cpp" />
@@ -126,13 +127,13 @@
     <ClCompile Include="..\..\..\UtilCore\Thread\SRWLock.cpp" />
     <ClCompile Include="..\..\..\UtilCore\Thread\ThreadManager.cpp" />
     <ClCompile Include="..\..\..\UtilCore\Util\Log.cpp" />
-    <ClCompile Include="IocpEchoSession.cpp" />
     <ClCompile Include="EchoStressClient.cpp" />
-    <ClCompile Include="RioEchoSession.cpp" />
+    <ClCompile Include="IocpEchoClientSession.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="RioEchoClientSession.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\UtilCore\BaseDefine.h" />
@@ -165,6 +166,8 @@
     <ClInclude Include="..\..\..\UtilCore\Network\RingBuffer.h" />
     <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioBuffer.h" />
     <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioCommon.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioConnectDispatcher.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioConnectEvent.h" />
     <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioCore.h" />
     <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioEvent.h" />
     <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioEventPool.h" />
@@ -183,10 +186,11 @@
     <ClInclude Include="..\..\..\UtilCore\Thread\SpinLock.h" />
     <ClInclude Include="..\..\..\UtilCore\Thread\SRWLock.h" />
     <ClInclude Include="..\..\..\UtilCore\Thread\ThreadManager.h" />
+    <ClInclude Include="..\..\..\UtilCore\Util\ConsoleUtil.h" />
     <ClInclude Include="..\..\..\UtilCore\Util\Log.h" />
-    <ClInclude Include="IocpEchoSession.h" />
-    <ClInclude Include="RioEchoSession.h" />
+    <ClInclude Include="IocpEchoClientSession.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="RioEchoClientSession.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\UtilCore\Containers\Map\ClusterSpinMap.inl" />

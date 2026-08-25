@@ -38,6 +38,9 @@
 #include <atomic>
 #include <memory>
 #include <cstdint>
+#include <deque>
+#include <vector>
+#include <mutex>
 
 class CRioCore;
 class CRioBuffer;
@@ -58,6 +61,23 @@ class CRioConnectDispatcher;
 //          서로 다른 메모리가 되어 RIOSendEx()가 실패합니다(과거에 실제로 겪은 문제).
 //          그래서 Init()에서 이 세션 자신이 _sendBuffer를 등록하고, FinalizeClose()/
 //          소멸자에서 해제합니다.
+//
+//      [송신 흐름 제어 — _sendOverflowQueue]
+//          _sendBuffer는 고정 64KB(정확히 65536바이트)라, 큰 body를 보내는 등
+//          누적 송신량이 이를 넘으면 예전에는 Send()가 즉시 Close(SendBufferOverflow)로
+//          연결을 끊었습니다. 지금은 그 대신 링버퍼가 꽉 찬 만큼을 _sendOverflowQueue
+//          (청크 단위 std::deque)에 임시 보관했다가, OnSendCompleted()가 완료
+//          통지를 받아 읽기 커서를 옮길 때마다 생기는 여유 공간만큼
+//          DrainOverflowIntoSendBufferLocked()로 이어서 채워 넣습니다 — IOCP
+//          세션(CVector<CSendBufferRef> 큐, 오브젝트 풀 기반이라 사실상 무제한
+//          큐잉)과 "초과분은 메모리에 버퍼링" 동작을 일관되게 맞춘 것입니다.
+//          진행 정지(deadlock) 걱정이 없는 이유: 청크 하나는 Send()의 uint16_t
+//          제약상 최대 65535바이트이고 _sendBuffer 용량은 정확히 65536바이트라,
+//          링버퍼가 완전히 비면 오버플로 큐의 다음 청크는 반드시 들어갈 수
+//          있습니다. 다만 매우 큰 body(예: 수십 MB 업로드)를 CHttpClientCore::
+//          BeginRequest()가 한 번에 다 쪼개서 던지면, 그 전량이 실제 전송
+//          완료될 때까지 이 큐에 임시로 쌓여 있을 수 있다는 점은 감안해야
+//          합니다(요청 크기에 비례하는 일시적 메모리 사용 — 무한 누수 아님).
 //
 //      [멀티 워커 스레드 안전성]
 //          CRioCore가 멀티 워커로 동작해도, 이 클래스는 별도 수정 없이 안전합니다.
@@ -276,6 +296,21 @@ private:
 	//***************************************************************************
 	bool FlushSendInternal() noexcept;
 
+	//***************************************************************************
+	// @brief 오버플로 큐(_sendOverflowQueue)에 쌓인 청크를 _sendBuffer에 여유
+	//        공간이 생긴 만큼 옮겨 담습니다.
+	// @details _sendLock을 write로 보유한 상태에서만 호출해야 합니다(호출부:
+	//          OnSendCompleted(), MoveReadBuffer() 직후). 청크 하나를 통째로
+	//          넣을 공간이 없으면 그 청크는 큐에 그대로 남겨두고 중단합니다
+	//          (Enqueue(..., exact=false)의 "전량 아니면 실패" 시맨틱과
+	//          일관성을 맞추기 위해 청크를 쪼개서 일부만 옮기지 않음). 청크는
+	//          항상 65535바이트 이하(Send()의 uint16_t 제약)이고 _sendBuffer
+	//          용량은 정확히 65536바이트라, 링버퍼가 완전히 빈 상태라면 다음
+	//          청크 하나는 반드시 들어갈 수 있음이 보장됩니다 — 즉 이 드레인이
+	//          영원히 진행 못 하고 멈추는 경우는 없습니다.
+	//***************************************************************************
+	void DrainOverflowIntoSendBufferLocked() noexcept;
+
 	void ShutdownSocketInternal() noexcept;
 	void CloseSocketInternal() noexcept;
 
@@ -355,7 +390,16 @@ private:
 	PRWLock _sendLock;                                  // 송신 동기화 RW 락
 	bool _isSending{ false };                           // 전송 진행 여부 플래그
 
-	CRingBuffer _sendBuffer{ Rio::kSendRingBufferSize };    // 64KB 송신 링버퍼 (세션 독자 소유 메모리)
+	// _sendBuffer(64KB)가 꽉 찼을 때 Close()로 연결을 죽이지 않고 여기 임시
+	// 보관했다가, OnSendCompleted()가 공간을 비울 때마다
+	// DrainOverflowIntoSendBufferLocked()로 이어서 채워 넣는다. 청크 단위(각
+	// Send() 호출 1회 = 최대 65535바이트)로 보관하며, _sendLock(write)으로
+	// 함께 보호한다(별도 락을 두지 않고 기존 _sendLock에 편입 — 오버플로
+	// 큐도 결국 _sendBuffer와 같은 "송신 대기열"의 연장이라 별도 락으로
+	// 나누면 두 락 사이의 원자성을 새로 신경 써야 해서 오히려 복잡해짐).
+	std::deque<std::vector<char>> _sendOverflowQueue;
+
+	CRingBuffer _sendBuffer{ Rio::kSendRingBufferSize };    // 64KB 송신 링버퍼 (세션 독자 소유 메모리, 꽉 차면 초과분은 _sendOverflowQueue로)
 	CRingBuffer _recvBuffer{ Rio::kRecvRingBufferSize };    // 64KB 수신 링버퍼
 
 	RioConnectEvent _connectEvent;                      // ConnectEx 요청 및 완료 처리를 위한 OVERLAPPED 이벤트 객체 (클라이언트 전용)

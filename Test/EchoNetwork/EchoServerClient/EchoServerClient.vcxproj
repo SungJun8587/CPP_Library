@@ -110,6 +110,7 @@
     <ClCompile Include="..\..\..\UtilCore\Network\NetworkFactory.cpp" />
     <ClCompile Include="..\..\..\UtilCore\Network\RingBuffer.cpp" />
     <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioBuffer.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioConnectDispatcher.cpp" />
     <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioCore.cpp" />
     <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioEvent.cpp" />
     <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioEventPool.cpp" />
@@ -165,6 +166,8 @@
     <ClInclude Include="..\..\..\UtilCore\Network\RingBuffer.h" />
     <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioBuffer.h" />
     <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioCommon.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioConnectDispatcher.h" />
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioConnectEvent.h" />
     <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioCore.h" />
     <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioEvent.h" />
     <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioEventPool.h" />
@@ -183,6 +186,7 @@
     <ClInclude Include="..\..\..\UtilCore\Thread\SpinLock.h" />
     <ClInclude Include="..\..\..\UtilCore\Thread\SRWLock.h" />
     <ClInclude Include="..\..\..\UtilCore\Thread\ThreadManager.h" />
+    <ClInclude Include="..\..\..\UtilCore\Util\ConsoleUtil.h" />
     <ClInclude Include="..\..\..\UtilCore\Util\Log.h" />
     <ClInclude Include="IocpEchoSession.h" />
     <ClInclude Include="RioEchoSession.h" />

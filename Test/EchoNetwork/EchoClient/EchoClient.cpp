@@ -16,15 +16,10 @@ int main()
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif
 
-#ifdef _WIN32
     // 1. 환경 설정 및 초기화
     // 1-1. C 런타임 로케일 설정 (printf, scanf 등 C 스타일 입출력 및 문자열 처리 함수가 UTF-8을 인식하도록 지정)
-    setlocale(LC_ALL, ".UTF8");
-
     // 1-2. 콘솔 입출력 코드페이지를 UTF-8(65001)로 변경
-    SetConsoleOutputCP(CP_UTF8);	// 출력 텍스트(std::cout 등)의 유니코드/한글 깨짐 방지
-    SetConsoleCP(CP_UTF8);			// 입력 텍스트(std::cin 등)의 UTF-8 인코딩 읽기 보장
-#endif
+    InitUtf8Console();
 
     // 1-3. 전역 시스템 초기화
     BaseGlobal::Init();
@@ -162,5 +157,8 @@ int main()
     CSocketUtils::Clear();
 
     std::cout << "[System] Client terminated safely.\n";
+
+    CloseConsole();
+
     return 0;
 }

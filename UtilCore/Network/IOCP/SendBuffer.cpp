@@ -93,6 +93,7 @@ void CSendBufferChunk::Close(uint32 writeSize)
 // @brief 지정된 크기의 SendBuffer를 오픈하여 반환합니다.
 // @param size 요청할 크기
 // @return 생성된 SendBuffer 스마트 포인터
+// @note [수정] static 메서드로 변경 (인스턴스 상태를 갖지 않으므로 인스턴스화 불필요).
 //***************************************************************************
 CSendBufferRef CSendBufferManager::Open(uint32 size)
 {

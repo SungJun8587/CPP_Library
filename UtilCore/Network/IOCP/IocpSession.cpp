@@ -93,8 +93,7 @@ bool CIocpSession::Send(const void* data, uint16_t size) noexcept
 	if( IsConnected() == false || data == nullptr || size == 0 )
 		return false;
 
-	CSendBufferManager sendBufferManager;
-	CSendBufferRef sendBuffer = sendBufferManager.Open(size);
+	CSendBufferRef sendBuffer = CSendBufferManager::Open(size);
 	if( sendBuffer == nullptr || sendBuffer->AllocSize() < size )
 		return false;
 
@@ -208,7 +207,9 @@ void CIocpSession::ProcessRecv(int32 numOfBytes)
 		int64 directSize = _recvBuffer.GetSizeDirectDequeueAble();
 		BYTE* readPos = reinterpret_cast<BYTE*>(_recvBuffer.GetReadBuffer());
 
-		// 콘텐츠 레이어로 데이터 전달
+		// 콘텐츠 레이어로 데이터 전달 (이 호출 중 상위 레이어가 Disconnect()를
+		// 호출할 수 있음 — 그 경우 RegisterRecv()는 자체적으로 IsConnected()를
+		// 체크하므로 아래 루프 종료 후 안전하게 처리된다)
 		int32 processLen = OnRecv(readPos, static_cast<int32>(directSize));
 
 		if( processLen < 0 || directSize < processLen )
@@ -233,7 +234,9 @@ void CIocpSession::ProcessRecv(int32 numOfBytes)
 
 	_recvEvent.owner = nullptr; // OnRecv 처리 완료 후 수명 해제
 
-	// 다음 데이터 수신 대기
+	// 다음 데이터 수신 대기. RegisterRecv() 진입 시 자체적으로 IsConnected()를
+	// 검사하므로, OnRecv() 도중 상위 레이어가 Disconnect()를 호출한 경우에도
+	// 여기서 새로운 WSARecv가 게시되지 않는다.
 	RegisterRecv();
 }
 
@@ -271,10 +274,21 @@ void CIocpSession::RegisterSend()
 		int32 errorCode = ::WSAGetLastError();
 		if( errorCode != WSA_IO_PENDING )
 		{
+			// [수정] Disconnect()를 가장 먼저 호출해 _connected를 즉시 false로
+			// 전환한다. 이렇게 해야 이 지점과 아래 정리 코드 사이의 시간 창에서
+			// 다른 스레드가 Send()를 호출해 IsConnected()==true를 관측하고
+			// _sendRegistered.exchange(true)==false를 통과해 같은 _sendEvent에
+			// 대해 RegisterSend()를 동시에 재진입하는 Race Condition을 막을 수
+			// 있다(기존에는 _sendRegistered를 Disconnect()보다 먼저 false로
+			// 되돌려, 그 창에서 다른 스레드가 새 WSASend를 거는 동시에 이
+			// 스레드가 Disconnect()로 DisconnectEx를 거는 문제가 있었다).
+			Disconnect(Iocp::CloseReason::SocketError);
+
+			std::lock_guard<std::mutex> guard(_lock);
 			_sendEvent.owner = nullptr;
 			_sendEvent.sendBuffers.clear();
+			_sendQueue.clear();
 			_sendRegistered.store(false);
-			Disconnect(Iocp::CloseReason::SocketError);
 		}
 	}
 }
@@ -343,6 +357,7 @@ void CIocpSession::ProcessDisconnect()
 	_disconnectEvent.owner = nullptr; // Ref -1
 
 	OnDisconnected();
+	CSession::OnDisconnected();
 }
 
 //***************************************************************************

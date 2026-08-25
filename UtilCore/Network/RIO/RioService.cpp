@@ -110,7 +110,7 @@ bool CRioServerService::Start()
 
 	std::weak_ptr<CRioServerService> weakService = std::static_pointer_cast<CRioServerService>(shared_from_this());
 
-	// 6. Listener 구동 시작
+	// 6. Listener 구동 시작 (Accept IOCP + AcceptContext Pool 기반 — CRioListener 참고)
 	bool result = _listener->Start(
 		_rioCore,
 		_address,
@@ -168,6 +168,9 @@ bool CRioServerService::Start()
 				CSocketUtils::Close(clientSocket);
 			}
 		}
+		// acceptPoolSize/acceptWorkerCount는 기본값(CRioListener::kDefaultAcceptPoolSize/
+		// kDefaultAcceptWorkerCount) 사용. 대량 동시 접속 환경이라면 이 두 값을
+		// 명시적으로 늘려 호출하는 것을 고려할 것.
 	);
 
 	if( !result )
@@ -184,16 +187,22 @@ bool CRioServerService::Start()
 
 //***************************************************************************
 // @brief 서버 종료 처리
+// @note [수정] 순서를 "세션 종료 -> Listener 정지"에서 "Listener 정지 -> 세션
+//       종료"로 바꿨다. Listener를 먼저 멈춰 신규 연결(및 그로부터 생성될
+//       새 세션)을 차단한 뒤에 기존 세션들을 정리해야, 세션 종료 도중에도
+//       계속 새 세션이 들어와 BeginCloseAllSessions()의 스냅샷에서 누락되는
+//       상황을 원천적으로 막을 수 있다(CRioListener 재설계 문서의 11번 항목
+//       권장 순서를 반영).
 //***************************************************************************
 void CRioServerService::Close()
 {
-	_sessionManager.BeginCloseAllSessions();
-
 	if( _listener )
 	{
 		_listener->Stop();
 		_listener = nullptr;
 	}
+
+	_sessionManager.BeginCloseAllSessions();
 
 	if( _rioCore )
 	{
@@ -288,7 +297,7 @@ CRioSessionRef CRioClientService::ConnectOneMoreSession()
 // - 1. 클라이언트 전용 이벤트 풀을 초기화합니다.
 // - 2. RIO 함수 테이블 조회용 더미 소켓으로 _rioCore를 초기화합니다.
 // - 3. 멀티 워커 스레드 그룹을 구동합니다(세션 등록 전에 코어가 Running 상태여야
-//      PostInitialReceive()가 정상 동작).
+//      PostInitialReceive()가 정상 동작합니다).
 // - 4. 글로벌 수신 버퍼를 초기화합니다.
 // - 5. ConnectEx 완료 통지 전용 디스패처(_connectDispatcher)를 시작합니다
 //      (CRioCore와 완전히 분리된 자기 소유 IOCP + 워커 스레드 1개 — 진단 이력 참고).

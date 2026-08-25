@@ -105,7 +105,19 @@ void CIocpEchoServerSession::OnSend(int32 len)
 void CIocpEchoClientSession::OnConnected()
 {
     CIocpSession::OnConnected();
-    LOG_INFO(_T("[Client] Connected to Server!"));
+    //LOG_WRITE(ELOG_TYPE::LOG_TYPE_INFO, false, _T("[IOCP Client] Connected to Server!"));
+}
+
+//***************************************************************************
+// @brief IOCP 클라이언트가 서버와의 연결이 종료되었을 때 호출되는 오버라이드 함수입니다.
+//***************************************************************************
+void CIocpEchoClientSession::OnDisconnected()
+{
+    CIocpSession::OnDisconnected();
+
+    // 세션 종료 사유 가져오기
+    Iocp::CloseReason reason = GetCloseReason();
+    //LOG_WRITE(ELOG_TYPE::LOG_TYPE_INFO, false, _T("[IOCP Client] Disconnected from Server! (Reason: %d)"), static_cast<int>(reason));
 }
 
 //***************************************************************************
@@ -127,7 +139,7 @@ int32 CIocpEchoClientSession::OnRecv(BYTE* buffer, int32 len)
         MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<char*>(buffer), len, &message[0], wlen);
     }
 
-    LOG_WRITE(ELOG_TYPE::LOG_TYPE_DEBUG, false, _T("[Client Received] %s (Len: %d)"), message.c_str(), len);
+    LOG_WRITE(ELOG_TYPE::LOG_TYPE_DEBUG, false, _T("[Client Received] %s (Len: %d)\n"), message.c_str(), len);
 
     // 대기 플래그를 해제하여 메인 루프가 다음 입력을 받도록 허용
     _waitingForEcho = false;

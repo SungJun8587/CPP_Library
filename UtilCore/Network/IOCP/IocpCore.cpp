@@ -105,16 +105,20 @@ int32 CIocpCore::DispatchBatch(uint32 timeoutMs)
 
     for( ULONG i = 0; i < numRemoved; i++ )
     {
+        LPOVERLAPPED lpOverlapped = entries[i].lpOverlapped;
+        if( lpOverlapped == nullptr )
+            continue;
+
         CIocpEvent* iocpEvent = reinterpret_cast<CIocpEvent*>(entries[i].lpOverlapped);
         DWORD       numOfBytes = entries[i].dwNumberOfBytesTransferred;
 
         // GQCSEx에서 개별 완료 성공/실패는 OVERLAPPED::Internal로 판단
         // STATUS_SUCCESS(0) 이면 성공
-        BOOL  entrySuccess = (entries[i].lpOverlapped->Internal == 0);
+        BOOL entrySuccess = (lpOverlapped->Internal == 0);
         DWORD errorCode = entrySuccess
             ? 0
             : static_cast<DWORD>(::RtlNtStatusToDosError(
-                static_cast<NTSTATUS>(entries[i].lpOverlapped->Internal)));
+                static_cast<NTSTATUS>(lpOverlapped->Internal)));
 
         ProcessOverlappedResult(entrySuccess, iocpEvent, numOfBytes, errorCode);
     }

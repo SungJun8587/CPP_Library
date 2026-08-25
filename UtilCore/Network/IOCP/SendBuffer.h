@@ -39,7 +39,7 @@ public:
 	CSendBuffer(CSendBufferChunkRef owner, BYTE* buffer, uint32 allocSize);
 	~CSendBuffer();
 
-	BYTE*		Buffer() { return _buffer; }
+	BYTE* Buffer() { return _buffer; }
 	uint32		AllocSize() { return _allocSize; }
 	uint32		WriteSize() { return _writeSize; }
 	void		Close(uint32 writeSize);
@@ -81,7 +81,7 @@ public:
 	void				Close(uint32 writeSize);
 
 	bool				IsOpen() { return _open; }
-	BYTE*				Buffer() { return &_buffer[_usedSize]; }
+	BYTE* Buffer() { return &_buffer[_usedSize]; }
 	uint32				FreeSize() { return static_cast<uint32>(_buffer.size()) - _usedSize; }
 
 private:
@@ -101,11 +101,16 @@ private:
 // 주요 처리 및 특징:
 //  - 객체 풀(ObjectPool)을 통한 SendBufferChunk 재사용 및 성능 최적화
 //  - 필요에 따른 동적 청크 교체 및 오픈 처리
+//
+// [수정] Open()은 멤버 변수를 전혀 갖지 않고 thread_local LSendBufferChunk만
+// 참조하는 순수 정적 동작이므로 static으로 변경했습니다. 기존에는 호출부
+// (예: CIocpSession::Send())가 매번 인스턴스를 지역 변수로 만들어 호출했는데,
+// 실질 비용은 0에 가깝지만 static 메서드로 명시해 의도를 분명히 합니다.
 //***************************************************************************
 class CSendBufferManager
 {
 public:
-	CSendBufferRef		Open(uint32 size);
+	static CSendBufferRef		Open(uint32 size);
 
 private:
 	static CSendBufferChunkRef	GetChunk();

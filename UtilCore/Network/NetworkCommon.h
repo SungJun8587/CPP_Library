@@ -24,6 +24,7 @@
 #include <Network/Session.h>
 #include <Network/NetService.h>
 
+#if defined(USE_NETWORK_IOCP)
 #include <Network/IOCP/IocpCommon.h>
 #include <Network/IOCP/SendBuffer.h>
 #include <Network/IOCP/RecvBuffer.h>
@@ -33,7 +34,9 @@
 #include <Network/IOCP/IocpSession.h>
 #include <Network/IOCP/IocpSessionManager.h>
 #include <Network/IOCP/IocpService.h>
+#endif
 
+#if defined(USE_NETWORK_RIO)
 #include <Network/RIO/RioCommon.h>
 #include <Network/RIO/RioObject.h>
 #include <Network/RIO/RioEvent.h>
@@ -47,18 +50,8 @@
 #include <Network/RIO/RioSession.h>
 #include <Network/RIO/RioSessionManager.h>
 #include <Network/RIO/RioService.h>
-
-#include <Network/HTTP/HttpResponseParser.h>
-#include <Network/HTTP/HttpPacketBuilder.h>
-#include <Network/HTTP/HttpClientCore.h>
-#include <Network/HTTP/HttpConnPoolCommon.h>
-#include <Network/HTTP/HttpConnPool.h>
-#include <Network/HTTP/HttpSessionIocp.h>
-#include <Network/HTTP/HttpSessionRio.h>
-#include <Network/HTTP/HttpConnPoolManager.h>
-#include <Network/HTTP/HttpConnPoolFactory.h>
+#endif
 
 #include <Network/NetworkFactory.h>
-
 
 #endif // ndef __NETWORKCOMMON_H__

@@ -86,27 +86,42 @@ size_t CIocpSessionManager::GetSessionCount() const
 // @brief 모든 클러스터를 순회하며 스냅샷을 수집한 뒤 락 밖에서 안전하게 전체 세션에게 패킷 전송을 브로드캐스트합니다.
 // @param data 전송할 데이터 포인터
 // @param size 전송할 데이터 크기
+// @note [수정] 기존에는 맵을 변경하지 않음에도 WriteLock을 잡은 채 session->Send()
+//       (내부적으로 락 획득 + WSASend 게시까지 수행)를 호출해 락 경합이 컸다.
+//       CRioSessionManager::Broadcast()와 동일하게 ReadLock으로 스냅샷만 수집한
+//       뒤 락 밖에서 Send()를 호출하도록 수정.
 //***************************************************************************
 void CIocpSessionManager::Broadcast(const void* data, uint16_t size)
 {
     if( data == nullptr || size == 0 )
         return;
 
+    CVector<CIocpSessionRef> sessionsToSend;
+
+    // 1. 각 클러스터를 ReadLock으로 순회하며 활성 세션들의 스냅샷만 수집
     for( int32 i = 0; i < _sessions.GetClusterCnt(); ++i )
     {
-        _sessions.WriteLockByIdx(i, __FUNCTION__);
+        _sessions.ReadLockByIdx(i, __FUNCTION__);
 
         auto& sessionMap = _sessions.GetClusterMapByIdx(i);
         for( auto& pair : sessionMap )
         {
-            const auto& session = pair.second;
-            if( session && session->IsConnected() )
+            if( pair.second && pair.second->IsConnected() )
             {
-                session->Send(data, size);
+                sessionsToSend.push_back(pair.second);
             }
         }
 
-        _sessions.WriteUnlockByIdx(i, __FUNCTION__);
+        _sessions.ReadUnlockByIdx(i, __FUNCTION__);
+    }
+
+    // 2. 락 외부에서 각 세션의 Send 호출 (다른 Add/Remove/Find와 경합하지 않음)
+    for( const auto& session : sessionsToSend )
+    {
+        if( session && session->IsConnected() )
+        {
+            session->Send(data, size);
+        }
     }
 }
 

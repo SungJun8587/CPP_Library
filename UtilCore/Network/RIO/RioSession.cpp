@@ -618,7 +618,6 @@ bool CRioSession::Send(const void* data, uint16_t size) noexcept
     if( !IsActive() ) return false;
 
     bool needStartSend = false;
-    bool enqueueFailed = false;
 
     {
         PRWriteLockGuard lockGuard(_sendLock, __FUNCTION__);
@@ -636,25 +635,23 @@ bool CRioSession::Send(const void* data, uint16_t size) noexcept
 
         if( !enqueueSuccess || enqueuedBytes != static_cast<int64>(size) )
         {
-            enqueueFailed = true;
+            // 링버퍼(64KB)가 꽉 찼다. 과거에는 여기서 곧바로 Close(SendBufferOverflow)
+            // 했으나, 그러면 body가 조금만 커도(예: 대량 POST) 연결이 끊겨버린다.
+            // IOCP 세션(CVector<CSendBufferRef> 큐, 오브젝트 풀 기반이라 사실상
+            // 무제한 큐잉)과 동작을 맞추기 위해, 여기서는 연결을 죽이지 않고
+            // 오버플로 큐에 보관한다 — OnSendCompleted()가 공간을 비울 때마다
+            // DrainOverflowIntoSendBufferLocked()로 이어서 채운다.
+            const char* bytes = static_cast<const char*>(data);
+            _sendOverflowQueue.emplace_back(bytes, bytes + size);
         }
-        else if( _isSending )
-        {
-            return true; // 이미 전송 루프 진행 중이므로 큐잉만 완료
-        }
-        else
-        {
-            _isSending = true;
-            needStartSend = true;
-        }
-    }
 
-    // 중요: _sendLock을 보유한 상태에서 Close()를 호출하지 않습니다.
-    // OnDisconnected()가 Send()를 호출하는 재진입 deadlock을 방지합니다.
-    if( enqueueFailed )
-    {
-        Close(Rio::CloseReason::SendBufferOverflow);
-        return false;
+        if( _isSending )
+        {
+            return true; // 이미 전송 루프 진행 중이므로 큐잉만 완료 (링버퍼든 오버플로든)
+        }
+
+        _isSending = true;
+        needStartSend = true;
     }
 
     if( !needStartSend ) return true;
@@ -802,9 +799,20 @@ void CRioSession::OnSendCompleted(CRioEvent* rioEvent, DWORD bytesTransferred) n
 
         if( !invalidCompletion )
         {
+            // 읽기 커서가 이동해 방금 생긴 여유 공간만큼 오버플로 큐를 채워
+            // 넣는다 — _sendBuffer.GetSizeUsed()가 아래에서 최신 상태를
+            // 반영하도록 needFlush 판단보다 먼저 수행해야 한다.
+            DrainOverflowIntoSendBufferLocked();
+
             // 이번 호출은 항상 1세그먼트만 보냈으므로, 남은 데이터(wrap의 나머지
-            // 세그먼트 포함)가 있으면 다시 FlushSendInternal()을 호출해 이어서 보냅니다.
-            if( IsActive() && _sendBuffer.GetSizeUsed() > 0 )
+            // 세그먼트, 방금 오버플로에서 옮겨진 데이터 포함)가 있으면 다시
+            // FlushSendInternal()을 호출해 이어서 보냅니다. 링버퍼가 비어있어도
+            // 오버플로 큐에 아직 못 옮긴 청크가 남아있을 수 있으므로(그 청크가
+            // 이번에 생긴 여유 공간보다 컸던 경우) 함께 확인한다.
+            const bool moreInBuffer = _sendBuffer.GetSizeUsed() > 0;
+            const bool moreInOverflow = !_sendOverflowQueue.empty();
+
+            if( IsActive() && (moreInBuffer || moreInOverflow) )
             {
                 needFlush = true;
             }
@@ -829,6 +837,34 @@ void CRioSession::OnSendCompleted(CRioEvent* rioEvent, DWORD bytesTransferred) n
     {
         PRWriteLockGuard lockGuard(_sendLock, __FUNCTION__);
         _isSending = false;
+    }
+}
+
+//***************************************************************************
+// @brief 오버플로 큐에 쌓인 청크를 _sendBuffer에 여유 공간이 생긴 만큼 옮겨 담습니다.
+// @details _sendLock을 write로 보유한 상태에서만 호출해야 합니다.
+//***************************************************************************
+void CRioSession::DrainOverflowIntoSendBufferLocked() noexcept
+{
+    while( !_sendOverflowQueue.empty() )
+    {
+        const std::vector<char>& chunk = _sendOverflowQueue.front();
+
+        int64 enqueuedBytes = 0;
+        const bool enqueueSuccess = _sendBuffer.Enqueue(
+            chunk.data(),
+            static_cast<int64>(chunk.size()),
+            &enqueuedBytes,
+            false);
+
+        if( !enqueueSuccess || enqueuedBytes != static_cast<int64>(chunk.size()) )
+        {
+            // 아직 이 청크를 통째로 넣을 공간이 없음 — 쪼개지 않고 큐에 남겨둔 채
+            // 중단한다. 다음 OnSendCompleted()가 다시 시도한다.
+            break;
+        }
+
+        _sendOverflowQueue.pop_front();
     }
 }
 

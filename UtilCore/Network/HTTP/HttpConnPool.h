@@ -7,10 +7,6 @@
 #ifndef __HTTPCONNPOOL_H__
 #define __HTTPCONNPOOL_H__
 
-#ifndef	__NETWORKREDEFINEDATATYPE_H__
-#include <Network/NetworkRedefineDataType.h>
-#endif
-
 #ifndef	__HTTPCONNPOOLCOMMON_H__
 #include <Network/HTTP/HttpConnPoolCommon.h>
 #endif
@@ -27,6 +23,7 @@
 #include <thread>
 #include <atomic>
 #include <algorithm>
+#include <functional>
 
 //***************************************************************************
 // @class CHttpConnPoolT
@@ -49,15 +46,30 @@
 //      참고하고, 실제 유휴 목록 등록은 항상 OnSessionConnStateChanged
 //      (connected=true) 콜백에서만 수행한다.
 //
-//      [재연결 정책]
-//      세션이 끊기면(OnSessionConnStateChanged(false)) ScheduleReconnect()가
-//      CDelayedTaskQueue에 재연결 작업을 예약한다. 지수 백오프(200ms 시작,
-//      2배씩 증가, 10초 상한)를 적용하고, 현재 세션 수(TService::
-//      GetCurrentSessionCount())가 _maxConnections 이상이면 재연결 자체를
-//      시도하지 않는다. 연결이 성공하면(OnSessionConnStateChanged(true))
-//      백오프 카운터를 리셋한다. CDelayedTaskQueue::ProcessExpiredTasks()는
-//      이 풀이 소유하는 전용 스레드(_taskThread) 하나가 돌린다 — Start()에서
-//      시작, Close()/소멸자에서 정지+join.
+//      [_minIdle vs _maxConnections — 책임 분리]
+//      이 풀은 커넥션 수 관리를 두 가지 독립된 메커니즘으로 나눈다:
+//      - ScheduleReconnect() (백오프 경로): 세션이 끊겼을 때(OnSessionConnStateChanged
+//        (false)) 호출된다. 목적은 "기준선(_minIdle) 유지"다 — 현재 세션 수가
+//        _minIdle 미만일 때만 지수 백오프(200ms 시작, 2배씩 증가, 10초 상한)를
+//        걸어 CDelayedTaskQueue에 재연결을 예약한다. 이미 _minIdle을 채우고
+//        있으면(끊긴 게 여분의 버스트 커넥션이었다면) 여기서는 더 만들지 않는다.
+//        디스커넥트는 원격 서버의 일시적 장애를 의미할 수 있어 백오프로 과도한
+//        재시도를 피한다.
+//      - TryGrow() (즉시 경로): SendRequest()가 유휴 세션을 못 찾아 요청을
+//        대기열에 쌓아야 할 때 호출된다. 이건 장애 복구가 아니라 "지금 수요가
+//        기준선을 넘었다"는 정상적인 신호이므로, 백오프 없이 즉시
+//        ConnectOneMoreSession()을 시도하되 _maxConnections 상한까지만 늘린다.
+//      Start()는 초기 연결을 _maxConnections가 아니라 _minIdle개만 게시한다 —
+//      나머지(_maxConnections까지의 여유분)는 실제로 버스트 수요가 생겼을 때
+//      TryGrow()가 채운다.
+//
+//      [증설 시도의 자연스러운 상한 도달] ConnectOneMoreSession()은 세션을
+//      생성하자마자(실제 연결 완료 전에) AddSession()으로 즉시 등록하므로
+//      GetCurrentSessionCount()가 그 자리에서 바로 반영된다. 그래서
+//      ScheduleReconnect()/TryGrow() 양쪽 다 "카운트 확인 -> 필요하면 1개
+//      요청"만 하면, 짧은 시간에 여러 번 호출돼도(예: 요청 폭주로 TryGrow()가
+//      연달아 불려도) 상한에 도달하는 순간 자동으로 더 이상 늘지 않는다 —
+//      별도의 동시성 카운터 관리가 필요 없다.
 //
 //      [스레드 안전성/수명 메모]
 //      _taskThread와 예약된 재연결 작업의 콜백은 모두 "this"를 raw 포인터로
@@ -67,10 +79,6 @@
 //      스스로를 살려두는" 자기 참조 사이클(Close()를 아무도 안 부르면 영원히
 //      안 죽는 leak)이 생긴다. raw this + 소멸자에서 확실한 join이 더 안전한
 //      선택이다.
-//
-//      [아직 반영 안 된 것] min idle 유지: 시작 시 minIdle개를 미리 채우는
-//      것은 TService::Start()의 maxSessionCount 설정에 위임(호출부 책임) —
-//      이 클래스는 "끊긴 만큼만" 보충한다.
 //***************************************************************************
 template<typename TSession, typename TSessionRef, typename TService, typename TServiceRef>
 class CHttpConnPoolT
@@ -87,22 +95,34 @@ public:
 	//***************************************************************************
 	// @brief 풀을 생성합니다. 세션 팩토리가 이 풀 자신(weak_ptr)을 캡처해야 하는
 	//        순환 구조 때문에 생성자 직접 호출 대신 이 정적 팩토리를 사용합니다.
-	// @param maxConnections host당 유지할 최대 커넥션 수
-	// @param makeService (sessionFactory, maxSessionCount) -> TServiceRef 형태의
-	//        콜백. 실제 CIocpClientService/CRioClientService 생성자 호출을
-	//        캡슐화해서 넘겨준다(엔진별 생성자 시그니처 차이를 이 템플릿이
-	//        몰라도 되게 하기 위함) — 실제 사용 예는 HttpConnPoolFactory.h 참고.
+	// @param minIdle host당 항상 유지할 기준 커넥션 수. Start()가 이 개수만큼
+	//        초기 연결을 게시하며, 디스커넥트로 이 아래로 떨어지면
+	//        ScheduleReconnect()가 백오프를 걸어 다시 채운다.
+	// @param maxConnections host당 허용할 최대 커넥션 수. minIdle을 넘는
+	//        추가분은 TryGrow()가 실제 수요(대기열 발생)에 반응해서만 만든다.
+	// @param makeService (sessionFactory, initialSessionCount) -> TServiceRef
+	//        형태의 콜백. 실제 CIocpClientService/CRioClientService 생성자
+	//        호출을 캡슐화해서 넘겨준다(엔진별 생성자 시그니처 차이를 이
+	//        템플릿이 몰라도 되게 하기 위함). initialSessionCount에는 minIdle이
+	//        전달된다 — 실제 사용 예는 HttpConnPoolFactory.h 참고.
+	// @param initSession 세션이 새로 생성될 때마다(SetConnStateHandler 등록보다
+	//        먼저) 호출되는 선택적 훅. HTTPS 세션처럼 생성 직후 추가 설정
+	//        (SSL_CTX/SNI 호스트네임 주입 등)이 필요한 경우에 쓴다. 평문 HTTP는
+	//        생략(nullptr)하면 됨 — 기존 호출부는 그대로 동작한다.
 	// @return std::shared_ptr<ThisPool> 생성된 풀 (Start() 호출 전까지는 미구동 상태)
 	//***************************************************************************
 	template<typename ServiceMakerFn>
-	static std::shared_ptr<ThisPool> Create(int32 maxConnections, ServiceMakerFn&& makeService)
+	static std::shared_ptr<ThisPool> Create(int32 minIdle, int32 maxConnections, ServiceMakerFn&& makeService,
+		std::function<void(TSessionRef)> initSession = nullptr)
 	{
-		std::shared_ptr<ThisPool> pool(new ThisPool(maxConnections));
+		std::shared_ptr<ThisPool> pool(new ThisPool(minIdle, maxConnections));
 
 		std::weak_ptr<ThisPool> weakPool = pool;
-		SessionFactory sessionFactory = [weakPool]() -> CSessionRef
+		SessionFactory sessionFactory = [weakPool, initSession]() -> CSessionRef
 			{
 				auto session = std::make_shared<TSession>();
+				if( initSession )
+					initSession(session);
 				session->SetConnStateHandler([weakPool](CSessionRef s, bool connected)
 					{
 						if( auto p = weakPool.lock() )
@@ -111,7 +131,7 @@ public:
 				return session;
 			};
 
-		pool->_clientService = makeService(sessionFactory, maxConnections);
+		pool->_clientService = makeService(sessionFactory, minIdle);
 		return pool;
 	}
 
@@ -127,7 +147,8 @@ public:
 	}
 
 	//***************************************************************************
-	// @brief 풀을 구동합니다: 클라이언트 서비스 시작 + 재연결 작업 큐 전용 스레드 시작.
+	// @brief 풀을 구동합니다: 클라이언트 서비스 시작(_minIdle개 초기 연결 게시) +
+	//        재연결 작업 큐 전용 스레드 시작.
 	// @return bool 성공 여부 (_clientService가 없거나 그 Start()가 실패하거나,
 	//         _taskThread 생성 자체가 실패하면 false)
 	//***************************************************************************
@@ -169,16 +190,18 @@ public:
 	// @param len data의 길이
 	// @param onComplete 응답 완결 시 호출되는 콜백
 	// @details 즉시 보낼 수 있는 유휴 세션이 있으면 바로 디스패치하고, 없으면
-	//          내부 대기열(_pendingRequests)에 쌓아둔다. data는 이 호출 안에서
-	//          std::string으로 복사되므로(제로카피 빌더의 "Build() 호출
-	//          시점까지만 유효" 전제가 큐잉 상황에서는 성립하지 않기 때문),
-	//          호출부가 반환 후 즉시 원본 버퍼를 해제해도 안전하다.
+	//          내부 대기열(_pendingRequests)에 쌓아둔 뒤 TryGrow()로 즉시(백오프
+	//          없이) 증설을 시도한다(_maxConnections 상한까지만). data는 이
+	//          호출 안에서 std::string으로 복사되므로(제로카피 빌더의 "Build()
+	//          호출 시점까지만 유효" 전제가 큐잉 상황에서는 성립하지 않기
+	//          때문), 호출부가 반환 후 즉시 원본 버퍼를 해제해도 안전하다.
 	//***************************************************************************
 	void SendRequest(const char* data, size_t len, HttpRequestCompletionHandler onComplete) override
 	{
 		PendingRequest req{ std::string(data, len), std::move(onComplete) };
 
 		TSessionRef idleSession;
+		bool queued = false;
 		{
 			std::lock_guard<std::mutex> guard(_lock);
 			if( !_idleSessions.empty() )
@@ -189,8 +212,17 @@ public:
 			else
 			{
 				_pendingRequests.push_back(std::move(req));
-				return;
+				queued = true;
 			}
+		}
+
+		if( queued )
+		{
+			// 유휴 세션이 없어 대기열로 갔다 = 지금 수요가 기준선(_minIdle)을
+			// 넘어섰을 수 있다는 신호 — 락 밖에서(ConnectOneMoreSession() 호출이
+			// 걸릴 수 있으므로) 즉시 증설을 시도한다.
+			TryGrow();
+			return;
 		}
 
 		DispatchToSession(idleSession, std::move(req));
@@ -203,8 +235,8 @@ public:
 	// @details 실제 배포 코드에서는 SetConnStateHandler로 등록된 람다를 통해서만
 	//          호출되지만, 단위 테스트에서 직접 연결/해제 이벤트를 시뮬레이션할
 	//          수 있도록 public으로 둔다(DisconnectHandler와 동일한 패턴).
-	//          connected==false면 ScheduleReconnect()로 재연결을 예약하고,
-	//          true면 백오프 카운터를 리셋한 뒤 DispatchOrIdle()로 넘긴다.
+	//          connected==false면 ScheduleReconnect()로 기준선(_minIdle) 유지를
+	//          시도하고, true면 백오프 카운터를 리셋한 뒤 DispatchOrIdle()로 넘긴다.
 	//***************************************************************************
 	void OnSessionConnStateChanged(CSessionRef sessionBase, bool connected)
 	{
@@ -252,10 +284,11 @@ private:
 
 	//***************************************************************************
 	// @brief CHttpConnPoolT 생성자 (private — Create() 정적 팩토리를 통해서만 생성 가능).
-	// @param maxConnections host당 유지할 최대 커넥션 수
+	// @param minIdle host당 항상 유지할 기준 커넥션 수
+	// @param maxConnections host당 허용할 최대 커넥션 수
 	//***************************************************************************
-	explicit CHttpConnPoolT(int32 maxConnections)
-		: _maxConnections(maxConnections)
+	explicit CHttpConnPoolT(int32 minIdle, int32 maxConnections)
+		: _minIdle(minIdle), _maxConnections(maxConnections)
 	{
 	}
 
@@ -345,14 +378,14 @@ private:
 	}
 
 	//***************************************************************************
-	// @brief 세션을 폐기하고 재연결을 예약합니다.
+	// @brief 세션을 폐기하고, 기준선(_minIdle) 유지를 위한 재연결을 예약합니다.
 	// @param session 폐기할 세션
 	// @details Disconnect()가 비동기로 OnDisconnected()를 유발해
 	//          ScheduleReconnect()가 다시 불릴 수 있음 — ScheduleReconnect()
-	//          자체가 상한 체크로 중복 호출에도 안전하게 설계돼 있으므로
-	//          (currentSessionCount >= max면 그냥 무시) 여기서도 호출해 두는
-	//          것이 안전하다(세션이 이미 Disconnected라 콜백이 다시 안 오는
-	//          경로까지 커버).
+	//          자체가 _minIdle 체크로 중복 호출에도 안전하게 설계돼 있으므로
+	//          (currentSessionCount >= minIdle이면 그냥 무시) 여기서도 호출해
+	//          두는 것이 안전하다(세션이 이미 Disconnected라 콜백이 다시 안
+	//          오는 경로까지 커버).
 	//***************************************************************************
 	void DiscardSession(TSessionRef session)
 	{
@@ -362,19 +395,21 @@ private:
 
 	//***************************************************************************
 	// @brief 재연결 작업을 지수 백오프 지연을 걸어 CDelayedTaskQueue에 예약합니다.
-	// @details 이미 상한만큼 세션을 보유(또는 연결 시도 중)라면 재연결하지
-	//          않는다. GetCurrentSessionCount()는 "연결 완료된" 세션뿐 아니라
-	//          "연결 시도 중"(AddSession()이 ConnectAsync() 게시 이전에 먼저
-	//          호출됨 — IocpService/RioService의 ConnectOneMoreSession() 설계
-	//          참고)인 세션도 포함하므로, 상한을 초과해 동시에 여러 연결을
-	//          시도하는 상황을 자연스럽게 막아준다.
+	// @details "기준선(_minIdle) 유지"가 목적이다 — 현재 세션 수가 이미 _minIdle
+	//          이상이면(끊긴 게 여분의 버스트 커넥션이었다면) 여기서는 아무것도
+	//          하지 않는다. _maxConnections까지의 추가 증설은 TryGrow()가 실제
+	//          수요에 반응해서 담당한다(이 함수의 책임이 아님). GetCurrentSessionCount()는
+	//          "연결 완료된" 세션뿐 아니라 "연결 시도 중"(AddSession()이
+	//          ConnectAsync() 게시 이전에 먼저 호출됨 — IocpService/RioService의
+	//          ConnectOneMoreSession() 설계 참고)인 세션도 포함하므로, 짧은
+	//          시간에 여러 번 불려도 자연스럽게 과다 재연결을 막아준다.
 	//***************************************************************************
 	void ScheduleReconnect()
 	{
 		if( !_clientService )
 			return;
 
-		if( _clientService->GetCurrentSessionCount() >= _maxConnections )
+		if( _clientService->GetCurrentSessionCount() >= _minIdle )
 			return;
 
 		uint32_t failCount = _consecutiveFailCount.fetch_add(1, std::memory_order_relaxed);
@@ -387,9 +422,28 @@ private:
 			});
 	}
 
+	//***************************************************************************
+	// @brief 실제 수요(대기열 발생)에 반응해 커넥션을 즉시(백오프 없이) 증설합니다.
+	// @details ScheduleReconnect()와 달리 이건 장애 복구가 아니라 정상적인 용량
+	//          확장이므로 지연을 걸지 않는다. _maxConnections 상한을 넘어서는
+	//          증설은 하지 않는다 — ConnectOneMoreSession()이 AddSession()을
+	//          즉시(연결 완료 전에) 수행해 GetCurrentSessionCount()에 바로
+	//          반영되므로, 짧은 시간에 여러 번 호출돼도(요청 폭주 등) 상한에
+	//          도달하는 순간 자연스럽게 멈춘다.
+	//***************************************************************************
+	void TryGrow()
+	{
+		if( !_clientService )
+			return;
+
+		if( _clientService->GetCurrentSessionCount() < _maxConnections )
+			_clientService->ConnectOneMoreSession();
+	}
+
 private:
 	TServiceRef _clientService; // 이 풀이 소유하는 IOCP/RIO 클라이언트 서비스
-	int32 _maxConnections;      // host당 유지할 최대 커넥션 수
+	int32 _minIdle;             // host당 항상 유지할 기준 커넥션 수 (ScheduleReconnect()가 지킴)
+	int32 _maxConnections;      // host당 허용할 최대 커넥션 수 (TryGrow()의 상한)
 
 	std::mutex _lock;                            // _idleSessions/_pendingRequests 보호
 	std::vector<TSessionRef> _idleSessions;      // 요청을 받을 수 있는 유휴 세션 목록

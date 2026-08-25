@@ -107,6 +107,9 @@
     </ClCompile>
     <ClCompile Include="IocpEchoServerSession.cpp" />
     <ClCompile Include="RioEchoServerSession.cpp" />
+    <ClCompile Include="..\..\..\UtilCore\Network\RIO\RioConnectDispatcher.cpp">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="UtilCore">
@@ -291,6 +294,15 @@
     </ClInclude>
     <ClInclude Include="IocpEchoServerSession.h" />
     <ClInclude Include="RioEchoServerSession.h" />
+    <ClInclude Include="..\..\..\UtilCore\Util\ConsoleUtil.h">
+      <Filter>UtilCore\Util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioConnectDispatcher.h">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioConnectEvent.h">
+      <Filter>UtilCore\Network\RIO</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\UtilCore\Containers\Map\ClusterSpinMap.inl">

@@ -1,11 +1,11 @@
 ﻿
 //***************************************************************************
-// HttpResponseParser.h : interface for the CHttpResponseParser class.
+// HttpRequestParser.h : interface for the CHttpRequestParser class.
 //
 //***************************************************************************
 
-#ifndef __HTTPRESPONSEPARSER_H__
-#define __HTTPRESPONSEPARSER_H__
+#ifndef __HTTPREQUESTPARSER_H__
+#define __HTTPREQUESTPARSER_H__
 
 #ifndef	__HTTPPARSEUTIL_H__
 #include <Network/HTTP/HttpParseUtil.h>
@@ -21,47 +21,54 @@
 #include <cctype>
 
 //***************************************************************************
-// @class CHttpResponseParser
-// @brief HTTP/1.1 응답을 증분(incremental)으로 파싱하는 상태머신
+// @class CHttpRequestParser
+// @brief HTTP/1.x 요청을 증분(incremental)으로 파싱하는 상태머신 (CHttpResponseParser의
+//        서버 측 대응)
 //
 // @details
-//      요청 빌더(HttpPacketBuilder.h)와 달리 이 쪽은 "제로카피 뷰"가 아니라
-//      내부에 데이터를 복사/누적해야 한다: 응답 바이트는 CRecvBuffer 같은
-//      링/시프트 버퍼에서 오는데, 그 버퍼는 다음 Dispatch() 콜에서 덮어써지거나
-//      재사용될 수 있어 Feed() 호출이 끝난 뒤에도 살아있어야 하는 상태(헤더,
-//      지금까지 읽은 body)는 소유권을 가져야 한다.
+//      [char 전용] HTTP 관련 클래스는 전부 char 타입으로 통일한다 — 설계
+//      원칙은 CHttpResponseParser와 동일하다(이유는 HttpResponseParser.h의
+//      클래스 설명 참고 — UNICODE 빌드에서 TCHAR=wchar_t 기반으로 바꾸면
+//      와이어 바이트 스트림 가정이 깨짐). TCHAR 문자열이 필요한 호출부는
+//      CIconvUtil 등으로 미리 변환해서 char로 넘기거나, 파싱 결과를 받아
+//      직접 변환하는 것을 권장한다.
+//      대소문자 비교(HTTP::EqualsIgnoreCaseAscii)/공백 트림(HTTP::Trim)/파싱
+//      상태(HTTP::EParseState)는 HttpParseUtil.h의 공용 정의를 그대로 재사용해
+//      CHttpResponseParser와 중복 정의하지 않는다(HTTP::EParseState::StartLine
+//      하나로 요청 라인/상태 라인을 함께 표현 — RFC 7230 §3.1의 start-line =
+//      request-line / status-line 문법을 그대로 반영한 것).
 //
-//      [char 전용] HTTP 관련 클래스는 전부 char 타입으로 통일한다 — Feed()가
-//      받는 데이터는 소켓에서 그대로 온 와이어 바이트라 항상 1바이트 단위
-//      (char)로 처리해야 한다(TCHAR=wchar_t로 바꾸면 "TCP 스트림이 2바이트
-//      단위로 온다"고 잘못 가정하게 되어 파싱이 깨짐 — HttpPacketBuilder.h의
-//      UNICODE 빌드 주의사항과 동일한 문제). TCHAR 문자열이 필요한 호출부는
-//      CIconvUtil 등으로 미리 변환해서 char로 넘기거나, GetBody()/GetHeaders()
-//      결과를 받아 직접 변환하는 것을 권장한다 — 변환을 이 계층 안에 숨기면
-//      중복 변환을 호출부가 통제할 수 없게 된다.
+//      [응답 파서와의 차이점]
+//      - 상태 라인 대신 요청 라인("METHOD URI VERSION")을 파싱한다 — 상태
+//        코드/Reason-Phrase 대신 Method/URI/Version 세 필드를 채운다.
+//      - URI는 경로와 쿼리 문자열을 분리해서 조회할 수 있다(GetPath()/
+//        GetQueryString(), '?' 기준 분리, 제로카피 뷰).
+//      - Content-Length도 chunked도 없는 요청은 CHttpResponseParser와 달리
+//        "알려진 제약"이 아니라 RFC 7230상 실제로 올바른 동작이다 — 요청은
+//        (일부 레거시 케이스를 제외하면) "연결 종료까지 body"라는 개념 자체가
+//        없으므로, 본 구현이 body 없음으로 간주하고 즉시 Complete 처리하는 것이
+//        스펙에 맞는 정상 동작이다.
+//      - IsKeepAlive()로 HTTP 버전 + Connection 헤더를 함께 고려한 keep-alive
+//        여부를 제공한다(HTTP/1.1은 명시적 "Connection: close"가 없으면 기본
+//        keep-alive, HTTP/1.0은 명시적 "Connection: keep-alive"가 없으면 기본
+//        close — RFC 7230 6.3절).
 //
-//      [사용 패턴 — 세션의 수신 훅에서]
-//      CHttpResponseParser parser;
+//      [사용 패턴 — 서버 세션의 수신 훅에서]
+//      CHttpRequestParser parser;
 //      // ... Dispatch() 콜백마다:
 //      auto state = parser.Feed(recvData, recvLen);
-//      if (state == HTTP::EParseState::Complete) { /* 콜백/future에 결과 전달 */ }
-//      else if (state == HTTP::EParseState::Error) { /* 커넥션 폐기, 재시도 판단 */ }
-//      // 같은 커넥션에서 다음 요청을 보내기 전 반드시 parser.Reset() 호출 (keep-alive 재사용)
-//
-//      [알려진 제약] Content-Length도 chunked도 없는 응답은 본 구현이 "연결
-//      종료까지 body"를 지원하지 않아 body 없음으로 간주하고 즉시 Complete
-//      처리한다(OnHeadersComplete() 참고). keep-alive 풀에서 이런 응답을 만나면
-//      그 커넥션을 재사용하지 말고 폐기해야 한다 — 상위 계층이 명시적으로
-//      처리해야 하는 부분.
+//      if (state == HTTP::EParseState::Complete) { /* 요청 처리 -> 응답 전송 */ }
+//      else if (state == HTTP::EParseState::Error) { /* 400 Bad Request 등, 커넥션 폐기 */ }
+//      // 같은 커넥션에서 다음 요청을 받기 전 반드시 parser.Reset() 호출 (keep-alive 재사용)
 //***************************************************************************
-class CHttpResponseParser
+class CHttpRequestParser
 {
 public:
 	//***************************************************************************
-	// @brief CHttpResponseParser 생성자
+	// @brief CHttpRequestParser 생성자
 	// @details 헤더 목록 벡터를 미리 reserve해 초기 파싱 중 재할당을 줄인다.
 	//***************************************************************************
-	CHttpResponseParser() { m_headers.reserve(16); }
+	CHttpRequestParser() { m_headers.reserve(16); }
 
 	//***************************************************************************
 	// @brief 수신 바이트를 밀어넣습니다. 여러 번 나눠 호출해도 내부 상태로 이어붙여 처리합니다.
@@ -77,10 +84,10 @@ public:
 			switch( m_state )
 			{
 			case HTTP::EParseState::StartLine:
-				pos += ConsumeLine(data + pos, len - pos, /*isStatusLine=*/true);
+				pos += ConsumeLine(data + pos, len - pos, /*isRequestLine=*/true);
 				break;
 			case HTTP::EParseState::Headers:
-				pos += ConsumeLine(data + pos, len - pos, /*isStatusLine=*/false);
+				pos += ConsumeLine(data + pos, len - pos, /*isRequestLine=*/false);
 				break;
 			case HTTP::EParseState::Body:
 				pos += ConsumeBody(data + pos, len - pos);
@@ -95,31 +102,48 @@ public:
 				pos += ConsumeChunkTrailingCrlf(data + pos, len - pos);
 				break;
 			case HTTP::EParseState::ChunkedTrailer:
-				pos += ConsumeLine(data + pos, len - pos, /*isStatusLine=*/false, /*isTrailer=*/true);
+				pos += ConsumeLine(data + pos, len - pos, /*isRequestLine=*/false, /*isTrailer=*/true);
 				break;
 			default:
 				break;
 			}
 		}
+		// Complete/Error 상태로 루프가 조기 종료되면 pos < len일 수 있다 (예: 파이프라이닝된
+		// 다음 요청의 바이트가 같은 수신 버퍼에 이어 붙어 온 경우). 호출부가 실제 소비량을
+		// 알 수 있도록 이번 호출에서 소비한 바이트 수를 기록해둔다 (GetLastFeedConsumed() 참고).
+		m_lastFeedConsumed = pos;
 		return m_state;
 	}
 
 	//***************************************************************************
-	// @brief 같은 커넥션(keep-alive)에서 다음 요청/응답을 위해 재사용합니다.
+	// @brief 직전 Feed() 호출에서 실제로 소비된 바이트 수를 반환합니다.
+	// @details Complete/Error로 상태가 바뀌며 루프가 조기 종료된 경우, 전달한 len
+	//          전부가 소비되지 않았을 수 있다(파이프라이닝된 다음 요청의 선두 바이트가
+	//          같은 버퍼에 섞여 들어온 경우 등). 호출부는 Feed()가 Complete를 반환했을 때
+	//          이 값을 이번에 "처리된" 바이트 수로 사용하고, 나머지(len - 반환값)는
+	//          다음 처리를 위해 버퍼에 남겨두어야 한다.
+	//***************************************************************************
+	size_t GetLastFeedConsumed() const noexcept { return m_lastFeedConsumed; }
+
+	//***************************************************************************
+	// @brief 같은 커넥션(keep-alive)에서 다음 요청을 위해 재사용합니다.
 	//***************************************************************************
 	void Reset()
 	{
 		m_state = HTTP::EParseState::StartLine;
 		m_lineBuffer.clear();
-		m_statusCode = 0;
-		m_reasonPhrase.clear();
+		m_method.clear();
+		m_uri.clear();
+		m_version.clear();
 		m_headers.clear();
 		m_body.clear();
 		m_contentLength = 0;
 		m_hasContentLength = false;
 		m_chunked = false;
 		m_chunkRemaining = 0;
-		m_connectionClose = false;
+		m_crlfSkipped = 0;
+		m_keepAlive = false;
+		m_lastFeedConsumed = 0;
 	}
 
 	//***************************************************************************
@@ -128,14 +152,40 @@ public:
 	HTTP::EParseState GetState() const noexcept { return m_state; }
 
 	//***************************************************************************
-	// @brief 응답 상태 코드를 반환합니다 (예: 200, 404).
+	// @brief HTTP 메서드를 바이트 문자열 그대로 반환합니다 (예: "GET", "POST").
 	//***************************************************************************
-	int GetStatusCode() const noexcept { return m_statusCode; }
+	const std::string& GetMethod() const noexcept { return m_method; }
 
 	//***************************************************************************
-	// @brief 상태 메시지(Reason-Phrase)를 바이트 문자열 그대로 반환합니다.
+	// @brief 요청 라인의 URI 전체(경로+쿼리)를 바이트 문자열 그대로 반환합니다.
 	//***************************************************************************
-	const std::string& GetReasonPhrase() const noexcept { return m_reasonPhrase; }
+	const std::string& GetUri() const noexcept { return m_uri; }
+
+	//***************************************************************************
+	// @brief URI에서 쿼리 문자열을 제외한 경로 부분만 반환합니다 (제로카피 뷰).
+	// @return std::string_view '?' 이전까지의 경로. '?'가 없으면 URI 전체.
+	//***************************************************************************
+	std::string_view GetPath() const noexcept
+	{
+		size_t q = m_uri.find('?');
+		return std::string_view(m_uri).substr(0, q);
+	}
+
+	//***************************************************************************
+	// @brief URI에서 쿼리 문자열 부분만 반환합니다 (제로카피 뷰, '?' 제외).
+	// @return std::string_view '?' 다음부터 끝까지. '?'가 없으면 빈 뷰.
+	//***************************************************************************
+	std::string_view GetQueryString() const noexcept
+	{
+		size_t q = m_uri.find('?');
+		if( q == std::string::npos ) return {};
+		return std::string_view(m_uri).substr(q + 1);
+	}
+
+	//***************************************************************************
+	// @brief HTTP 버전 문자열을 바이트 문자열 그대로 반환합니다 (예: "HTTP/1.1").
+	//***************************************************************************
+	const std::string& GetVersion() const noexcept { return m_version; }
 
 	//***************************************************************************
 	// @brief 파싱된 헤더 목록을 바이트 문자열 쌍 그대로 반환합니다 (삽입 순서 보존).
@@ -144,16 +194,19 @@ public:
 
 	//***************************************************************************
 	// @brief 지금까지 누적된 body를 바이트 그대로 반환합니다.
-	// @details body는 임의의 인코딩(UTF-8 JSON, 바이너리 등)일 수 있어 Content-Type에
-	//          맞는 변환은 호출부 책임.
+	// @details body는 임의의 인코딩(폼 데이터, JSON, 바이너리 업로드 등)일 수
+	//          있어 Content-Type에 맞는 변환은 호출부 책임.
 	//***************************************************************************
 	const std::string& GetBody() const noexcept { return m_body; }
 
 	//***************************************************************************
-	// @brief 서버가 "Connection: close"를 명시했는지 반환합니다.
-	// @return bool true면 응답 완료 후 풀에 반납하지 말고 커넥션을 폐기해야 함
+	// @brief 이 요청이 keep-alive로 처리돼야 하는지 반환합니다.
+	// @return bool true면 응답 전송 후 커넥션을 유지, false면 응답 후 닫아야 함.
+	// @details HTTP/1.1은 "Connection: close"가 명시되지 않는 한 기본 keep-alive,
+	//          HTTP/1.0(또는 그 이하)은 "Connection: keep-alive"가 명시되지
+	//          않는 한 기본 close — RFC 7230 6.3절 규칙을 그대로 따른다.
 	//***************************************************************************
-	bool IsConnectionCloseRequested() const noexcept { return m_connectionClose; }
+	bool IsKeepAlive() const noexcept { return m_keepAlive; }
 
 	//***************************************************************************
 	// @brief 헤더를 이름으로 찾습니다 (대소문자 무시, ASCII 바이트 문자열 기준).
@@ -163,43 +216,22 @@ public:
 	std::string_view FindHeader(std::string_view key) const noexcept
 	{
 		for( const auto& [k, v] : m_headers )
-			if( EqualsIgnoreCaseAscii(k, key) )
+			if( HTTP::EqualsIgnoreCaseAscii(k, key) )
 				return v;
 		return {};
 	}
 
 private:
 	//***************************************************************************
-	// @brief 대소문자 무시 비교 (헤더 이름은 RFC 7230 기준 대소문자 무관, ASCII 범위만 처리).
-	// @details 실제 구현은 HTTP::EqualsIgnoreCaseAscii()에 위임 — CHttpRequestParser
-	//          등 다른 파서와 공유하기 위해 그쪽으로 승격했다. 이 private
-	//          래퍼는 기존 내부 호출부(EqualsIgnoreCaseAscii(...))를 그대로
-	//          유지하기 위해 남겨둔다.
-	//***************************************************************************
-	static bool EqualsIgnoreCaseAscii(std::string_view a, std::string_view b) noexcept
-	{
-		return HTTP::EqualsIgnoreCaseAscii(a, b);
-	}
-
-	//***************************************************************************
-	// @brief 문자열 앞뒤의 공백(스페이스/탭)을 제거합니다.
-	// @details 실제 구현은 HTTP::Trim()에 위임 (EqualsIgnoreCaseAscii와 동일한 이유).
-	//***************************************************************************
-	static std::string_view Trim(std::string_view sv) noexcept
-	{
-		return HTTP::Trim(sv);
-	}
-
-	//***************************************************************************
 	// @brief data 안에서 개행(\n)을 찾아 한 줄을 소비합니다.
 	// @param data 입력 바이트 포인터
 	// @param len data의 길이
-	// @param isStatusLine 상태 라인 파싱 중인지 여부 (true면 HandleStatusLine으로)
-	// @param isTrailer chunked 응답의 trailer 헤더 섹션인지 여부
+	// @param isRequestLine 요청 라인 파싱 중인지 여부 (true면 HandleRequestLine으로)
+	// @param isTrailer chunked 요청의 trailer 헤더 섹션인지 여부
 	// @return size_t 소비한 바이트 수. 개행을 못 찾으면 m_lineBuffer에 누적만
 	//         하고 len 전체를 반환, 찾으면 그 줄까지 소비한 바이트 수를 반환.
 	//***************************************************************************
-	size_t ConsumeLine(const char* data, size_t len, bool isStatusLine, bool isTrailer = false)
+	size_t ConsumeLine(const char* data, size_t len, bool isRequestLine, bool isTrailer = false)
 	{
 		const char* nl = static_cast<const char*>(memchr(data, '\n', len));
 		if( !nl )
@@ -213,9 +245,9 @@ private:
 		if( !m_lineBuffer.empty() && m_lineBuffer.back() == '\r' )
 			m_lineBuffer.pop_back();
 
-		if( isStatusLine )
+		if( isRequestLine )
 		{
-			HandleStatusLine(m_lineBuffer);
+			HandleRequestLine(m_lineBuffer);
 		}
 		else if( m_lineBuffer.empty() )
 		{
@@ -234,23 +266,29 @@ private:
 	}
 
 	//***************************************************************************
-	// @brief 상태 라인("HTTP/1.1 200 OK")을 파싱해 상태 코드/메시지를 채웁니다.
-	// @param line 개행이 제거된 상태 라인 원문
+	// @brief 요청 라인("GET /path?query HTTP/1.1")을 파싱해 Method/URI/Version을 채웁니다.
+	// @param line 개행이 제거된 요청 라인 원문
 	//***************************************************************************
-	void HandleStatusLine(const std::string& line)
+	void HandleRequestLine(const std::string& line)
 	{
-		// "HTTP/1.1 200 OK"
 		size_t sp1 = line.find(' ');
 		if( sp1 == std::string::npos ) { m_state = HTTP::EParseState::Error; return; }
 		size_t sp2 = line.find(' ', sp1 + 1);
-		std::string_view codeSv(line.data() + sp1 + 1, (sp2 == std::string::npos ? line.size() : sp2) - sp1 - 1);
+		if( sp2 == std::string::npos ) { m_state = HTTP::EParseState::Error; return; }
 
-		int code = 0;
-		auto res = std::from_chars(codeSv.data(), codeSv.data() + codeSv.size(), code);
-		if( res.ec != std::errc() ) { m_state = HTTP::EParseState::Error; return; }
-		m_statusCode = code;
-		if( sp2 != std::string::npos )
-			m_reasonPhrase.assign(line.data() + sp2 + 1, line.size() - sp2 - 1);
+		m_method.assign(line, 0, sp1);
+		m_uri.assign(line, sp1 + 1, sp2 - sp1 - 1);
+		m_version.assign(line, sp2 + 1, line.size() - sp2 - 1);
+
+		if( m_method.empty() || m_uri.empty() || m_version.empty() )
+		{
+			m_state = HTTP::EParseState::Error;
+			return;
+		}
+
+		// HTTP/1.1 기본 keep-alive, 그 외(HTTP/1.0 등) 기본 close — Connection
+		// 헤더를 실제로 확인하기 전까지의 잠정값. 최종값은 OnHeadersComplete()에서 확정.
+		m_keepAlive = HTTP::EqualsIgnoreCaseAscii(m_version, "HTTP/1.1");
 
 		m_state = HTTP::EParseState::Headers;
 	}
@@ -264,13 +302,14 @@ private:
 		size_t colon = line.find(':');
 		if( colon == std::string::npos ) return; // 관례상 무시 (엄격 모드가 필요하면 Error로 바꿀 것)
 		std::string key(line.data(), colon);
-		std::string_view value = Trim(std::string_view(line).substr(colon + 1));
+		std::string_view value = HTTP::Trim(std::string_view(line).substr(colon + 1));
 		m_headers.emplace_back(std::move(key), std::string(value));
 	}
 
 	//***************************************************************************
 	// @brief 헤더 섹션이 끝났을 때(빈 줄 도달) 호출되어, Transfer-Encoding/
-	//        Content-Length/Connection 헤더를 검사해 다음 파싱 상태를 결정합니다.
+	//        Content-Length/Connection 헤더를 검사해 다음 파싱 상태와 keep-alive
+	//        여부를 확정합니다.
 	//***************************************************************************
 	void OnHeadersComplete()
 	{
@@ -278,10 +317,13 @@ private:
 		std::string_view cl = FindHeader("Content-Length");
 		std::string_view conn = FindHeader("Connection");
 
-		if( EqualsIgnoreCaseAscii(conn, "close") )
-			m_connectionClose = true;
+		// Connection 헤더가 명시돼 있으면 버전 기본값을 덮어씀.
+		if( HTTP::EqualsIgnoreCaseAscii(conn, "close") )
+			m_keepAlive = false;
+		else if( HTTP::EqualsIgnoreCaseAscii(conn, "keep-alive") )
+			m_keepAlive = true;
 
-		if( EqualsIgnoreCaseAscii(te, "chunked") )
+		if( HTTP::EqualsIgnoreCaseAscii(te, "chunked") )
 		{
 			m_chunked = true;
 			m_state = HTTP::EParseState::ChunkedSize;
@@ -299,15 +341,10 @@ private:
 			}
 		}
 
-		if( m_hasContentLength && m_contentLength == 0 )
+		if( !m_hasContentLength || m_contentLength == 0 )
 		{
-			m_state = HTTP::EParseState::Complete; // body 없음 (예: 204, 또는 CL:0)
-			return;
-		}
-		if( !m_hasContentLength )
-		{
-			// Content-Length도 chunked도 없음: 클래스 설명의 [알려진 제약] 참고 —
-			// "연결 종료까지 body"는 지원하지 않고 body 없음으로 간주해 종료 처리.
+			// Content-Length가 없거나 0 — 요청은 스펙상 이 경우 body가 없는 게
+			// 정상이므로(클래스 설명의 [응답 파서와의 차이점] 참고), 즉시 완료 처리.
 			m_state = HTTP::EParseState::Complete;
 			return;
 		}
@@ -410,13 +447,14 @@ private:
 	}
 
 private:
-	static constexpr size_t kMaxLineLen = 8192; // 헤더 한 줄 상한 (비정상 응답/공격 방어)
+	static constexpr size_t kMaxLineLen = 8192; // 헤더 한 줄 상한 (비정상 요청/공격 방어)
 
 	HTTP::EParseState m_state = HTTP::EParseState::StartLine; // 파싱 진행 상태
-	std::string m_lineBuffer;                              // 개행을 못 찾은 부분 라인의 누적 버퍼 (char 기준)
+	std::string m_lineBuffer;                                             // 개행을 못 찾은 부분 라인의 누적 버퍼 (char 기준)
 
-	int m_statusCode = 0;                                        // 응답 상태 코드
-	std::string m_reasonPhrase;                                  // 상태 메시지 (Reason-Phrase, char 기준)
+	std::string m_method;                                        // HTTP 메서드 (char 기준, 예: "GET")
+	std::string m_uri;                                           // 요청 라인의 URI 전체(경로+쿼리, char 기준)
+	std::string m_version;                                       // HTTP 버전 문자열 (char 기준, 예: "HTTP/1.1")
 	std::vector<std::pair<std::string, std::string>> m_headers;  // 파싱된 헤더 목록 (삽입 순서 보존, char 기준)
 	std::string m_body;                                          // 지금까지 누적된 body (char 기준, 임의 인코딩 가능)
 
@@ -427,7 +465,8 @@ private:
 	size_t m_chunkRemaining = 0; // 현재 청크에서 아직 안 읽은 바이트 수
 	int m_crlfSkipped = 0;       // 청크 데이터 뒤 CRLF 소비 진행도(0~2)
 
-	bool m_connectionClose = false; // "Connection: close" 응답 헤더 존재 여부
+	bool m_keepAlive = false; // 이 요청이 keep-alive로 처리돼야 하는지 (버전 기본값 + Connection 헤더로 확정)
+	size_t m_lastFeedConsumed = 0; // 직전 Feed() 호출에서 실제로 소비한 바이트 수 (GetLastFeedConsumed() 참고)
 };
 
-#endif // ndef __HTTPRESPONSEPARSER_H__
+#endif // ndef __HTTPREQUESTPARSER_H__

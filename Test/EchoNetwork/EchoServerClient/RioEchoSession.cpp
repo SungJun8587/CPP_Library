@@ -40,6 +40,7 @@ void CRioEchoServerSession::OnConnected()
 void CRioEchoServerSession::OnDisconnected(Rio::CloseReason reason)
 {
 	CRioSession::OnDisconnected(reason);
+
 	LOG_INFO(_T("[RIO Session] Disconnected! (Reason: %d)"), static_cast<int>(reason));
 }
 
@@ -78,7 +79,7 @@ void CRioEchoServerSession::OnDataReceived()
 void CRioEchoClientSession::OnConnected()
 {
 	CRioSession::OnConnected();
-	LOG_INFO(_T("[RIO Client] Connected to Server!"));
+	//LOG_WRITE(ELOG_TYPE::LOG_TYPE_INFO, false, _T("[RIO Client] Connected to Server!"));
 }
 
 //***************************************************************************
@@ -88,7 +89,7 @@ void CRioEchoClientSession::OnConnected()
 void CRioEchoClientSession::OnDisconnected(Rio::CloseReason reason)
 {
 	CRioSession::OnDisconnected(reason);
-	LOG_INFO(_T("[RIO Client] Disconnected from Server! (Reason: %d)"), static_cast<int>(reason));
+	//LOG_WRITE(ELOG_TYPE::LOG_TYPE_INFO, false, _T("[RIO Client] Disconnected from Server! (Reason: %d)"), static_cast<int>(reason));
 }
 
 //***************************************************************************
@@ -119,7 +120,7 @@ void CRioEchoClientSession::OnDataReceived()
 			}
 
 			// 2. 로그 출력 (원하시는 형식 반영)
-			LOG_DEBUG(_T("[RIO Client Received] %s (Len: %d)"), message.c_str(), static_cast<int>(outDequeueSize));
+			LOG_WRITE(ELOG_TYPE::LOG_TYPE_INFO, false, _T("[RIO Client Received] %s (Len: %d)\n"), message.c_str(), static_cast<int>(outDequeueSize));
 		}
 	}
 

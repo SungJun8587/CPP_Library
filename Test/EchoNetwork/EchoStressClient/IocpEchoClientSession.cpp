@@ -12,7 +12,7 @@
 //***************************************************************************
 void CIocpEchoClientSession::OnConnected()
 {
-	CIocpSession::OnConnected();
+    CIocpSession::OnConnected();
     //LOG_WRITE(ELOG_TYPE::LOG_TYPE_INFO, false, _T("[IOCP Client] Connected to Server!"));
 }
 
@@ -22,7 +22,7 @@ void CIocpEchoClientSession::OnConnected()
 void CIocpEchoClientSession::OnDisconnected()
 {
     CIocpSession::OnDisconnected();
- 
+
     // 세션 종료 사유 가져오기
     Iocp::CloseReason reason = GetCloseReason();
     //LOG_WRITE(ELOG_TYPE::LOG_TYPE_INFO, false, _T("[IOCP Client] Disconnected from Server! (Reason: %d)"), static_cast<int>(reason));
