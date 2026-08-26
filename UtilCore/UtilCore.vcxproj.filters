@@ -64,6 +64,9 @@
     <Filter Include="Network\HTTP">
       <UniqueIdentifier>{2b514dd2-3ce0-49d3-b75a-e16af477a84c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="GcpService">
+      <UniqueIdentifier>{d413dae0-d17b-4f0d-8a3f-16511f13ed5f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Memory\Containers.h">
@@ -496,11 +499,23 @@
     <ClInclude Include="Network\HTTP\TlsFilter.h">
       <Filter>Network\HTTP</Filter>
     </ClInclude>
-    <ClInclude Include="Network\HTTP\HttpsSessionIocp.h">
+    <ClInclude Include="Network\HTTP\HttpClient.h">
       <Filter>Network\HTTP</Filter>
     </ClInclude>
-    <ClInclude Include="Network\HTTP\HttpsSessionRio.h">
+    <ClInclude Include="Network\HTTP\HttpUrl.h">
       <Filter>Network\HTTP</Filter>
+    </ClInclude>
+    <ClInclude Include="GcpService\GcpServiceAccountAuth.h">
+      <Filter>GcpService</Filter>
+    </ClInclude>
+    <ClInclude Include="GcpService\Base64UrlUtil.h">
+      <Filter>GcpService</Filter>
+    </ClInclude>
+    <ClInclude Include="GcpService\JsonFieldExtract.h">
+      <Filter>GcpService</Filter>
+    </ClInclude>
+    <ClInclude Include="GcpService\GcpAuthHttpClient.h">
+      <Filter>GcpService</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

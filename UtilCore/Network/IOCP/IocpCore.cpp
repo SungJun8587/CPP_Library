@@ -58,6 +58,11 @@ bool CIocpCore::Dispatch(uint32 timeoutMs)
         timeoutMs
     );
 
+    if( key == Iocp::QUIT_KEY )
+    {
+        return false;
+    }
+
     DWORD errorCode = success ? 0 : ::WSAGetLastError();
     ProcessOverlappedResult(success, iocpEvent, numOfBytes, errorCode);
 

@@ -80,6 +80,12 @@ namespace Iocp
     //		- 소규모 서버 또는 테스트 환경(2 ~ 4코어)의 경우 클러스터 개수를 8 또는 16
     //***************************************************************************
     static constexpr int32 kSessionClusterCnt = 16;
+
+    //***************************************************************************
+    // @brief 워커 스레드 종료 알림용 특수 완료 키(Completion Key)입니다.
+    // @details ULONG_PTR의 최댓값(-1)을 사용하여 일반 completion key와 구분합니다.
+    //***************************************************************************
+    static constexpr ULONG_PTR QUIT_KEY = static_cast<ULONG_PTR>(-1);
 }
 
 #endif // ndef __IOCPCOMMON_H__

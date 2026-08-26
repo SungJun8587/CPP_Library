@@ -63,6 +63,10 @@
     <ClInclude Include="DB\OdbcConnPool.h" />
     <ClInclude Include="DB\RedisConn.h" />
     <ClInclude Include="EXCEL\XlntUtil.h" />
+    <ClInclude Include="GcpService\Base64UrlUtil.h" />
+    <ClInclude Include="GcpService\GcpAuthHttpClient.h" />
+    <ClInclude Include="GcpService\GcpServiceAccountAuth.h" />
+    <ClInclude Include="GcpService\JsonFieldExtract.h" />
     <ClInclude Include="Job\GlobalQueue.h" />
     <ClInclude Include="Job\Job.h" />
     <ClInclude Include="Job\JobQueue.h" />
@@ -78,6 +82,7 @@
     <ClInclude Include="Memory\RefCountable.h" />
     <ClInclude Include="Memory\Singleton.h" />
     <ClInclude Include="Memory\Stream.h" />
+    <ClInclude Include="Network\HTTP\HttpClient.h" />
     <ClInclude Include="Network\HTTP\HttpClientCore.h" />
     <ClInclude Include="Network\HTTP\HttpConnPool.h" />
     <ClInclude Include="Network\HTTP\HttpConnPoolCommon.h" />
@@ -91,8 +96,7 @@
     <ClInclude Include="Network\HTTP\HttpResponseParser.h" />
     <ClInclude Include="Network\HTTP\HttpSessionIocp.h" />
     <ClInclude Include="Network\HTTP\HttpSessionRio.h" />
-    <ClInclude Include="Network\HTTP\HttpsSessionIocp.h" />
-    <ClInclude Include="Network\HTTP\HttpsSessionRio.h" />
+    <ClInclude Include="Network\HTTP\HttpUrl.h" />
     <ClInclude Include="Network\HTTP\TlsFilter.h" />
     <ClInclude Include="Network\IOCP\IocpCommon.h" />
     <ClInclude Include="Network\IOCP\IocpCore.h" />

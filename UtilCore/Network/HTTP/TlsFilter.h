@@ -16,6 +16,9 @@
 #include <cstdint>
 #include <algorithm>
 
+#pragma comment(lib, LIB_NAME("libssl"))
+#pragma comment(lib, LIB_NAME("libcrypto"))
+
 //***************************************************************************
 // @brief 실제 소켓으로 암호문(ciphertext)을 내보내는 콜백. 세션의 Send()를
 //        그대로 감싸서 넘기면 된다. 시그니처는 CSession::Send()와 동일하게

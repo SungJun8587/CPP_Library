@@ -40,31 +40,73 @@
 #include <Network/HTTP/HttpSessionRio.h>
 #endif
 
-#ifndef	__HTTPSSESSIONIOCP_H__
-#include <Network/HTTP/HttpsSessionIocp.h>
+#ifndef	__SOCKETUTILS_H__
+#include <Network/SocketUtils.h>
 #endif
 
-#ifndef	__HTTPSSESSIONRIO_H__
-#include <Network/HTTP/HttpsSessionRio.h>
-#endif
+#include <list>
+#include <memory>
 
 // CIocpClientService/CRioClientService 생성자 시그니처(CNetAddress,
 // CIocpCoreRef/CRioCoreRef, SessionFactory, maxSessionCount, workerThreadCount)를
 // 여기서만 알고, CHttpConnPoolT 자신은 이 시그니처를 몰라도 되게 분리한다.
+//
+// [SessionType 템플릿 파라미터] 아래 Create* 함수들은 전부 SessionType을
+// 템플릿 파라미터로 받는다(기본값 CHttpSessionIocp/CHttpSessionRio) — 호출부가
+// CHttpSessionIocp/CHttpSessionRio를 상속한 커스텀 세션(예: OnConnected()/
+// OnRecv()를 오버라이드해 로깅을 추가하거나 멤버를 더 갖는 세션)을 대신 꽂아
+// 넣을 수 있게 하기 위함이다(HttpSessionIocp.h/HttpSessionRio.h가 더 이상
+// final이 아닌 이유도 이것). 커스텀 SessionType은 CHttpSessionIocp/Rio와 같은
+// 인터페이스(SetConnStateHandler/SendRequest/IsConnectionCloseRequested/
+// GetHttpState, HTTPS 풀을 쓰려면 SetTlsConfig까지)를 가져야 한다 — 덕타이핑이라
+// 만족하지 못하면 템플릿 인스턴스화 시점에 컴파일 에러로 드러난다.
+// 기본값을 지정해뒀으므로 기존 호출부(SessionType을 명시하지 않는 코드)는
+// 전부 그대로 동작한다.
 using CHttpConnPoolIocp = CHttpConnPoolT<CHttpSessionIocp, CHttpSessionIocpRef, CIocpClientService, CIocpClientServiceRef>;
 using CHttpConnPoolIocpRef = std::shared_ptr<CHttpConnPoolIocp>;
 
 using CHttpConnPoolRio = CHttpConnPoolT<CHttpSessionRio, CHttpSessionRioRef, CRioClientService, CRioClientServiceRef>;
 using CHttpConnPoolRioRef = std::shared_ptr<CHttpConnPoolRio>;
 
-using CHttpsConnPoolIocp = CHttpConnPoolT<CHttpsSessionIocp, CHttpsSessionIocpRef, CIocpClientService, CIocpClientServiceRef>;
-using CHttpsConnPoolIocpRef = std::shared_ptr<CHttpsConnPoolIocp>;
+//***************************************************************************
+// @brief hostname을 CNetAddress로 변환하는 기본 DNS resolve 함수 (CSocketUtils::
+//        GetSockAddrIn 기반). CHttpConnPoolManager 생성 시 HttpDnsResolveFn으로
+//        그대로 넘기면 된다.
+// @param hostname 조회할 hostname (DNS 이름은 RFC 1035상 항상 ASCII이므로,
+//        UNICODE 빌드에서도 바이트를 그대로 TCHAR로 widen하는 게 안전하다 —
+//        임의의 유니코드 텍스트일 수 있는 폼 필드 값과는 다른 경우.)
+// @param port 조회할 포트
+// @param outAddr [OUT] 조회 성공 시 채워지는 주소 (IPv4 첫 결과만 사용)
+// @return bool 성공 여부
+//***************************************************************************
+inline bool ResolveHostnameToNetAddress(const std::string& hostname, uint16_t port, CNetAddress& outAddr)
+{
+	_tstring tHostname;
+	tHostname.reserve(hostname.size());
+	for( char c : hostname )
+		tHostname.push_back(static_cast<TCHAR>(static_cast<unsigned char>(c)));
 
-using CHttpsConnPoolRio = CHttpConnPoolT<CHttpsSessionRio, CHttpsSessionRioRef, CRioClientService, CRioClientServiceRef>;
-using CHttpsConnPoolRioRef = std::shared_ptr<CHttpsConnPoolRio>;
+	std::list<addrinfo> results;
+	if( !CSocketUtils::GetSockAddrIn(tHostname.c_str(), static_cast<int>(port), results) )
+		return false;
+
+	for( const addrinfo& info : results )
+	{
+		if( info.ai_family == AF_INET && info.ai_addr != nullptr )
+		{
+			SOCKADDR_IN sockAddr = *reinterpret_cast<SOCKADDR_IN*>(info.ai_addr);
+			outAddr = CNetAddress(sockAddr);
+			return true;
+		}
+	}
+
+	return false;
+}
 
 //***************************************************************************
 // @brief IOCP 엔진으로 host 하나에 대한 HTTP 커넥션 풀을 만듭니다.
+// @tparam SessionType 사용할 세션 클래스 (기본값 CHttpSessionIocp — 커스텀
+//         세션을 쓰려면 CHttpSessionIocp를 상속한 클래스를 명시적으로 지정)
 // @param hostAddr 접속할 원격 host 주소
 // @param iocpCore 이 풀의 서비스가 사용할 IOCP 코어(공유 소유 — 여러 풀이 코어를
 //        공유해도 되지만, 그럴 경우 워커 스레드도 공유됨을 감안할 것)
@@ -78,10 +120,13 @@ using CHttpsConnPoolRioRef = std::shared_ptr<CHttpsConnPoolRio>;
 //        호출부가 명시적으로 늘릴 것)
 // @return IHttpConnPoolRef 생성된 풀 (Start() 호출 전까지는 미구동 상태)
 //***************************************************************************
+template<typename SessionType = CHttpSessionIocp>
 inline IHttpConnPoolRef CreateHttpConnPoolIocp(CNetAddress hostAddr, CIocpCoreRef iocpCore,
 	int32 minIdle = 2, int32 maxConnections = 8, uint32_t workerThreadCount = 1)
 {
-	return CHttpConnPoolIocp::Create(minIdle, maxConnections,
+	using PoolType = CHttpConnPoolT<SessionType, std::shared_ptr<SessionType>, CIocpClientService, std::shared_ptr<CIocpClientService>>;
+
+	return PoolType::Create(minIdle, maxConnections,
 		[hostAddr, iocpCore, workerThreadCount](SessionFactory factory, int32 initialSessionCount)
 		{
 			return std::make_shared<CIocpClientService>(hostAddr, iocpCore, factory, initialSessionCount, workerThreadCount);
@@ -90,6 +135,7 @@ inline IHttpConnPoolRef CreateHttpConnPoolIocp(CNetAddress hostAddr, CIocpCoreRe
 
 //***************************************************************************
 // @brief RIO 엔진으로 host 하나에 대한 HTTP 커넥션 풀을 만듭니다.
+// @tparam SessionType 사용할 세션 클래스 (기본값 CHttpSessionRio)
 // @param hostAddr 접속할 원격 host 주소
 // @param rioCore 이 풀의 서비스가 사용할 RIO 코어(공유 소유)
 // @param minIdle host당 항상 유지할 기준 커넥션 수 (Start() 시 이 개수만 초기 게시)
@@ -98,10 +144,13 @@ inline IHttpConnPoolRef CreateHttpConnPoolIocp(CNetAddress hostAddr, CIocpCoreRe
 // @param workerThreadCount RIO 완료 처리용 워커 스레드 개수 (기본 1 — 클라이언트 권장값)
 // @return IHttpConnPoolRef 생성된 풀 (Start() 호출 전까지는 미구동 상태)
 //***************************************************************************
+template<typename SessionType = CHttpSessionRio>
 inline IHttpConnPoolRef CreateHttpConnPoolRio(CNetAddress hostAddr, CRioCoreRef rioCore,
 	int32 minIdle = 2, int32 maxConnections = 8, uint32_t workerThreadCount = 1)
 {
-	return CHttpConnPoolRio::Create(minIdle, maxConnections,
+	using PoolType = CHttpConnPoolT<SessionType, std::shared_ptr<SessionType>, CRioClientService, std::shared_ptr<CRioClientService>>;
+
+	return PoolType::Create(minIdle, maxConnections,
 		[hostAddr, rioCore, workerThreadCount](SessionFactory factory, int32 initialSessionCount)
 		{
 			return std::make_shared<CRioClientService>(hostAddr, rioCore, factory, initialSessionCount, workerThreadCount);
@@ -110,6 +159,9 @@ inline IHttpConnPoolRef CreateHttpConnPoolRio(CNetAddress hostAddr, CRioCoreRef 
 
 //***************************************************************************
 // @brief IOCP 엔진 + TLS로 host 하나에 대한 HTTPS 커넥션 풀을 만듭니다.
+// @tparam SessionType 사용할 세션 클래스 (기본값 CHttpSessionIocp). 커스텀
+//         타입을 쓰려면 SetTlsConfig(SSL_CTX*, const std::string&)를 상속
+//         또는 직접 제공해야 한다.
 // @param hostAddr 접속할 원격 host 주소 (이미 DNS resolve된 IP:Port)
 // @param sniHostname TLS SNI 및 인증서 호스트네임 검증에 쓸 원래 hostname
 //        문자열(예: "api.example.com") — hostAddr은 resolve된 IP라 SNI에는
@@ -123,15 +175,18 @@ inline IHttpConnPoolRef CreateHttpConnPoolRio(CNetAddress hostAddr, CRioCoreRef 
 // @param workerThreadCount IOCP 완료 처리용 워커 스레드 개수 (기본 1)
 // @return IHttpConnPoolRef 생성된 풀 (Start() 호출 전까지는 미구동 상태)
 //***************************************************************************
+template<typename SessionType = CHttpSessionIocp>
 inline IHttpConnPoolRef CreateHttpsConnPoolIocp(CNetAddress hostAddr, const std::string& sniHostname, SSL_CTX* sslCtx,
 	CIocpCoreRef iocpCore, int32 minIdle = 2, int32 maxConnections = 8, uint32_t workerThreadCount = 1)
 {
-	return CHttpsConnPoolIocp::Create(minIdle, maxConnections,
+	using PoolType = CHttpConnPoolT<SessionType, std::shared_ptr<SessionType>, CIocpClientService, std::shared_ptr<CIocpClientService>>;
+
+	return PoolType::Create(minIdle, maxConnections,
 		[hostAddr, iocpCore, workerThreadCount](SessionFactory factory, int32 initialSessionCount)
 		{
 			return std::make_shared<CIocpClientService>(hostAddr, iocpCore, factory, initialSessionCount, workerThreadCount);
 		},
-		[sslCtx, sniHostname](std::shared_ptr<CHttpsSessionIocp> session)
+		[sslCtx, sniHostname](std::shared_ptr<SessionType> session)
 		{
 			// CHttpConnPoolT::Create()의 initSession 훅 — 세션 생성 직후,
 			// 연결 시도(SetConnStateHandler 등록보다도 먼저) 전에 TLS 설정을 주입한다.
@@ -141,6 +196,7 @@ inline IHttpConnPoolRef CreateHttpsConnPoolIocp(CNetAddress hostAddr, const std:
 
 //***************************************************************************
 // @brief RIO 엔진 + TLS로 host 하나에 대한 HTTPS 커넥션 풀을 만듭니다.
+// @tparam SessionType 사용할 세션 클래스 (기본값 CHttpSessionRio)
 // @param hostAddr 접속할 원격 host 주소 (이미 DNS resolve된 IP:Port)
 // @param sniHostname TLS SNI 및 인증서 호스트네임 검증에 쓸 원래 hostname 문자열
 // @param sslCtx 여러 커넥션이 공유하는 SSL_CTX (호출부가 소유권 유지)
@@ -150,22 +206,26 @@ inline IHttpConnPoolRef CreateHttpsConnPoolIocp(CNetAddress hostAddr, const std:
 // @param workerThreadCount RIO 완료 처리용 워커 스레드 개수 (기본 1)
 // @return IHttpConnPoolRef 생성된 풀 (Start() 호출 전까지는 미구동 상태)
 //***************************************************************************
+template<typename SessionType = CHttpSessionRio>
 inline IHttpConnPoolRef CreateHttpsConnPoolRio(CNetAddress hostAddr, const std::string& sniHostname, SSL_CTX* sslCtx,
 	CRioCoreRef rioCore, int32 minIdle = 2, int32 maxConnections = 8, uint32_t workerThreadCount = 1)
 {
-	return CHttpsConnPoolRio::Create(minIdle, maxConnections,
+	using PoolType = CHttpConnPoolT<SessionType, std::shared_ptr<SessionType>, CRioClientService, std::shared_ptr<CRioClientService>>;
+
+	return PoolType::Create(minIdle, maxConnections,
 		[hostAddr, rioCore, workerThreadCount](SessionFactory factory, int32 initialSessionCount)
 		{
 			return std::make_shared<CRioClientService>(hostAddr, rioCore, factory, initialSessionCount, workerThreadCount);
 		},
-		[sslCtx, sniHostname](std::shared_ptr<CHttpsSessionRio> session)
+		[sslCtx, sniHostname](std::shared_ptr<SessionType> session)
 		{
 			session->SetTlsConfig(sslCtx, sniHostname);
 		});
 }
 
 //***************************************************************************
-// @brief IOCP 엔진으로 여러 host를 관리하는 CHttpConnPoolManager를 만듭니다.
+// @brief IOCP 엔진으로 여러 host(평문 HTTP)를 관리하는 CHttpConnPoolManager를 만듭니다.
+// @tparam SessionType 사용할 세션 클래스 (기본값 CHttpSessionIocp)
 // @param iocpCore 이 매니저가 생성하는 모든 host 풀이 공유할 IOCP 코어
 // @param minIdlePerHost host당 항상 유지할 기준 커넥션 수 (풀마다 동일하게 적용)
 // @param maxConnectionsPerHost host당 허용할 최대 커넥션 수 (풀마다 동일하게 적용)
@@ -173,43 +233,86 @@ inline IHttpConnPoolRef CreateHttpsConnPoolRio(CNetAddress hostAddr, const std::
 // @return std::shared_ptr<CHttpConnPoolManager> 생성된 매니저 (host별 풀은
 //         첫 SendRequest() 시점에 지연 생성됨 — HttpConnPoolManager.h 참고)
 //***************************************************************************
+template<typename SessionType = CHttpSessionIocp>
 inline std::shared_ptr<CHttpConnPoolManager> CreateHttpConnPoolManagerIocp(CIocpCoreRef iocpCore,
 	int32 minIdlePerHost = 2, int32 maxConnectionsPerHost = 8, uint32_t workerThreadCountPerHost = 1)
 {
 	return std::make_shared<CHttpConnPoolManager>(
-		[iocpCore, minIdlePerHost, maxConnectionsPerHost, workerThreadCountPerHost](CNetAddress hostAddr) -> IHttpConnPoolRef
+		[iocpCore, minIdlePerHost, maxConnectionsPerHost, workerThreadCountPerHost](const std::string&, CNetAddress hostAddr) -> IHttpConnPoolRef
 		{
-			return CreateHttpConnPoolIocp(hostAddr, iocpCore, minIdlePerHost, maxConnectionsPerHost, workerThreadCountPerHost);
-		});
+			return CreateHttpConnPoolIocp<SessionType>(hostAddr, iocpCore, minIdlePerHost, maxConnectionsPerHost, workerThreadCountPerHost);
+		},
+		&ResolveHostnameToNetAddress);
 }
 
 //***************************************************************************
-// @brief RIO 엔진으로 여러 host를 관리하는 CHttpConnPoolManager를 만듭니다.
+// @brief RIO 엔진으로 여러 host(평문 HTTP)를 관리하는 CHttpConnPoolManager를 만듭니다.
+// @tparam SessionType 사용할 세션 클래스 (기본값 CHttpSessionRio)
 // @param rioCore 이 매니저가 생성하는 모든 host 풀이 공유할 RIO 코어
 // @param minIdlePerHost host당 항상 유지할 기준 커넥션 수 (풀마다 동일하게 적용)
 // @param maxConnectionsPerHost host당 허용할 최대 커넥션 수 (풀마다 동일하게 적용)
 // @param workerThreadCountPerHost host 풀 하나당 RIO 워커 스레드 개수 (기본 1)
-// @return std::shared_ptr<CHttpConnPoolManager> 생성된 매니저 (host별 풀은
-//         첫 SendRequest() 시점에 지연 생성됨 — HttpConnPoolManager.h 참고)
+// @return std::shared_ptr<CHttpConnPoolManager> 생성된 매니저
 //***************************************************************************
+template<typename SessionType = CHttpSessionRio>
 inline std::shared_ptr<CHttpConnPoolManager> CreateHttpConnPoolManagerRio(CRioCoreRef rioCore,
 	int32 minIdlePerHost = 2, int32 maxConnectionsPerHost = 8, uint32_t workerThreadCountPerHost = 1)
 {
 	return std::make_shared<CHttpConnPoolManager>(
-		[rioCore, minIdlePerHost, maxConnectionsPerHost, workerThreadCountPerHost](CNetAddress hostAddr) -> IHttpConnPoolRef
+		[rioCore, minIdlePerHost, maxConnectionsPerHost, workerThreadCountPerHost](const std::string&, CNetAddress hostAddr) -> IHttpConnPoolRef
 		{
-			return CreateHttpConnPoolRio(hostAddr, rioCore, minIdlePerHost, maxConnectionsPerHost, workerThreadCountPerHost);
-		});
+			return CreateHttpConnPoolRio<SessionType>(hostAddr, rioCore, minIdlePerHost, maxConnectionsPerHost, workerThreadCountPerHost);
+		},
+		&ResolveHostnameToNetAddress);
 }
 
-// [알려진 제약] CreateHttpsConnPoolManagerIocp/Rio(다중 host HTTPS 매니저)는
-// 아직 없다. CHttpConnPoolManager는 host 키를 CNetAddress(=resolve된 IP:Port)
-// 로만 관리하는데, TLS SNI/인증서 검증에는 원래 hostname 문자열이 별도로
-// 필요해서(CreateHttpsConnPoolIocp/Rio의 sniHostname 파라미터 참고) 지금의
-// "IP만 아는" 매니저 설계로는 host별 SNI를 자연스럽게 연결할 방법이 없다.
-// 필요해지면 CHttpConnPoolManager의 키를 (hostname, port)로 바꾸고 내부에서
-// DNS resolve를 수행하도록 확장하거나, SendRequest() 시그니처에 sniHostname을
-// 추가로 받는 방식으로 풀어야 한다 — 지금은 host 하나씩 CreateHttpsConnPoolIocp/
-// Rio()로 직접 만들어 호출부가 관리하는 것만 지원한다.
+//***************************************************************************
+// @brief IOCP 엔진 + TLS로 여러 host(HTTPS)를 관리하는 CHttpConnPoolManager를 만듭니다.
+// @tparam SessionType 사용할 세션 클래스 (기본값 CHttpSessionIocp)
+// @param sslCtx 여러 커넥션이 공유하는 SSL_CTX (호출부가 소유권 유지, 매니저보다
+//        오래 살아있어야 함)
+// @param iocpCore 이 매니저가 생성하는 모든 host 풀이 공유할 IOCP 코어
+// @param minIdlePerHost host당 항상 유지할 기준 커넥션 수
+// @param maxConnectionsPerHost host당 허용할 최대 커넥션 수
+// @param workerThreadCountPerHost host 풀 하나당 IOCP 워커 스레드 개수 (기본 1)
+// @return std::shared_ptr<CHttpConnPoolManager> 생성된 매니저. hostname 문자열로
+//         키잉하므로(HttpConnPoolManager.h 참고) 여러 host에 대해 각자 올바른
+//         SNI로 TLS 연결이 이뤄진다.
+//***************************************************************************
+template<typename SessionType = CHttpSessionIocp>
+inline std::shared_ptr<CHttpConnPoolManager> CreateHttpsConnPoolManagerIocp(SSL_CTX* sslCtx, CIocpCoreRef iocpCore,
+	int32 minIdlePerHost = 2, int32 maxConnectionsPerHost = 8, uint32_t workerThreadCountPerHost = 1)
+{
+	return std::make_shared<CHttpConnPoolManager>(
+		[sslCtx, iocpCore, minIdlePerHost, maxConnectionsPerHost, workerThreadCountPerHost]
+		(const std::string& hostname, CNetAddress hostAddr) -> IHttpConnPoolRef
+		{
+			return CreateHttpsConnPoolIocp<SessionType>(hostAddr, hostname, sslCtx, iocpCore, minIdlePerHost, maxConnectionsPerHost, workerThreadCountPerHost);
+		},
+		&ResolveHostnameToNetAddress);
+}
+
+//***************************************************************************
+// @brief RIO 엔진 + TLS로 여러 host(HTTPS)를 관리하는 CHttpConnPoolManager를 만듭니다.
+// @tparam SessionType 사용할 세션 클래스 (기본값 CHttpSessionRio)
+// @param sslCtx 여러 커넥션이 공유하는 SSL_CTX (호출부가 소유권 유지)
+// @param rioCore 이 매니저가 생성하는 모든 host 풀이 공유할 RIO 코어
+// @param minIdlePerHost host당 항상 유지할 기준 커넥션 수
+// @param maxConnectionsPerHost host당 허용할 최대 커넥션 수
+// @param workerThreadCountPerHost host 풀 하나당 RIO 워커 스레드 개수 (기본 1)
+// @return std::shared_ptr<CHttpConnPoolManager> 생성된 매니저
+//***************************************************************************
+template<typename SessionType = CHttpSessionRio>
+inline std::shared_ptr<CHttpConnPoolManager> CreateHttpsConnPoolManagerRio(SSL_CTX* sslCtx, CRioCoreRef rioCore,
+	int32 minIdlePerHost = 2, int32 maxConnectionsPerHost = 8, uint32_t workerThreadCountPerHost = 1)
+{
+	return std::make_shared<CHttpConnPoolManager>(
+		[sslCtx, rioCore, minIdlePerHost, maxConnectionsPerHost, workerThreadCountPerHost]
+		(const std::string& hostname, CNetAddress hostAddr) -> IHttpConnPoolRef
+		{
+			return CreateHttpsConnPoolRio<SessionType>(hostAddr, hostname, sslCtx, rioCore, minIdlePerHost, maxConnectionsPerHost, workerThreadCountPerHost);
+		},
+		&ResolveHostnameToNetAddress);
+}
 
 #endif // ndef __HTTPCONNPOOLFACTORY_H__

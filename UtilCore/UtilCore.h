@@ -115,11 +115,14 @@ using namespace std;
 #include <Network/HTTP/HttpConnPoolManager.h>
 #include <Network/HTTP/HttpSessionIocp.h>
 #include <Network/HTTP/HttpSessionRio.h>
-#include <Network/HTTP/HttpsSessionIocp.h>
-#include <Network/HTTP/HttpsSessionRio.h>
 #include <Network/HTTP/HttpConnPoolFactory.h>
 #include <Network/HTTP/HttpFormUtil.h>
 #include <Network/HTTP/HttpMultipartBuilder.h>
+#include <Network/HTTP/HttpClient.h>
+
+#include <GcpService/Base64UrlUtil.h>
+#include <GcpService/JsonFieldExtract.h>
+#include <GcpService/GcpServiceAccountAuth.h>
 
 #include <BaseGlobal.h>
 #include <BaseTLS.h>

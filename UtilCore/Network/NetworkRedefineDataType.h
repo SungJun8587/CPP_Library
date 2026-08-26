@@ -38,7 +38,7 @@ USING_SHARED_PTR(CHttpResponseBuilder);
 USING_SHARED_PTR(IHttpConnPool);
 USING_SHARED_PTR(CHttpSessionIocp);
 USING_SHARED_PTR(CHttpSessionRio);
-USING_SHARED_PTR(CHttpsSessionIocp);
-USING_SHARED_PTR(CHttpsSessionRio);
+USING_SHARED_PTR(CHttpConnPoolManager);
+USING_SHARED_PTR(CHttpClient);
 
 #endif // ndef __NETWORKREDEFINEDATATYPE_H__

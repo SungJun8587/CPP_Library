@@ -14,12 +14,12 @@
 #include <cstdio>
 
 //***************************************************************************
-// @namespace http
+// @namespace HTTP
 // @brief 쿼리스트링/폼 인코딩 유틸리티. HttpParseUtil.h의 http 네임스페이스와
 //        같은 네임스페이스를 쓰지만 별개 파일이라 서로 몰라도 된다(서로 겹치는
 //        함수 이름이 없어 같은 TU에서 함께 include해도 재정의 충돌 없음).
 //***************************************************************************
-namespace http
+namespace HTTP
 {
 	//***************************************************************************
 	// @brief 문자열을 percent-encoding(RFC 3986)합니다.
@@ -52,6 +52,47 @@ namespace http
 				std::snprintf(buf, sizeof(buf), "%%%02X", c);
 				result.append(buf, 3);
 			}
+		}
+
+		return result;
+	}
+
+	//***************************************************************************
+	// @brief percent-encoding(%XX)된 문자열을 원래 바이트로 디코딩합니다.
+	// @param input 디코딩할 문자열 (URL 경로 또는 쿼리스트링 일부)
+	// @return std::string 디코딩된 문자열
+	// @details '+'는 공백으로 바꾸지 않는다 — 그건 application/x-www-form-urlencoded
+	//          쿼리 파라미터 값에만 해당하는 관례고, URL 경로(path) 세그먼트에서는
+	//          '+'가 그냥 리터럴 '+' 문자다(RFC 3986). 잘못된 %XX 시퀀스(뒤에 hex가
+	//          아닌 문자가 오는 등)는 원본 그대로 통과시킨다(엄격 실패 대신 관대하게 처리).
+	//***************************************************************************
+	inline std::string UrlDecode(std::string_view input)
+	{
+		auto hexVal = [](char c) -> int
+			{
+				if( c >= '0' && c <= '9' ) return c - '0';
+				if( c >= 'A' && c <= 'F' ) return c - 'A' + 10;
+				if( c >= 'a' && c <= 'f' ) return c - 'a' + 10;
+				return -1;
+			};
+
+		std::string result;
+		result.reserve(input.size());
+
+		for( size_t i = 0; i < input.size(); ++i )
+		{
+			if( input[i] == '%' && i + 2 < input.size() )
+			{
+				int hi = hexVal(input[i + 1]);
+				int lo = hexVal(input[i + 2]);
+				if( hi >= 0 && lo >= 0 )
+				{
+					result.push_back(static_cast<char>((hi << 4) | lo));
+					i += 2;
+					continue;
+				}
+			}
+			result.push_back(input[i]);
 		}
 
 		return result;

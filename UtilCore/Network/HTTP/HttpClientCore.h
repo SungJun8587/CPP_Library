@@ -126,6 +126,20 @@ public:
 	//***************************************************************************
 	bool IsConnectionCloseRequested() const noexcept { return m_parser.IsConnectionCloseRequested(); }
 
+	void OnSessionDisconnected()
+	{
+		if( m_state != EHttpClientState::AwaitingResponse )
+			return;
+
+		m_state = EHttpClientState::Idle;
+		if( m_onComplete )
+		{
+			HttpRequestCompletionHandler cb = std::move(m_onComplete);
+			m_onComplete = nullptr;               // 호출 전에 비워서 self-cycle을 즉시 끊음
+			cb(false, m_parser);                  // success=false로 실패 통지
+		}
+	}
+
 private:
 	EHttpClientState m_state = EHttpClientState::Idle; // 요청/응답 진행 상태
 	CHttpResponseParser m_parser;                      // 응답 파서 (Idle 전이 시 재사용)

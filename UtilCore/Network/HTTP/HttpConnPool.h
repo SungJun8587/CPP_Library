@@ -300,6 +300,22 @@ private:
 	//          재진입 등으로 Send 자체가 실패한 경우) 즉시 실패 콜백을 호출하고
 	//          세션을 폐기한다. 성공하면 세션의 완료 콜백 안에서 사용자 콜백을
 	//          먼저 부른 뒤 OnRequestComplete()로 이어서 세션을 반납/폐기한다.
+	//
+	//          [순환 참조 방지] 이 완료 콜백은 session->SendRequest() 내부에서
+	//          CHttpClientCore::m_onComplete로 저장된다 — 즉 콜백이 "그 세션
+	//          자신의 멤버 안"에 들어간다. 예전에는 이 콜백이 TSessionRef(강한
+	//          shared_ptr)를 캡처했는데, 그러면 "세션이 자기 자신을 가리키는
+	//          shared_ptr을 자기 멤버 안에 들고 있는" 자기 참조 순환이 생겨서,
+	//          응답이 끝까지 안 오는 경우(연결 중간에 끊김, TLS 핸드셰이크 실패
+	//          등 FeedRecv()가 끝내 m_onComplete를 비우지 못하는 모든 경로)
+	//          세션이 영원히 해제되지 않는 메모리 릭이 됐다. 지금은 원시 포인터
+	//          (sessionRaw)만 캡처한다 — 이 콜백은 세션 자신이 자기 멤버 안에서
+	//          호출해주는 것이라 불리는 시점엔 세션이 반드시 살아있음이 보장되고
+	//          (자기가 자기를 부르는 구조라 댕글링 가능성 자체가 없음), 세션의
+	//          실제 수명은 어차피 CNetService::_sessions(서비스가 소유)가 별도로
+	//          보장하므로 이 콜백이 강한 참조를 들고 있을 필요가 애초에 없었다.
+	//          TSessionRef가 진짜로 필요한 시점(OnRequestComplete()가 유휴
+	//          목록에 반납/폐기 판단할 때)에만 shared_from_this()로 다시 만든다.
 	//***************************************************************************
 	void DispatchToSession(TSessionRef session, PendingRequest&& req)
 	{
@@ -307,14 +323,18 @@ private:
 		HttpRequestCompletionHandler userCb = std::move(req.onComplete);
 
 		auto self = this->shared_from_this();
-		TSessionRef sessionCapture = session;
+		TSession* sessionRaw = session.get(); // 강한 참조 대신 원시 포인터만 캡처 (위 설명 참고)
 
 		bool began = session->SendRequest(dataOwned.data(), dataOwned.size(),
-			[self, sessionCapture, userCb](bool success, CHttpResponseParser& parser)
+			[self, sessionRaw, userCb](bool success, CHttpResponseParser& parser)
 			{
 				if( userCb )
 					userCb(success, parser);
-				self->OnRequestComplete(sessionCapture, success);
+				// 이 시점에 sessionRaw는 반드시 유효하다(자기 자신이 자기 콜백을
+				// 호출하는 구조). TSessionRef가 필요한 곳(OnRequestComplete)에만
+				// 여기서 다시 만들어 넘긴다 — 콜백 자체는 강한 참조를 들고 있지 않음.
+				TSessionRef sessionRef = std::static_pointer_cast<TSession>(sessionRaw->shared_from_this());
+				self->OnRequestComplete(sessionRef, success);
 			});
 
 		if( !began )
