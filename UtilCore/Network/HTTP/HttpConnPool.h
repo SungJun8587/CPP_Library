@@ -185,6 +185,28 @@ public:
 	}
 
 	//***************************************************************************
+	// @brief 이 풀이 현재 붙들고 있는 세션 수를 반환합니다.
+	// @return size_t _clientService->GetCurrentSessionCount()를 그대로 전달.
+	//         _clientService가 없으면(생성 실패 등) 0.
+	//***************************************************************************
+	size_t GetActiveSessionCount() override
+	{
+		if( !_clientService )
+			return 0;
+		return static_cast<size_t>(_clientService->GetCurrentSessionCount());
+	}
+
+	//***************************************************************************
+	// @brief 활성 세션 수가 변할 때마다 호출될 콜백을 등록합니다.
+	// @details CHttpConnPoolManager가 폴링 없이 "세션 수가 0이 됐다"를 알아채기
+	//          위해 쓴다 — IHttpConnPool::SetSessionCountChangedHandler() 참고.
+	//***************************************************************************
+	void SetSessionCountChangedHandler(std::function<void(size_t)> handler) override
+	{
+		_sessionCountChangedHandler = std::move(handler);
+	}
+
+	//***************************************************************************
 	// @brief 완성된 HTTP 요청 패킷을 이 풀이 관리하는 host로 비동기 전송합니다.
 	// @param data 요청 패킷 바이트
 	// @param len data의 길이
@@ -237,19 +259,42 @@ public:
 	//          수 있도록 public으로 둔다(DisconnectHandler와 동일한 패턴).
 	//          connected==false면 ScheduleReconnect()로 기준선(_minIdle) 유지를
 	//          시도하고, true면 백오프 카운터를 리셋한 뒤 DispatchOrIdle()로 넘긴다.
+	//
+	//          [_sessionCountChangedHandler에 _notifiedSessionCount를 쓰는 이유]
+	//          처음에는 여기서 GetActiveSessionCount()(=_clientService->
+	//          GetCurrentSessionCount(), 즉 하위 CNetService::_sessions.size()를
+	//          실시간 조회)를 그대로 넘겼는데, 실제로 돌려보니 CNetService의
+	//          disconnect 처리 순서가 "OnDisconnected() 훅을 먼저 호출하고,
+	//          그 세션을 _sessions에서 실제로 빼는 건 그 다음"이라, 마지막
+	//          세션이 끊길 때 우리가 읽는 값이 항상 실제보다 1 많게(예: 세션
+	//          3개면 통지값이 3,2,1로만 오고 0은 절대 안 옴) 나오는 레이스가
+	//          있었다. CNetService::_sessions를 우리가 직접 건드릴 수 없으니,
+	//          _sessions.size()에 의존하는 대신 "연결 성공/해제 통지를 우리가
+	//          직접 받은 횟수"만으로 순수하게 세는 별도 카운터
+	//          (_notifiedSessionCount)를 둬서 이 레이스 자체를 회피한다 —
+	//          OnConnected()/OnDisconnected() 쌍은 이 프로젝트 전반에서 세션당
+	//          정확히 1:1로 호출되는 게 기존 불변식이므로, 이 카운터는 하위
+	//          컨테이너의 정리 타이밍과 무관하게 항상 정확하다.
 	//***************************************************************************
 	void OnSessionConnStateChanged(CSessionRef sessionBase, bool connected)
 	{
 		TSessionRef session = std::static_pointer_cast<TSession>(sessionBase);
 
+		int64_t notifiedCount;
 		if( !connected )
 		{
+			notifiedCount = _notifiedSessionCount.fetch_sub(1, std::memory_order_acq_rel) - 1;
 			ScheduleReconnect();
-			return;
+		}
+		else
+		{
+			notifiedCount = _notifiedSessionCount.fetch_add(1, std::memory_order_acq_rel) + 1;
+			_consecutiveFailCount.store(0, std::memory_order_relaxed); // 연결 성공 -> 백오프 리셋
+			DispatchOrIdle(session);
 		}
 
-		_consecutiveFailCount.store(0, std::memory_order_relaxed); // 연결 성공 -> 백오프 리셋
-		DispatchOrIdle(session);
+		if( _sessionCountChangedHandler )
+			_sessionCountChangedHandler(static_cast<size_t>((std::max)(notifiedCount, static_cast<int64_t>(0))));
 	}
 
 	//***************************************************************************
@@ -462,6 +507,10 @@ private:
 
 private:
 	TServiceRef _clientService; // 이 풀이 소유하는 IOCP/RIO 클라이언트 서비스
+	std::function<void(size_t)> _sessionCountChangedHandler; // 활성 세션 수 변화 통지 콜백 (주로 CHttpConnPoolManager가 등록)
+	std::atomic<int64_t> _notifiedSessionCount{ 0 }; // OnSessionConnStateChanged()로 직접 받은 연결/해제 통지만으로 세는 카운터
+	// (하위 CNetService::_sessions의 정리 타이밍 레이스를 피하기 위해
+	// GetActiveSessionCount() 대신 이 값을 _sessionCountChangedHandler에 씀 — 위 설명 참고)
 	int32 _minIdle;             // host당 항상 유지할 기준 커넥션 수 (ScheduleReconnect()가 지킴)
 	int32 _maxConnections;      // host당 허용할 최대 커넥션 수 (TryGrow()의 상한)
 

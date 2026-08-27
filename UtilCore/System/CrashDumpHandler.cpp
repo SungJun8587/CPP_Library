@@ -306,6 +306,47 @@ void CrashDumpHandler::initialize(
 #endif
 }
 
+//***************************************************************************
+// @brief Windows Debug 빌드 환경에서 메모리 누수 추적 활성화
+//***************************************************************************
+void CrashDumpHandler::enableMemoryLeakCheck() 
+{
+#if (defined(_WIN32) || defined(_WIN64)) && defined(_DEBUG)
+    // 1. 메모리 할당 시 디버그 헤더 정보가 누락되지 않도록 플래그 설정
+    int nOldFlags = _CrtSetDbgFlag(_CRTDBG_REPORT_FLAG);
+
+    // _CRTDBG_ALLOC_MEM_DF : CRT 디버그 힙 할당 사용
+    // _CRTDBG_LEAK_CHECK_DF : 프로그램 종료(exit) 시 _CrtDumpMemoryLeaks() 자동 호출
+    _CrtSetDbgFlag(nOldFlags | _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+
+    // 2. 누수 리포트가 콘솔 및 OutputDebugString(Visual Studio 출력창)으로 출력되도록 지정
+    _CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_DEBUG | _CRTDBG_MODE_FILE);
+    _CrtSetReportFile(_CRT_WARN, _CRTDBG_FILE_STDERR);
+
+    _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_DEBUG | _CRTDBG_MODE_FILE);
+    _CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDERR);
+
+    OutputDebugString(_T("[CrashDumpHandler] CRT Memory Leak Checker Enabled.\n"));
+#endif
+}
+
+//***************************************************************************
+// @brief 특정 시점에 실시간으로 메모리 누수 출력
+//***************************************************************************
+void CrashDumpHandler::checkMemoryLeaksNow() 
+{
+#if (defined(_WIN32) || defined(_WIN64)) && defined(_DEBUG)
+    OutputDebugString(_T("[CrashDumpHandler] --- Checking Memory Leaks Now ---\n"));
+    if( _CrtDumpMemoryLeaks() ) 
+    {
+        OutputDebugString(_T("[CrashDumpHandler] Memory Leaks Detected!\n"));
+    }
+    else {
+        OutputDebugString(_T("[CrashDumpHandler] No Memory Leaks Detected.\n"));
+    }
+#endif
+}
+
 #if defined(_WIN32) || defined(_WIN64)
 //***************************************************************************
 // @brief   PID + TickCount를 조합해 매 크래시마다 고유한 덤프 파일 경로를 생성합니다.

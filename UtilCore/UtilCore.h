@@ -147,6 +147,9 @@ using namespace std;
 #include <Util/BufferReader.h>
 #include <Util/BufferWriter.h>
 #include <Util/TypeCast.h>
+#include <Util/BitField.h>
+#include <Util/UniqNumGenerator.h>
+#include <Util/BitOperate.h>
 
 #include <System/SystemBaseDefine.h>
 #include <System/PDHPerformanceObject.h>
@@ -184,6 +187,15 @@ using namespace std;
 #include <DB/MySQL/BaseMySQL.h>
 #include <DB/MySQL/MySQLConnPool.h>
 #include <DB/MySQL/MySQLAsyncSrv.h>
+
+#include <Redis/HiRedisConn.h>
+#include <Redis/RedisProtocol.h>
+#include <Redis/RedisParser.h>
+#include <Redis/RedisCommandBuilder.h>
+#include <Redis/RedisClient.h>
+#include <Redis/RedisConnectionPool.h>
+#include <Redis/RedisService.h>
+#include <Redis/RedisResultSet.h>
 
 #include <WindowsServiceBase.h>
 

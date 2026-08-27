@@ -1,11 +1,11 @@
 ﻿
 //***************************************************************************
-// RedisConn.h : Interface and Implementation for the CRedisConn class.
+// HiRedisConn.h : Interface and Implementation for the CHiRedisConn class.
 //
 //***************************************************************************
 
-#ifndef __REDISCONN_H__
-#define __REDISCONN_H__
+#ifndef __HIREDISCONN_H__
+#define __HIREDISCONN_H__
 
 #pragma once
 
@@ -71,14 +71,14 @@ namespace RedisCpp
 	 }
 	 *
 	 */
-	class CRedisConn
+	class CHiRedisConn
 	{
 	public:
 		//***************************************************************************
 		// Construction/Destruction 
 		//***************************************************************************
 
-		CRedisConn(void)
+		CHiRedisConn(void)
 		{
 			_redCtx = NULL;
 			_host.clear();
@@ -89,7 +89,7 @@ namespace RedisCpp
 			_errStr = _errDes[ERR_NO_ERROR];
 		}
 
-		virtual ~CRedisConn(void)
+		virtual ~CHiRedisConn(void)
 		{
 			disConnect();
 		}
@@ -1069,7 +1069,7 @@ namespace RedisCpp
 		}
 
 	private:
-		DISALLOW_COPY_AND_ASSIGN(CRedisConn);
+		DISALLOW_COPY_AND_ASSIGN(CHiRedisConn);
 
 		redisContext* _redCtx;		///< redis connector context
 
@@ -1096,7 +1096,7 @@ namespace RedisCpp
 		static const char* _errDes[ERR_BOTTOM];	///< describe error
 	};
 
-	const char* CRedisConn::_errDes[ERR_BOTTOM] =
+	const char* CHiRedisConn::_errDes[ERR_BOTTOM] =
 	{
 			"No error.",
 			"NULL pointer ",
@@ -1108,4 +1108,4 @@ namespace RedisCpp
 	};
 }
 
-#endif // ndef __REDISCONN_H__
+#endif // ndef __HIREDISCONN_H__

@@ -204,15 +204,22 @@ void CRioServerService::Close()
 
 	_sessionManager.BeginCloseAllSessions();
 
+	// _sessionManager의 세션들이 실제로 다 닫힐 때까지 대기 (CNetService::Close()는
+	// 여기서 도움이 안 됨 — _sessionManager와는 별개의, 서버 경로에서 안 쓰이는
+	// 컨테이너를 대상으로 동작하기 때문)
+	while( !_sessionManager.AreAllSessionsClosed() )
+	{
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+	}
+	_sessionManager.RemoveClosedSessions();
+
 	if( _rioCore )
 	{
 		_rioCore->RequestStop();
 		_rioCore->Shutdown();
 	}
-
 	_globalRecvBuffer.reset();
-
-	CNetService::Close();
+	CNetService::Close(); // _sessionManager 대기와 무관 — 순서 상관없이 맨 뒤에 둬도 무해
 }
 
 
@@ -390,20 +397,33 @@ bool CRioClientService::Start()
 //***************************************************************************
 void CRioClientService::Close()
 {
-	_sessionManager.BeginCloseAllSessions();
+	// 1. 세션 정리를 게시하고, 실제로 세션이 0개가 될 때까지 블로킹 대기한다.
+	//    이 시점엔 아직 _rioCore/_connectDispatcher가 살아있어서 disconnect
+	//    완료 통지(및 진행 중이던 ConnectEx 완료 통지)를 계속 처리해줄 수
+	//    있다 — 그래서 여기서 먼저 기다려야 한다. 2번(디스패처/코어 정지)을
+	//    먼저 해버리면, 게시된 세션 정리들이 완료 통지를 처리해줄 워커가
+	//    없어져서 영원히 안 끝나는 문제가 생긴다(CIocpClientService::Close()와
+	//    동일한 이유 — RIO 클라이언트는 IOCP 클라이언트와 마찬가지로
+	//    CRioSessionManager 없이 CNetService::_sessions를 직접 쓰므로 같은
+	//    패턴이 그대로 적용됨).
+	CNetService::Close(); // 세션이 실제로 0개 될 때까지 블로킹 대기(_connectDispatcher/_rioCore를 멈추기 전에 _sessions가 실제로 비워질 때까지 기다려야 함)
 
-	// ConnectEx 게시/완료 통지를 더 이상 처리하지 않도록 먼저 정지.
-	// _rioCore보다 먼저 멈춰도 안전한 이유: 이 디스패처는 _rioCore와 완전히
-	// 독립된 리소스(자체 IOCP)라 서로의 정지 순서에 의존성이 없음.
+	// 2. 세션 정리가 다 끝났으니, ConnectEx 게시/완료 통지 처리를 담당하던
+	//    디스패처부터 정지한다.
+	// 2-1. _connectDispatcher는 _rioCore와 완전히 독립된 리소스(자체 IOCP)라
+	//      _rioCore보다 먼저 멈춰도 서로의 정지 순서에 의존성이 없어 안전하다.
 	_connectDispatcher.Shutdown();
 
+	// 3. 이어서 RIO 코어(데이터 송수신 완료 통지 처리 워커)를 정지한다.
 	if( _rioCore )
 	{
+		// 3-1. 신규 등록/게시를 더 이상 받지 않도록 먼저 정지 요청.
 		_rioCore->RequestStop();
+		// 3-2. 실제 리소스(워커 스레드 등) 해제까지 확실하게 완료.
 		_rioCore->Shutdown();
 	}
 
+	// 4. 전역 수신 버퍼를 해제한다 (위 1~3번으로 모든 세션/워커가 정리된
+	//    뒤라 더 이상 이 버퍼를 참조하는 진행 중인 I/O가 없음이 보장된 상태).
 	_globalRecvBuffer.reset();
-
-	CNetService::Close();
 }

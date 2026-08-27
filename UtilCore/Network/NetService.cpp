@@ -33,14 +33,22 @@ CNetService::~CNetService()
 //***************************************************************************
 void CNetService::Close()
 {
-	std::lock_guard<std::mutex> guard(_lock);
-
+	// 1. _sessions를 순회하며 각 세션에 Disconnect()를 게시한다. Disconnect()는
+	//    비동기라(실제 소켓 종료/완료 통지 처리는 워커 스레드가 나중에 처리)
+	//    이 루프 자체는 즉시 끝난다 — "게시"일 뿐 "완료 대기"가 아니다.
+	std::unique_lock<std::mutex> guard(_lock);
 	for( const CSessionRef& session : _sessions )
-	{
 		session->Disconnect(L"NetService Close");
-	}
 
-	_sessions.clear();
+	// 2. 각 세션의 disconnect가 실제로 완료되면(OnDisconnected() 훅 이후)
+	//    ReleaseSession()이 호출되어 _sessions에서 제거되고 _sessionsEmptyCv가
+	//    notify된다 — 그 순간이 올 때까지, 즉 _sessions가 실제로 빌 때까지
+	//    여기서 블로킹 대기한다.
+	// 2-1. wait()가 대기하는 동안엔 guard(락)를 자동으로 풀어주므로, 그 사이에
+	//      워커 스레드가 ReleaseSession()에서 같은 락을 잡고 세션을 제거할 수
+	//      있다 — 여기서 락을 계속 쥐고 있으면 ReleaseSession()이 락을 못 잡아
+	//      데드락에 빠진다는 점에서 unique_lock(lock_guard 아님)이 필수적이다.
+	_sessionsEmptyCv.wait(guard, [this] { return _sessions.empty(); });
 }
 
 //***************************************************************************
@@ -109,6 +117,7 @@ void CNetService::ReleaseSession(CSessionRef session)
 	if( it != _sessions.end() )
 	{
 		_sessions.erase(it);
+		_sessionsEmptyCv.notify_all();
 	}
 }
 

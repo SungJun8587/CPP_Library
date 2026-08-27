@@ -61,7 +61,6 @@
     <ClInclude Include="DB\MySQL\MySQLConnPool.h" />
     <ClInclude Include="DB\OdbcAsyncSrv.h" />
     <ClInclude Include="DB\OdbcConnPool.h" />
-    <ClInclude Include="DB\RedisConn.h" />
     <ClInclude Include="EXCEL\XlntUtil.h" />
     <ClInclude Include="GcpService\Base64UrlUtil.h" />
     <ClInclude Include="GcpService\GcpAuthHttpClient.h" />
@@ -131,6 +130,14 @@
     <ClInclude Include="Network\Session.h" />
     <ClInclude Include="Network\SocketUtils.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="Redis\HiRedisConn.h" />
+    <ClInclude Include="Redis\RedisClient.h" />
+    <ClInclude Include="Redis\RedisCommandBuilder.h" />
+    <ClInclude Include="Redis\RedisConnectionPool.h" />
+    <ClInclude Include="Redis\RedisParser.h" />
+    <ClInclude Include="Redis\RedisProtocol.h" />
+    <ClInclude Include="Redis\RedisResultSet.h" />
+    <ClInclude Include="Redis\RedisService.h" />
     <ClInclude Include="ServerConfig.h" />
     <ClInclude Include="ServerConnectInfo.h" />
     <ClInclude Include="System\CpuInfo.h" />
@@ -154,6 +161,8 @@
     <ClInclude Include="Thread\ThreadManager.h" />
     <ClInclude Include="UtilCore.h" />
     <ClInclude Include="Util\BaseFile.h" />
+    <ClInclude Include="Util\BitField.h" />
+    <ClInclude Include="Util\BitOperate.h" />
     <ClInclude Include="Util\BufferReader.h" />
     <ClInclude Include="Util\BufferWriter.h" />
     <ClInclude Include="Util\CalculatedElapsedTime.h" />
@@ -162,6 +171,7 @@
     <ClInclude Include="Util\DirectoryUtil.h" />
     <ClInclude Include="Util\EncodingConvert.h" />
     <ClInclude Include="Util\TypeCast.h" />
+    <ClInclude Include="Util\UniqNumGenerator.h" />
     <ClInclude Include="Util\WinCharsetConv.h" />
     <ClInclude Include="Util\DateTimeUtil.h" />
     <ClInclude Include="Util\Endian.h" />
@@ -230,6 +240,11 @@
     <ClCompile Include="Network\RIO\RioSessionManager.cpp" />
     <ClCompile Include="Network\RIO\RioSubmissionHelper.cpp" />
     <ClCompile Include="Network\SocketUtils.cpp" />
+    <ClCompile Include="Redis\RedisClient.cpp" />
+    <ClCompile Include="Redis\RedisConnectionPool.cpp" />
+    <ClCompile Include="Redis\RedisParser.cpp" />
+    <ClCompile Include="Redis\RedisResultSet.cpp" />
+    <ClCompile Include="Redis\RedisService.cpp" />
     <ClCompile Include="ServerConfig.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -251,11 +266,13 @@
     <ClCompile Include="Thread\SRWLock.cpp" />
     <ClCompile Include="Thread\ThreadManager.cpp" />
     <ClCompile Include="Util\BaseFile.cpp" />
+    <ClCompile Include="Util\BitField.cpp" />
     <ClCompile Include="Util\BufferReader.cpp" />
     <ClCompile Include="Util\BufferWriter.cpp" />
     <ClCompile Include="Util\CommonUtil.cpp" />
     <ClCompile Include="Util\DirectoryUtil.cpp" />
     <ClCompile Include="Util\EncodingConvert.cpp" />
+    <ClCompile Include="Util\UniqNumGenerator.cpp" />
     <ClCompile Include="Util\WinCharsetConv.cpp" />
     <ClCompile Include="Util\DateTimeUtil.cpp" />
     <ClCompile Include="Util\Endian.cpp" />
@@ -311,6 +328,7 @@
     <None Include="JSON\RapidJSONUtil.inl" />
     <None Include="Memory\Singleton.inl" />
     <None Include="Thread\SpinLock.inl" />
+    <None Include="Util\BitOperate.inl" />
     <None Include="XML\RapidXMLUtil.inl" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -381,7 +399,7 @@
     <OutDir>Bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>Bin\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)64D</TargetName>
-    <IncludePath>K:\GitHub\CPP\Library\ExternalLib\mimalloc-main\include;K:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;K:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;K:\GitHub\CPP\Library\ExternalLib\mysql-8.4.4-winx64\include;K:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;K:\GitHub\CPP\Library\ExternalLib\libiconv-1.18\build\include;K:\GitHub\CPP\Library\ExternalLib\openssl-master\include;$(ProjectDir);$(IncludePath)</IncludePath>
+    <IncludePath>K:\GitHub\CPP\Library\ExternalLib\mimalloc-main\include;K:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;K:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;K:\GitHub\CPP\Library\ExternalLib\mysql-8.4.4-winx64\include;K:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;K:\GitHub\CPP\Library\ExternalLib\libiconv-1.18\build\include;K:\GitHub\CPP\Library\ExternalLib\openssl-master\include;K:\GitHub\CPP\Library\ExternalLib\hiredis-master;$(ProjectDir);$(IncludePath)</IncludePath>
     <LibraryPath>K:\GitHub\CPP\Library\ExternalLib\Bin\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
     <SourcePath>$(SourcePath)</SourcePath>
   </PropertyGroup>
@@ -399,7 +417,7 @@
     <OutDir>Bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>Bin\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>$(ProjectName)64</TargetName>
-    <IncludePath>K:\GitHub\CPP\Library\ExternalLib\mimalloc-main\include;K:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;K:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;K:\GitHub\CPP\Library\ExternalLib\mysql-8.4.4-winx64\include;K:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;K:\GitHub\CPP\Library\ExternalLib\libiconv-1.18\build\include;K:\GitHub\CPP\Library\ExternalLib\openssl-master\include;$(ProjectDir);$(IncludePath)</IncludePath>
+    <IncludePath>K:\GitHub\CPP\Library\ExternalLib\mimalloc-main\include;K:\GitHub\CPP\Library\ExternalLib\rapidjson-master\include;K:\GitHub\CPP\Library\ExternalLib\RapidXML-master\RapidXML;K:\GitHub\CPP\Library\ExternalLib\mysql-8.4.4-winx64\include;K:\GitHub\CPP\Library\ExternalLib\xlnt-master\include;K:\GitHub\CPP\Library\ExternalLib\libiconv-1.18\build\include;K:\GitHub\CPP\Library\ExternalLib\openssl-master\include;K:\GitHub\CPP\Library\ExternalLib\hiredis-master;$(ProjectDir);$(IncludePath)</IncludePath>
     <LibraryPath>K:\GitHub\CPP\Library\ExternalLib\Bin\$(Platform)\$(Configuration);$(LibraryPath)</LibraryPath>
     <SourcePath>$(SourcePath)</SourcePath>
   </PropertyGroup>

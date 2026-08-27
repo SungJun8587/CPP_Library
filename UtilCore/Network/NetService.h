@@ -83,6 +83,7 @@ protected:
 	std::mutex				_lock;               // 세션 컨테이너 동기화용 뮤텍스
 	int32					_maxSessionCount = 0;// 최대 허용 세션 수
 	CVector<CSessionRef>	_sessions;           // 현재 관리 중인 활성 세션 컨테이너
+	std::condition_variable _sessionsEmptyCv;
 };
 
 #endif // ndef __NETSERVICE_H__

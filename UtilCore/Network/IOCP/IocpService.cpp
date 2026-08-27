@@ -124,14 +124,29 @@ bool CIocpServerService::Start()
 //***************************************************************************
 void CIocpServerService::Close()
 {
-	_sessionManager.BeginCloseAllSessions();
-
+	// 1. 신규 연결 차단을 가장 먼저 (RIO 쪽과 동일한 이유 — 세션 정리 도중에도
+	//    계속 새 세션이 들어와 BeginCloseAllSessions()의 스냅샷에서 누락되는
+	//    상황을 막기 위함)
 	if( _listener )
 	{
 		_listener->CloseSocket();
 		_listener = nullptr;
 	}
 
+	// 2. 기존 세션 종료 게시
+	_sessionManager.BeginCloseAllSessions();
+
+	// 3. 실제로 다 닫힐 때까지 대기 — 워커 스레드(_threadManager)가 아직
+	//    살아있어서 close 완료 통지를 계속 처리해줄 수 있는 동안에 해야 한다.
+	//    AreAllSessionsClosed()/BeginCloseAllSessions()/RemoveClosedSessions()가
+	//    폴링 전용으로 설계돼 있어(RIO 쪽과 동일) 여기서도 짧은 간격 폴링으로 대기.
+	while( !_sessionManager.AreAllSessionsClosed() )
+	{
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+	}
+	_sessionManager.RemoveClosedSessions();
+
+	// 4. 세션 정리가 다 끝난 뒤에야 워커 스레드 정지
 	if( _iocpCore && _iocpCore->GetHandle() != INVALID_HANDLE_VALUE )
 	{
 		size_t threadCount = _threadManager.GetThreadCount();
@@ -140,12 +155,10 @@ void CIocpServerService::Close()
 			::PostQueuedCompletionStatus(_iocpCore->GetHandle(), 0, 0, nullptr);
 		}
 	}
-
 	_threadManager.JoinThreads();
 
 	CNetService::Close();
 }
-
 
 //***************************************************************************
 // CIocpClientService Implementation
@@ -277,8 +290,19 @@ bool CIocpClientService::Start()
 //***************************************************************************
 void CIocpClientService::Close()
 {
+	// 1. 세션 정리를 게시하고, 실제로 세션이 0개가 될 때까지 블로킹 대기한다.
+	//    이 시점엔 아직 워커 스레드(_threadManager)가 살아있어서 disconnect
+	//    완료 통지를 계속 처리해줄 수 있다 — 그래서 여기서 먼저 기다려야 한다.
+	//    2번(워커 스레드 정지)을 먼저 해버리면, 게시된 세션 정리들이 완료 통지를
+	//    처리해줄 스레드가 없어져서 영원히 안 끝나는 문제가 생긴다.
+	CNetService::Close();	// 세션이 실제로 0개 될 때까지 블로킹 대기
+
+	// 2. 세션 정리가 다 끝났으니, 이제 워커 스레드들에게 종료 신호를 보낸다.
 	if( _iocpCore && _iocpCore->GetHandle() != INVALID_HANDLE_VALUE )
 	{
+		// 2-1. 워커 스레드 개수만큼 wake-up(빈 overlapped) 패킷을 게시한다.
+		//      GetQueuedCompletionStatus()로 블로킹 중인 각 워커 스레드가
+		//      이 패킷을 하나씩 받아 깨어나 종료 조건을 확인하게 하기 위함.
 		size_t threadCount = _threadManager.GetThreadCount();
 		for( size_t i = 0; i < threadCount; ++i )
 		{
@@ -286,7 +310,6 @@ void CIocpClientService::Close()
 		}
 	}
 
+	// 3. 모든 워커 스레드가 실제로 종료될 때까지 join으로 확실하게 대기한다.
 	_threadManager.JoinThreads();
-
-	CNetService::Close();
 }

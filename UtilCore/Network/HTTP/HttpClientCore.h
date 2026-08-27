@@ -126,6 +126,29 @@ public:
 	//***************************************************************************
 	bool IsConnectionCloseRequested() const noexcept { return m_parser.IsConnectionCloseRequested(); }
 
+	//***************************************************************************
+	// @brief 세션이 끊어졌을 때 세션(CHttpSessionIocp/Rio)의 OnDisconnected()가
+	//        호출해주는 훅입니다. 진행 중이던 요청이 있으면 실패로 마무리합니다.
+	// @details 요청 응답을 기다리는 중(AwaitingResponse)이 아니면 아무것도 하지
+	//          않는다 — Idle 상태에서 세션이 끊기는 건 정상적인 keep-alive
+	//          커넥션 종료(또는 idle 상태에서의 서버측 종료)라 실패로 통지할
+	//          대상 요청 자체가 없기 때문이다.
+	//
+	//          진행 중이던 요청이 있으면 m_onComplete를 로컬 변수로 옮겨 담고
+	//          멤버는 즉시 nullptr로 비운 뒤에 호출한다 — 콜백을 호출하기
+	//          "전에" 먼저 비우는 순서가 중요하다. 이 콜백(주로 CHttpConnPoolT::
+	//          DispatchToSession()이 넘긴 것) 자신이 이 세션을 참조하고 있을 수
+	//          있는데, m_onComplete를 비우지 않은 채로 콜백을 호출하면 콜백
+	//          실행 도중 재진입(예: 콜백이 즉시 다음 요청을 이 세션에 다시
+	//          걸려고 시도하는 경우)이 일어났을 때 아직 남아있는 이전
+	//          m_onComplete와 상태가 꼬일 수 있고, 무엇보다 콜백이 붙잡고 있는
+	//          참조가 세션 자신을 향하는 자기 참조 순환(self-cycle)으로 이어질
+	//          경우 그 순환을 최대한 빨리 끊어주기 위함이다(HttpConnPool.h의
+	//          DispatchToSession() 순환 참조 수정 이력 참고).
+	//
+	//          success=false로 통지하므로, 이 콜백을 받는 쪽(풀)은 이 세션을
+	//          재사용하지 말고 폐기해야 한다.
+	//***************************************************************************
 	void OnSessionDisconnected()
 	{
 		if( m_state != EHttpClientState::AwaitingResponse )

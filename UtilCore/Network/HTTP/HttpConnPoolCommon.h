@@ -7,10 +7,6 @@
 #ifndef __HTTPCONNPOOLCOMMON_H__
 #define __HTTPCONNPOOLCOMMON_H__
 
-#ifndef	__NETWORKREDEFINEDATATYPE_H__
-#include <Network/NetworkRedefineDataType.h>
-#endif
-
 #ifndef	__HTTPCLIENTCORE_H__
 #include <Network/HTTP/HttpClientCore.h>
 #endif
@@ -51,6 +47,33 @@ public:
 	//          안전하다(대기열에 오래 남아있을 수 있어 원본 수명에 의존할 수 없음).
 	//***************************************************************************
 	virtual void SendRequest(const char* data, size_t len, HttpRequestCompletionHandler onComplete) = 0;
+
+	//***************************************************************************
+	// @brief 이 풀이 현재 붙들고 있는(연결 완료 + 연결 시도 중 포함) 세션 수를 반환한다.
+	// @return size_t 살아있는 세션 수
+	// @details Close()가 세션 정리를 비동기로만 게시하고 실제 정리 완료는 IOCP/RIO
+	//          워커 스레드가 완료 통지를 처리해야 끝나기 때문에, "Close() 호출 =
+	//          즉시 정리 완료"가 아니다. 이 값이 0이 될 때까지 기다린 뒤에야
+	//          워커 스레드를 안전하게 멈춰도 된다 — 그렇지 않으면 QUIT_KEY가
+	//          아직 처리 안 된 세션 정리 완료 패킷보다 먼저 큐에서 뽑혀 나가면서
+	//          그 세션이 영원히 정리 안 되는(메모리 릭으로 보이는) 레이스가
+	//          생길 수 있다(호출부의 권장 종료 시퀀스는 CHttpConnPoolManager.h의
+	//          WaitUntilAllSessionsClosed()/SetAllSessionsClosedHandler() 참고).
+	//***************************************************************************
+	virtual size_t GetActiveSessionCount() = 0;
+
+	//***************************************************************************
+	// @brief 이 풀의 활성 세션 수가 변할 때마다 호출되는 콜백을 등록한다.
+	// @param handler 새 세션 수를 인자로 받는 콜백. 실제로 값이 바뀌지 않았는데도
+	//        호출될 수 있다(멱등하게/방어적으로 처리할 것) — 세션 연결/해제
+	//        시점마다 통지하는 구현이라, 정확히 "변화가 있을 때만"이 보장되진
+	//        않는다.
+	// @details CHttpConnPoolManager가 폴링 없이 "세션 수가 0이 됐다"를 알아채기
+	//          위해 쓴다(WaitUntilAllSessionsClosed()/SetAllSessionsClosedHandler()
+	//          가 이 훅으로 구현돼 있음) — 그 외 목적으로 직접 쓸 필요는 보통 없다.
+	//***************************************************************************
+	virtual void SetSessionCountChangedHandler(std::function<void(size_t)> handler) = 0;
 };
+using IHttpConnPoolRef = std::shared_ptr<IHttpConnPool>;
 
 #endif // ndef __HTTPCONNPOOLCOMMON_H__

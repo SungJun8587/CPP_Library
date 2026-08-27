@@ -67,6 +67,9 @@
     <Filter Include="GcpService">
       <UniqueIdentifier>{d413dae0-d17b-4f0d-8a3f-16511f13ed5f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Redis">
+      <UniqueIdentifier>{af4525ed-529e-41cf-bce7-32c35192c31b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Memory\Containers.h">
@@ -182,9 +185,6 @@
     </ClInclude>
     <ClInclude Include="Util\Regular.h">
       <Filter>Util</Filter>
-    </ClInclude>
-    <ClInclude Include="DB\RedisConn.h">
-      <Filter>DB</Filter>
     </ClInclude>
     <ClInclude Include="Util\FileUtil.h">
       <Filter>Util</Filter>
@@ -517,6 +517,39 @@
     <ClInclude Include="GcpService\GcpAuthHttpClient.h">
       <Filter>GcpService</Filter>
     </ClInclude>
+    <ClInclude Include="Util\BitField.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\UniqNumGenerator.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\BitOperate.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Redis\HiRedisConn.h">
+      <Filter>Redis</Filter>
+    </ClInclude>
+    <ClInclude Include="Redis\RedisClient.h">
+      <Filter>Redis</Filter>
+    </ClInclude>
+    <ClInclude Include="Redis\RedisCommandBuilder.h">
+      <Filter>Redis</Filter>
+    </ClInclude>
+    <ClInclude Include="Redis\RedisConnectionPool.h">
+      <Filter>Redis</Filter>
+    </ClInclude>
+    <ClInclude Include="Redis\RedisParser.h">
+      <Filter>Redis</Filter>
+    </ClInclude>
+    <ClInclude Include="Redis\RedisProtocol.h">
+      <Filter>Redis</Filter>
+    </ClInclude>
+    <ClInclude Include="Redis\RedisService.h">
+      <Filter>Redis</Filter>
+    </ClInclude>
+    <ClInclude Include="Redis\RedisResultSet.h">
+      <Filter>Redis</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">
@@ -770,6 +803,27 @@
     <ClCompile Include="Network\RIO\RioConnectDispatcher.cpp">
       <Filter>Network\RIO</Filter>
     </ClCompile>
+    <ClCompile Include="Util\BitField.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\UniqNumGenerator.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Redis\RedisClient.cpp">
+      <Filter>Redis</Filter>
+    </ClCompile>
+    <ClCompile Include="Redis\RedisConnectionPool.cpp">
+      <Filter>Redis</Filter>
+    </ClCompile>
+    <ClCompile Include="Redis\RedisParser.cpp">
+      <Filter>Redis</Filter>
+    </ClCompile>
+    <ClCompile Include="Redis\RedisService.cpp">
+      <Filter>Redis</Filter>
+    </ClCompile>
+    <ClCompile Include="Redis\RedisResultSet.cpp">
+      <Filter>Redis</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="DB\BaseODBC.inl">
@@ -813,6 +867,9 @@
     </None>
     <None Include="Containers\Map\ClusterSpinMap.inl">
       <Filter>Containers\Map</Filter>
+    </None>
+    <None Include="Util\BitOperate.inl">
+      <Filter>Util</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
