@@ -4,18 +4,13 @@
 //
 //***************************************************************************
 
-#ifndef __SOFTWAREINFO_H__
-#define __SOFTWAREINFO_H__
+#ifndef UC_SOFTWAREINFO_H
+#define UC_SOFTWAREINFO_H
 
 #include <vector>
 
-#ifndef __SYSTEMBASEDEFINE_H__
 #include <System/SystemBaseDefine.h>
-#endif
-
-#ifndef __OSINFO_H__
 #include <System/OsInfo.h>
-#endif
 
 BOOL GetVersionLangOfFile(TCHAR* ptszAppName, TCHAR* ptszVersion, TCHAR* ptszLanguage);
 
@@ -197,4 +192,4 @@ private:
 	std::vector<INSTALL_SWINFO*> m_sInstallSwInfoArray; // 설치된 소프트웨어 정보 포인터 벡터
 };
 
-#endif // ndef __SOFTWAREINFO_H__
+#endif // ndef UC_SOFTWAREINFO_H

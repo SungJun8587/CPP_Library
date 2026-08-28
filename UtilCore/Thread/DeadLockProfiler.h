@@ -4,46 +4,19 @@
 //
 //***************************************************************************
 
-#ifndef __DEADLOCKPROFILER_H__
-#define __DEADLOCKPROFILER_H__
+#ifndef UC_DEADLOCKPROFILER_H
+#define UC_DEADLOCKPROFILER_H
 
-#pragma once
-
-#ifndef _STACK_
 #include <stack>
-#endif
-
-#ifndef _MAP_
 #include <map>
-#endif
-
-#ifndef _VECTOR_
 #include <vector>
-#endif
-
-#ifndef _THREAD_
 #include <thread>
-#endif
-
-#ifndef _MUTEX_
 #include <mutex>
-#endif
-
-#ifndef _SET_
 #include <set>
-#endif
 
-#ifndef __BASEREDEFINEDATATYPE_H__
 #include <BaseRedefineDataType.h>
-#endif
-
-#ifndef __CONTAINERS_H__
-#include <Memory/Containers.h>
-#endif
-
-#ifndef __BASETLS_H__
 #include <BaseTLS.h>
-#endif
+#include <Memory/Containers.h>
 
 extern thread_local CStack<int32>	LLockStack;
 
@@ -92,6 +65,6 @@ private:
 	CVector<int32>	_parent;
 };
 
-#endif // ndef __DEADLOCKPROFILER_H__
+#endif // ndef UC_DEADLOCKPROFILER_H
 
 

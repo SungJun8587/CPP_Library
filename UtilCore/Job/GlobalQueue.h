@@ -4,14 +4,10 @@
 //
 //***************************************************************************
 
-#ifndef __GLOBALQUEUE_H__
-#define __GLOBALQUEUE_H__
+#ifndef UC_GLOBALQUEUE_H
+#define UC_GLOBALQUEUE_H
 
-#pragma once
-
-#ifndef __SPINLOCKQUEUE_H__
 #include <Containers/Queue/SpinLockQueue.h>
-#endif
 
 //***************************************************************************
 // @brief 전역 작업 큐(Global Job Queue)를 관리하는 클래스입니다.
@@ -31,4 +27,4 @@ private:
 	CSpinLockQueue<CJobQueueRef> _jobQueues; // 작업 큐(Job Queue)들을 안전하게 저장하는 스핀락 큐
 };
 
-#endif // ndef __GLOBALQUEUE_H__
+#endif // ndef UC_GLOBALQUEUE_H

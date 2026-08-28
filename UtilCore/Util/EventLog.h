@@ -4,16 +4,11 @@
 //
 //***************************************************************************
 
-#ifndef __EVENTLOG_H__
-#define __EVENTLOG_H__
+#ifndef UC_EVENTLOG_H
+#define UC_EVENTLOG_H
 
-#ifndef __BASEFILE_H__
-#include "BaseFile.h"
-#endif
-
-#ifndef __CRITICALSECTION_H__
-#include "Thread/CriticalSection.h"
-#endif
+#include <Util/BaseFile.h>
+#include <Thread/CriticalSection.h>
 
 #define EVENTLOG_MAX_BUFFER_SIZE 4095
 #define TERMINATOR_STRLEN 1
@@ -62,4 +57,4 @@ private:
 	size_t			  m_nCount;
 };
 
-#endif // ndef __EVENTLOG_H__
+#endif // ndef UC_EVENTLOG_H

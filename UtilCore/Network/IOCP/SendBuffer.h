@@ -4,16 +4,11 @@
 //
 //***************************************************************************
 
-#ifndef __SENDBUFFER_H__
-#define __SENDBUFFER_H__
+#ifndef UC_SENDBUFFER_H
+#define UC_SENDBUFFER_H
 
-#ifndef	__CONTAINERS_H__
 #include <Memory/Containers.h>
-#endif
-
-#ifndef	__IOCPCOMMON_H__
 #include <Network/IOCP/IocpCommon.h>
-#endif
 
 #include <array>
 
@@ -45,10 +40,11 @@ public:
 	void		Close(uint32 writeSize);
 
 private:
-	BYTE*				_buffer;		// 버퍼 시작 주소
-	uint32				_allocSize = 0;	// 할당된 크기
-	uint32				_writeSize = 0;	// 실제 기록된 크기
-	CSendBufferChunkRef	_owner;			// 소유 중인 청크 참조
+	BYTE*				_buffer;			// 버퍼 시작 주소
+	uint32				_allocSize = 0;		// 할당된 크기
+	uint32				_writeSize = 0;		// 실제 기록된 크기
+	bool                _closed = false;	// 중복 Close 방지 플래그
+	CSendBufferChunkRef	_owner;				// 소유 중인 청크 참조
 };
 
 
@@ -116,4 +112,4 @@ private:
 	static CSendBufferChunkRef	GetChunk();
 };
 
-#endif // ndef __SENDBUFFER_H__
+#endif // ndef UC_SENDBUFFER_H

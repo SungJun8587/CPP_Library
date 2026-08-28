@@ -4,28 +4,14 @@
 //
 //***************************************************************************
 
-#ifndef __HTTPCLIENT_H__
-#define __HTTPCLIENT_H__
+#ifndef UC_HTTPCLIENT_H
+#define UC_HTTPCLIENT_H
 
-#ifndef	__HTTPURL_H__
 #include <Network/HTTP/HttpUrl.h>
-#endif
-
-#ifndef	__HTTPCONNPOOLFACTORY_H__
 #include <Network/HTTP/HttpConnPoolFactory.h>
-#endif
-
-#ifndef	__HTTPPACKETBUILDER_H__
 #include <Network/HTTP/HttpPacketBuilder.h>
-#endif
-
-#ifndef	__HTTPFORMUTIL_H__
 #include <Network/HTTP/HttpFormUtil.h>
-#endif
-
-#ifndef	__HTTPMULTIPARTBUILDER_H__
 #include <Network/HTTP/HttpMultipartBuilder.h>
-#endif
 
 #include <string>
 #include <vector>
@@ -352,4 +338,4 @@ private:
 	std::shared_ptr<CHttpConnPoolManager> _httpsManager;	// https:// 요청용 (sslCtx 없이 생성했으면 nullptr)
 };
 
-#endif // ndef __HTTPCLIENT_H__
+#endif // ndef UC_HTTPCLIENT_H

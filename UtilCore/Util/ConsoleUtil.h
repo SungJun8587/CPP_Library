@@ -22,10 +22,8 @@
 //
 //***************************************************************************
 
-#ifndef __CONSOLEUTIL_H__
-#define __CONSOLEUTIL_H__
-
-#pragma once
+#ifndef UC_CONSOLEUTIL_H
+#define UC_CONSOLEUTIL_H
 
 #define _CONSOLE_LOG
 
@@ -115,4 +113,4 @@ inline void CloseConsole()
 #endif
 }
 
-#endif // ndef __CONSOLEUTIL_H__
+#endif // ndef UC_CONSOLEUTIL_H

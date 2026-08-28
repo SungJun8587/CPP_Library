@@ -1,19 +1,14 @@
 ﻿
 //***************************************************************************
-// WebUtil.h: interface for the WebUtil Function.
+// WebUtil.h : interface for the WebUtil Function.
 //
 //***************************************************************************
 
-#ifndef	__WEBUTIL_H__
-#define	__WEBUTIL_H__
+#ifndef UC_WEBUTIL_H
+#define UC_WEBUTIL_H
 
-#ifndef __BASEREDEFINEDATATYPE_H__
 #include <BaseRedefineDataType.h>
-#endif
-
-#ifndef __ENCODINGCONVERT_H__
 #include <Util/EncodingConvert.h>
-#endif
 
 #include <array>
 
@@ -56,4 +51,4 @@ _tstring DecodeURI(const _tstring& source);
 _tstring EncodeURIComponent(const _tstring& source);
 _tstring DecodeURIComponent(const _tstring& source);
 
-#endif // ndef __WEBUTIL_H__
+#endif // ndef UC_WEBUTIL_H

@@ -4,28 +4,15 @@
 //
 //***************************************************************************
 
-#ifndef __SHELLUTIL_H__
-#define __SHELLUTIL_H__
+#ifndef UC_SHELLUTIL_H
+#define UC_SHELLUTIL_H
 
-#ifndef	_INC_WINDOWS
 #include <windows.h>
-#endif
-
-#ifndef	_INC_TIME
 #include <time.h>
-#endif
-
-#ifndef	_INC_TCHAR
 #include <tchar.h>
-#endif
 
-#ifndef	__STRINGUTIL_H__
 #include <Util/StringUtil.h>
-#endif
-
-#ifndef __DIRECTORYUTIL_H__
-#include "DirectoryUtil.h"		// SH_APPLY_FILEINFO, IsMatchedExtension()/IsAbleFile(), 재귀 파일 조작 함수 — 플랫폼 공용 구현
-#endif
+#include <Util/DirectoryUtil.h>	
 
 // 기존 코드 호환용 포인터 typedef (SH_APPLY_FILEINFO 정의는 FileFilterUtil.h로 이전됨)
 typedef SH_APPLY_FILEINFO* PSH_APPLY_FILEINFO;
@@ -96,4 +83,4 @@ HANDLE	GetFileHandleDuplicate(TCHAR* ptszDestFullPath, TCHAR* ptszDestFileNameEx
 
 bool GetProductKeyExtract(_tstring& TProductKey, const BYTE* pbDigitalProductID, const DWORD dwLength, const bool bIsExtractBytesRange);
 
-#endif // ndef __SHELLUTIL_H__
+#endif // ndef UC_SHELLUTIL_H

@@ -4,16 +4,11 @@
 //
 //***************************************************************************
 
-#ifndef __CLUSTERSPINMAP_H__
-#define __CLUSTERSPINMAP_H__
+#ifndef UC_CLUSTERSPINMAP_H
+#define UC_CLUSTERSPINMAP_H
 
-#ifndef __BASEREDEFINEDATATYPE_H__
 #include <BaseRedefineDataType.h>
-#endif
-
-#ifndef __PLATFORMLOCK_H__
 #include <Thread/PlatformLock.h>
-#endif
 
 //***************************************************************************
 // @class CClusterSpinMap
@@ -198,4 +193,4 @@ public:
 
 #include "ClusterSpinMap.inl"
 
-#endif // ndef __CLUSTERSPINMAP_H__
+#endif // ndef UC_CLUSTERSPINMAP_H

@@ -4,24 +4,13 @@
 //
 //***************************************************************************
 
-#ifndef __HTTPSESSIONIOCP_H__
-#define __HTTPSESSIONIOCP_H__
+#ifndef UC_HTTPSESSIONIOCP_H
+#define UC_HTTPSESSIONIOCP_H
 
-#ifndef	__NETWORKREDEFINEDATATYPE_H__
 #include <Network/NetworkRedefineDataType.h>
-#endif
-
-#ifndef	__IOCPSESSION_H__
 #include <Network/IOCP/IocpSession.h>
-#endif
-
-#ifndef	__HTTPCONNPOOLCOMMON_H__
 #include <Network/HTTP/HttpConnPoolCommon.h>
-#endif
-
-#ifndef	__TLSFILTER_H__
 #include <Network/HTTP/TlsFilter.h>
-#endif
 
 class CHttpSessionIocp;
 using CHttpSessionIocpRef = std::shared_ptr<CHttpSessionIocp>;
@@ -183,4 +172,4 @@ private:
 	bool _tlsEnabled = false;                // SetTlsConfig() 호출 여부 (true면 HTTPS 모드)
 };
 
-#endif // ndef __HTTPSESSIONIOCP_H__
+#endif // ndef UC_HTTPSESSIONIOCP_H

@@ -1,26 +1,16 @@
-﻿//***************************************************************************
+﻿
+//***************************************************************************
 // RioEventPool.h : interface for the CRioEventPool class.
 //
 //***************************************************************************
 
-#ifndef __RIOEVENTPOOL_H__
-#define __RIOEVENTPOOL_H__
+#ifndef UC_RIOEVENTPOOL_H
+#define UC_RIOEVENTPOOL_H
 
-#ifndef __CONTAINERS_H__
 #include <Memory/Containers.h>
-#endif
-
-#ifndef __RIOCOMMON_H__
 #include <Network/RIO/RioCommon.h>
-#endif
-
-#ifndef __RIOEVENT_H__
 #include <Network/RIO/RioEvent.h>
-#endif
-
-#ifndef __RIOOBJECT_H__
 #include <Network/RIO/RioObject.h>
-#endif
 
 //***************************************************************************
 // @class CRioEventPool
@@ -112,4 +102,4 @@ private:
     std::atomic<size_t> _inUseCount;             // 현재 외부에서 할당되어 사용 중인 이벤트 개수
 };
 
-#endif // ndef __RIOEVENTPOOL_H__
+#endif // ndef UC_RIOEVENTPOOL_H

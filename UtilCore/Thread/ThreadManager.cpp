@@ -8,10 +8,10 @@
 #include "ThreadManager.h"
 
 // 프로젝트에 CMemory 모듈이 포함된 경우에만 TLS 캐시 flush 호출을 활성화.
-// __MEMORY_H__는 Memory.h에 정의된 인클루드 가드를 그대로 재사용하여,
+// UC_MEMORY_H는 Memory.h에 정의된 인클루드 가드를 그대로 재사용하여,
 // ThreadManager가 CMemory 모듈 존재 여부와 무관하게 독립적으로 컴파일될 수
 // 있도록 합니다(BaseGlobal.cpp와 동일한 패턴).
-#ifdef __MEMORY_H__
+#ifdef UC_MEMORY_H
 #include "Memory.h"
 #endif
 
@@ -174,7 +174,7 @@ void CThreadManager::InitTLS()
 //***************************************************************************
 void CThreadManager::DestroyTLS()
 {
-#ifdef __MEMORY_H__
+#ifdef UC_MEMORY_H
     CMemory::FlushCurrentThreadCache();
 #endif
 }

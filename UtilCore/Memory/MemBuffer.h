@@ -4,12 +4,10 @@
 //
 //***************************************************************************
 
-#ifndef __MEMBUFFER_H__
-#define __MEMBUFFER_H__
+#ifndef UC_MEMBUFFER_H
+#define UC_MEMBUFFER_H
 
-#ifndef _TYPEINFO_
 #include <typeinfo>
-#endif
 
 //***************************************************************************
 //
@@ -109,4 +107,4 @@ public:
 	size_t  m_nBufLength;	// 버퍼에 저장된 문자 수 : 문자 수 + 1('\0')
 };
 
-#endif // ndef __MEMBUFFER_H__
+#endif // ndef UC_MEMBUFFER_H

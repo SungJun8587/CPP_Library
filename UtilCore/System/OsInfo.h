@@ -1,16 +1,13 @@
-﻿//***************************************************************************
+﻿
+//***************************************************************************
 // OsInfo.h: interface for the COsInfo Class.
 //
 //***************************************************************************
 
-#ifndef __OSINFO_H__
-#define __OSINFO_H__
+#ifndef UC_OSINFO_H
+#define UC_OSINFO_H
 
-#pragma once
-
-#ifndef __SYSTEMBASEDEFINE_H__
-#include <SystemBaseDefine.h>
-#endif
+#include <System/SystemBaseDefine.h>
 
 #include <windows.h>
 
@@ -521,4 +518,4 @@ private:
 	SYSTEM_INFO			m_Sysi; // 시스템 하드웨어 정보 구조체
 };
 
-#endif // ndef __OSINFO_H__
+#endif // ndef UC_OSINFO_H

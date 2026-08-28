@@ -11,10 +11,25 @@
 // Construction/Destruction
 //***************************************************************************
 
+//***************************************************************************
+// @brief CDBSchema 클래스 생성자
+// @param conn 데이터베이스 연결을 위한 BaseODBC 객체 참조
+//***************************************************************************
+CDBSchema::CDBSchema(CBaseODBC& conn) : _dbClass(conn.GetDBClass()), _dbConn(conn) 
+{
+}
+
+//***************************************************************************
+// @brief CDBSchema 클래스 소멸자
+//***************************************************************************
 CDBSchema::~CDBSchema()
 {
 }
 
+//***************************************************************************
+// @brief 전체 데이터베이스 스키마 정보를 수집합니다.
+// @return 성공 여부 (true/false)
+//***************************************************************************
 bool CDBSchema::GatherDBSchema()
 {
 	GatherDBTables();
@@ -42,7 +57,8 @@ bool CDBSchema::GatherDBSchema()
 }
 
 //***************************************************************************
-//
+// @brief 수집된 데이터베이스 스키마 정보를 로그 파일로 출력합니다.
+//***************************************************************************
 void CDBSchema::PrintDBSchema()
 {
 	_tstring query;
@@ -108,7 +124,10 @@ void CDBSchema::PrintDBSchema()
 }
 
 //***************************************************************************
-//
+// @brief DB 테이블 정보를 수집합니다.
+// @param ptszTableName 대상 테이블명 (기본값: 전체)
+// @return 성공 여부 (true/false)
+//***************************************************************************
 bool CDBSchema::GatherDBTables(const TCHAR* ptszTableName)
 {
 	TCHAR   tszDBName[DATABASE_NAME_STRLEN] = { 0, };
@@ -161,7 +180,10 @@ bool CDBSchema::GatherDBTables(const TCHAR* ptszTableName)
 }
 
 //***************************************************************************
-//
+// @brief DB 테이블 컬럼 정보를 수집합니다.
+// @param ptszTableName 대상 테이블명 (기본값: 전체)
+// @return 성공 여부 (true/false)
+//***************************************************************************
 bool CDBSchema::GatherDBTableColumns(const TCHAR* ptszTableName)
 {
 	TCHAR   tszDBName[DATABASE_NAME_STRLEN] = { 0, };
@@ -259,7 +281,10 @@ bool CDBSchema::GatherDBTableColumns(const TCHAR* ptszTableName)
 }
 
 //***************************************************************************
-//
+// @brief DB 테이블 제약조건 정보를 수집합니다.
+// @param ptszTableName 대상 테이블명 (기본값: 전체)
+// @return 성공 여부 (true/false)
+//***************************************************************************
 bool CDBSchema::GatherDBTableConstraints(const TCHAR* ptszTableName)
 {
 	TCHAR   tszDBName[DATABASE_NAME_STRLEN] = { 0, };
@@ -326,7 +351,10 @@ bool CDBSchema::GatherDBTableConstraints(const TCHAR* ptszTableName)
 }
 
 //***************************************************************************
-//
+// @brief DB Identity 컬럼 정보를 수집합니다.
+// @param ptszTableName 대상 테이블명 (기본값: 전체)
+// @return 성공 여부 (true/false)
+//***************************************************************************
 bool CDBSchema::GatherDBIdentityColumns(const TCHAR* ptszTableName)
 {
 	TCHAR   tszDBName[DATABASE_NAME_STRLEN] = { 0, };
@@ -417,7 +445,10 @@ bool CDBSchema::GatherDBIdentityColumns(const TCHAR* ptszTableName)
 }
 
 //***************************************************************************
-//
+// @brief DB 인덱스 정보를 수집합니다.
+// @param ptszTableName 대상 테이블명 (기본값: 전체)
+// @return 성공 여부 (true/false)
+//***************************************************************************
 bool CDBSchema::GatherDBIndexes(const TCHAR* ptszTableName)
 {
 	TCHAR   tszDBName[DATABASE_NAME_STRLEN] = { 0, };
@@ -494,7 +525,10 @@ bool CDBSchema::GatherDBIndexes(const TCHAR* ptszTableName)
 }
 
 //***************************************************************************
-//
+// @brief DB 인덱스 옵션 정보를 수집합니다.
+// @param ptszTableName 대상 테이블명 (기본값: 전체)
+// @return 성공 여부 (true/false)
+//***************************************************************************
 bool CDBSchema::GatherDBIndexOptions(const TCHAR* ptszTableName)
 {
 	TCHAR   tszDBName[DATABASE_NAME_STRLEN] = { 0, };
@@ -602,7 +636,10 @@ bool CDBSchema::GatherDBIndexOptions(const TCHAR* ptszTableName)
 }
 
 //***************************************************************************
-//
+// @brief DB 외래키 정보를 수집합니다.
+// @param ptszTableName 대상 테이블명 (기본값: 전체)
+// @return 성공 여부 (true/false)
+//***************************************************************************
 bool CDBSchema::GatherDBForeignKeys(const TCHAR* ptszTableName)
 {
 	TCHAR   tszDBName[DATABASE_NAME_STRLEN] = { 0, };
@@ -691,7 +728,10 @@ bool CDBSchema::GatherDBForeignKeys(const TCHAR* ptszTableName)
 }
 
 //***************************************************************************
-//
+// @brief DB 기본값 제약조건 정보를 수집합니다.
+// @param ptszTableName 대상 테이블명 (기본값: 전체)
+// @return 성공 여부 (true/false)
+//***************************************************************************
 bool CDBSchema::GatherDBDefaultConstraints(const TCHAR* ptszTableName)
 {
 	TCHAR   tszDBName[DATABASE_NAME_STRLEN] = { 0, };
@@ -750,7 +790,10 @@ bool CDBSchema::GatherDBDefaultConstraints(const TCHAR* ptszTableName)
 }
 
 //***************************************************************************
-//
+// @brief DB 체크 제약조건 정보를 수집합니다.
+// @param ptszTableName 대상 테이블명 (기본값: 전체)
+// @return 성공 여부 (true/false)
+//***************************************************************************
 bool CDBSchema::GatherDBCheckConstraints(const TCHAR* ptszTableName)
 {
 	TCHAR   tszDBName[DATABASE_NAME_STRLEN] = { 0, };
@@ -805,7 +848,10 @@ bool CDBSchema::GatherDBCheckConstraints(const TCHAR* ptszTableName)
 }
 
 //***************************************************************************
-//
+// @brief DB 트리거 정보를 수집합니다.
+// @param ptszTableName 대상 테이블명 (기본값: 전체)
+// @return 성공 여부 (true/false)
+//***************************************************************************
 bool CDBSchema::GatherDBTrigger(const TCHAR* ptszTableName)
 {
 	TCHAR   tszDBName[DATABASE_NAME_STRLEN] = { 0, };
@@ -854,7 +900,10 @@ bool CDBSchema::GatherDBTrigger(const TCHAR* ptszTableName)
 }
 
 //***************************************************************************
-//
+// @brief DB 저장프로시저 정보를 수집합니다.
+// @param ptszProcName 대상 저장프로시저명 (기본값: 전체)
+// @return 성공 여부 (true/false)
+//***************************************************************************
 bool CDBSchema::GatherDBStoredProcedures(const TCHAR* ptszProcName)
 {
 	TCHAR   tszDBName[DATABASE_NAME_STRLEN] = { 0, };
@@ -927,7 +976,10 @@ bool CDBSchema::GatherDBStoredProcedures(const TCHAR* ptszProcName)
 }
 
 //***************************************************************************
-//
+// @brief DB 저장프로시저 파라미터 정보를 수집합니다.
+// @param ptszProcName 대상 저장프로시저명 (기본값: 전체)
+// @return 성공 여부 (true/false)
+//***************************************************************************
 bool CDBSchema::GatherDBStoredProcedureParams(const TCHAR* ptszProcName)
 {
 	TCHAR   tszDBName[DATABASE_NAME_STRLEN] = { 0, };
@@ -1003,7 +1055,10 @@ bool CDBSchema::GatherDBStoredProcedureParams(const TCHAR* ptszProcName)
 }
 
 //***************************************************************************
-//
+// @brief DB 함수 정보를 수집합니다.
+// @param ptszFuncName 대상 함수명 (기본값: 전체)
+// @return 성공 여부 (true/false)
+//***************************************************************************
 bool CDBSchema::GatherDBFunctions(const TCHAR* ptszFuncName)
 {
 	TCHAR   tszDBName[DATABASE_NAME_STRLEN] = { 0, };
@@ -1076,7 +1131,10 @@ bool CDBSchema::GatherDBFunctions(const TCHAR* ptszFuncName)
 }
 
 //***************************************************************************
-//
+// @brief DB 함수 파라미터 정보를 수집합니다.
+// @param ptszFuncName 대상 함수명 (기본값: 전체)
+// @return 성공 여부 (true/false)
+//***************************************************************************
 bool CDBSchema::GatherDBFunctionParams(const TCHAR* ptszFuncName)
 {
 	TCHAR   tszDBName[DATABASE_NAME_STRLEN] = { 0, };

@@ -4,8 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __TLSFILTER_H__
-#define __TLSFILTER_H__
+#ifndef UC_TLSFILTER_H
+#define UC_TLSFILTER_H
 
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -370,4 +370,4 @@ private:
 	bool _handshakeComplete = false;   // 핸드셰이크 완료 여부
 };
 
-#endif // ndef __TLSFILTER_H__
+#endif // ndef UC_TLSFILTER_H

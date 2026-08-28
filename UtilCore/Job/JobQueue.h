@@ -4,34 +4,15 @@
 //
 //***************************************************************************
 
-#ifndef __JOBQUEUE_H__
-#define __JOBQUEUE_H__
+#ifndef UC_JOBQUEUE_H
+#define UC_JOBQUEUE_H
 
-#pragma once
-
-#ifndef __BASEREDEFINEDATATYPE_H__
 #include <BaseRedefineDataType.h>
-#endif
-
-#ifndef __BASETLS_H__
 #include <BaseTLS.h>
-#endif
-
-#ifndef __JOB_H__
 #include <Job/Job.h>
-#endif
-
-#ifndef __SPINLOCKQUEUE_H__
 #include <Containers/Queue/SpinLockQueue.h>
-#endif
-
-#ifndef __JOBTIMER_H__
 #include <Job/JobTimer.h>
-#endif
-
-#ifndef __GLOBALQUEUE_H__
 #include <Job/GlobalQueue.h>
-#endif
 
 //***************************************************************************
 // @brief 전역 타이머 관리 클래스 전방 선언
@@ -136,4 +117,4 @@ protected:
 
 #include <Job/JobQueue.inl>
 
-#endif // ndef __JOBQUEUE_H__
+#endif // ndef UC_JOBQUEUE_H

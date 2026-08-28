@@ -4,16 +4,11 @@
 //
 //***************************************************************************
 
-#ifndef __BASEMYSQL_H__
-#define __BASEMYSQL_H__
+#ifndef UC_BASEMYSQL_H
+#define UC_BASEMYSQL_H
 
-#ifndef	__ALLOCATOR_H__
 #include <Memory/Allocator.h>
-#endif
-
-#ifndef __ENCODINGCONVERT_H__
 #include <Util/EncodingConvert.h>
-#endif
 
 #include <mysql.h>
 #include <mysqld_error.h>
@@ -21,11 +16,10 @@
 #pragma comment(lib, LIB_NAME("libmysql"))
 
 //***************************************************************************
-// - mysql_library_init(0, NULL, NULL);		// MySQL 라이브러리 초기화(프로그램에서 단 한 번만 호출)
-// - mysql_library_end();					// MySQL 라이브러리 메모리 정리(프로그램 종료 시 한 번만 호출)
-
+// @brief MySQL C API 기반 데이터베이스 제어 기본 클래스
+// @detail 데이터베이스 연결, 쿼리 실행, Prepared Statement, 
+//         트랜잭션 및 파라미터 바인딩을 위한 랩퍼(Wrapper) 기능을 제공합니다.
 //***************************************************************************
-//
 class CBaseMySQL : public BaseAllocator
 {
 public:
@@ -39,7 +33,7 @@ public:
 	void		StmtClose();
 	void		FreeResult(MYSQL_RES* res);
 
-	MYSQL*		GetConnPtr();
+	MYSQL* GetConnPtr();
 	bool		IsConnected();
 
 	bool		GetServerInfo(TCHAR* ptszServerInfo, int32 nBufferLength);
@@ -103,10 +97,10 @@ public:
 	bool		GetStmtErrorMessage(MYSQL_STMT* pStmt, TCHAR* ptszMessage);
 
 	//***************************************************************************
-	// @brief 문자열(const char*)을 사용하여 MySQL 입력(Input) 매개변수를 바인딩
-	// @param pszValue - 바인딩할 널 종료 문자열 포인터
-	// @param ulBufLength - 문자열의 길이를 가리키는 포인터
-	// @return 초기화 및 설정이 완료된 MYSQL_BIND 구조체
+	// @brief 문자열(const char*)을 사용하여 MySQL 입력 매개변수를 바인딩합니다.
+	// @param pszValue 바인딩할 널 종료 문자열 포인터
+	// @param ulBufLength 문자열의 길이를 가리키는 포인터
+	// @return MYSQL_BIND 초기화 및 설정이 완료된 MYSQL_BIND 구조체
 	//***************************************************************************
 	static MYSQL_BIND BindParam(const char* pszValue, ulong* ulBufLength)
 	{
@@ -116,25 +110,24 @@ public:
 		unsigned long size = static_cast<unsigned long>(strlen(pszValue));
 
 		bind.buffer_type = MYSQL_TYPE_STRING;
-		bind.buffer = (void*)pszValue;			// const char*로 받은 문자열
-		bind.buffer_length = size;				// 문자열 길이
+		bind.buffer = (void*)pszValue;
+		bind.buffer_length = size;
 		bind.length = ulBufLength;
 
 		return bind;
 	};
 
 	//***************************************************************************
-	// @brief 유니코드 문자열(const wchar_t*)을 UTF-8로 변환하여 MySQL 입력(Input) 매개변수를 바인딩
-	// @param pwszValue - 바인딩할 유니코드 문자열 포인터
-	// @param ulBufSize - 변환할 문자열의 크기
-	// @return 동적 할당된 버퍼가 포함된 MYSQL_BIND 구조체
+	// @brief 유니코드 문자열(const wchar_t*)을 UTF-8로 변환하여 MySQL 입력 매개변수를 바인딩합니다.
+	// @param pwszValue 바인딩할 유니코드 문자열 포인터
+	// @param ulBufSize 변환할 문자열의 크기
+	// @return MYSQL_BIND 동적 할당된 버퍼가 포함된 MYSQL_BIND 구조체
 	//***************************************************************************
 	static MYSQL_BIND BindParam(const wchar_t* pwszValue, ulong ulBufSize)
 	{
 		MYSQL_BIND bind{};
 		memset(&bind, 0, sizeof(bind));
 
-		// 유니코드 문자열을 UTF-8로 변환
 		std::wstring wstrValue(pwszValue, ulBufSize);
 		std::string utf8 = UnicodeToUtf8(wstrValue);
 
@@ -146,7 +139,6 @@ public:
 		bind.buffer_length = size;
 		bind.is_null = 0;
 
-		// Bind length
 		unsigned long* pulLength = new unsigned long(size);
 		bind.length = pulLength;
 
@@ -154,10 +146,9 @@ public:
 	};
 
 	//***************************************************************************
-	// @brief 템플릿을 사용하여 기본 데이터 타입 및 산술 타입의 MySQL 입력(Input) 매개변수를 바인딩
-	// @tparam T - 바인딩할 데이터의 타입
-	// @param tValue - 바인딩할 데이터 객체 (참조)
-	// @return 타입에 맞게 설정된 MYSQL_BIND 구조체
+	// @brief 템플릿을 사용하여 기본 데이터 타입 및 산술 타입의 MySQL 입력 매개변수를 바인딩합니다.
+	// @param tValue 바인딩할 데이터 객체
+	// @return MYSQL_BIND 타입에 맞게 설정된 MYSQL_BIND 구조체
 	//***************************************************************************
 	template<typename T>
 	static MYSQL_BIND BindParam(const T& tValue)
@@ -243,7 +234,7 @@ public:
 
 	//***************************************************************************
 	// @brief 바인딩된 매개변수 중 동적 할당된 문자열 버퍼 및 길이 포인터의 메모리를 해제합니다.
-	// @param bind - 메모리를 해제할 대상 MYSQL_BIND 구조체 (값 전달 방식)
+	// @param bind 메모리를 해제할 대상 MYSQL_BIND 구조체
 	//***************************************************************************
 	static void ClearBindParam(MYSQL_BIND bind)
 	{
@@ -268,21 +259,21 @@ private:
 	void		StmtErrorQuery(MYSQL_STMT* pStmt, const char* pszFunc, const char* pszSQL, uint32 uiErrno = 0, const char* pszMessage = nullptr);
 
 private:
-	bool		m_bConnected;                                     // 데이터베이스 연결 상태 여부
-	bool		m_bInTransaction;	                              // 트랜잭션 진행 중 여부 (재연결 억제 판단용)
+	bool		m_bConnected;                                      // 데이터베이스 연결 상태 여부
+	bool		m_bInTransaction;                                  // 트랜잭션 진행 중 여부 (재연결 억제 판단용)
 
-	char		m_szDBHost[DATABASE_SERVER_NAME_STRLEN];          // 데이터베이스 서버 호스트 주소
-	char		m_szDBUserId[DATABASE_DSN_USER_ID_STRLEN];        // 데이터베이스 접속 사용자 ID
-	char		m_szDBPasswd[DATABASE_DSN_USER_PASSWORD_STRLEN];  // 데이터베이스 접속 비밀번호
-	char		m_szDBName[DATABASE_NAME_STRLEN];                 // 접속할 기본 데이터베이스 이름
+	char		m_szDBHost[DATABASE_SERVER_NAME_STRLEN];           // 데이터베이스 서버 호스트 주소
+	char		m_szDBUserId[DATABASE_DSN_USER_ID_STRLEN];         // 데이터베이스 접속 사용자 ID
+	char		m_szDBPasswd[DATABASE_DSN_USER_PASSWORD_STRLEN];   // 데이터베이스 접속 비밀번호
+	char		m_szDBName[DATABASE_NAME_STRLEN];                  // 접속할 기본 데이터베이스 이름
 
-	char		m_szCharacterSet[DATABASE_CHARACTERSET_STRLEN];   // 데이터베이스 문자셋 설정값
-	char		m_szSelectDBName[DATABASE_NAME_STRLEN];           // 현재 선택된 데이터베이스 이름
+	char		m_szCharacterSet[DATABASE_CHARACTERSET_STRLEN];    // 데이터베이스 문자셋 설정값
+	char		m_szSelectDBName[DATABASE_NAME_STRLEN];            // 현재 선택된 데이터베이스 이름
 
-	uint32		m_uiPort;                                         // 데이터베이스 서버 포트 번호
+	uint32		m_uiPort;                                          // 데이터베이스 서버 포트 번호
 
-	MYSQL*		m_pConn;		                                  // MySQL Connection 핸들러 객체 포인터
-	MYSQL_STMT* m_pStmt;		                                  // MySQL Prepared Statement 실행 관리 객체 포인터
+	MYSQL* m_pConn;                                           // MySQL Connection 핸들러 객체 포인터
+	MYSQL_STMT* m_pStmt;                                           // MySQL Prepared Statement 실행 관리 객체 포인터
 };
 
-#endif // ndef __BASEMYSQL_H__
+#endif // ndef UC_BASEMYSQL_H

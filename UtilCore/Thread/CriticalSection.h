@@ -4,12 +4,10 @@
 //
 //***************************************************************************
 
-#ifndef __CRITICALSECTION_H__
-#define __CRITICALSECTION_H__
+#ifndef UC_CRITICALSECTION_H
+#define UC_CRITICALSECTION_H
 
-#ifndef __BASEMACRO_H__
 #include <BaseMacro.h>
-#endif
 
 //***************************************************************************
 // @brief Windows 임계 구역(Critical Section)을 래핑하여 스레드 동기화를 제공하는 클래스입니다.
@@ -99,4 +97,4 @@ private:
 	CCriticalSection& m_criticalSection;
 };
 
-#endif // ndef __CRITICALSECTION_H__
+#endif // ndef UC_CRITICALSECTION_H

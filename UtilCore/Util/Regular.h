@@ -4,12 +4,10 @@
 //
 //***************************************************************************
 
-#ifndef __REGULAR_H__
-#define __REGULAR_H__
+#ifndef UC_REGULAR_H
+#define UC_REGULAR_H
 
-#ifndef	_INC_TCHAR
 #include <tchar.h>
-#endif
 
 bool	IsAllAscii(const TCHAR *ptszSource);
 bool	IsAllAlphaNum(const TCHAR *ptszSource);
@@ -24,4 +22,4 @@ bool	IsAllNumeric(const TCHAR *ptszSource);
 bool	IsCharacter(const int ch);
 bool	IsKoreanChar(const TCHAR ch);
 
-#endif // ndef __REGULAR_H__
+#endif // ndef UC_REGULAR_H

@@ -4,24 +4,13 @@
 //
 //***************************************************************************
 
-#ifndef __SPINLOCKQUEUE_H__
-#define __SPINLOCKQUEUE_H__
+#ifndef UC_SPINLOCKQUEUE_H
+#define UC_SPINLOCKQUEUE_H
 
-#ifndef __BASEREDEFINEDATATYPE_H__
 #include <BaseRedefineDataType.h>
-#endif
-
-#ifndef	__CONTAINERS_H__
-#include <Memory/Containers.h>
-#endif
-
-#ifndef __PLATFORMLOCK_H__
-#include <Thread/PlatformLock.h>
-#endif
-
-#ifndef	__QUEUECOMMON_H__
 #include <Containers/Queue/QueueCommon.h>
-#endif
+#include <Memory/Containers.h>
+#include <Thread/PlatformLock.h>
 
 //***************************************************************************
 // @class CSpinLockQueue
@@ -143,4 +132,4 @@ private:
     std::atomic<bool>       _stopped{ false };  // 종료 플래그 추가
 };
 
-#endif // ndef __SPINLOCKQUEUE_H__
+#endif // ndef UC_SPINLOCKQUEUE_H

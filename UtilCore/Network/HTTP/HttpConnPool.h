@@ -4,16 +4,11 @@
 //
 //***************************************************************************
 
-#ifndef __HTTPCONNPOOL_H__
-#define __HTTPCONNPOOL_H__
+#ifndef UC_HTTPCONNPOOL_H
+#define UC_HTTPCONNPOOL_H
 
-#ifndef	__HTTPCONNPOOLCOMMON_H__
 #include <Network/HTTP/HttpConnPoolCommon.h>
-#endif
-
-#ifndef	__DELAYEDTASKQUEUE_H__
 #include <Containers/Queue/DelayedTaskQueue.h>
-#endif
 
 #include <deque>
 #include <vector>
@@ -523,4 +518,4 @@ private:
 	std::thread _taskThread;                          // _delayedTaskQueue.ProcessExpiredTasks() 전용 스레드
 };
 
-#endif // ndef __HTTPCONNPOOL_H__
+#endif // ndef UC_HTTPCONNPOOL_H

@@ -4,8 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __ENDIAN_H__
-#define __ENDIAN_H__
+#ifndef UC_ENDIAN_H
+#define UC_ENDIAN_H
 
 #ifdef WIN32
 	typedef signed __int8 int8_t;
@@ -104,5 +104,5 @@ inline uint64_t ByteSwap8(const uint64_t InData)
 		((InData << 56) & 0xff00000000000000);
 }
 
-#endif // ndef __ENDIAN_H__
+#endif // ndef UC_ENDIAN_H
 

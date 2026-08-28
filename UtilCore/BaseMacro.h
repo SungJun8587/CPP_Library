@@ -4,10 +4,8 @@
 // 
 //***************************************************************************
 
-#ifndef __BASEMACRO_H__
-#define __BASEMACRO_H__
-
-#pragma once
+#ifndef UC_BASEMACRO_H
+#define UC_BASEMACRO_H
 
 //***************************************************************************
 // @brief 네임스페이스 영역을 시작합니다.
@@ -125,4 +123,4 @@
 #	endif
 #endif
 
-#endif // ndef __BASEMACRO_H__
+#endif // ndef UC_BASEMACRO_H

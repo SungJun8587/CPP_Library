@@ -4,20 +4,12 @@
 //
 //***************************************************************************
 
-#ifndef __RIOLISTENER_H__
-#define __RIOLISTENER_H__
+#ifndef UC_RIOLISTENER_H
+#define UC_RIOLISTENER_H
 
-#ifndef __RIO_COMMON_H__
-#include <Network/Rio/RioCommon.h>
-#endif
-
-#ifndef __RIO_CORE_H__
-#include <Network/Rio/RioCore.h>
-#endif
-
-#ifndef __NET_ADDRESS_H__
+#include <Network/RIO/RioCommon.h>
+#include <Network/RIO/RioCore.h>
 #include <Network/NetAddress.h>
-#endif
 
 #include <functional>
 #include <thread>
@@ -233,4 +225,4 @@ private:
     std::vector<std::thread> _acceptWorkers;                     // Accept 전용 IOCP를 소비하는 워커 스레드들
     std::vector<std::unique_ptr<RioAcceptContext>> _acceptContexts; // 상시 유지되는 AcceptContext Pool
 };
-#endif // ndef __RIOLISTENER_H__
+#endif // ndef UC_RIOLISTENER_H

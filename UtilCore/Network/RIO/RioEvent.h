@@ -4,16 +4,11 @@
 //
 //***************************************************************************
 
-#ifndef __RIOEVENT_H__
-#define __RIOEVENT_H__
+#ifndef UC_RIOEVENT_H
+#define UC_RIOEVENT_H
 
-#ifndef __RIOCOMMON_H__
 #include <Network/RIO/RioCommon.h>
-#endif
-
-#ifndef __RIOBUFFER_H__
 #include <Network/RIO/RioBuffer.h>
-#endif
 
 class CRioBuffer;
 
@@ -184,4 +179,4 @@ private:
 #endif
 };
 
-#endif // ndef __RIOEVENT_H__
+#endif // ndef UC_RIOEVENT_H

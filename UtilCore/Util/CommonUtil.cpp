@@ -71,8 +71,7 @@ void GetADOConnectionString(TCHAR* ptszConnStr, const EDBClass dbClass, const TC
 			// SQL Server OLE DB Provider 사용
 			portToUse = (nPort == 0) ? 1433 : nPort;
 
-			_sntprintf_s(ptszConnStr, DATABASE_DSN_STRLEN, _TRUNCATE,
-				_T("Provider=SQLOLEDB;Data Source=%s,%u;Initial Catalog=%s;User ID=%s;Password=%s;"),
+			_sntprintf_s(ptszConnStr, DATABASE_DSN_STRLEN, _TRUNCATE, _T("Provider=SQLOLEDB;Data Source=%s,%u;Initial Catalog=%s;User ID=%s;Password=%s;"),
 				ptszDBHost, portToUse, ptszDBName, ptszDBUserId, ptszDBPasswd);
 			break;
 
@@ -80,8 +79,7 @@ void GetADOConnectionString(TCHAR* ptszConnStr, const EDBClass dbClass, const TC
 			// MySQL OLE DB Provider (MyOLEDB) 사용
 			portToUse = (nPort == 0) ? 3306 : nPort;
 
-			_sntprintf_s(ptszConnStr, DATABASE_DSN_STRLEN, _TRUNCATE,
-				_T("Provider=MySQLProv;Data Source=%s;Port=%u;Database=%s;User ID=%s;Password=%s;Option=3;"),
+			_sntprintf_s(ptszConnStr, DATABASE_DSN_STRLEN, _TRUNCATE, _T("Provider=MySQLProv;Data Source=%s;Port=%u;Database=%s;User ID=%s;Password=%s;Option=3;"),
 				ptszDBHost, portToUse, ptszDBName, ptszDBUserId, ptszDBPasswd);
 			break;
 
@@ -90,14 +88,65 @@ void GetADOConnectionString(TCHAR* ptszConnStr, const EDBClass dbClass, const TC
 			// Data Source는 TNS 명칭 또는 [호스트]:[포트]/[서비스명] 형식
 			portToUse = (nPort == 0) ? 1521 : nPort;
 
-			_sntprintf_s(ptszConnStr, DATABASE_DSN_STRLEN, _TRUNCATE,
-				_T("Provider=OraOLEDB.Oracle;Data Source=%s:%u/%s;User ID=%s;Password=%s;"),
+			_sntprintf_s(ptszConnStr, DATABASE_DSN_STRLEN, _TRUNCATE, _T("Provider=OraOLEDB.Oracle;Data Source=%s:%u/%s;User ID=%s;Password=%s;"),
 				ptszDBHost, portToUse, ptszDBName, ptszDBUserId, ptszDBPasswd);
 			break;
 
 		default:
 			_tcscpy_s(ptszConnStr, DATABASE_DSN_STRLEN, _T(""));
 			break;
+	}
+}
+
+//***************************************************************************
+// @brief Redis 연결 문자열(URI)을 생성합니다.
+// @param ptszConnStr 생성된 연결 문자열이 저장될 버퍼
+// @param ptszDBHost 데이터베이스 호스트 주소
+// @param nPort 데이터베이스 포트 번호 (0 전달 시 기본값 6379 사용)
+// @param ptszDBUserId 데이터베이스 사용자 ID (Redis 6.0+ ACL 기능 사용 시)
+// @param ptszDBPasswd 데이터베이스 비밀번호
+// @param ptszDBName Redis DB 인덱스 문자열 (예: "0", "1" 등. NULL 또는 빈값 전달 시 0)
+//***************************************************************************
+void GetRedisConnectionString(TCHAR* ptszConnStr, const TCHAR* ptszDBHost, const unsigned int nPort, const TCHAR* ptszDBUserId, const TCHAR* ptszDBPasswd, const TCHAR* ptszDBName)
+{
+	ptszConnStr[0] = _T('\0');
+
+	// 기본 포트 설정 (0 전달 시 6379)
+	const unsigned int portToUse = (nPort == 0) ? 6379 : nPort;
+
+	// Redis DB 인덱스 처리 (ptszDBName 문자열을 숫자 인덱스로 변환)
+	unsigned int nDBIndex = 0;
+	if( ptszDBName != NULL && _tcslen(ptszDBName) > 0 )
+	{
+		nDBIndex = (unsigned int)_ttoi(ptszDBName);
+	}
+
+	const BOOL bHasPasswd = (ptszDBPasswd != NULL && _tcslen(ptszDBPasswd) > 0);
+	const BOOL bHasUser = (ptszDBUserId != NULL && _tcslen(ptszDBUserId) > 0);
+
+	if( bHasPasswd )
+	{
+		if( bHasUser )
+		{
+			// Redis 6.0+ ACL 인증 (사용자 ID + 비밀번호)
+			// 형식: redis://user:password@host:port/db_index
+			_sntprintf_s(ptszConnStr, DATABASE_DSN_STRLEN, _TRUNCATE, _T("redis://%s:%s@%s:%u/%u"), 
+				ptszDBUserId, ptszDBPasswd, ptszDBHost, portToUse, nDBIndex);
+		}
+		else
+		{
+			// 일반 AUTH 인증 (비밀번호만 존재)
+			// 형식: redis://:password@host:port/db_index
+			_sntprintf_s(ptszConnStr, DATABASE_DSN_STRLEN, _TRUNCATE, _T("redis://:%s@%s:%u/%u"), 
+				ptszDBPasswd, ptszDBHost, portToUse, nDBIndex);
+		}
+	}
+	else
+	{
+		// 인증 정보가 없는 경우
+		// 형식: redis://host:port/db_index
+		_sntprintf_s(ptszConnStr, DATABASE_DSN_STRLEN, _TRUNCATE, _T("redis://%s:%u/%u"), 
+			ptszDBHost, portToUse, nDBIndex);
 	}
 }
 

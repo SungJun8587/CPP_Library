@@ -4,20 +4,12 @@
 //
 //***************************************************************************
 
-#ifndef __BLOCKINGTASKQUEUE_H__
-#define __BLOCKINGTASKQUEUE_H__
+#ifndef UC_BLOCKINGTASKQUEUE_H
+#define UC_BLOCKINGTASKQUEUE_H
 
-#ifndef __BASEREDEFINEDATATYPE_H__
 #include <BaseRedefineDataType.h>
-#endif
-
-#ifndef	__CONTAINERS_H__
-#include <Memory/Containers.h>
-#endif
-
-#ifndef	__QUEUECOMMON_H__
 #include <Containers/Queue/QueueCommon.h>
-#endif
+#include <Memory/Containers.h>
 
 //***************************************************************************
 // @class CBlockingTaskQueue
@@ -138,4 +130,4 @@ private:
     std::atomic<bool>       _stopped{ false };          // 강제 종료 플래그
 };
 
-#endif // ndef __BLOCKINGTASKQUEUE_H__
+#endif // ndef UC_BLOCKINGTASKQUEUE_H

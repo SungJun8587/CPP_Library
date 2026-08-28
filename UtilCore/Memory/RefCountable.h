@@ -4,8 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __REFCOUNTABLE_H__
-#define __REFCOUNTABLE_H__
+#ifndef UC_REFCOUNTABLE_H
+#define UC_REFCOUNTABLE_H
 
 #include <cassert>
 #include <atomic>
@@ -483,4 +483,4 @@ private:
     RefControlBlock* _controlBlock = nullptr;// 유효성 검증용 제어 블록
 };
 
-#endif // __REFCOUNTABLE_H__
+#endif // ndef UC_REFCOUNTABLE_H

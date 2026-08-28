@@ -4,19 +4,13 @@
 //
 //***************************************************************************
 
-#ifndef __SMBIOSHARDWAREINFO_H__
-#define __SMBIOSHARDWAREINFO_H__
+#ifndef UC_SMBIOSHARDWAREINFO_H
+#define UC_SMBIOSHARDWAREINFO_H
 
 #include <tchar.h>
 #include <vector>
 
-//***************************************************************************
-// 하드웨어 정보 데이터 구조체(HWINFO_BIOS 등)는 SmHardwareInfo.h(non-WMI 버전)와
-// 공유하기 위해 HwInfoStructs.h로 이동했습니다.
-//***************************************************************************
-#ifndef __HWINFOSTRUCTS_H__
 #include <System/HwInfoStructs.h>
-#endif
 
 //***************************************************************************
 // @class CSmbiosBiosInfo
@@ -298,4 +292,4 @@ private:
     std::vector<HWINFO_HDDISK*> m_sHdDiskArray;
 };
 
-#endif // ndef __SMBIOSHARDWAREINFO_H__
+#endif // ndef UC_SMBIOSHARDWAREINFO_H

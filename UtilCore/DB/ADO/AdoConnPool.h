@@ -4,47 +4,33 @@
 // 
 //***************************************************************************
 
-#ifndef __ADOCONNPOOL_H__
-#define __ADOCONNPOOL_H__
+#ifndef UC_ADOCONNPOOL_H
+#define UC_ADOCONNPOOL_H
 
-#ifndef	__ALLOCATOR_H__
 #include <Memory/Allocator.h>
-#endif
-
-#ifndef __CONTAINERS_H__
 #include <Memory/Containers.h>
-#endif
-
-#ifndef __CACHEALIGNMENT_H__
 #include <Thread/CacheAlignment.h>
-#endif
-
-#ifndef __PLATFORMLOCK_H__
 #include <Thread/PlatformLock.h>
-#endif
-
-#ifndef __THREADMANAGER_H__
 #include <Thread/ThreadManager.h>
-#endif
-
-#ifndef __ADODB_H__
-#include <DB/AdoDB.h>
-#endif
-
-#ifndef __DELAYEDTASKQUEUE_H__
+#include <DB/ADO/AdoDB.h>
 #include <Containers/Queue/DelayedTaskQueue.h>
-#endif
 
+//***************************************************************************
+// @brief ADO 커넥션 풀을 관리하는 클래스
+// @detail 데이터베이스 커넥션의 생명주기, 자동 재연결, 헬스체크,
+//         지수 백오프 기반 타이머 재시도 및 자원 격리를 관리합니다.
+//***************************************************************************
 class CAdoConnPool : public BaseAllocator
 {
 private:
 	//***************************************************************************
-	// @struct TQuarantineItem
-	// @brief 참조 카운트가 남아 즉시 삭제하지 못하고 격리된 오래된 커넥션의 정보를 담는 구조체
+	// @brief 참조 카운트가 남아 즉시 삭제하지 못하고 격리된 오래된 커넥션 정보 구조체
+	// @detail 백그라운드에서 참조 카운트가 0이 되는 시점에 안전하게 해제하기 위한 정보를 담습니다.
+	//***************************************************************************
 	struct TQuarantineItem
 	{
-		CAdoDB* pConn;                  // 격리된 커넥션 객체 포인터
-		std::atomic<int32>* pRefCount;  // 해당 슬롯의 참조 카운트 변수 포인터
+		CAdoDB* pConn;                             // 격리된 커넥션 객체 포인터
+		std::atomic<int32>* pRefCount;             // 해당 슬롯의 참조 카운트 변수 포인터
 		std::chrono::steady_clock::time_point lastLogTime; // 마지막으로 경고 로그를 출력한 시각
 	};
 
@@ -52,8 +38,9 @@ private:
 
 public:
 	//***************************************************************************
-	// @struct TReconnectConfig
-	// @brief 재연결 워커 수 및 지수 백오프 정책을 정의하는 설정 구조체
+	// @brief 재연결 워커 수 및 지수 백오프 정책 설정 구조체
+	// @detail 재시도 동작 시 사용할 스레드 수 및 타이밍(Backoff, Jitter 등)을 설정합니다.
+	//***************************************************************************
 	struct TReconnectConfig
 	{
 		int32	nWorkerCount = 4;           // 재시도 작업을 처리할 백그라운드 워커 스레드 수
@@ -73,6 +60,10 @@ public:
 	void		ReleaseAdoConn(int32 nType);
 	CAdoDB* GetPooledConnUnsafe(int32 nType) const;
 
+	//***************************************************************************
+	// @brief 커넥션 풀의 최대 크기를 반환합니다.
+	// @return int32 설정된 커넥션 풀의 최대 슬롯 개수
+	//***************************************************************************
 	int32		GetMaxPoolSize(void) const { return _nMaxPoolSize; }
 	int32		PopFreeSlotIndex(void);
 
@@ -81,6 +72,12 @@ public:
 
 protected:
 	void		Clear(void);
+
+	//***************************************************************************
+	// @brief 지정한 슬롯 인덱스가 유효한 범위 내에 있는지 검사합니다.
+	// @param nType 검사할 커넥션 슬롯 인덱스
+	// @return bool 인덱스가 유효하면 true, 그렇지 않으면 false
+	//***************************************************************************
 	bool		IsValidIndex(int32 nType) const { return nType >= 0 && nType < _nMaxPoolSize; }
 	static bool	ValidateReconnectConfig(const TReconnectConfig& cfg);
 
@@ -152,19 +149,24 @@ protected:
 
 	std::mutex					_reconnectQueueMutex;       // 재접속 대기열 접근 동기화 뮤텍스
 	std::condition_variable		_reconnectQueueCv;          // 재접속 대기열 조건 변수
-	CQueue<int32>				_reconnectPendingSlots;		// 재접속 대기 중인 슬롯 인덱스 큐
+	CQueue<int32>				_reconnectPendingSlots;     // 재접속 대기 중인 슬롯 인덱스 큐
 
 	// 자원 격리(Quarantine) 관련 멤버
 	PLock						_globalQuarantineLock;      // 격리 큐 보호용 단독 락
-	CQueue<TQuarantineItem>		_quarantineQueue;			// 좀비 커넥션 격리 큐
+	CQueue<TQuarantineItem>		_quarantineQueue;           // 좀비 커넥션 격리 큐
 };
 
 //***************************************************************************
-// @class AdoConnGuard
-// @brief RAII 패턴을 사용하여 ADO 커넥션 슬롯의 획득과 자동 반환을 보장하는 스마트 가드 클래스
+// @brief RAII 패턴 기반 ADO 커넥션 가드 클래스
+// @detail 커넥션 풀에서 커넥션 슬롯을 안전하게 할당받고, 스코프를 벗어날 때 자동으로 반환합니다.
+//***************************************************************************
 class AdoConnGuard
 {
 public:
+	//***************************************************************************
+	// @brief AdoConnGuard 객체를 생성하고 대상 풀에서 사용 가능한 커넥션을 자동으로 할당받습니다.
+	// @param pPool 할당을 요청할 CAdoConnPool 객체의 포인터
+	//***************************************************************************
 	explicit AdoConnGuard(CAdoConnPool* pPool)
 		: _pPool(pPool), _pConn(nullptr), _nAllocatedIndex(-1)
 	{
@@ -184,6 +186,9 @@ public:
 		}
 	}
 
+	//***************************************************************************
+	// @brief AdoConnGuard 소멸자로, 대여했던 커넥션 슬롯을 커넥션 풀에 자동으로 반환합니다.
+	//***************************************************************************
 	~AdoConnGuard() noexcept
 	{
 		if( _pPool != nullptr && _nAllocatedIndex != -1 && _pConn != nullptr )
@@ -192,18 +197,39 @@ public:
 		}
 	}
 
+	//***************************************************************************
+	// @brief 관리 중인 CAdoDB 포인터에 접근하기 위한 멤버 접근 연산자
+	// @return CAdoDB* 관리 중인 CAdoDB 객체 포인터
+	//***************************************************************************
 	CAdoDB* operator->() const noexcept { return _pConn; }
+
+	//***************************************************************************
+	// @brief 관리 중인 CAdoDB 포인터 원본을 반환합니다.
+	// @return CAdoDB* 관리 중인 CAdoDB 객체 포인터
+	//***************************************************************************
 	CAdoDB* get() const noexcept { return _pConn; }
+
+	//***************************************************************************
+	// @brief 커넥션 포인터가 nullptr인지 확인합니다.
+	// @param nullptr
+	// @return bool 포인터가 nullptr이면 true, 아니면 false
+	//***************************************************************************
 	bool operator==(std::nullptr_t) const noexcept { return _pConn == nullptr; }
+
+	//***************************************************************************
+	// @brief 커넥션 포인터가 유효한지(nullptr가 아닌지) 확인합니다.
+	// @param nullptr
+	// @return bool 포인터가 nullptr가 아니면 true, 맞으면 false
+	//***************************************************************************
 	bool operator!=(std::nullptr_t) const noexcept { return _pConn != nullptr; }
 
 	AdoConnGuard(const AdoConnGuard&) = delete;
 	AdoConnGuard& operator=(const AdoConnGuard&) = delete;
 
 private:
-	CAdoConnPool*	_pPool;				// 관리 대상 커넥션 풀 포인터
+	CAdoConnPool*	_pPool;             // 관리 대상 커넥션 풀 포인터
 	CAdoDB*			_pConn;             // 대여된 ADO 커넥션 포인터
 	int32			_nAllocatedIndex;   // 할당받은 풀 슬롯 인덱스
 };
 
-#endif // ndef __ADOCONNPOOL_H__
+#endif // ndef UC_ADOCONNPOOL_H

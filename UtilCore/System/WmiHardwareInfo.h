@@ -4,30 +4,15 @@
 //
 //***************************************************************************
 
-#ifndef __WMIHARDWAREINFO_H__
-#define __WMIHARDWAREINFO_H__
+#ifndef UC_WMIHARDWAREINFO_H
+#define UC_WMIHARDWAREINFO_H
 
 #include <vector>
 
-#ifndef __SYSTEMBASEDEFINE_H__
 #include <System/SystemBaseDefine.h>
-#endif
-
-#ifndef __WMI_H__
 #include <System/Wmi.h>
-#endif
-
-#ifndef __OSINFO_H__
 #include <System/OsInfo.h>
-#endif
-
-//***************************************************************************
-// 하드웨어 정보 데이터 구조체(HWINFO_BIOS 등)는 SmHardwareInfo.h(non-WMI 버전)와
-// 공유하기 위해 HwInfoStructs.h로 이동했습니다.
-//***************************************************************************
-#ifndef __HWINFOSTRUCTS_H__
 #include <System/HwInfoStructs.h>
-#endif
 
 //***************************************************************************
 // @brief 바이트 단위의 정수 데이터를 읽기 좋은 데이터 크기 포맷 문자열로 변환합니다.
@@ -705,4 +690,4 @@ private:
 	std::vector<HWINFO_PCIDEVICE*> m_sPciArray; // PCI 장치 정보 포인터 배열
 };
 
-#endif // ndef __WMIHARDWAREINFO_H__
+#endif // ndef UC_WMIHARDWAREINFO_H

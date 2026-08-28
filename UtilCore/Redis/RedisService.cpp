@@ -16,7 +16,7 @@
 // @param iocpCore IOCP 코어 참조 객체
 // @param pJobQueue 결과를 전달받을 메인/대상 스레드의 JobQueue 객체 포인터
 //***************************************************************************
-CRedisService::CRedisService(CIocpCoreRef iocpCore, std::shared_ptr<CJobQueue> pJobQueue)
+CRedisService::CRedisService(CIocpCoreRef iocpCore, CJobQueueRef pJobQueue)
 	: _jobQueue(pJobQueue)
 {
 	_pool = std::make_shared<CRedisConnectionPool>(iocpCore);

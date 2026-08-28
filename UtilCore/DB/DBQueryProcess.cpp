@@ -1,5 +1,4 @@
-﻿
-//***************************************************************************
+﻿//***************************************************************************
 // DBQueryProcess.cpp: implementation of the Database Query Process.
 //
 //***************************************************************************
@@ -11,12 +10,19 @@
 // Construction/Destruction
 //***************************************************************************
 
+//***************************************************************************
+// @brief 소멸자
+//***************************************************************************
 CDBQueryProcess::~CDBQueryProcess()
 {
 }
 
 //***************************************************************************
-//
+// @brief DB 시스템 정보 조회
+// @param iSystemCount 조회된 시스템 정보 개수
+// @param pDBSystemInfo 조회된 DB 시스템 정보
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::GetDBSystemInfo(int32& iSystemCount, std::unique_ptr<DB_SYSTEM_INFO>& pDBSystemInfo)
 {
 	_tstring query;
@@ -50,7 +56,11 @@ bool CDBQueryProcess::GetDBSystemInfo(int32& iSystemCount, std::unique_ptr<DB_SY
 }
 
 //***************************************************************************
-//  
+// @brief DB 시스템 데이터 타입 정보 조회
+// @param iDatatypeCount 데이터 타입 개수
+// @param pDBSystemDataType 데이터 타입 정보 배열
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::GetDBSystemDataTypeInfo(int& iDatatypeCount, std::unique_ptr<DB_SYSTEM_DATATYPE[]>& pDBSystemDataType)
 {
 	_tstring query = _T("");
@@ -114,7 +124,11 @@ bool CDBQueryProcess::GetDBSystemDataTypeInfo(int& iDatatypeCount, std::unique_p
 }
 
 //***************************************************************************
-//
+// @brief 데이터베이스 목록 조회
+// @param iDBCount 데이터베이스 개수
+// @param pDatabase 데이터베이스 정보 배열
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::GetDatabaseList(int& iDBCount, std::unique_ptr<DB_INFO[]>& pDatabase)
 {
 	_tstring query = _T("");
@@ -173,7 +187,12 @@ bool CDBQueryProcess::GetDatabaseList(int& iDBCount, std::unique_ptr<DB_INFO[]>&
 }
 
 //***************************************************************************
-//
+// @brief MSSQL RowStore 인덱스 조각화 상태 점검
+// @param ptszTableName 대상 테이블명
+// @param iIndexCount 인덱스 개수
+// @param pIndexFragmentation 인덱스 조각화 정보 배열
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::MSSQLGetRowStoreIndexFragmentationCheck(const TCHAR* ptszTableName, int32& iIndexCount, std::unique_ptr<MSSQL_INDEX_FRAGMENTATION[]>& pIndexFragmentation)
 {
 	_tstring query = _T("");
@@ -250,7 +269,12 @@ bool CDBQueryProcess::MSSQLGetRowStoreIndexFragmentationCheck(const TCHAR* ptszT
 }
 
 //***************************************************************************
-//
+// @brief MSSQL ColumnStore 인덱스 조각화 상태 점검
+// @param ptszTableName 대상 테이블명
+// @param iIndexCount 인덱스 개수
+// @param pIndexFragmentation 인덱스 조각화 정보 배열
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::MSSQLGetColumnStoreIndexFragmentationCheck(const TCHAR* ptszTableName, int32& iIndexCount, std::unique_ptr<MSSQL_INDEX_FRAGMENTATION[]>& pIndexFragmentation)
 {
 	_tstring query = _T("");
@@ -331,7 +355,13 @@ bool CDBQueryProcess::MSSQLGetColumnStoreIndexFragmentationCheck(const TCHAR* pt
 }
 
 //***************************************************************************
-//  
+// @brief MSSQL 인덱스 옵션 설정
+// @param ptszSchemaName 스키마명
+// @param ptszTableName 테이블명
+// @param ptszIndexName 인덱스명
+// @param indexOptions 설정할 인덱스 옵션 맵
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::MSSQLIndexOptionSet(const TCHAR* ptszSchemaName, const TCHAR* ptszTableName, const TCHAR* ptszIndexName, unordered_map<_tstring, _tstring> indexOptions)
 {
 	if( _dbClass != EDBClass::MSSQL ) return false;
@@ -350,7 +380,13 @@ bool CDBQueryProcess::MSSQLIndexOptionSet(const TCHAR* ptszSchemaName, const TCH
 }
 
 //***************************************************************************
-//  
+// @brief MSSQL 옵션 없는 인덱스 조각화 모드 변경 (REBUILD/REORGANIZE)
+// @param ptszSchemaName 스키마명
+// @param ptszTableName 테이블명
+// @param ptszIndexName 인덱스명
+// @param indexFragmentation 변경할 조각화 작업 종류
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::MSSQLAlterIndexFragmentationNonOption(const TCHAR* ptszSchemaName, const TCHAR* ptszTableName, const TCHAR* ptszIndexName, const EMSSQLIndexFragmentation indexFragmentation)
 {
 	if( _dbClass != EDBClass::MSSQL ) return false;
@@ -369,7 +405,14 @@ bool CDBQueryProcess::MSSQLAlterIndexFragmentationNonOption(const TCHAR* ptszSch
 }
 
 //***************************************************************************
-//  
+// @brief MSSQL 옵션을 포함한 인덱스 조각화 모드 변경
+// @param ptszSchemaName 스키마명
+// @param ptszTableName 테이블명
+// @param ptszIndexName 인덱스명
+// @param indexFragmentation 변경할 조각화 작업 종류
+// @param indexOptions 설정할 인덱스 옵션 맵
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::MSSQLAlterIndexFragmentationOption(const TCHAR* ptszSchemaName, const TCHAR* ptszTableName, const TCHAR* ptszIndexName, const EMSSQLIndexFragmentation indexFragmentation, unordered_map<_tstring, _tstring> indexOptions)
 {
 	if( _dbClass != EDBClass::MSSQL ) return false;
@@ -388,7 +431,11 @@ bool CDBQueryProcess::MSSQLAlterIndexFragmentationOption(const TCHAR* ptszSchema
 }
 
 //***************************************************************************
-//  
+// @brief MSSQL 저장프로시저, 함수 등의 DDL 스크립트(HelpText) 조회
+// @param dbObject DB 객체 종류
+// @param ptszObjectName 객체 이름
+// @return 스크립트 문자열
+//***************************************************************************
 _tstring CDBQueryProcess::MSSQLHelpText(const EDBObjectType dbObject, const TCHAR* ptszObjectName)
 {
 	_tstring query;
@@ -431,7 +478,12 @@ _tstring CDBQueryProcess::MSSQLHelpText(const EDBObjectType dbObject, const TCHA
 }
 
 //***************************************************************************
-//
+// @brief MSSQL 테이블 또는 컬럼 이름 변경
+// @param ptszObjectName 기존 객체명
+// @param ptszChgObjectName 변경할 객체명
+// @param renameObjectType 변경 대상 타입
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::MSSQLRenameObject(const TCHAR* ptszObjectName, const TCHAR* ptszChgObjectName, const EMSSQLRenameObjectType renameObjectType)
 {
 	_tstring query;
@@ -452,7 +504,12 @@ bool CDBQueryProcess::MSSQLRenameObject(const TCHAR* ptszObjectName, const TCHAR
 }
 
 //***************************************************************************
-//
+// @brief MSSQL 테이블/컬럼 주석 조회
+// @param ptszSchemaName 스키마명
+// @param ptszTableName 테이블명
+// @param ptszColumnName 컬럼명
+// @return 주석 내용
+//***************************************************************************
 _tstring CDBQueryProcess::MSSQLGetTableColumnComment(const TCHAR* ptszSchemaName, const TCHAR* ptszTableName, const TCHAR* ptszColumnName)
 {
 	_tstring ret;
@@ -483,7 +540,13 @@ _tstring CDBQueryProcess::MSSQLGetTableColumnComment(const TCHAR* ptszSchemaName
 }
 
 //***************************************************************************
-//
+// @brief MSSQL 테이블/컬럼 주석 추가/수정/삭제 처리
+// @param ptszSchemaName 스키마명
+// @param ptszTableName 테이블명
+// @param ptszColumnName 컬럼명
+// @param ptszComment 주석 내용
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::MSSQLProcessTableColumnComment(const TCHAR* ptszSchemaName, const TCHAR* ptszTableName, const TCHAR* ptszColumnName, const TCHAR* ptszComment)
 {
 	if( _dbClass != EDBClass::MSSQL ) return false;
@@ -537,7 +600,12 @@ bool CDBQueryProcess::MSSQLProcessTableColumnComment(const TCHAR* ptszSchemaName
 }
 
 //***************************************************************************
-//
+// @brief MSSQL 저장프로시저/파라미터 주석 조회
+// @param ptszSchemaName 스키마명
+// @param ptszProcName 프로시저명
+// @param ptszProcParam 파라미터명
+// @return 주석 내용
+//***************************************************************************
 _tstring CDBQueryProcess::MSSQLGetProcedureParamComment(const TCHAR* ptszSchemaName, const TCHAR* ptszProcName, const TCHAR* ptszProcParam)
 {
 	_tstring ret;
@@ -568,7 +636,13 @@ _tstring CDBQueryProcess::MSSQLGetProcedureParamComment(const TCHAR* ptszSchemaN
 }
 
 //***************************************************************************
-//
+// @brief MSSQL 저장프로시저/파라미터 주석 추가/수정/삭제 처리
+// @param ptszSchemaName 스키마명
+// @param ptszProcName 프로시저명
+// @param ptszProcParam 파라미터명
+// @param ptszComment 주석 내용
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::MSSQLProcessProcedureParamComment(const TCHAR* ptszSchemaName, const TCHAR* ptszProcName, const TCHAR* ptszProcParam, const TCHAR* ptszComment)
 {
 	if( _dbClass != EDBClass::MSSQL ) return false;
@@ -622,7 +696,12 @@ bool CDBQueryProcess::MSSQLProcessProcedureParamComment(const TCHAR* ptszSchemaN
 }
 
 //***************************************************************************
-//
+// @brief MSSQL 함수/파라미터 주석 조회
+// @param ptszSchemaName 스키마명
+// @param ptszFuncName 함수명
+// @param ptszFuncParam 파라미터명
+// @return 주석 내용
+//***************************************************************************
 _tstring CDBQueryProcess::MSSQLGetFunctionParamComment(const TCHAR* ptszSchemaName, const TCHAR* ptszFuncName, const TCHAR* ptszFuncParam)
 {
 	_tstring ret;
@@ -653,7 +732,13 @@ _tstring CDBQueryProcess::MSSQLGetFunctionParamComment(const TCHAR* ptszSchemaNa
 }
 
 //***************************************************************************
-//
+// @brief MSSQL 함수/파라미터 주석 추가/수정/삭제 처리
+// @param ptszSchemaName 스키마명
+// @param ptszFuncName 함수명
+// @param ptszFuncParam 파라미터명
+// @param ptszComment 주석 내용
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::MSSQLProcessFunctionParamComment(const TCHAR* ptszSchemaName, const TCHAR* ptszFuncName, const TCHAR* ptszFuncParam, const TCHAR* ptszComment)
 {
 	if( _dbClass != EDBClass::MSSQL ) return false;
@@ -707,7 +792,10 @@ bool CDBQueryProcess::MSSQLProcessFunctionParamComment(const TCHAR* ptszSchemaNa
 }
 
 //***************************************************************************
-//
+// @brief MSSQL 확장 속성 조회
+// @param extendedProperty 확장 속성 정보 구조체
+// @return 속성 값 문자열
+//***************************************************************************
 _tstring CDBQueryProcess::MSSQLGetExtendedProperty(const MSSQL_ExtendedProperty extendedProperty)
 {
 	_tstring query = _T("");
@@ -773,7 +861,10 @@ _tstring CDBQueryProcess::MSSQLGetExtendedProperty(const MSSQL_ExtendedProperty 
 }
 
 //***************************************************************************
-//
+// @brief MSSQL 확장 속성 추가
+// @param extendedProperty 확장 속성 정보 구조체
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::MSSQLAddExtendedProperty(const MSSQL_ExtendedProperty extendedProperty)
 {
 	_tstring query = _T("");
@@ -830,7 +921,10 @@ bool CDBQueryProcess::MSSQLAddExtendedProperty(const MSSQL_ExtendedProperty exte
 }
 
 //***************************************************************************
-//
+// @brief MSSQL 확장 속성 수정
+// @param extendedProperty 확장 속성 정보 구조체
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::MSSQLUpdateExtendedProperty(const MSSQL_ExtendedProperty extendedProperty)
 {
 	_tstring query = _T("");
@@ -887,7 +981,10 @@ bool CDBQueryProcess::MSSQLUpdateExtendedProperty(const MSSQL_ExtendedProperty e
 }
 
 //***************************************************************************
-//
+// @brief MSSQL 확장 속성 삭제
+// @param extendedProperty 확장 속성 정보 구조체
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::MSSQLDropExtendedProperty(const MSSQL_ExtendedProperty extendedProperty)
 {
 	_tstring query = _T("");
@@ -942,7 +1039,12 @@ bool CDBQueryProcess::MSSQLDropExtendedProperty(const MSSQL_ExtendedProperty ext
 }
 
 //***************************************************************************
-//
+// @brief MYSQL 캐릭터셋 목록 조회
+// @param ptszCharset 검색할 캐릭터셋 이름
+// @param iCharsetCount 캐릭터셋 개수
+// @param pCharacterSet 캐릭터셋 정보 배열
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::MYSQLGetCharacterSets(const TCHAR* ptszCharset, int32& iCharsetCount, std::unique_ptr<MYSQL_CHARACTER_SET[]>& pCharacterSet)
 {
 	_tstring query = _T("");
@@ -1004,7 +1106,12 @@ bool CDBQueryProcess::MYSQLGetCharacterSets(const TCHAR* ptszCharset, int32& iCh
 }
 
 //***************************************************************************
-//
+// @brief MYSQL Collation 목록 조회
+// @param ptszCharset 검색할 캐릭터셋 이름
+// @param iCharsetCount Collation 개수
+// @param pCollation Collation 정보 배열
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::MYSQLGetCollations(const TCHAR* ptszCharset, int32& iCharsetCount, std::unique_ptr<MYSQL_COLLATION[]>& pCollation)
 {
 	_tstring query = _T("");
@@ -1070,7 +1177,12 @@ bool CDBQueryProcess::MYSQLGetCollations(const TCHAR* ptszCharset, int32& iChars
 }
 
 //***************************************************************************
-//
+// @brief MYSQL 캐릭터셋 적용 가능한 Collation 목록 조회
+// @param ptszCharset 검색할 캐릭터셋 이름
+// @param iCharsetCount 개수
+// @param pCharacterSetCollation 캐릭터셋 Collation 매핑 정보 배열
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::MYSQLGetCharacterSetCollations(const TCHAR* ptszCharset, int32& iCharsetCount, std::unique_ptr<MYSQL_CHARACTER_SET_COLLATION[]>& pCharacterSetCollation)
 {
 	_tstring query = _T("");
@@ -1130,7 +1242,11 @@ bool CDBQueryProcess::MYSQLGetCharacterSetCollations(const TCHAR* ptszCharset, i
 }
 
 //***************************************************************************
-//
+// @brief MYSQL 스토리지 엔진 목록 조회
+// @param iStorageEngineCount Engine 개수
+// @param pStorageEngine 스토리지 엔진 정보 배열
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::MYSQLGetStorageEngines(int32& iStorageEngineCount, std::unique_ptr<MYSQL_STORAGE_ENGINE[]>& pStorageEngine)
 {
 	_tstring query = _T("");
@@ -1192,7 +1308,13 @@ bool CDBQueryProcess::MYSQLGetStorageEngines(int32& iStorageEngineCount, std::un
 }
 
 //***************************************************************************
-//
+// @brief MYSQL 테이블 옵션 변경 (CharacterSet, Collation, Engine)
+// @param ptszTableName 테이블명
+// @param ptszCharacterSet 캐릭터셋
+// @param ptszCollation 데이터 정렬
+// @param ptszEngine 스토리지 엔진
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::MYSQLAlterTable(const TCHAR* ptszTableName, const TCHAR* ptszCharacterSet, const TCHAR* ptszCollation, const TCHAR* ptszEngine)
 {
 	if( _dbClass != EDBClass::MYSQL ) return false;
@@ -1211,7 +1333,12 @@ bool CDBQueryProcess::MYSQLAlterTable(const TCHAR* ptszTableName, const TCHAR* p
 }
 
 //***************************************************************************
-//
+// @brief MYSQL 테이블 Collation 변경
+// @param ptszTableName 테이블명
+// @param ptszCharacterSet 캐릭터셋
+// @param ptszCollation 데이터 정렬
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::MYSQLAlterTableCollation(const TCHAR* ptszTableName, const TCHAR* ptszCharacterSet, const TCHAR* ptszCollation)
 {
 	if( _dbClass != EDBClass::MYSQL ) return false;
@@ -1230,7 +1357,12 @@ bool CDBQueryProcess::MYSQLAlterTableCollation(const TCHAR* ptszTableName, const
 }
 
 //***************************************************************************
-//
+// @brief MYSQL 테이블 조각화 상태 점검
+// @param ptszTableName 테이블명
+// @param iTableCount 테이블 개수
+// @param pTableFragmentation 테이블 조각화 정보 배열
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::MYSQLGetTableFragmentationCheck(const TCHAR* ptszTableName, int32& iTableCount, std::unique_ptr<MYSQL_TABLE_FRAGMENTATION[]>& pTableFragmentation)
 {
 	_tstring query = _T("");
@@ -1290,7 +1422,10 @@ bool CDBQueryProcess::MYSQLGetTableFragmentationCheck(const TCHAR* ptszTableName
 }
 
 //***************************************************************************
-//
+// @brief MYSQL 테이블 최적화 (OPTIMIZE TABLE)
+// @param ptszTableName 테이블명
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::MYSQLOptimizeTable(const TCHAR* ptszTableName)
 {
 	if( _dbClass != EDBClass::MYSQL ) return false;
@@ -1309,7 +1444,10 @@ bool CDBQueryProcess::MYSQLOptimizeTable(const TCHAR* ptszTableName)
 }
 
 //***************************************************************************
-//
+// @brief MYSQL 테이블 생성 쿼리(SHOW CREATE TABLE) 조회
+// @param ptszTableName 테이블명
+// @return 생성 쿼리 문자열
+//***************************************************************************
 _tstring CDBQueryProcess::MYSQLShowTable(const TCHAR* ptszTableName)
 {
 	_tstring query = _T("");
@@ -1350,7 +1488,11 @@ _tstring CDBQueryProcess::MYSQLShowTable(const TCHAR* ptszTableName)
 }
 
 //***************************************************************************
-//
+// @brief MYSQL 객체 생성 쿼리(SHOW CREATE ...) 조회
+// @param dbObject DB 객체 종류
+// @param ptszObjectName 객체명
+// @return 생성 쿼리 문자열
+//***************************************************************************
 _tstring CDBQueryProcess::MYSQLShowObject(const EDBObjectType dbObject, const TCHAR* ptszObjectName)
 {
 	_tstring query = _T("");
@@ -1400,7 +1542,19 @@ _tstring CDBQueryProcess::MYSQLShowObject(const EDBObjectType dbObject, const TC
 }
 
 //***************************************************************************
-//
+// @brief MYSQL 테이블/컬럼 이름 및 데이터 타입 속성 변경
+// @param ptszTableName 테이블명
+// @param ptszChgName 변경할 이름
+// @param ptszColumnName 대상 컬럼명
+// @param ptszDataTypeDesc 데이터 타입 표현식
+// @param bIsNullable Null 허용 여부
+// @param ptszDefaultDefinition 기본값 표현식
+// @param bIsIdentity Identity 여부
+// @param ptszCharacterSet 캐릭터셋
+// @param ptszCollation 데이터 정렬
+// @param ptszComment 코멘트 내용
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::MYSQLRenameObject(const TCHAR* ptszTableName, const TCHAR* ptszChgName, const TCHAR* ptszColumnName, const TCHAR* ptszDataTypeDesc, bool bIsNullable, const TCHAR* ptszDefaultDefinition, bool bIsIdentity, const TCHAR* ptszCharacterSet, const TCHAR* ptszCollation, const TCHAR* ptszComment)
 {
 	if( _dbClass != EDBClass::MYSQL ) return false;
@@ -1419,9 +1573,14 @@ bool CDBQueryProcess::MYSQLRenameObject(const TCHAR* ptszTableName, const TCHAR*
 }
 
 //***************************************************************************
+// @brief MYSQL 테이블/컬럼 주석 조회
+// @param ptszTableName 테이블명
+// @param ptszColumnName 컬럼명
+// @return 주석 내용
 // Ex)
 //	SELECT `TABLE_COMMENT` AS `tableComment` FROM INFORMATION_SCHEMA.TABLES WHERE `TABLE_SCHEMA` = DATABASE() AND `TABLE_NAME` = 'tbl_table1';
 //	SELECT `COLUMN_COMMENT` AS `columncomment` FROM INFORMATION_SCHEMA.COLUMNS WHERE `TABLE_SCHEMA` = DATABASE() AND `TABLE_NAME` = 'tbl_table1' AND `COLUMN_NAME` = 'Id';
+//***************************************************************************
 _tstring CDBQueryProcess::MYSQLGetTableColumnComment(const TCHAR* ptszTableName, const TCHAR* ptszColumnName)
 {
 	_tstring query = _T("");
@@ -1470,9 +1629,21 @@ _tstring CDBQueryProcess::MYSQLGetTableColumnComment(const TCHAR* ptszTableName,
 }
 
 //***************************************************************************
+// @brief MYSQL 테이블/컬럼 주석 추가/수정/삭제 처리
+// @param ptszTableName 테이블명
+// @param ptszColumnName 컬럼명
+// @param ptszDataTypeDesc 데이터 타입
+// @param bIsNullable Null 허용 여부
+// @param ptszDefaultDefinition 기본값 정의
+// @param bIsIdentity Identity 여부
+// @param ptszCharacterSet 캐릭터셋
+// @param ptszCollation 데이터 정렬
+// @param ptszComment 코멘트 내용
+// @return 성공 여부
 // Ex)
 //	ALTER TABLE `tbl_table1` COMMENT '테스트 테이블';
 //  ALTER TABLE `tbl_table1` MODIFY `Id` VARCHAR(50) NOT NULL COMMENT '아이디';
+//***************************************************************************
 bool CDBQueryProcess::MYSQLProcessTableColumnComment(const TCHAR* ptszTableName, const TCHAR* ptszColumnName, const TCHAR* ptszDataTypeDesc, bool bIsNullable, const TCHAR* ptszDefaultDefinition, bool bIsIdentity, const TCHAR* ptszCharacterSet, const TCHAR* ptszCollation, const TCHAR* ptszComment)
 {
 	if( _dbClass != EDBClass::MYSQL ) return false;
@@ -1492,8 +1663,12 @@ bool CDBQueryProcess::MYSQLProcessTableColumnComment(const TCHAR* ptszTableName,
 }
 
 //***************************************************************************
+// @brief MYSQL 저장프로시저 주석 조회
+// @param ptszProcName 프로시저명
+// @return 주석 내용
 // Ex)
 //	SELECT `ROUTINE_COMMENT` AS `procComment` FROM INFORMATION_SCHEMA.ROUTINES WHERE `ROUTINE_SCHEMA` = DATABASE() AND `ROUTINE_TYPE` = 'PROCEDURE' AND `ROUTINE_NAME` = 'sp_procedure1';
+//***************************************************************************
 _tstring CDBQueryProcess::MYSQLGetProcedureComment(const TCHAR* ptszProcName)
 {
 	_tstring query = _T("");
@@ -1542,8 +1717,13 @@ _tstring CDBQueryProcess::MYSQLGetProcedureComment(const TCHAR* ptszProcName)
 }
 
 //***************************************************************************
+// @brief MYSQL 저장프로시저 주석 변경
+// @param ptszProcName 프로시저명
+// @param ptszComment 주석 내용
+// @return 성공 여부
 // Ex)
 //	ALTER PROCEDURE `sp_procedure1` COMMENT '테스트 저장프로시저';
+//***************************************************************************
 bool CDBQueryProcess::MYSQLProcessProcedureComment(const TCHAR* ptszProcName, const TCHAR* ptszComment)
 {
 	if( _dbClass != EDBClass::MYSQL ) return false;
@@ -1563,8 +1743,12 @@ bool CDBQueryProcess::MYSQLProcessProcedureComment(const TCHAR* ptszProcName, co
 }
 
 //***************************************************************************
+// @brief MYSQL 함수 주석 조회
+// @param ptszFuncName 함수명
+// @return 주석 내용
 // Ex)
 //	SELECT `ROUTINE_COMMENT` AS `funcComment` FROM INFORMATION_SCHEMA.ROUTINES WHERE `ROUTINE_SCHEMA` = DATABASE() AND `ROUTINE_TYPE` = 'FUNCTION' AND `ROUTINE_NAME` = 'sp_function1';
+//***************************************************************************
 _tstring CDBQueryProcess::MYSQLGetFunctionComment(const TCHAR* ptszFuncName)
 {
 	_tstring query = _T("");
@@ -1613,8 +1797,13 @@ _tstring CDBQueryProcess::MYSQLGetFunctionComment(const TCHAR* ptszFuncName)
 }
 
 //***************************************************************************
+// @brief MYSQL 함수 주석 변경
+// @param ptszFuncName 함수명
+// @param ptszComment 주석 내용
+// @return 성공 여부
 // Ex)
 //	ALTER FUNCTION `sp_function1` COMMENT '테스트 함수';
+//***************************************************************************
 bool CDBQueryProcess::MYSQLProcessFunctionComment(const TCHAR* ptszFuncName, const TCHAR* ptszComment)
 {
 	if( _dbClass != EDBClass::MYSQL ) return false;
@@ -1634,9 +1823,15 @@ bool CDBQueryProcess::MYSQLProcessFunctionComment(const TCHAR* ptszFuncName, con
 }
 
 //***************************************************************************
+// @brief ORACLE 테이블/컬럼 주석 변경
+// @param ptszTableName 테이블명
+// @param ptszColumnName 컬럼명
+// @param ptszDescription 주석 내용
+// @return 성공 여부
 // Ex)
 //	COMMENT ON TABLE 테이블명 IS '코멘트';
 //  COMMENT ON COLUMN 테이블명.컬럼명 IS '코멘트';
+//***************************************************************************
 bool CDBQueryProcess::ORACLEProcessTableColumnComment(const TCHAR* ptszTableName, const TCHAR* ptszColumnName, const TCHAR* ptszDescription)
 {
 	if( _dbClass != EDBClass::ORACLE ) return false;
@@ -1656,9 +1851,15 @@ bool CDBQueryProcess::ORACLEProcessTableColumnComment(const TCHAR* ptszTableName
 }
 
 //***************************************************************************
+// @brief ORACLE 메타데이터 DDL 구문 추출
+// @param dbObject DB 객체 종류
+// @param ptszObjectName 객체명
+// @param ptszSchemaName 스키마명
+// @return DDL 문자열
 // Ex)
 //  SELECT DBMS_METADATA.GET_DDL('TABLE', '테이블명') SCRIPT FROM DUAL
 //  SELECT DBMS_METADATA.GET_DDL('INDEX', '인덱스명') SCRIPT FROM DUAL
+//***************************************************************************
 _tstring CDBQueryProcess::ORACLEMetaDataGetDDL(const EDBObjectType dbObject, const TCHAR* ptszObjectName, const TCHAR* ptszSchemaName)
 {
 	_tstring query = _T("");
@@ -1707,7 +1908,11 @@ _tstring CDBQueryProcess::ORACLEMetaDataGetDDL(const EDBObjectType dbObject, con
 }
 
 //***************************************************************************
-// 
+// @brief ORACLE 저장프로시저/함수 소스코드 조회
+// @param dbObject DB 객체 종류
+// @param ptszObjectName 객체명
+// @return 소스코드 문자열
+//***************************************************************************
 _tstring CDBQueryProcess::ORACLEGetUserSource(const EDBObjectType dbObject, const TCHAR* ptszObjectName)
 {
 	_tstring query = _T("");
@@ -1756,7 +1961,10 @@ _tstring CDBQueryProcess::ORACLEGetUserSource(const EDBObjectType dbObject, cons
 }
 
 //***************************************************************************
-// 
+// @brief ORACLE 인덱스 구조 분석 분석 실행 (ANALYZE INDEX VALIDATE STRUCTURE)
+// @param ptszIndexName 인덱스명
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::ORACLEGetAnalyzeIndexFragmentationCheck(const TCHAR* ptszIndexName)
 {
 	if( _dbClass != EDBClass::ORACLE ) return false;
@@ -1776,7 +1984,12 @@ bool CDBQueryProcess::ORACLEGetAnalyzeIndexFragmentationCheck(const TCHAR* ptszI
 }
 
 //***************************************************************************
-// 
+// @brief ORACLE 인덱스 조각화 상태 점검
+// @param ptszIndexName 인덱스명
+// @param iCount 검색 결과 개수
+// @param pIndexFragmentation 인덱스 조각화 정보 배열
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::ORACLEGetIndexFragmentationCheck(const TCHAR* ptszIndexName, int32& iCount, std::unique_ptr<ORACLE_INDEX_FRAGMENTATION[]>& pIndexFragmentation)
 {
 	_tstring query = _T("");
@@ -1837,7 +2050,10 @@ bool CDBQueryProcess::ORACLEGetIndexFragmentationCheck(const TCHAR* ptszIndexNam
 }
 
 //***************************************************************************
-// 
+// @brief ORACLE INDEX_STATS 분석 수행
+// @param ptszIndexName 인덱스명
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::ORACLEGetAnalyzeIndexStatFragmentationCheck(const TCHAR* ptszIndexName)
 {
 	if( _dbClass != EDBClass::ORACLE ) return false;
@@ -1857,7 +2073,12 @@ bool CDBQueryProcess::ORACLEGetAnalyzeIndexStatFragmentationCheck(const TCHAR* p
 }
 
 //***************************************************************************
-// 
+// @brief ORACLE 인덱스 통계 조각화 상태 점검
+// @param ptszIndexName 인덱스명
+// @param iCount 검색 결과 개수
+// @param pIndexStatFragmentation 인덱스 통계 조각화 정보 배열
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::ORACLEGetIndexStatFragmentationCheck(const TCHAR* ptszIndexName, int32& iCount, std::unique_ptr<ORACLE_INDEX_STAT_FRAGMENTATION[]>& pIndexStatFragmentation)
 {
 	_tstring query = _T("");
@@ -1917,7 +2138,10 @@ bool CDBQueryProcess::ORACLEGetIndexStatFragmentationCheck(const TCHAR* ptszInde
 }
 
 //***************************************************************************
-// 
+// @brief ORACLE 인덱스 재생성 (REBUILD)
+// @param ptszIndexName 인덱스명
+// @return 성공 여부
+//***************************************************************************
 bool CDBQueryProcess::ORACLEGetIndexRebuild(const TCHAR* ptszIndexName)
 {
 	if( _dbClass != EDBClass::ORACLE ) return false;

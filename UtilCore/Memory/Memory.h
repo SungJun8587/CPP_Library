@@ -17,18 +17,11 @@
 //        스레드는 FlushCurrentThreadCache()를 명시적으로 호출해 반납합니다.
 //***************************************************************************
 
-#ifndef __MEMORY_H__
-#define __MEMORY_H__
+#ifndef UC_MEMORY_H
+#define UC_MEMORY_H
 
-#pragma once
-
-#ifndef	__ALLOCATOR_H__
 #include <Memory/Allocator.h>
-#endif
-
-#ifndef	__MEMORYPOOL_H__
 #include <Memory/MemoryPool.h>
-#endif
 
 class CMemoryPool;
 
@@ -116,4 +109,4 @@ private:
 	static thread_local TlsCache _tlsCache;
 };
 
-#endif // ndef __MEMORY_H__
+#endif // ndef UC_MEMORY_H

@@ -4,36 +4,16 @@
 //
 //***************************************************************************
 
-#ifndef __RIOSESSION_H__
-#define __RIOSESSION_H__
+#ifndef UC_RIOSESSION_H
+#define UC_RIOSESSION_H
 
-#ifndef __RIOCOMMON_H__
-#include <Network/Rio/RioCommon.h>
-#endif
-
-#ifndef __RIOOBJECT_H__
-#include <Network/Rio/RioObject.h>
-#endif
-
-#ifndef __RIOEVENT_H__
-#include <Network/Rio/RioEvent.h>
-#endif
-
-#ifndef __RIOSEND_H__
-#include <Network/Rio/RioSend.h>
-#endif
-
-#ifndef __RIORECEIVE_H__
-#include <Network/Rio/RioReceive.h>
-#endif
-
-#ifndef __RIOCONNECTEVENT_H__
-#include <Network/Rio/RioConnectEvent.h>
-#endif
-
-#ifndef __PLATFORMLOCK_H__
+#include <Network/RIO/RioCommon.h>
+#include <Network/RIO/RioObject.h>
+#include <Network/RIO/RioEvent.h>
+#include <Network/RIO/RioSend.h>
+#include <Network/RIO/RioReceive.h>
+#include <Network/RIO/RioConnectEvent.h>
 #include <Thread/PlatformLock.h>
-#endif
 
 #include <atomic>
 #include <memory>
@@ -405,4 +385,4 @@ private:
 	RioConnectEvent _connectEvent;                      // ConnectEx 요청 및 완료 처리를 위한 OVERLAPPED 이벤트 객체 (클라이언트 전용)
 };
 
-#endif // ndef __RIOSESSION_H__
+#endif // ndef UC_RIOSESSION_H

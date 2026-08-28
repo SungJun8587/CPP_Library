@@ -13,15 +13,13 @@
 // (HWINFO_BIOS, HWINFO_RAM, HWINFO_VIDEOCARD 등)을 그대로 주고받습니다.
 //***************************************************************************
 
-#ifndef __HWINFOSTRUCTS_H__
-#define __HWINFOSTRUCTS_H__
+#ifndef UC_HWINFOSTRUCTS_H
+#define UC_HWINFOSTRUCTS_H
 
 #include <windows.h>
 #include <tchar.h>
 
-#ifndef __SYSTEMBASEDEFINE_H__
 #include <System/SystemBaseDefine.h>
-#endif
 
 //***************************************************************************
 // @struct  _HWINFO_CPU
@@ -476,4 +474,4 @@ public:
 
 } HWINFO_PCIDEVICE, * PHWINFO_PCIDEVICE;
 
-#endif // ndef __HWINFOSTRUCTS_H__
+#endif // ndef UC_HWINFOSTRUCTS_H

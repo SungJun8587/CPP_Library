@@ -4,16 +4,11 @@
 //
 //**********************************************************************************************************************
 
-#ifndef __RIOBUFFER_H__
-#define __RIOBUFFER_H__
+#ifndef UC_RIOBUFFER_H
+#define UC_RIOBUFFER_H
 
-#ifndef __RIOCOMMON_H__
 #include <Network/RIO/RioCommon.h>
-#endif
-
-#ifndef __LOCKFREESLOTSTACK_H__
 #include <Containers/Stack/LockFreeSlotStack.h>
-#endif
 
 //***************************************************************************
 // @class CRioBuffer
@@ -261,4 +256,4 @@ private:
     bool _initialized{ false };     // 버퍼 정상 초기화 완료 여부 플래그 (_lifecycleMutex 보호 하에 접근)
 };
 
-#endif // ndef __RIOBUFFER_H__
+#endif // ndef UC_RIOBUFFER_H

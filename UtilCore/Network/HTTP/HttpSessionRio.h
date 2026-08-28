@@ -4,24 +4,13 @@
 //
 //***************************************************************************
 
-#ifndef __HTTPSESSIONRIO_H__
-#define __HTTPSESSIONRIO_H__
+#ifndef UC_HTTPSESSIONRIO_H
+#define UC_HTTPSESSIONRIO_H
 
-#ifndef	__NETWORKREDEFINEDATATYPE_H__
 #include <Network/NetworkRedefineDataType.h>
-#endif
-
-#ifndef	__RIOSESSION_H__
 #include <Network/RIO/RioSession.h>
-#endif
-
-#ifndef	__HTTPCONNPOOLCOMMON_H__
 #include <Network/HTTP/HttpConnPoolCommon.h>
-#endif
-
-#ifndef	__TLSFILTER_H__
 #include <Network/HTTP/TlsFilter.h>
-#endif
 
 class CHttpSessionRio;
 using CHttpSessionRioRef = std::shared_ptr<CHttpSessionRio>;
@@ -172,4 +161,4 @@ private:
 	bool _tlsEnabled = false;                // SetTlsConfig() 호출 여부 (true면 HTTPS 모드)
 };
 
-#endif // ndef __HTTPSESSIONRIO_H__
+#endif // ndef UC_HTTPSESSIONRIO_H

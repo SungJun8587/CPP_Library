@@ -4,20 +4,11 @@
 //
 //***************************************************************************
 
-#ifndef __RIOSESSIONMANAGER_H__
-#define __RIOSESSIONMANAGER_H__
+#ifndef UC_RIOSESSIONMANAGER_H
+#define UC_RIOSESSIONMANAGER_H
 
-#ifndef __RIO_COMMON_H__
-#include <Network/Rio/RioCommon.h>
-#endif
-
-#ifndef __CLUSTERSPINMAP_H__
-#include <Network/ClusterSpinMap.h>
-#endif
-
-#ifndef __RIO_SESSION_H__
-#include <Network/Rio/RioSession.h>
-#endif
+#include <Network/RIO/RioCommon.h>
+#include <Containers/Map/ClusterSpinMap.h>
 
 #include <vector>
 #include <memory>
@@ -63,4 +54,4 @@ private:
 	std::atomic<uint64_t> _nextSessionId{ 0 };                                          // 세션 ID 자동 증가 카운터
 };
 
-#endif // ndef __RIOSESSIONMANAGER_H__
+#endif // ndef UC_RIOSESSIONMANAGER_H

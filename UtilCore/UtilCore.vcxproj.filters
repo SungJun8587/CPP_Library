@@ -165,9 +165,6 @@
     <ClInclude Include="Util\DateTimeUtil.h">
       <Filter>Util</Filter>
     </ClInclude>
-    <ClInclude Include="Memory\Stream.h">
-      <Filter>Util</Filter>
-    </ClInclude>
     <ClInclude Include="Util\StringUtil.h">
       <Filter>Util</Filter>
     </ClInclude>
@@ -550,6 +547,9 @@
     <ClInclude Include="Redis\RedisResultSet.h">
       <Filter>Redis</Filter>
     </ClInclude>
+    <ClInclude Include="Redis\RedisRedefineDataType.h">
+      <Filter>Redis</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">
@@ -605,9 +605,6 @@
       <Filter>Util</Filter>
     </ClCompile>
     <ClCompile Include="Util\WebUtil.cpp">
-      <Filter>Util</Filter>
-    </ClCompile>
-    <ClCompile Include="Memory\Stream.cpp">
       <Filter>Util</Filter>
     </ClCompile>
     <ClCompile Include="Util\Endian.cpp">

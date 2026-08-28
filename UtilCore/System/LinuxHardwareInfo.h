@@ -20,8 +20,8 @@
 //   CLinuxPciInfo         - /sys/bus/pci/devices/*  (root 불필요)
 //***************************************************************************
 
-#ifndef __LINUXHARDWAREINFO_H__
-#define __LINUXHARDWAREINFO_H__
+#ifndef UC_LINUXHARDWAREINFO_H
+#define UC_LINUXHARDWAREINFO_H
 
 #if defined(_WIN32)
 #error "LinuxHardwareInfo.h는 Linux 전용입니다. Windows 빌드에는 System/CpuInfo.h, System/SmbiosHardwareInfo.h, System/PciInfo.h를 쓰세요."
@@ -210,4 +210,4 @@ private:
     std::vector<HWINFO_PCIDEVICE*> m_sPciArray;
 };
 
-#endif // ndef __LINUXHARDWAREINFO_H__
+#endif // ndef UC_LINUXHARDWAREINFO_H

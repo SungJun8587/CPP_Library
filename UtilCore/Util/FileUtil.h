@@ -4,24 +4,14 @@
 //
 //***************************************************************************
 
-#ifndef __FILEUTIL_H__
-#define __FILEUTIL_H__
+#ifndef UC_FILEUTIL_H
+#define UC_FILEUTIL_H
 
-#ifndef	_INC_WINDOWS
 #include <windows.h>
-#endif
-
-#ifndef	_INC_TIME
 #include <time.h>
-#endif
-
-#ifndef	_INC_TCHAR
 #include <tchar.h>
-#endif
 
-#ifndef	__WINCHARSETCONV_H__
 #include <Util/WinCharsetConv.h>
-#endif
 
 #define SWAP16(s) (((((s) & 0xff) << 8) | (((s) >> 8) & 0xff))) 
 #define SWAP32(l) (((((l) & 0xff000000) >> 24) | (((l) & 0x00ff0000) >> 8) | (((l) & 0x0000ff00) << 8) | (((l) & 0x000000ff) << 24)))  
@@ -76,4 +66,4 @@ bool			WriteFile(const _tstring& filepath, const _tstring& content, EEncoding fi
 bool			IsExistFile(const _tstring& filepath);
 std::uintmax_t	GetFileSize(const _tstring& filepath);
 
-#endif // ndef __FILEUTIL_H__
+#endif // ndef UC_FILEUTIL_H

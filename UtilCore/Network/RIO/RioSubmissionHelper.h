@@ -4,28 +4,14 @@
 //
 //***************************************************************************
 
-#ifndef __RIOSUBMISSIONHELPER_H__
-#define __RIOSUBMISSIONHELPER_H__
+#ifndef UC_RIOSUBMISSIONHELPER_H
+#define UC_RIOSUBMISSIONHELPER_H
 
-#ifndef __RIOCOMMON_H__
-#include <Network/Rio/RioCommon.h>
-#endif
-
-#ifndef __RIOEVENT_H__
-#include <Network/Rio/RioEvent.h>
-#endif
-
-#ifndef __RIOOBJECT_H__
-#include <Network/Rio/RioObject.h>
-#endif
-
-#ifndef __RIOCORE_H__
-#include <Network/Rio/RioCore.h>
-#endif
-
-#ifndef __RIOBUFFER_H__
-#include <Network/Rio/RioBuffer.h>
-#endif
+#include <Network/RIO/RioCommon.h>
+#include <Network/RIO/RioEvent.h>
+#include <Network/RIO/RioObject.h>
+#include <Network/RIO/RioCore.h>
+#include <Network/RIO/RioBuffer.h>
 
 #include <cassert>
 #include <type_traits>
@@ -261,4 +247,4 @@ private:
     static CRioObjectRef AcquireOwner(CRioObject* owner) noexcept;
 };
 
-#endif // ndef __RIOSUBMISSIONHELPER_H__
+#endif // ndef UC_RIOSUBMISSIONHELPER_H

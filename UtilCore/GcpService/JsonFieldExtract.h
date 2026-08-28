@@ -5,8 +5,8 @@
 //
 //***************************************************************************
 
-#ifndef __JSONFIELDEXTRACT_H__
-#define __JSONFIELDEXTRACT_H__
+#ifndef UC_JSONFIELDEXTRACT_H
+#define UC_JSONFIELDEXTRACT_H
 
 #include <string>
 #include <string_view>
@@ -122,4 +122,4 @@ namespace json_extract
 	}
 }
 
-#endif // ndef __JSONFIELDEXTRACT_H__
+#endif // ndef UC_JSONFIELDEXTRACT_H

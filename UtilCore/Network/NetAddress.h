@@ -4,8 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __NETADDRESS_H__
-#define __NETADDRESS_H__
+#ifndef UC_NETADDRESS_H
+#define UC_NETADDRESS_H
 
 //***************************************************************************
 // @class CNetAddress
@@ -47,4 +47,4 @@ private:
 	SOCKADDR_IN		_sockAddr = {}; // 소켓 주소(IP, Port, Family) 정보 구조체
 };
 
-#endif // ndef __NETADDRESS_H__
+#endif // ndef UC_NETADDRESS_H

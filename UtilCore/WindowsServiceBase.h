@@ -4,10 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __WINDOWSSERVICEBASE_H__
-#define __WINDOWSSERVICEBASE_H__
-
-#pragma once
+#ifndef UC_WINDOWSSERVICEBASE_H
+#define UC_WINDOWSSERVICEBASE_H
 
 //***************************************************************************
 // @class WindowsServiceBase
@@ -81,4 +79,4 @@ protected:
 	HANDLE					m_hSvrStopEvent;                // 서비스 종료 동기화 이벤트 핸들
 };
 
-#endif // ndef __WINDOWSSERVICEBASE_H__
+#endif // ndef UC_WINDOWSSERVICEBASE_H

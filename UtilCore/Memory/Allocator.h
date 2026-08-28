@@ -14,14 +14,10 @@
 //   - xnew/xdelete   : PoolAllocator 기반 객체 생성 및 파괴 유틸리티
 //***************************************************************************
 
-#ifndef __ALLOCATOR_H__
-#define __ALLOCATOR_H__
+#ifndef UC_ALLOCATOR_H
+#define UC_ALLOCATOR_H
 
-#pragma once
-
-#ifndef __RAWALLOCATOR_H__
 #include <Memory/RawAllocator.h>
-#endif
 
 #include <new>           // std::align_val_t
 #include <unordered_map> // StompAllocator의 크기별 free-list 맵
@@ -365,4 +361,4 @@ shared_ptr<Type> MakeShared(Args&&... args)
 	return shared_ptr<Type>{ xnew<Type>(static_cast<Args&&>(args)...), xdelete<Type> };
 }
 
-#endif // ndef __ALLOCATOR_H__
+#endif // ndef UC_ALLOCATOR_H

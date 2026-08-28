@@ -31,7 +31,10 @@ CSendBuffer::~CSendBuffer()
 //***************************************************************************
 void CSendBuffer::Close(uint32 writeSize)
 {
+	ASSERT_CRASH(_closed == false); // 이중 Close 방지
 	ASSERT_CRASH(_allocSize >= writeSize);
+
+	_closed = true;
 	_writeSize = writeSize;
 	_owner->Close(writeSize);
 }
@@ -73,8 +76,14 @@ CSendBufferRef CSendBufferChunk::Open(uint32 allocSize)
 	if( allocSize > FreeSize() )
 		return nullptr;
 
-	_open = true;
-	return CObjectPool<CSendBuffer>::MakeShared(shared_from_this(), Buffer(), allocSize);
+	// MakeShared 할당 수행 후 성공 시에만 _open = true 설정 (이슈 9번 해결)
+	CSendBufferRef buffer = CObjectPool<CSendBuffer>::MakeShared(shared_from_this(), Buffer(), allocSize);
+	if( buffer != nullptr )
+	{
+		_open = true;
+	}
+
+	return buffer;
 }
 
 //***************************************************************************
@@ -87,7 +96,6 @@ void CSendBufferChunk::Close(uint32 writeSize)
 	_open = false;
 	_usedSize += writeSize;
 }
-
 
 //***************************************************************************
 // @brief 지정된 크기의 SendBuffer를 오픈하여 반환합니다.

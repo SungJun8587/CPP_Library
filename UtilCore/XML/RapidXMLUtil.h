@@ -4,27 +4,17 @@
 //
 //***************************************************************************
 
-#ifndef __RAPIDXMLUTIL_H__
-#define __RAPIDXMLUTIL_H__
+#ifndef UC_RAPIDXMLUTIL_H
+#define UC_RAPIDXMLUTIL_H
 
-#pragma once
-
-#ifndef	_INC_TCHAR
 #include <tchar.h>
-#endif
-
 #include <string>
 #include <vector>
 #include <map>
 #include <type_traits>
 
-#ifndef __BASEREDEFINEDATATYPE_H__
 #include <BaseRedefineDataType.h> 
-#endif
-
-#ifndef __ENCODINGCONVERT_H__
 #include <Util/EncodingConvert.h>
-#endif
 
 #include <rapidxml.hpp>
 #include <rapidxml_utils.hpp>
@@ -319,4 +309,4 @@ private:
 
 #include "XML/RapidXMLUtil.inl"
 
-#endif // ndef __RAPIDXMLUTIL_H__
+#endif // ndef UC_RAPIDXMLUTIL_H

@@ -4,8 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __BASE64URLUTIL_H__
-#define __BASE64URLUTIL_H__
+#ifndef UC_BASE64URLUTIL_H
+#define UC_BASE64URLUTIL_H
 
 #include <string>
 #include <string_view>
@@ -104,4 +104,4 @@ namespace base64url
 	}
 }
 
-#endif // ndef __BASE64URLUTIL_H__
+#endif // ndef UC_BASE64URLUTIL_H

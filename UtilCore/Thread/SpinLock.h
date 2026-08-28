@@ -4,10 +4,8 @@
 // 
 //***************************************************************************
 
-#ifndef __SPINLOCK_H__
-#define __SPINLOCK_H__
-
-#pragma once
+#ifndef UC_SPINLOCK_H
+#define UC_SPINLOCK_H
 
 #include <atomic>
 #include <thread>
@@ -17,9 +15,7 @@
 #include <cstdio>
 #include <exception>
 
-#ifndef __CACHEALIGNMENT_H__
 #include <Thread/CacheAlignment.h>
-#endif
 
 //***************************************************************************
 //  Platform: CPU pause hint
@@ -365,4 +361,4 @@ private:
 
 #include "SpinLock.inl"
 
-#endif // ndef __SPINLOCK_H__
+#endif // ndef UC_SPINLOCK_H

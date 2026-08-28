@@ -4,37 +4,47 @@
 //
 //***************************************************************************
 
-#ifndef __DBMYSQLQUERY_H__
-#define __DBMYSQLQUERY_H__
-
-#pragma once
+#ifndef UC_DBMYSQLQUERY_H
+#define UC_DBMYSQLQUERY_H
 
 //***************************************************************************
-// MYSQL 인덱스타입 : (CASE INFORMATION_SCHEMA.TABLE_CONSTRAINTS.`CONSTRAINT_TYPE` WHEN 'PRIMARY KEY' THEN 1 WHEN 'UNIQUE' THEN 2 ELSE (CASE INFORMATION_SCHEMA.STATISTICS.`INDEX_TYPE` WHEN 'BTREE' THEN 3 WHEN 'FULLTEXT' THEN 4 WHEN 'SPATIAL' THEN 5 ELSE 0 END) END)
+// @brief MYSQL 인덱스 타입 열거형
+// @details INFORMATION_SCHEMA 기반의 MYSQL 인덱스 종류를 정의
+//***************************************************************************
 enum class EMYSQLIndexType
 {
-	NONE = 0,
-	PRIMARY__KEY = 1,
-	UNIQUE = 2,
-	INDEX = 3,
-	FULLTEXT = 4,
-	SPATIAL = 5
+	NONE = 0,             // 인덱스 없음
+	PRIMARY__KEY = 1,     // 기본키 (PRIMARY KEY)
+	UNIQUE = 2,           // 유니크 인덱스 (UNIQUE)
+	INDEX = 3,            // 일반 인덱스 (INDEX / BTREE)
+	FULLTEXT = 4,         // 전문 검색 인덱스 (FULLTEXT)
+	SPATIAL = 5           // 공간 인덱스 (SPATIAL)
 };
 
+//***************************************************************************
+// @brief EMYSQLIndexType 열거형 값을 문자열로 변환
+// @param v 변환할 EMYSQLIndexType 열거형 값
+// @return 변환된 문자열 포인터
+//***************************************************************************
 inline const TCHAR* ToString(EMYSQLIndexType v)
 {
 	switch( v )
 	{
-		case EMYSQLIndexType::NONE:			return _T("NONE");
-		case EMYSQLIndexType::PRIMARY__KEY:	return _T("PRIMARY KEY");
-		case EMYSQLIndexType::UNIQUE:		return _T("UNIQUE");
-		case EMYSQLIndexType::INDEX:		return _T("INDEX");
-		case EMYSQLIndexType::FULLTEXT:		return _T("FULLTEXT");
-		case EMYSQLIndexType::SPATIAL:		return _T("SPATIAL");
-		default:							return _T("NONE");
+	case EMYSQLIndexType::NONE:			return _T("NONE");
+	case EMYSQLIndexType::PRIMARY__KEY:	return _T("PRIMARY KEY");
+	case EMYSQLIndexType::UNIQUE:		return _T("UNIQUE");
+	case EMYSQLIndexType::INDEX:		return _T("INDEX");
+	case EMYSQLIndexType::FULLTEXT:		return _T("FULLTEXT");
+	case EMYSQLIndexType::SPATIAL:		return _T("SPATIAL");
+	default:							return _T("NONE");
 	}
 }
 
+//***************************************************************************
+// @brief 인덱스 타입 문자열을 EMYSQLIndexType 열거형으로 변환
+// @param ptszIndexType 변환할 인덱스 타입 문자열
+// @return 변환된 EMYSQLIndexType 열거형 값
+//***************************************************************************
 inline const EMYSQLIndexType StringToMYSQLIndexType(const TCHAR* ptszIndexType)
 {
 	if( ::_tcsicmp(ptszIndexType, _T("PRIMARY KEY")) == 0 )
@@ -52,7 +62,9 @@ inline const EMYSQLIndexType StringToMYSQLIndexType(const TCHAR* ptszIndexType)
 }
 
 //***************************************************************************
-// MYSQL 캐릭터셋
+// @brief MYSQL 캐릭터셋 정보 클래스
+// @details MYSQL에서 지원하는 캐릭터셋 명 및 기본 정렬 규칙 정보를 관리
+//***************************************************************************
 class MYSQL_CHARACTER_SET
 {
 public:
@@ -63,7 +75,9 @@ public:
 };
 
 //***************************************************************************
-// MYSQL 데이터 정렬(문자비교규칙)
+// @brief MYSQL 데이터 정렬(문자비교규칙) 정보 클래스
+// @details MYSQL에서 사용되는 데이터 정렬 규칙 속성을 관리
+//***************************************************************************
 class MYSQL_COLLATION
 {
 public:
@@ -77,7 +91,9 @@ public:
 };
 
 //***************************************************************************
-// MYSQL 캐릭터셋과 문자비교규칙 연결 정보
+// @brief MYSQL 캐릭터셋과 문자비교규칙 매핑 정보 클래스
+// @details 캐릭터셋과 해당 데이터 정렬(Collation) 간의 매핑을 관리
+//***************************************************************************
 class MYSQL_CHARACTER_SET_COLLATION
 {
 public:
@@ -86,19 +102,14 @@ public:
 };
 
 //***************************************************************************
-// MYSQL 스토리지 엔진 정보
+// @brief MYSQL 스토리지 엔진 정보 클래스
+// @details MYSQL에서 지원하는 스토리지 엔진과 각 기능의 지원 유무를 관리
+//***************************************************************************
 class MYSQL_STORAGE_ENGINE
 {
 public:
 	TCHAR tszEngine[20] = { 0, };											// 스토리지 엔진 명
-
-	// 스토리지 엔진에 대한 서버의 지원 수준
-	// - YES : 엔진이 지원되고 활성 상태
-	// - DEFAULT : YES와 마찬가지로, 그리고 이것은 기본 엔진
-	// - NO : 엔진이 지원되지 않음
-	// - DISABLED : 엔진이 지원되지만 비활성 상태	
-	TCHAR tszSupport[20] = { 0, };
-
+	TCHAR tszSupport[20] = { 0, };											// 스토리지 엔진에 대한 서버의 지원 수준 (YES, DEFAULT, NO, DISABLED)
 	TCHAR tszComment[DATABASE_WVARCHAR_MAX] = { 0, };						// 설명
 	TCHAR tszTransactions[5] = { 0, };										// 스토리지 엔진이 트랜잭션을 지원하는지 여부
 	TCHAR tszXA[5] = { 0, };												// 스토리지 엔진이 XA 트랜잭션을 지원하는지 여부
@@ -106,39 +117,32 @@ public:
 };
 
 //***************************************************************************
-// MYSQL 테이블 조각화 정보
+// @brief MYSQL 테이블 조각화 정보 클래스
+// @details 테이블의 용량 및 사용되지 않는 바이트(Data Free) 크기 정보를 관리
+//***************************************************************************
 class MYSQL_TABLE_FRAGMENTATION
 {
 public:
 	TCHAR	tszTableName[DATABASE_TABLE_NAME_STRLEN] = { 0, };				// 테이블 명
-
-	// 전체 크기
-	// - DATA_LENGTH + INDEX_LENGTH
-	// - DATA_LENGTH : MyISAM의 경우 데이터 파일의 길이(바이트), InnoDB의 경우 클러스터형 인덱스에 할당된 대략적인 공간의 양(바이트)
-	// - INDEX_LENGTH : MyISAM의 경우 INDEX_LENGTH 인덱스 파일의 길이(바이트), InnoDB의 경우 INDEX_LENGTH 클러스터 되지 않은 인덱스에 할당된 대략적인 공간의 양(바이트)
-	uint64  TotalSize;
-
-	// 테이블에 할당되었지만 사용되지 않은 바이트 수
-	uint64 DataFreeSize;
+	uint64  TotalSize;														// 전체 크기 (DATA_LENGTH + INDEX_LENGTH)
+	uint64 DataFreeSize;													// 테이블에 할당되었지만 사용되지 않은 바이트 수
 };
 
 //***************************************************************************
-//
+// @brief MYSQL 컬럼 정의 옵션 문자열 생성
+// @param dataTypeDesc 데이터 타입 및 설명
+// @param isNullable NULL 허용 여부
+// @param defaultDefinition 기본값 정의
+// @param isIdentity AUTO_INCREMENT 여부
+// @param characterSet 캐릭터셋 (기본값: "")
+// @param collation 데이터 정렬 규칙 (기본값: "")
+// @param comment 컬럼 코멘트 (기본값: "")
+// @return 생성된 컬럼 옵션 SQL 문자열
+//***************************************************************************
 inline _tstring MYSQLGetTableColumnOption(_tstring dataTypeDesc, bool isNullable, _tstring defaultDefinition, bool isIdentity, _tstring characterSet = _T(""), _tstring collation = _T(""), _tstring comment = _T(""))
 {
 	_tstring columnOption = _T("");
 
-	// <컬럼속성> : CHARACTER SET, COLLATE, {NULL|NOT NULL}, DEFAULT, AUTO_INCREMENT, COMMENT 설정이 포함됨
-	//  - 만약 컬럼 속성에 포함된 설정 값을 변경할 경우 아래와 같은 순서로 나열해서 변경하면 됨
-	//  - 만약 캐릭터셋, 데이터정렬 값이 해당 데이터베이스에 설정된 캐릭터셋, 데이터정렬 값과 동일한 경우 따로 명시하지 않아도 됨
-	//  - CHARACTER SET '캐릭터셋' COLLATE '데이터정렬' {NULL|NOT NULL} DEFAULT 값 AUTO_INCREMENT COMMENT '코멘트'
-	//
-	// `컬럼명` 데이터타입 <컬럼속성>
-	//  - `컬럼명` 데이터타입 NOT NULL AUTO_INCREMENT COMMENT '코멘트'
-	//  - `컬럼명` 데이터타입 {NULL|NOT NULL}
-	//  - `컬럼명` 데이터타입 {NULL|NOT NULL} DEFAULT 값 COMMENT '코멘트'
-	//  - `컬럼명` 데이터타입 CHARACTER SET '캐릭터셋' COLLATE '데이터정렬' {NULL|NOT NULL} COMMENT '코멘트'
-	//  - `컬럼명` 데이터타입 {NULL|NOT NULL} COMMENT '코멘트'
 	columnOption = dataTypeDesc;
 	if( characterSet != "" && collation != "" )
 		columnOption = columnOption + " CHARACTER SET '" + characterSet + "' COLLATE '" + collation + "'";
@@ -152,36 +156,39 @@ inline _tstring MYSQLGetTableColumnOption(_tstring dataTypeDesc, bool isNullable
 }
 
 //***************************************************************************
-//
+// @brief 제약조건 삭제 쿼리 생성
+// @param tableName 대상 테이블 명
+// @param constType 제약조건 타입 (PRIMARY KEY, UNIQUE, FOREIGN KEY, CHECK)
+// @param constName 제약조건 명
+// @return 제약조건 삭제 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetDropConstraintQuery(_tstring tableName, _tstring constType, _tstring constName)
 {
 	_tstring query = _T("");
 
 	if( constType == "PRIMARY KEY" )
 	{
-		// ALTER TABLE `테이블명` DROP PRIMARY KEY;
 		query = tstring_tcformat(_T("ALTER TABLE `%s` DROP PRIMARY KEY;"), tableName.c_str());
 	}
 	else if( constType == "UNIQUE" )
 	{
-		// ALTER TABLE `테이블명` DROP INDEX `제약조건명`;
 		query = tstring_tcformat(_T("ALTER TABLE `%s` DROP INDEX `%s`;"), tableName.c_str(), constName.c_str());
 	}
 	else if( constType == "FOREIGN KEY" )
 	{
-		// ALTER TABLE `테이블명` DROP FOREIGN KEY `제약조건명`;
 		query = tstring_tcformat(_T("ALTER TABLE `%s` DROP CONSTRAINT `%s`;"), tableName.c_str(), constName.c_str());
 	}
 	else if( constType == "CHECK" )
 	{
-		// ALTER TABLE `테이블명` DROP CHECK `제약조건명`;
 		query = tstring_tcformat(_T("ALTER TABLE `%s` DROP CHECK `%s`;"), tableName.c_str(), constName.c_str());
 	}
 	return query;
 }
 
 //***************************************************************************
-//
+// @brief 시스템 버전을 조회하는 쿼리 생성
+// @return DB 시스템 정보 조회 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetDBSystemQuery()
 {
 	_tstring query = _T("");
@@ -193,7 +200,9 @@ inline _tstring MYSQLGetDBSystemQuery()
 }
 
 //***************************************************************************
-//
+// @brief 사용자 목록을 조회하는 쿼리 생성
+// @return 사용자 목록 조회 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetUserListQuery()
 {
 	_tstring query = _T("");
@@ -203,7 +212,9 @@ inline _tstring MYSQLGetUserListQuery()
 }
 
 //***************************************************************************
-//
+// @brief 데이터베이스 목록을 조회하는 쿼리 생성
+// @return 데이터베이스 목록 조회 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetDatabaseListQuery()
 {
 	_tstring query = _T("");
@@ -213,16 +224,16 @@ inline _tstring MYSQLGetDatabaseListQuery()
 }
 
 //***************************************************************************
-//
+// @brief 데이터베이스 백업 덤프 명령어 생성
+// @param loginPath mysql_config_editor로 저장된 로그인 패스 이름
+// @param dbName 백업할 데이터베이스 명
+// @param backupFilePath 백업 결과 파일 경로
+// @param defaultCharacterSet 캐릭터셋 옵션 (기본값: "")
+// @param isNoData 데이터 제외 및 DDL만 백업할지 여부 (기본값: false)
+// @return mysqldump 실행 명령어 문자열
+//***************************************************************************
 inline _tstring MYSQLGetDatabaseBackupQuery(_tstring loginPath, _tstring dbName, _tstring backupFilePath, _tstring defaultCharacterSet = _T(""), bool isNoData = false)
 {
-	// mysqldump -h [원격호스트명(IP)] port=[연결포트] -u [사용자 계정] -p [패스워드] [데이터베이스명] > [백업 파일 경로]
-	// --login-path : mysql_config_editor를 이용하여 MySQL 서버 연결에 대한 자격 정보(login-path 이름, user, password, host, port, socket 정보가 난독화되어 들어있음)를 저장
-	// --set-gtid-purged=OFF : GTID(Global Transaction Identifier) 활성화 여부 설정(GTID를 사용하지 않는 MySQL DB를 복구하려면 백업 수행 시 --set-gtid-purged=OFF 옵션을 추가).
-	// --single-transaction : lock 을 걸지 않고도 dump 파일의 정합성 보장. InnoDB 일때만 사용 가능.
-	// --no-tablespaces : 해당 옵션을 줄 경우 CREATE LOGFILE GROUP과 CREATE TABLESPACE문을 생성하지 않음
-	// --default-character-set=utf8mb4 : 기본 문자 집합을 utf8mb4로 지정
-	// --no-data : 데이터를 백업하지 않고, DDL만 백업
 	_tstring query = tstring_tcformat(_T("mysqldump --login-path=%s %s --routines --events --single-transaction --set-gtid-purged=OFF --no-tablespaces%s%s > %s"),
 		loginPath.c_str(),
 		dbName.c_str(),
@@ -233,17 +244,23 @@ inline _tstring MYSQLGetDatabaseBackupQuery(_tstring loginPath, _tstring dbName,
 }
 
 //***************************************************************************
-//
+// @brief 데이터베이스 복원 명령어 생성
+// @param loginPath mysql_config_editor로 저장된 로그인 패스 이름
+// @param dbName 복원할 데이터베이스 명
+// @param restoreFilePath 복원할 파일 경로
+// @return mysql 복원 실행 명령어 문자열
+//***************************************************************************
 inline _tstring MYSQLGetDatabaseRestoreQuery(_tstring loginPath, _tstring dbName, _tstring restoreFilePath)
 {
-	// mysql -h [원격호스트명(IP)] port=[연결포트] -u [사용자 계정] -p [패스워드] [데이터베이스명] < [복원할 파일 경로]
-	// --login-path : mysql_config_editor를 이용하여 MySQL 서버 연결에 대한 자격 정보(login-path 이름, user, password, host, port, socket 정보가 난독화되어 들어있음)를 저장
 	_tstring query = tstring_tcformat(_T("mysql --login-path=%s %s < %s"), loginPath.c_str(), dbName.c_str(), restoreFilePath.c_str());
 	return query;
 }
 
 //***************************************************************************
-//
+// @brief 시스템 뷰 테이블 정보를 조회하는 쿼리 생성
+// @param tableName 특정 테이블 명 (기본값: "")
+// @return 시스템 뷰 테이블 정보 조회 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetSystemViewTableQuery(_tstring tableName = _T(""))
 {
 	_tstring query = _T("");
@@ -263,7 +280,10 @@ inline _tstring MYSQLGetSystemViewTableQuery(_tstring tableName = _T(""))
 }
 
 //***************************************************************************
-//
+// @brief 시스템 뷰 테이블의 컬럼 정보를 조회하는 쿼리 생성
+// @param tableName 특정 테이블 명 (기본값: "")
+// @return 시스템 뷰 컬럼 정보 조회 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetSystemViewTableColumnQuery(_tstring tableName = _T(""))
 {
 	_tstring query = _T("");
@@ -293,7 +313,10 @@ inline _tstring MYSQLGetSystemViewTableColumnQuery(_tstring tableName = _T(""))
 }
 
 //***************************************************************************
-//
+// @brief 캐릭터셋 목록을 조회하는 쿼리 생성
+// @param charset 특정 캐릭터셋 명 (기본값: "")
+// @return 캐릭터셋 목록 조회 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetCharacterSetsQuery(_tstring charset = _T(""))
 {
 	_tstring query = _T("");
@@ -308,7 +331,10 @@ inline _tstring MYSQLGetCharacterSetsQuery(_tstring charset = _T(""))
 }
 
 //***************************************************************************
-//
+// @brief 데이터 정렬(Collation) 목록을 조회하는 쿼리 생성
+// @param charset 특정 캐릭터셋 명 (기본값: "")
+// @return Collation 목록 조회 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetCollationsQuery(_tstring charset = _T(""))
 {
 	_tstring query = _T("");
@@ -324,7 +350,10 @@ inline _tstring MYSQLGetCollationsQuery(_tstring charset = _T(""))
 }
 
 //***************************************************************************
-//
+// @brief 캐릭터셋 및 적용 가능한 데이터 정렬 연결 정보를 조회하는 쿼리 생성
+// @param charset 특정 캐릭터셋 명 (기본값: "")
+// @return 캐릭터셋-Collation 연결 정보 조회 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetCharacterSetCollationsQuery(_tstring charset = _T(""))
 {
 	_tstring query = _T("");
@@ -340,7 +369,9 @@ inline _tstring MYSQLGetCharacterSetCollationsQuery(_tstring charset = _T(""))
 }
 
 //***************************************************************************
-//
+// @brief 스토리지 엔진 목록을 조회하는 쿼리 생성
+// @return 스토리지 엔진 목록 조회 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetEnginesQuery()
 {
 	_tstring query = _T("");
@@ -353,13 +384,17 @@ inline _tstring MYSQLGetEnginesQuery()
 }
 
 //***************************************************************************
-//
+// @brief 테이블 속성(캐릭터셋, 데이터정렬, 스토리지엔진) 변경 쿼리 생성
+// @param tableName 변경할 테이블 명
+// @param characterSet 설정할 캐릭터셋 명 (기본값: "")
+// @param collation 설정할 Collation 명 (기본값: "")
+// @param engine 설정할 스토리지 엔진 명 (기본값: "")
+// @return 테이블 속성 변경 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetAlterTableQuery(_tstring tableName, _tstring characterSet = _T(""), _tstring collation = _T(""), _tstring engine = _T(""))
 {
 	_tstring query = _T("");
 
-	// 테이블 캐릭터셋, 데이터정렬(문자비교규칙), 스토리지엔진 변경
-	// ALTER TABLE `테이블명` CHARACTER SET = 캐릭터셋, COLLATE = 데이터정렬, ENGINE = 스토리지엔진;
 	query = query + "ALTER TABLE `" + tableName + "`";
 
 	if( characterSet != "" )
@@ -376,30 +411,29 @@ inline _tstring MYSQLGetAlterTableQuery(_tstring tableName, _tstring characterSe
 }
 
 //***************************************************************************
-//
+// @brief 테이블 캐릭터셋 및 데이터 정렬 전체 변환(CONVERT TO) 쿼리 생성
+// @param tableName 변경할 테이블 명
+// @param characterSet 변환할 캐릭터셋 명
+// @param collation 변환할 Collation 명
+// @return 테이블 캐릭터셋 전체 변환 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetAlterTableCollationQuery(_tstring tableName, _tstring characterSet, _tstring collation)
 {
 	_tstring query = _T("");
 
-	// 테이블 캐릭터셋, 데이터정렬(문자비교규칙)을 변경
-	// ALTER TABLE `테이블명` CONVERT TO CHARACTER SET 캐릭터셋 COLLATE 데이터정렬;
 	query = query + "ALTER TABLE `" + tableName + "` CONVERT TO CHARACTER SET " + characterSet + " COLLATE " + collation + ";";
 	return query;
 }
 
 //***************************************************************************
-//
+// @brief 테이블 단편화(Fragmentation) 상태 확인 쿼리 생성
+// @param tableName 특정 테이블 명 (기본값: "")
+// @return 테이블 단편화 용량 확인 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetTableFragmentationCheckQuery(_tstring tableName = _T(""))
 {
 	_tstring query = _T("");
 
-	// 테이블 단편화(Fragmentation) 확인
-	// [발생 원인]
-	//  - fragmentation이란 INSERT & DELETE가 수차례 반복되면서 Page 안에 회수가 안되는(사용되지 않는) 부분이 많아지면서 발생하게 되는데
-	//    그 영향으로 테이블이 실제로 가져야 하는 OS 공간 보다 더 많은 공간을 차지하게 됨.
-	// [확인 방법]
-	//  - OS 서버에서 해당 테이블에 ibd 파일과 아래 쿼리에 total의 사이즈를 비교하여 간극 만큼을 단편화(Fragmentation)로 판단할 수 있고,
-	//    이 경우에 테이블 최적화(OPTIMIZE TABLE)를 수행해서 성능 향상
 	query = query + "SELECT `TABLE_NAME` AS `table_name`, ";
 	query = query + "ROUND((DATA_LENGTH + INDEX_LENGTH) / (1024 * 1024), 2) AS `totalsize`, ";
 	query = query + "ROUND((DATA_FREE) / (1024 * 1024 ), 2) AS `datafreesize`";
@@ -418,59 +452,71 @@ inline _tstring MYSQLGetTableFragmentationCheckQuery(_tstring tableName = _T("")
 }
 
 //***************************************************************************
-//
+// @brief 테이블 최적화(OPTIMIZE TABLE) 쿼리 생성
+// @param tableName 최적화할 테이블 명
+// @return 테이블 최적화 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetOptimizeTableQuery(_tstring tableName)
 {
-	// OPTIMIZE TABLE `테이블명`
-	// MYSQL은 인덱스 리빌드가 존재하지 않고, 테이블 최적화(OPTIMIZE TABLE)를 진행해야 함. 
-	// OPTIMIZE [NO_WRITE_TO_BINLOG | LOCAL] TABLE 테이블명 [, 테이블명] ...
-	// 기본적으로 서버는 OPTIMIZE TABLE 복제본에 복제되도록 바이너리 로그에 명령문을 기록
-	//  - 로깅을 억제하려면 선택적 NO_WRITE_TO_BINLOG 키워드 또는 별칭 LOCAL 키워드 지정
 	_tstring query = tstring_tcformat(_T("OPTIMIZE TABLE `%s`;"), tableName.c_str());
 	return query;
 }
 
 //***************************************************************************
-//
+// @brief 데이터베이스 개체 생성 DDL 구문 조회 쿼리 생성
+// @param dbObject 개체 유형 (TABLE, PROCEDURE, FUNCTION 등)
+// @param objectName 조회할 개체 명
+// @return SHOW CREATE SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetShowObjectQuery(EDBObjectType dbObject, _tstring objectName)
 {
 	_tstring query = _T("");
 
 	switch( dbObject )
 	{
-		case EDBObjectType::TABLE:
-			query = query + "SHOW CREATE TABLE " + objectName + ";";
-			break;
-		case EDBObjectType::PROCEDURE:
-			query = query + "SHOW CREATE PROCEDURE " + objectName + ";";
-			break;
-		case EDBObjectType::FUNCTION:
-			query = query + "SHOW CREATE FUNCTION " + objectName + ";";
-			break;
-		case EDBObjectType::TRIGGERS:
-			query = query + "SHOW CREATE TRIGGER " + objectName + ";";
-			break;
-		case EDBObjectType::EVENTS:
-			query = query + "SHOW CREATE EVENT " + objectName + ";";
-			break;
+	case EDBObjectType::TABLE:
+		query = query + "SHOW CREATE TABLE " + objectName + ";";
+		break;
+	case EDBObjectType::PROCEDURE:
+		query = query + "SHOW CREATE PROCEDURE " + objectName + ";";
+		break;
+	case EDBObjectType::FUNCTION:
+		query = query + "SHOW CREATE FUNCTION " + objectName + ";";
+		break;
+	case EDBObjectType::TRIGGERS:
+		query = query + "SHOW CREATE TRIGGER " + objectName + ";";
+		break;
+	case EDBObjectType::EVENTS:
+		query = query + "SHOW CREATE EVENT " + objectName + ";";
+		break;
 	}
 	return query;
 }
 
 //***************************************************************************
-//
+// @brief 테이블 또는 컬럼의 이름을 변경하는 쿼리 생성
+// @param tableName 대상 테이블 명
+// @param chgName 변경할 이름
+// @param columnName 컬럼 변경 시 지정할 기존 컬럼 명 (기본값: "")
+// @param dataTypeDesc 컬럼 타입 설명 (기본값: "")
+// @param isNullable NULL 허용 여부 (기본값: false)
+// @param defaultDefinition 기본값 (기본값: "")
+// @param isIdentity AUTO_INCREMENT 여부 (기본값: false)
+// @param characterSet 캐릭터셋 (기본값: "")
+// @param collation 데이터 정렬 규칙 (기본값: "")
+// @param comment 코멘트 (기본값: "")
+// @return 이름 변경 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetRenameObjectQuery(_tstring tableName, _tstring chgName, _tstring columnName = _T(""), _tstring dataTypeDesc = _T(""), bool isNullable = false, _tstring defaultDefinition = _T(""), bool isIdentity = false, _tstring characterSet = _T(""), _tstring collation = _T(""), _tstring comment = _T(""))
 {
 	_tstring query = _T("");
 
 	if( columnName != _T("") )
 	{
-		// ALTER TABLE `테이블명` RENAME `변경할테이블명`;
 		query = tstring_tcformat(_T("ALTER TABLE `%s` RENAME `%s`;"), tableName.c_str(), chgName.c_str());
 	}
 	else
 	{
-		// ALTER TABLE `테이블명` CHANGE COLUMN `컬럼명` `변경할컬럼명` 데이터타입 컬럼속성;
 		_tstring columnOption = MYSQLGetTableColumnOption(dataTypeDesc, isNullable, defaultDefinition, isIdentity, characterSet, collation, comment);
 		query = tstring_tcformat(_T("ALTER TABLE `%s` CHANGE COLUMN `%s` `%s` %s;"), tableName.c_str(), columnName.c_str(), chgName.c_str(), columnOption.c_str());
 	}
@@ -478,9 +524,11 @@ inline _tstring MYSQLGetRenameObjectQuery(_tstring tableName, _tstring chgName, 
 }
 
 //***************************************************************************
-// Ex)
-//	SELECT `TABLE_COMMENT` AS `tableComment` FROM INFORMATION_SCHEMA.TABLES WHERE `TABLE_SCHEMA` = DATABASE() AND `TABLE_NAME` = 'tbl_table1';
-//	SELECT `COLUMN_COMMENT` AS `columncomment` FROM INFORMATION_SCHEMA.COLUMNS WHERE `TABLE_SCHEMA` = DATABASE() AND `TABLE_NAME` = 'tbl_table1' AND `COLUMN_NAME` = 'Id';
+// @brief 테이블 또는 컬럼의 코멘트 조회 쿼리 생성
+// @param tableName 대상 테이블 명
+// @param columnName 대상 컬럼 명 (빈 문자열일 경우 테이블 코멘트 조회)
+// @return 코멘트 조회 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetTableColumnCommentQuery(_tstring tableName, _tstring columnName)
 {
 	_tstring query = _T("");
@@ -495,9 +543,18 @@ inline _tstring MYSQLGetTableColumnCommentQuery(_tstring tableName, _tstring col
 }
 
 //***************************************************************************
-// Ex)
-//	ALTER TABLE `tbl_table1` COMMENT '테스트 테이블';
-//  ALTER TABLE `tbl_table1` MODIFY `Id` VARCHAR(50) NOT NULL COMMENT '아이디';
+// @brief 테이블 또는 컬럼의 코멘트를 설정/수정하는 쿼리 생성
+// @param tableName 대상 테이블 명
+// @param setComment 설정할 코멘트 내용
+// @param columnName 대상 컬럼 명 (기본값: "")
+// @param dataTypeDesc 컬럼 타입 설명 (기본값: "")
+// @param isNullable NULL 허용 여부 (기본값: false)
+// @param defaultDefinition 기본값 (기본값: "")
+// @param isIdentity AUTO_INCREMENT 여부 (기본값: false)
+// @param characterSet 캐릭터셋 (기본값: "")
+// @param collation 데이터 정렬 규칙 (기본값: "")
+// @return 코멘트 설정/수정 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLProcessTableColumnCommentQuery(_tstring tableName, _tstring setComment, _tstring columnName = _T(""), _tstring dataTypeDesc = _T(""), bool isNullable = false, _tstring defaultDefinition = _T(""), bool isIdentity = false, _tstring characterSet = _T(""), _tstring collation = _T(""))
 {
 	_tstring query = _T("");
@@ -513,8 +570,10 @@ inline _tstring MYSQLProcessTableColumnCommentQuery(_tstring tableName, _tstring
 }
 
 //***************************************************************************
-// Ex)
-//	SELECT `ROUTINE_COMMENT` AS `procComment` FROM INFORMATION_SCHEMA.ROUTINES WHERE `ROUTINE_SCHEMA` = DATABASE() AND `ROUTINE_TYPE` = 'PROCEDURE' AND `ROUTINE_NAME` = 'sp_procedure1';
+// @brief 저장 프로시저의 코멘트 조회 쿼리 생성
+// @param procName 저장 프로시저 명
+// @return 프로시저 코멘트 조회 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetProcedureCommentQuery(_tstring procName)
 {
 	_tstring query = _T("");
@@ -524,8 +583,11 @@ inline _tstring MYSQLGetProcedureCommentQuery(_tstring procName)
 }
 
 //***************************************************************************
-// Ex)
-//	ALTER PROCEDURE `sp_procedure1` COMMENT '테스트 저장프로시저';
+// @brief 저장 프로시저의 코멘트 설정/수정 쿼리 생성
+// @param procName 저장 프로시저 명
+// @param comment 설정할 코멘트 내용
+// @return 프로시저 코멘트 수정 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLProcessProcedureCommentQuery(_tstring procName, _tstring comment)
 {
 	_tstring query = _T("");
@@ -535,8 +597,10 @@ inline _tstring MYSQLProcessProcedureCommentQuery(_tstring procName, _tstring co
 }
 
 //***************************************************************************
-// Ex)
-//	SELECT `ROUTINE_COMMENT` AS `funcComment` FROM INFORMATION_SCHEMA.ROUTINES WHERE `ROUTINE_SCHEMA` = DATABASE() AND `ROUTINE_TYPE` = 'FUNCTION' AND `ROUTINE_NAME` = 'sp_function1';
+// @brief 함수의 코멘트 조회 쿼리 생성
+// @param funcName 함수 명
+// @return 함수 코멘트 조회 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetFunctionCommentQuery(_tstring funcName)
 {
 	_tstring query = _T("");
@@ -546,8 +610,11 @@ inline _tstring MYSQLGetFunctionCommentQuery(_tstring funcName)
 }
 
 //***************************************************************************
-// Ex)
-//	ALTER FUNCTION `sp_function1` COMMENT '테스트 함수';
+// @brief 함수의 코멘트 설정/수정 쿼리 생성
+// @param funcName 함수 명
+// @param comment 설정할 코멘트 내용
+// @return 함수 코멘트 수정 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLProcessFunctionCommentQuery(_tstring funcName, _tstring comment)
 {
 	_tstring query = _T("");
@@ -557,7 +624,9 @@ inline _tstring MYSQLProcessFunctionCommentQuery(_tstring funcName, _tstring com
 }
 
 //***************************************************************************
-//
+// @brief 사용자가 생성한 테이블 목록 조회 쿼리 생성
+// @return 테이블 목록 조회 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetTableListQuery()
 {
 	_tstring query = _T("");
@@ -571,7 +640,10 @@ inline _tstring MYSQLGetTableListQuery()
 }
 
 //***************************************************************************
-//
+// @brief 테이블 상세 정보를 조회하는 쿼리 생성
+// @param tableName 특정 테이블 명 (기본값: "")
+// @return 테이블 상세 정보 조회 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetTableInfoQuery(_tstring tableName = _T(""))
 {
 	_tstring query = _T("");
@@ -597,7 +669,10 @@ inline _tstring MYSQLGetTableInfoQuery(_tstring tableName = _T(""))
 }
 
 //***************************************************************************
-//
+// @brief 테이블 컬럼 상세 정보를 조회하는 쿼리 생성
+// @param tableName 특정 테이블 명 (기본값: "")
+// @return 테이블 컬럼 정보 조회 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetTableColumnInfoQuery(_tstring tableName = _T(""))
 {
 	_tstring query = _T("");
@@ -629,7 +704,10 @@ inline _tstring MYSQLGetTableColumnInfoQuery(_tstring tableName = _T(""))
 }
 
 //***************************************************************************
-//
+// @brief 테이블 제약조건 정보 조회 쿼리 생성
+// @param tableName 특정 테이블 명 (기본값: "")
+// @return 제약조건 정보 조회 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetConstraintsInfoQuery(_tstring tableName = _T(""))
 {
 	_tstring query = _T("");
@@ -656,7 +734,10 @@ inline _tstring MYSQLGetConstraintsInfoQuery(_tstring tableName = _T(""))
 }
 
 //***************************************************************************
-//
+// @brief 테이블 인덱스 정보 조회 쿼리 생성
+// @param tableName 특정 테이블 명 (기본값: "")
+// @return 인덱스 정보 조회 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetIndexInfoQuery(_tstring tableName = _T(""))
 {
 	_tstring query = _T("");
@@ -685,7 +766,10 @@ inline _tstring MYSQLGetIndexInfoQuery(_tstring tableName = _T(""))
 }
 
 //***************************************************************************
-//
+// @brief 파티션 정보 조회 쿼리 생성
+// @param tableName 특정 테이블 명 (기본값: "")
+// @return 파티션 정보 조회 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetPartitionInfoQuery(_tstring tableName = _T(""))
 {
 	_tstring query = _T("");
@@ -707,7 +791,10 @@ inline _tstring MYSQLGetPartitionInfoQuery(_tstring tableName = _T(""))
 }
 
 //***************************************************************************
-//
+// @brief 외래 키(Foreign Key) 정보 조회 쿼리 생성
+// @param tableName 특정 테이블 명 (기본값: "")
+// @return 외래 키 정보 조회 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetForeignKeyInfoQuery(_tstring tableName = _T(""))
 {
 	_tstring query = _T("");
@@ -737,7 +824,10 @@ inline _tstring MYSQLGetForeignKeyInfoQuery(_tstring tableName = _T(""))
 }
 
 //***************************************************************************
-//
+// @brief CHECK 제약조건 정보 조회 쿼리 생성
+// @param tableName 특정 테이블 명 (기본값: "")
+// @return CHECK 제약조건 정보 조회 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetCheckConstInfoQuery(_tstring tableName = _T(""))
 {
 	_tstring query = _T("");
@@ -763,7 +853,10 @@ inline _tstring MYSQLGetCheckConstInfoQuery(_tstring tableName = _T(""))
 }
 
 //***************************************************************************
-//
+// @brief 트리거 정보 조회 쿼리 생성
+// @param tableName 특정 테이블 명 (기본값: "")
+// @return 트리거 정보 조회 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetTriggerInfoQuery(_tstring tableName = _T(""))
 {
 	_tstring query = _T("");
@@ -786,7 +879,9 @@ inline _tstring MYSQLGetTriggerInfoQuery(_tstring tableName = _T(""))
 }
 
 //***************************************************************************
-//
+// @brief 저장 프로시저 목록 조회 쿼리 생성
+// @return 프로시저 목록 조회 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetProcedureListQuery()
 {
 	_tstring query = _T("");
@@ -800,7 +895,10 @@ inline _tstring MYSQLGetProcedureListQuery()
 }
 
 //***************************************************************************
-//
+// @brief 저장 프로시저 상세 정보 조회 쿼리 생성
+// @param procName 특정 프로시저 명 (기본값: "")
+// @return 프로시저 상세 정보 조회 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetProcedureInfoQuery(_tstring procName = _T(""))
 {
 	_tstring query = _T("");
@@ -822,7 +920,10 @@ inline _tstring MYSQLGetProcedureInfoQuery(_tstring procName = _T(""))
 }
 
 //***************************************************************************
-//
+// @brief 저장 프로시저 파라미터 정보 조회 쿼리 생성
+// @param procName 특정 프로시저 명 (기본값: "")
+// @return 프로시저 파라미터 정보 조회 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetProcedureParamInfoQuery(_tstring procName = _T(""))
 {
 	_tstring query = _T("");
@@ -850,7 +951,9 @@ inline _tstring MYSQLGetProcedureParamInfoQuery(_tstring procName = _T(""))
 }
 
 //***************************************************************************
-//
+// @brief 함수 목록 조회 쿼리 생성
+// @return 함수 목록 조회 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetFunctionListQuery()
 {
 	_tstring query = _T("");
@@ -864,7 +967,10 @@ inline _tstring MYSQLGetFunctionListQuery()
 }
 
 //***************************************************************************
-//
+// @brief 함수 상세 정보 조회 쿼리 생성
+// @param funcName 특정 함수 명 (기본값: "")
+// @return 함수 상세 정보 조회 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetFunctionInfoQuery(_tstring funcName = _T(""))
 {
 	_tstring query = _T("");
@@ -881,7 +987,10 @@ inline _tstring MYSQLGetFunctionInfoQuery(_tstring funcName = _T(""))
 }
 
 //***************************************************************************
-//
+// @brief 함수 파라미터 정보 조회 쿼리 생성
+// @param funcName 특정 함수 명 (기본값: "")
+// @return 함수 파라미터 정보 조회 SQL 쿼리문
+//***************************************************************************
 inline _tstring MYSQLGetFunctionParamInfoQuery(_tstring funcName = _T(""))
 {
 	_tstring query = _T("");
@@ -908,4 +1017,4 @@ inline _tstring MYSQLGetFunctionParamInfoQuery(_tstring funcName = _T(""))
 	return query;
 }
 
-#endif // ndef __DBMYSQLQUERY_H__
+#endif // ndef UC_DBMYSQLQUERY_H

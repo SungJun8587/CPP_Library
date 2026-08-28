@@ -4,20 +4,12 @@
 //
 //***************************************************************************
 
-#ifndef __DELAYEDTASKQUEUE_H__
-#define __DELAYEDTASKQUEUE_H__
+#ifndef UC_DELAYEDTASKQUEUE_H
+#define UC_DELAYEDTASKQUEUE_H
 
-#ifndef __BASEREDEFINEDATATYPE_H__
 #include <BaseRedefineDataType.h>
-#endif
-
-#ifndef	__ALLOCATOR_H__
-#include <Memory/Allocator.h>
-#endif
-
-#ifndef	__QUEUECOMMON_H__
 #include <Containers/Queue/QueueCommon.h>
-#endif
+#include <Memory/Containers.h>
 
 //***************************************************************************
 // @struct DelayedTask
@@ -184,4 +176,4 @@ private:
     std::atomic<bool>       _stopped{ false };          // ProcessExpiredTasks() 루프 정지 플래그
 };
 
-#endif // ndef __DELAYEDTASKQUEUE_H__
+#endif // ndef UC_DELAYEDTASKQUEUE_H

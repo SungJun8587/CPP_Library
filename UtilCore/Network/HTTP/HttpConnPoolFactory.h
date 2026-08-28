@@ -5,44 +5,18 @@
 //
 //***************************************************************************
 
-#ifndef __HTTPCONNPOOLFACTORY_H__
-#define __HTTPCONNPOOLFACTORY_H__
+#ifndef UC_HTTPCONNPOOLFACTORY_H
+#define UC_HTTPCONNPOOLFACTORY_H
 
-#ifndef	__NETWORKREDEFINEDATATYPE_H__
 #include <Network/NetworkRedefineDataType.h>
-#endif
-
-#ifndef	__SESSION_H__
 #include <Network/Session.h>
-#endif
-
-#ifndef	__IOCPSERVICE_H__
 #include <Network/IOCP/IocpService.h>
-#endif
-
-#ifndef	__RIOSERVICE_H__
 #include <Network/Rio/RioService.h>
-#endif
-
-#ifndef	__HTTPCONNPOOL_H__
 #include <Network/HTTP/HttpConnPool.h>
-#endif
-
-#ifndef	__HTTPCONNPOOLMANAGER_H__
 #include <Network/HTTP/HttpConnPoolManager.h>
-#endif
-
-#ifndef	__HTTPSESSIONIOCP_H__
 #include <Network/HTTP/HttpSessionIocp.h>
-#endif
-
-#ifndef	__HTTPSESSIONRIO_H__
 #include <Network/HTTP/HttpSessionRio.h>
-#endif
-
-#ifndef	__SOCKETUTILS_H__
 #include <Network/SocketUtils.h>
-#endif
 
 #include <list>
 #include <memory>
@@ -315,4 +289,4 @@ inline std::shared_ptr<CHttpConnPoolManager> CreateHttpsConnPoolManagerRio(SSL_C
 		&ResolveHostnameToNetAddress);
 }
 
-#endif // ndef __HTTPCONNPOOLFACTORY_H__
+#endif // ndef UC_HTTPCONNPOOLFACTORY_H

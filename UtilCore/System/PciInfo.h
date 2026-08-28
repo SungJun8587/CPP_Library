@@ -8,14 +8,12 @@
 // 분리했습니다.
 //***************************************************************************
 
-#ifndef __PCIINFO_H__
-#define __PCIINFO_H__
+#ifndef UC_PCIINFO_H
+#define UC_PCIINFO_H
 
 #include <vector>
 
-#ifndef __HWINFOSTRUCTS_H__
 #include <System/HwInfoStructs.h>
-#endif
 
 //***************************************************************************
 // @class CPciInfo
@@ -50,4 +48,4 @@ private:
     std::vector<HWINFO_PCIDEVICE*> m_sPciArray;
 };
 
-#endif // ndef __PCIINFO_H__
+#endif // ndef UC_PCIINFO_H

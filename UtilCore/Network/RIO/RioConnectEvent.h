@@ -4,19 +4,14 @@
 //
 //***************************************************************************
 
-#ifndef __RIOCONNECTEVENT_H__
-#define __RIOCONNECTEVENT_H__
+#ifndef UC_RIOCONNECTEVENT_H
+#define UC_RIOCONNECTEVENT_H
 
 #include <WinSock2.h>
 #include <memory>
 
-#ifndef __RIOCOMMON_H__
 #include <Network/RIO/RioCommon.h>
-#endif
-
-#ifndef __RIOSESSION_H__
 #include <Network/RIO/RioSession.h>
-#endif
 
 class CRioSession;
 using CRioSessionRef = std::shared_ptr<CRioSession>;
@@ -62,4 +57,4 @@ public:
 	CRioSessionRef owner;
 };
 
-#endif // ndef __RIOCONNECTEVENT_H__
+#endif // ndef UC_RIOCONNECTEVENT_H

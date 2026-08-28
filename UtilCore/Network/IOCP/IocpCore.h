@@ -4,16 +4,11 @@
 //
 //***************************************************************************
 
-#ifndef __IOCPCORE_H__
-#define __IOCPCORE_H__
+#ifndef UC_IOCPCORE_H
+#define UC_IOCPCORE_H
 
-#ifndef	__IOCPCOMMON_H__
 #include <Network/IOCP/IocpCommon.h>
-#endif
-
-#ifndef	__IOCPEVENT_H__
 #include <Network/IOCP/IocpEvent.h>
-#endif
 
 #pragma comment(lib, "ntdll.lib")
 
@@ -203,4 +198,4 @@ private:
     HANDLE  _iocpHandle;    // CreateIoCompletionPort로 생성된 IOCP 커널 오브젝트
 };
 
-#endif // ndef __IOCPCORE_H__
+#endif // ndef UC_IOCPCORE_H

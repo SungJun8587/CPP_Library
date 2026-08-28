@@ -4,24 +4,12 @@
 //
 //***************************************************************************
 
-#ifndef __JOBTIMER_H__
-#define __JOBTIMER_H__
+#ifndef UC_JOBTIMER_H
+#define UC_JOBTIMER_H
 
-#pragma once
-
-#include <windows.h>
-
-#ifndef __BASEREDEFINEDATATYPE_H__
 #include <BaseRedefineDataType.h> 
-#endif
-
-#ifndef __CONTAINERS_H__
 #include <Memory/Containers.h> 
-#endif
-
-#ifndef __PLATFORMLOCK_H__
 #include <Thread/PlatformLock.h>
-#endif
 
 //***************************************************************************
 //	QPC 유틸리티 (JobTimer 전용)
@@ -134,4 +122,4 @@ private:
 	Atomic<bool>				_distributing = false;	// 현재 타이머 분배 작업이 진행 중인지 나타내는 원자적 플래그
 };
 
-#endif // ndef __JOBTIMER_H__
+#endif // ndef UC_JOBTIMER_H

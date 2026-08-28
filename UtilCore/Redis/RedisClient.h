@@ -4,20 +4,12 @@
 //
 //***************************************************************************
 
-#ifndef __REDISCLIENT_H__
-#define __REDISCLIENT_H__
+#ifndef UC_REDISCLIENT_H
+#define UC_REDISCLIENT_H
 
-#ifndef __IOCPCORE_H__
 #include <Network/IOCP/IocpCore.h>
-#endif
-
-#ifndef __RINGBUFFER_H__
 #include <Network/RingBuffer.h>
-#endif
-
-#ifndef __REDISPARSER_H__
 #include <Redis/RedisParser.h>
-#endif
 
 #include <queue>
 #include <mutex>
@@ -96,4 +88,4 @@ private:
 	CQueue<RedisCallback>	_pendingCallbacks;		// 전송 대기 콜백 큐
 };
 
-#endif // ndef __REDISCLIENT_H__
+#endif // ndef UC_REDISCLIENT_H

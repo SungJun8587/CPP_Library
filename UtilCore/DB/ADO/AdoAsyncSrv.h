@@ -4,21 +4,25 @@
 //
 //***************************************************************************
 
-#ifndef __ADOASYNCSRV__H__
-#define __ADOASYNCSRV__H__
+#ifndef UC_ADOASYNCSRV_H
+#define UC_ADOASYNCSRV_H
 
-#ifndef	__ADOCONNPOOL_H__
 #include <DB/ADO/AdoConnPool.h>
-#endif
-
-#ifndef __CHUNKED_SWAPQUEUE_H__
 #include <Containers/Queue/ChunkedSwapQueue.h>
-#endif
 
+//***************************************************************************
+// @brief ADO 비동기 DB 요청 처리 및 스레드 풀 관리 서비스 클래스
+// @detail 데이터베이스 요청을 큐에 쌓아 비동기 스레드에서 처리하며, 
+//         비동기 핸들러 맵 관리 및 ADO 커넥션 풀을 제공합니다.
+//***************************************************************************
 class CAdoAsyncSrv
 {
 	typedef std::unordered_map<uint16, std::shared_ptr<CDBAsyncSrvHandler>> COMMAND_MAP;
 
+	//***************************************************************************
+	// @brief 비동기 서비스 내부 설정 상수
+	// @detail 큐 크기 경고 임계치 등을 정의하는 상수 열거형입니다.
+	//***************************************************************************
 	enum
 	{
 		MAX_WARNING_QUERY_QUEUE_SIZE = 100000,
@@ -32,15 +36,29 @@ public:
 
 	std::shared_ptr<CDBAsyncSrvHandler> Regist(const BYTE command, std::shared_ptr<CDBAsyncSrvHandler> const handler);
 
+	//***************************************************************************
+	// @brief 현재 대기 중인 비동기 요청 큐의 크기를 반환합니다.
+	// @return int 현재 큐에 대기 중인 요청 개수
+	//***************************************************************************
 	int GetQueryQueueSize() const {
 		return static_cast<int>(_queueDBAsyncRq.GetSize());
 	}
+
+	//***************************************************************************
+	// @brief 비동기 요청 큐가 비어있는지 확인합니다.
+	// @return bool 큐가 비어있으면 true, 요청이 존재하면 false
+	//***************************************************************************
 	bool IsEmpty() const {
 		return _queueDBAsyncRq.IsEmpty();
 	}
+
 	int Push(std::unique_ptr<st_DBAsyncRq> pAsyncRq);
 	std::unique_ptr<st_DBAsyncRq> Pop(CQueue<std::unique_ptr<st_DBAsyncRq>>& localQueue);
 
+	//***************************************************************************
+	// @brief 큐 용량이 설정값 미만이 되거나 스레드가 종료될 때까지 생산자 스레드를 대기시킵니다.
+	// @param maxCapacity 대기 기준이 되는 최대 용량 크기
+	//***************************************************************************
 	void WaitPushCapacity(size_t maxCapacity) {
 		std::unique_lock<std::mutex> lock(_mutex);
 		_cvProducer.wait(lock, [this, maxCapacity]() {
@@ -48,14 +66,24 @@ public:
 			});
 	}
 
+	//***************************************************************************
+	// @brief 현재 처리 중인(미완료된) 비동기 요청 수를 반환합니다.
+	// @return int32 현재 처리 중인 미완료 요청 수
+	//***************************************************************************
 	int32 GetOutstandingRequests() const {
 		return _nOutstandingRequests.load(std::memory_order_relaxed);
 	}
 
+	//***************************************************************************
+	// @brief 처리 중인 비동기 요청 수를 1 증가시킵니다.
+	//***************************************************************************
 	void AddOutstandingRequest() {
 		_nOutstandingRequests.fetch_add(1, std::memory_order_relaxed);
 	}
 
+	//***************************************************************************
+	// @brief 처리 중인 비동기 요청 수를 1 감소시킵니다.
+	//***************************************************************************
 	void SubOutstandingRequest() {
 		_nOutstandingRequests.fetch_sub(1, std::memory_order_relaxed);
 	}
@@ -65,6 +93,10 @@ public:
 
 	void StartIoThreads();
 	bool Action();
+
+	//***************************************************************************
+	// @brief 비동기 서비스 스레드를 중단하고 대기 중인 모든 조건 변수에 알림을 보냅니다.
+	//***************************************************************************
 	void StopThread() {
 		_bStopThread.store(true);
 		_cva.notify_all();
@@ -76,12 +108,12 @@ public:
 	CAdoConnPool* GetLogAdoConnPool();
 
 	CChunkedSwapQueue<std::unique_ptr<st_DBAsyncRq>>	_queueDBAsyncRq;			// 비동기 요청 큐
-	COMMAND_MAP							_mapCommand;				// 명령 핸들러 맵
+	COMMAND_MAP											_mapCommand;				// 명령 핸들러 맵
 
-	int32								_nDBCount;					// DB 개수
-	bool								_bOpen;						// 서비스 오픈 여부
-	int32								_nMaxThreadCnt;				// 최대 스레드 수
-	CAdoConnPool**						_pAdoConnPools;				// ADO 연결 풀 배열
+	int32						_nDBCount;					// DB 개수
+	bool						_bOpen;						// 서비스 오픈 여부
+	int32						_nMaxThreadCnt;				// 최대 스레드 수
+	CAdoConnPool**				_pAdoConnPools;				// ADO 연결 풀 배열
 
 public:
 	static std::shared_ptr<CAdoAsyncSrv> Instance();
@@ -96,9 +128,9 @@ private:
 	std::atomic<int32>			_nOutstandingRequests{ 0 };			// 처리 중 요청 수
 	int							_nLastWarnedQueueSize{ 2 };			// 마지막 경고 큐 크기
 
-	std::mutex					_mutex;								// 동기화용 뮤텍스				
+	std::mutex					_mutex;								// 동기화용 뮤텍스
 	std::condition_variable		_cva;								// 소비자 대기 조건 변수
 	std::condition_variable		_cvProducer;						// 생산자 대기 조건 변수
 };
 
-#endif // ndef __ADOASYNCSRV__H__
+#endif // ndef UC_ADOASYNCSRV_H

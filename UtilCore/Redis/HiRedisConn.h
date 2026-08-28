@@ -4,10 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __HIREDISCONN_H__
-#define __HIREDISCONN_H__
-
-#pragma once
+#ifndef UC_HIREDISCONN_H
+#define UC_HIREDISCONN_H
 
 #include <string>
 #include <list>
@@ -1108,4 +1106,4 @@ namespace RedisCpp
 	};
 }
 
-#endif // ndef __HIREDISCONN_H__
+#endif // ndef UC_HIREDISCONN_H

@@ -4,8 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __BASEFILE_H__
-#define __BASEFILE_H__
+#ifndef UC_BASEFILE_H
+#define UC_BASEFILE_H
 
 //***************************************************************************
 // Synchoronus File Processing
@@ -32,4 +32,4 @@ protected:
 	HANDLE		m_hFile;
 };
 
-#endif // ndef __BASEFILE_H__
+#endif // ndef UC_BASEFILE_H

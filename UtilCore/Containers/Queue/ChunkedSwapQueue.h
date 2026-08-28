@@ -4,24 +4,13 @@
 //
 //***************************************************************************
 
-#ifndef __CHUNKED_SWAPQUEUE_H__
-#define __CHUNKED_SWAPQUEUE_H__
+#ifndef UC_CHUNKEDSWAPQUEUE_H
+#define UC_CHUNKEDSWAPQUEUE_H
 
-#ifndef __BASEREDEFINEDATATYPE_H__
 #include <BaseRedefineDataType.h>
-#endif
-
-#ifndef	__CONTAINERS_H__
-#include <Memory/Containers.h>
-#endif
-
-#ifndef __PLATFORMLOCK_H__
-#include <Thread/PlatformLock.h>
-#endif
-
-#ifndef	__QUEUECOMMON_H__
 #include <Containers/Queue/QueueCommon.h>
-#endif
+#include <Memory/Containers.h>
+#include <Thread/PlatformLock.h>
 
 //***************************************************************************
 // @class CChunkedSwapQueue
@@ -188,4 +177,4 @@ private:
     std::atomic<bool>       _stopped{ false };  // 종료 플래그 추가
 };
 
-#endif // ndef __CHUNKED_SWAPQUEUE_H__
+#endif // ndef UC_CHUNKEDSWAPQUEUE_H

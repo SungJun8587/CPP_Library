@@ -4,19 +4,14 @@
 //
 //***************************************************************************
 
-#ifndef __COMMONUTIL_H__
-#define __COMMONUTIL_H__
+#ifndef UC_COMMONUTIL_H
+#define UC_COMMONUTIL_H
 
 #include <functional>
 #include <random>
 
-#ifndef __DBENUM_H__
 #include <DB/DBEnum.h> 
-#endif
-
-#ifndef __ENCODINGCONVERT_H__
 #include <Util/EncodingConvert.h> 
-#endif
 
 //***************************************************************************
 // @namespace SYSTEM
@@ -493,10 +488,13 @@ void		GetDBDSNString(TCHAR* ptszDSN, const EDBClass dbClass, const TCHAR* ptszDS
 // ADO 연결 문자열 생성 함수 선언
 void		GetADOConnectionString(TCHAR* ptszConnStr, const EDBClass dbClass, const TCHAR* ptszDBHost, const unsigned int nPort, const TCHAR* ptszDBUserId, const TCHAR* ptszDBPasswd, const TCHAR* ptszDBName);
 
+// REDIS 연결 문자열 생성 함수 선언
+void		GetRedisConnectionString(TCHAR* ptszConnStr, const TCHAR* ptszDBHost, const unsigned int nPort, const TCHAR* ptszDBUserId, const TCHAR* ptszDBPasswd, const TCHAR* ptszDBName);
+
 EDBClass	GetInt8ToDBClass(uint8 num);
 uint32		GetUInt32(const char* pszText);
 uint64		GetUInt64(const char* pszText);
 uint32		GetUInt32(const wchar_t* pwszText);
 uint64		GetUInt64(const wchar_t* pwszText);
 
-#endif // ndef __COMMONUTIL_H__
+#endif // ndef UC_COMMONUTIL_H

@@ -4,13 +4,12 @@
 //
 //***************************************************************************
 
-#ifndef __DBORACLEQUERY_H__
-#define __DBORACLEQUERY_H__
-
-#pragma once
+#ifndef UC_DBORACLEQUERY_H
+#define UC_DBORACLEQUERY_H
 
 //***************************************************************************
-// ORACLE 인덱스타입 : ALL_INDEXES 테이블 INDEX_TYPE(VARCHAR2(27)) 컬럼
+// @brief ORACLE 인덱스타입 : ALL_INDEXES 테이블 INDEX_TYPE(VARCHAR2(27)) 컬럼
+//***************************************************************************
 enum class EORACLEIndexType
 {
 	NONE = 0,
@@ -27,25 +26,35 @@ enum class EORACLEIndexType
 	DOMAIN_ = 11
 };
 
+//***************************************************************************
+// @brief EORACLEIndexType 열거형 값을 문자열 형태로 변환
+// @param v 변환할 ORACLE 인덱스 타입 열거형 값
+// @return 인덱스 타입에 대응하는 문자열 (TCHAR*)
+//***************************************************************************
 inline const TCHAR* ToString(EORACLEIndexType v)
 {
 	switch( v )
 	{
-		case EORACLEIndexType::LOB:							return _T("LOB");
-		case EORACLEIndexType::NORMAL:						return _T("NORMAL");
-		case EORACLEIndexType::NORMAL1REV:					return _T("NORMAL/REV");
-		case EORACLEIndexType::BITMAP:						return _T("BITMAP");
-		case EORACLEIndexType::FUNCTION2BASED__NORMAL:		return _T("FUNCTION-BASED NORMAL");
-		case EORACLEIndexType::FUNCTION2BASED__NORMAL1REV:	return _T("FUNCTION-BASED NORMAL/REV");
-		case EORACLEIndexType::FUNCTION2BASED__BITMAP:		return _T("FUNCTION-BASED BITMAP");
-		case EORACLEIndexType::FUNCTION2BASED__DOMAIN:		return _T("FUNCTION-BASED DOMAIN");
-		case EORACLEIndexType::CLUSTER:						return _T("CLUSTER");
-		case EORACLEIndexType::IOT__2__TOP:					return _T("IOT - TOP");
-		case EORACLEIndexType::DOMAIN_:						return _T("DOMAIN");
-		default:											return _T("NONE");
+	case EORACLEIndexType::LOB:							return _T("LOB");
+	case EORACLEIndexType::NORMAL:						return _T("NORMAL");
+	case EORACLEIndexType::NORMAL1REV:					return _T("NORMAL/REV");
+	case EORACLEIndexType::BITMAP:						return _T("BITMAP");
+	case EORACLEIndexType::FUNCTION2BASED__NORMAL:		return _T("FUNCTION-BASED NORMAL");
+	case EORACLEIndexType::FUNCTION2BASED__NORMAL1REV:	return _T("FUNCTION-BASED NORMAL/REV");
+	case EORACLEIndexType::FUNCTION2BASED__BITMAP:		return _T("FUNCTION-BASED BITMAP");
+	case EORACLEIndexType::FUNCTION2BASED__DOMAIN:		return _T("FUNCTION-BASED DOMAIN");
+	case EORACLEIndexType::CLUSTER:						return _T("CLUSTER");
+	case EORACLEIndexType::IOT__2__TOP:					return _T("IOT - TOP");
+	case EORACLEIndexType::DOMAIN_:						return _T("DOMAIN");
+	default:											return _T("NONE");
 	}
 }
 
+//***************************************************************************
+// @brief 문자열 형태의 인덱스 타입을 EORACLEIndexType 열거형 값으로 변환
+// @param ptszIndexType 변환할 인덱스 타입 문자열
+// @return 대응하는 EORACLEIndexType 열거형 값 (매칭되지 않을 경우 NONE)
+//***************************************************************************
 inline const EORACLEIndexType StringToORACLEIndexType(const TCHAR* ptszIndexType)
 {
 	if( ::_tcsicmp(ptszIndexType, _T("LOB")) == 0 )
@@ -75,8 +84,9 @@ inline const EORACLEIndexType StringToORACLEIndexType(const TCHAR* ptszIndexType
 }
 
 //***************************************************************************
-// ORACLE 인덱스 조각화 정보
-//	- BLEVEL이 4이상(HIGH LEVEL)인 경우 REBUILD 대상으로 판단
+// @brief ORACLE 인덱스 조각화 정보
+// @details BLEVEL이 4이상(HIGH LEVEL)인 경우 REBUILD 대상으로 판단
+//***************************************************************************
 class ORACLE_INDEX_FRAGMENTATION
 {
 public:
@@ -88,9 +98,9 @@ public:
 };
 
 //***************************************************************************
-// ORACLE 인덱스 조각화 정보
-//	- PCT_DELETED가 20%이상으로 나타나면 인덱스는 REBUILD 대상으로 판단
-//	- DISTINCTIVENESS 컬럼은 인덱스가 만들어진 컬럼의 값이 얼마나 자주 반복되는지를 보여주는 값(해당 값이 99%이상이면 BITMAP INDEX 대상)
+// @brief ORACLE 인덱스 조각화 정보
+// @details PCT_DELETED가 20%이상으로 나타나면 인덱스는 REBUILD 대상으로 판단 / DISTINCTIVENESS 컬럼은 인덱스가 만들어진 컬럼의 값이 얼마나 자주 반복되는지를 보여주는 값(해당 값이 99%이상이면 BITMAP INDEX 대상)
+//***************************************************************************
 class ORACLE_INDEX_STAT_FRAGMENTATION
 {
 public:
@@ -100,7 +110,8 @@ public:
 };
 
 //***************************************************************************
-// ORACLE 인덱스 조각화 정보
+// @brief ORACLE 인덱스 조각화 정보
+//***************************************************************************
 class ORACLE_TABLE_IDENTITY_COLUMN
 {
 public:
@@ -109,30 +120,15 @@ public:
 	TCHAR	tszColumnName[DATABASE_COLUMN_NAME_STRLEN];		// 컬럼 명
 	TCHAR   tszIdentityColumn[4];							// 컬럼이 Identity인지 여부(YES/NO : 유/무)
 	TCHAR   tszDefaultOnNull[4];							// 컬럼이 DEFAULT ON NULL 의미를 가지는지 여부(YES/NO : 유/무)
-
-	/// <summary>ID 열의 생성 유형
-	/// - ALWAYS : 기본 설정 옵션으로, 이 옵션을 사용하면 컬럼에 대한 사용자의 입력을 받지 않고 시스템이 자동으로 값을 할당. NULL 값 허용 안함(에러 발생).
-	/// - BY DEFAULT : 이 옵션은 사용자가 컬럼에 대한 값을 지정하면 해당 값을 사용하고, 값이 제공되지 않으면 시스템이 값을 생성. NULL 값 허용 안함(에러 발생).
-	/// - BY DEFAULT ON NULL : BY DEFAULT 옵션과 동일하지만, NULL 값을 입력되었을 경우 에러를 발생하지 않고 시스템이 자동으로 값을 할당.
-	/// </summary>
-	TCHAR	tszGenerationType[32];
-
+	TCHAR	tszGenerationType[32];							// ID 열의 생성 유형 (ALWAYS / BY DEFAULT / BY DEFAULT ON NULL)
 	TCHAR   tszSequenceName[DATABASE_OBJECT_NAME_STRLEN];	// ID 열과 연관된 시퀀스 이름(SYS.USER_SEQUENCES 테이블 SEQUENCE_NAME 컬럼 참조)
 	uint64	MinValue;										// 시퀀스의 최소값
 	uint64	MaxValue;										// 시퀀스의 최대값
 	uint64	IncrementBy;									// 시퀀스가 증가되는 값
-
-	TCHAR   tszCycleFlag[2];								// 한계에 도달하면 시퀀스가 ​​순환 여부(Y/N : 유/무)
+	TCHAR   tszCycleFlag[2];								// 한계에 도달하면 시퀀스가 순환 여부(Y/N : 유/무)
 	TCHAR   tszOrderFlag[2];								// 시퀀스 번호가 순서대로 생성되는지 여부(Y/N : 유/무)
 	uint64	CacheSize;										// 캐시할 시퀀스 번호 수
-
-	/// <summary>디스크에 기록된 마지막 시퀀스 번호
-	///     - 시퀀스가 캐싱을 사용하는 경우 디스크에 기록된 숫자는 시퀀스 캐시에 배치된 마지막 숫자입니다. 
-	///     - 이 번호는 사용된 마지막 시퀀스 번호보다 클 가능성이 높습니다.
-	///     - 세션 순서의 경우 이 열의 값은 무시되어야 합니다.
-	/// </summary>
-	uint64	LastNumber;
-
+	uint64	LastNumber;										// 디스크에 기록된 마지막 시퀀스 번호
 	TCHAR   tszScaleFlag[2];								// 확장 가능한 시퀀스인지 여부(Y/N : 유/무)
 	TCHAR   tszExtendFlag[2];								// 이 확장 가능한 시퀀스의 생성된 값이 MAX_VALUE 또는 MIN_VALUE를 초과하는지 여부(Y/N : 유/무)
 	TCHAR	tszShardedFlag[2];								// 이것이 분할된 시퀀스인지 여부(Y/N : 유/무)
@@ -140,81 +136,50 @@ public:
 	TCHAR   tszKeepValue[2];								// 시퀀스 값이 실패후 재생 중에 유지되는지 여부(Y/N : 유/무)
 };
 
+//***************************************************************************
+// @brief ORACLE DB 테이블 아이덴티티 컬럼 정보를 관리하는 클래스
+//***************************************************************************
 class ORACLEDBTableIdentityColumn
 {
 public:
-	_tstring	SchemaName;
-	_tstring	TableName;
-	_tstring	ColumnName;
-	_tstring	IdentityColumn;
-	_tstring	DefaultOnNull;
-	_tstring	GenerationType;
-	_tstring	SequenceName;
-	uint64		MinValue;
-	uint64		MaxValue;
-	uint64		IncrementBy;
-	_tstring	CycleFlag;
-	_tstring	OrderFlag;
-	uint64		CacheSize;
-	uint64		LastNumber;
-	_tstring	ScaleFlag;
-	_tstring	ExtendFlag;
-	_tstring	ShardedFlag;
-	_tstring	SessionFlag;
-	_tstring	KeepValue;
+	_tstring	SchemaName;			// 스키마 명
+	_tstring	TableName;			// 테이블 명
+	_tstring	ColumnName;			// 컬럼 명
+	_tstring	IdentityColumn;		// 컬럼이 Identity인지 여부
+	_tstring	DefaultOnNull;		// 컬럼이 DEFAULT ON NULL 의미를 가지는지 여부
+	_tstring	GenerationType;		// ID 열의 생성 유형
+	_tstring	SequenceName;		// ID 열과 연관된 시퀀스 이름
+	uint64		MinValue;			// 시퀀스의 최소값
+	uint64		MaxValue;			// 시퀀스의 최대값
+	uint64		IncrementBy;		// 시퀀스가 증가되는 값
+	_tstring	CycleFlag;			// 한계 도달 시 순환 여부
+	_tstring	OrderFlag;			// 시퀀스 번호 순서 생성 여부
+	uint64		CacheSize;			// 캐시할 시퀀스 번호 수
+	uint64		LastNumber;			// 디스크에 기록된 마지막 시퀀스 번호
+	_tstring	ScaleFlag;			// 확장 가능한 시퀀스 여부
+	_tstring	ExtendFlag;			// 생성된 값이 범위 초과 여부
+	_tstring	ShardedFlag;		// 분할된 시퀀스 여부
+	_tstring	SessionFlag;		// 세션 전용 시퀀스 여부
+	_tstring	KeepValue;			// 재생 중 유지 여부
 };
 
 //***************************************************************************
-//
+// @brief ORACLE 테이블 컬럼 옵션 구문 생성
+// @param dataTypeDesc 데이터 타입 설명
+// @param isNullable Null 허용 여부
+// @param defaultDefinition 기본값 정의
+// @param isIdentity Identity 컬럼 여부
+// @param pdbTabIdentityCols Identity 컬럼 상세 정보 포인터
+// @return 생성된 컬럼 옵션 SQL 구문 문자열
+//***************************************************************************
 inline _tstring ORACLEGetTableColumnOption(_tstring dataTypeDesc, bool isNullable, _tstring defaultDefinition, bool isIdentity, ORACLEDBTableIdentityColumn* pdbTabIdentityCols)
 {
 	_tstring columnOption = _T("");
 
-	// <컬럼속성> : DEFAULT, {NULL|NOT NULL} 설정이 포함됨
-	//  - 만약 컬럼 속성에 포함된 설정 값을 변경할 경우 아래와 같은 순서로 나열해서 변경하면 됨
-	//  - DEFAULT 값 {NULL|NOT NULL}
-	//
-	// 컬럼명 데이터타입 <컬럼속성>
-	//  - 컬럼명 데이터타입 [IDENTITY 컬럼 정의] {NULL|NOT NULL}
-	//  - 컬럼명 데이터타입 {NULL|NOT NULL}
-	//  - 컬럼명 데이터타입 DEFAULT 값 {NULL|NOT NULL}
 	columnOption = dataTypeDesc;
 
 	if( isIdentity && pdbTabIdentityCols != NULL )
 	{
-		// [IDENTITY 컬럼 정의]
-		//  GENERATED        
-		//  [ ALWAYS | BY DEFAULT [ ON NULL ] ]
-		//  AS IDENTITY [ ( identity_options ) ]
-		//  : IDENTITY 컬럼은 오라클 12c 버전부터 사용 가능하며, 테이블을 생성할 때 특정 컬럼에 자동증가 속성을 부여합니다.
-		//    IDENTITY 컬럼은 내부적으로 시퀀스를 사용하여 값을 생성하지만, 사용자는 이 과정을 신경 쓸 필요가 없습니다. 
-		//    테이블 정의 시에 해당 컬럼을 IDENTITY로 지정함으로써, 행이 추가될 때마다 오라클이 자동으로 값을 생성하고 할당합니다. 
-		//      - GENERATED ALWAYS AS IDENTITY : 이 옵션을 사용하면 오라클은 항상 고유한 값을 자동으로 생성합니다. 
-		//                                       사용자가 명시적으로 값을 지정하려고 하거나 NULL 값을 삽입하려고 할 때 에러가 발생합니다. 
-		//                                       이는 기본 설정 옵션으로, 이 옵션을 사용하면 컬럼에 대한 사용자의 입력을 받지 않고 오라클 시스템이 자동으로 값을 할당합니다. 
-		//      - GENERATED BY DEFAULT AS IDENTITY : 이 옵션은 사용자가 컬럼에 대해 값을 명시적으로 제공하지 않을 때만 오라클이 자동으로 값을 생성합니다. 
-		//                                           사용자가 컬럼에 대한 값을 지정하면 해당 값을 사용하고, 값이 제공되지 않으면 시스템이 값을 생성합니다. 
-		//                                           하지만 NULL 값을 삽입하려고 하면 에러가 발생합니다.
-		//      - GENERATED BY DEFAULT ON NULL AS IDENTITY : 이 옵션은 BY DEFAULT 옵션과 유사하지만, 차이점은 NULL 값을 컬럼에 삽입할 수 있으며, 이 경우 시스템이 자동으로 값을 생성한다는 것입니다. 
-		//                                                   사용자가 값을 명시적으로 제공하거나, 값을 제공하지 않거나, NULL 값을 제공하면, 오라클이 자동으로 고유한 값을 생성합니다.
-		//      
-		//          - START WITH: 시작 값 지정. 기본값은 1입니다.
-		//          - INCREMENT BY: 증가량 지정. 기본값은 1입니다.
-		//          - MINVALUE, MAXVALUE: 값의 최소값 및 최대값을 지정할 수 있습니다.
-		//          - CACHE/NOCACHE: 성능 최적화를 위해 특정 수의 값들을 미리 생성하고 캐시에 저장합니다. NOCACHE는 이 기능을 비활성화합니다.
-		//          - ORDER/NOORDER: 시퀀스 번호가 순서대로 생성되었는지 여부를 결정합니다.
-		//          - CYCLE/NOCYCLE: 최대값에 도달한 후 다시 최소값으로 돌아갈지 여부를 결정합니다.
-		//          - KEEP/NOKEEP: 시퀀스 값이 실패후 재생 중에 유지되는지 여부를 결정합니다.
-		//          - SCALE/NOSCALE: 확장 가능한 시퀀스인지 여부를 결정합니다.
-		//  Ex)
-		//      CREATE TABLE users (
-		//          user_id NUMBER GENERATED BY DEFAULT AS IDENTITY
-		//          START WITH 1000 INCREMENT BY 1,
-		//          username VARCHAR2(100)
-		//      );
-		//
-		//      INSERT INTO users (username) VALUES ('user1');
-		//
 		columnOption = columnOption + " GENERATED " + pdbTabIdentityCols->GenerationType + (pdbTabIdentityCols->DefaultOnNull == "YES" ? " ON NULL" : "") + " AS IDENTITY";
 		columnOption = columnOption + " MINVALUE " + to_tstring(pdbTabIdentityCols->MinValue);
 		columnOption = columnOption + " MAXVALUE " + to_tstring(pdbTabIdentityCols->MaxValue);
@@ -233,21 +198,27 @@ inline _tstring ORACLEGetTableColumnOption(_tstring dataTypeDesc, bool isNullabl
 }
 
 //***************************************************************************
-//
+// @brief 제약 조건 삭제 쿼리 생성
+// @param tableName 테이블 명
+// @param constType 제약 조건 타입 (P, U, R, C 등)
+// @param constName 제약 조건 명
+// @return 제약 조건 삭제 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEGetDropConstraintQuery(_tstring tableName, _tstring constType, _tstring constName)
 {
 	_tstring query = _T("");
 
 	if( constType == "P" || constType == "U" || constType == "R" || constType == "C" )
 	{
-		// ALTER TABLE [테이블명] DROP CONSTRAINT [제약조건명]
 		query = tstring_tcformat(_T("ALTER TABLE %s DROP CONSTRAINT %s"), tableName.c_str(), constName.c_str());
 	}
 	return query;
 }
 
 //***************************************************************************
-//
+// @brief DB 시스템 정보 조회 쿼리 생성
+// @return DB 시스템 정보 조회 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEGetDBSystemQuery()
 {
 	_tstring query = _T("");
@@ -260,7 +231,9 @@ inline _tstring ORACLEGetDBSystemQuery()
 }
 
 //***************************************************************************
-//
+// @brief 사용자 목록 조회 쿼리 생성
+// @return 사용자 목록 조회 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEGetUserListQuery()
 {
 	_tstring query = _T("");
@@ -270,7 +243,9 @@ inline _tstring ORACLEGetUserListQuery()
 }
 
 //***************************************************************************
-//
+// @brief 테이블스페이스 목록 조회 쿼리 생성
+// @return 테이블스페이스 목록 조회 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEGetTableSpaceListQuery()
 {
 	_tstring query = _T("");
@@ -280,7 +255,9 @@ inline _tstring ORACLEGetTableSpaceListQuery()
 }
 
 //***************************************************************************
-//
+// @brief 데이터베이스 목록 조회 쿼리 생성
+// @return 데이터베이스 목록 조회 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEGetDatabaseListQuery()
 {
 	_tstring query = _T("");
@@ -290,9 +267,12 @@ inline _tstring ORACLEGetDatabaseListQuery()
 }
 
 //***************************************************************************
-// Ex)
-//	COMMENT ON TABLE 테이블명 IS '코멘트';
-//  COMMENT ON COLUMN 테이블명.컬럼명 IS '코멘트';
+// @brief 테이블 또는 컬럼 코멘트 처리 쿼리 생성
+// @param tableName 테이블 명
+// @param setComment 설정할 주석 내용
+// @param columnName 컬럼 명 (기본값: 빈 문자열, 입력 시 컬럼 주석 생성)
+// @return 코멘트 설정 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEProcessTableColumnCommentQuery(_tstring tableName, _tstring setComment, _tstring columnName = _T(""))
 {
 	_tstring query = _T("");
@@ -305,9 +285,12 @@ inline _tstring ORACLEProcessTableColumnCommentQuery(_tstring tableName, _tstrin
 }
 
 //***************************************************************************
-// Ex)
-//  SELECT DBMS_METADATA.GET_DDL('TABLE', '테이블명') SCRIPT FROM DUAL
-//  SELECT DBMS_METADATA.GET_DDL('INDEX', '인덱스명') SCRIPT FROM DUAL
+// @brief 객체 DDL 추출 쿼리 생성 (DBMS_METADATA.GET_DDL)
+// @param dbObjectType DB 객체 유형 (테이블, 인덱스 등)
+// @param objectName 객체 명
+// @param schemaName 스키마 명 (기본값: 빈 문자열)
+// @return DDL 추출 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEMetaDataGetDDLQuery(EDBObjectType dbObjectType, _tstring objectName, _tstring schemaName = _T(""))
 {
 	_tstring query = _T("");
@@ -319,9 +302,13 @@ inline _tstring ORACLEMetaDataGetDDLQuery(EDBObjectType dbObjectType, _tstring o
 	return query;
 }
 
-
 //***************************************************************************
-// 해당 인덱스 생성 쿼리 확인
+// @brief 테이블 인덱스 DDL 메타데이터 조회 쿼리 생성
+// @param tableName 테이블 명
+// @param indexName 인덱스 명 (기본값: 빈 문자열)
+// @param schemaName 스키마 명 (기본값: 빈 문자열)
+// @return 인덱스 DDL 메타데이터 조회 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLETableIndexMetaDataGetDDLQuery(_tstring tableName, _tstring indexName = _T(""), _tstring schemaName = _T(""))
 {
 	_tstring query = _T("");
@@ -361,7 +348,11 @@ inline _tstring ORACLETableIndexMetaDataGetDDLQuery(_tstring tableName, _tstring
 }
 
 //***************************************************************************
-// 해당 테이블에 외래키 생성 쿼리 만들기
+// @brief 테이블 외래키 생성 SQL 쿼리 구문 추출
+// @param tableName 테이블 명
+// @param constraintName 제약 조건 명 (기본값: 빈 문자열)
+// @return 외래키 생성 쿼리문 출력 SQL
+//***************************************************************************
 inline _tstring ORACLETableForeignKeyCreateSQLQuery(_tstring tableName, _tstring constraintName = _T(""))
 {
 	_tstring query = _T("");
@@ -391,7 +382,10 @@ inline _tstring ORACLETableForeignKeyCreateSQLQuery(_tstring tableName, _tstring
 }
 
 //***************************************************************************
-// 해당 테이블, 컬럼 코멘트 생성 쿼리 만들기
+// @brief 테이블 및 컬럼 코멘트 생성 SQL 쿼리 구문 추출
+// @param tableName 테이블 명
+// @return 코멘트 생성 쿼리문 출력 SQL
+//***************************************************************************
 inline _tstring ORACLETableCommentCreateSQLQuery(_tstring tableName)
 {
 	_tstring query = _T("");
@@ -407,8 +401,11 @@ inline _tstring ORACLETableCommentCreateSQLQuery(_tstring tableName)
 }
 
 //***************************************************************************
-// PROCEDURE, FUNCTION, TRIGGER 등 객체의 텍스트 소스 확인
-// TYPE 컬럼 : PROCEDURE, FUNCTION, TRIGGER 등으로 구분
+// @brief 객체(PROCEDURE, FUNCTION, TRIGGER 등) 소스 코드 조회 쿼리 생성
+// @param dbObjectType DB 객체 유형
+// @param objectName 객체 명
+// @return 소스 코드 조회 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEGetUserSourceQuery(EDBObjectType dbObjectType, _tstring objectName)
 {
 	_tstring query = tstring_tcformat(_T("SELECT TEXT FROM SYS.USER_SOURCE WHERE TYPE = '%s' AND NAME = '%s'"), ToString(dbObjectType), objectName.c_str());
@@ -416,28 +413,27 @@ inline _tstring ORACLEGetUserSourceQuery(EDBObjectType dbObjectType, _tstring ob
 }
 
 //***************************************************************************
-// 인덱스 리빌드 대상 확인 1(1, 2 순서대로 처리)
-//  1. ORACLEGetAnalyzeIndexFragmentationCheckQuery : 분석하고자 하는 인덱스에 대한 통계정보를 생성
-//  2. ORACLEGetIndexFragmentationCheckQuery : BLEVEL이 4이상(HIGH LEVEL)인 경우 REBUILD 대상으로 판단
+// @brief 인덱스 조각화 분석용 통계 생성 쿼리 (Step 1)
+// @param indexName 분석할 인덱스 명
+// @return 인덱스 분석 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEGetAnalyzeIndexFragmentationCheckQuery(_tstring indexName)
 {
 	_tstring query = _T("");
 
-	// 분석하고자 하는 인덱스에 대한 통계정보를 생성
-	// 수백만건 이상의 row를 지닌 테이블에 대한 인덱스인 경우 COMPUTE STATISTICS 대신에 ESTIMATE 옵션을 사용할 것.
 	query = query + "ANALYZE INDEX " + indexName + " COMPUTE STATISTICS";
 	return query;
 }
 
 //***************************************************************************
-//
+// @brief 인덱스 B-Tree 깊이(BLEVEL) 기반 조각화 점검 쿼리 (Step 2)
+// @param indexName 인덱스 명
+// @return 조각화 점검 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEGetIndexFragmentationCheckQuery(_tstring indexName)
 {
 	_tstring query = _T("");
 
-	// BLEVEL이 4이상(HIGH LEVEL)인 경우 REBUILD 대상으로 판단
-	// 이 BLEVEL(Branch Level)이 의미하는 것은 오라클이 Index Access를 할 때 몇 단계를 거쳐서 블럭의 위치를 찾아가는가와 관계가 있음
-	// 아래 SQL 수행시 통계가 수집되지 않은 인덱스에 대해서는 "BLEVEL HIGH" 로 나타남
 	query = query + "SELECT TABLE_NAME AS \"table_name\", INDEX_NAME AS \"index_name\", BLEVEL AS \"blevel\", DECODE(BLEVEL, 0, 'OK BLEVEL', 1, 'OK BLEVEL', 2, 'OK BLEVEL', 3, 'OK BLEVEL', 4, 'OK BLEVEL', 'BLEVEL HIGH') \"ok?\", ";
 	query = query + "\n" + "TO_CHAR(LAST_ANALYZED, 'yyyy-mm-dd hh24:mi:ss') AS \"last_analyzed\"";
 	query = query + "\n" + "FROM SYS.USER_INDEXES";
@@ -447,29 +443,27 @@ inline _tstring ORACLEGetIndexFragmentationCheckQuery(_tstring indexName)
 }
 
 //***************************************************************************
-// 인덱스 리빌드 대상 확인 2(1, 2 순서대로 처리)
-//  1. ORACLEGetAnalyzeIndexStatFragmentationCheckQuery : INDEX_STATS 테이블에 추가적인 인덱스 정보를 생성
-//  2. ORACLEGetIndexStatFragmentationCheckQuery : PCT_DELETED가 20%이상으로 나타나면 인덱스는 REBUILD 대상으로 판단
+// @brief INDEX_STATS 테이블 구조 검증 통계 생성 쿼리 (Step 1)
+// @param indexName 분석할 인덱스 명
+// @return 구조 검증 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEGetAnalyzeIndexStatFragmentationCheckQuery(_tstring indexName)
 {
 	_tstring query = _T("");
 
-	// INDEX_STATS 테이블에 추가적인 인덱스 정보를 생성
-	// 주의할 점은 아래의 쿼리 실행시 Lock이 발생하므로, 점검시에 해야함.
 	query = query + "ANALYZE INDEX " + indexName + " VALIDATE STRUCTURE";
 	return query;
 }
 
 //***************************************************************************
-//
+// @brief 인덱스 삭제 비율(PCT_DELETED) 및 카디널리티 조각화 점검 쿼리 (Step 2)
+// @param indexName 인덱스 명
+// @return 삭제 비율 및 조각화 점검 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEGetIndexStatFragmentationCheckQuery(_tstring indexName)
 {
 	_tstring query = _T("");
 
-	// PCT_DELETED가 20%이상으로 나타나면 인덱스는 REBUILD 대상으로 판단
-	// DISTINCTIVENESS 컬럼은 인덱스가 만들어진 컬럼의 값이 얼마나 자주 반복되는지를 보여주는 값(해당 값이 99%이상이면 BITMAP INDEX 대상)
-	//  - 1만건의 row와 9000건의 서로 다른 값을 가진 테이블이 있을 때 DISTINCTIVENESS값 : (10000 - 9000) * 100 / 10000 = 10     => 컬럼의 값이 잘 분산되어 있음
-	//  - 1만건의 row가 있지만 2가지 값으로만 중복되어 있을 때 DISTINCTIVENESS값 : (10000 - 2) * 100 / 10000 = 99.98            => rebuild 대상이 아니라 BITMAP INDEX로 만들 대상(99%이상이면 BITMAP INDEX 대상)
 	query = query + "SELECT NAME AS \"index_name\", DEL_LF_ROWS * 100 / DECODE(LF_ROWS, 0, 1, LF_ROWS) AS \"PCT_DELETED\", ";
 	query = query + "\n" + "(LF_ROWS - DISTINCT_KEYS) * 100 / DECODE(LF_ROWS, 0, 1, LF_ROWS) AS \"distinctiveness\"";
 	query = query + "\n" + "FROM SYS.INDEX_STATS";
@@ -479,18 +473,22 @@ inline _tstring ORACLEGetIndexStatFragmentationCheckQuery(_tstring indexName)
 }
 
 //***************************************************************************
-//
+// @brief 인덱스 REBUILD 쿼리 생성
+// @param indexName 인덱스 명
+// @return 인덱스 재구축 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEGetIndexRebuildQuery(_tstring indexName)
 {
 	_tstring query = _T("");
 
-	// ALTER INDEX 인덱스명 REBUILD;
 	query = query + "ALTER INDEX " + indexName + " REBUILD";
 	return query;
 }
 
 //***************************************************************************
-//
+// @brief 테이블 목록 조회 쿼리 생성
+// @return 테이블 목록 조회 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEGetTableListQuery()
 {
 	_tstring query = _T("");
@@ -503,7 +501,10 @@ inline _tstring ORACLEGetTableListQuery()
 }
 
 //***************************************************************************
-//
+// @brief 테이블 기본 정보 조회 쿼리 생성
+// @param tableName 테이블 명 (기본값: 빈 문자열, 전체 테이블 대상)
+// @return 테이블 정보 조회 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEGetTableInfoQuery(_tstring tableName = _T(""))
 {
 	_tstring query = _T("");
@@ -531,7 +532,10 @@ inline _tstring ORACLEGetTableInfoQuery(_tstring tableName = _T(""))
 }
 
 //***************************************************************************
-//
+// @brief 테이블 컬럼 정보 조회 쿼리 생성
+// @param tableName 테이블 명 (기본값: 빈 문자열)
+// @return 컬럼 정보 조회 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEGetTableColumnInfoQuery(_tstring tableName = _T(""))
 {
 	_tstring query = _T("");
@@ -572,7 +576,10 @@ inline _tstring ORACLEGetTableColumnInfoQuery(_tstring tableName = _T(""))
 }
 
 //***************************************************************************
-//
+// @brief 테이블 Identity 컬럼 상세 정보 조회 쿼리 생성
+// @param tableName 테이블 명 (기본값: 빈 문자열)
+// @return Identity 컬럼 정보 조회 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEGetTableIdentityColumnInfoQuery(_tstring tableName = _T(""))
 {
 	_tstring query = _T("");
@@ -608,7 +615,10 @@ inline _tstring ORACLEGetTableIdentityColumnInfoQuery(_tstring tableName = _T(""
 }
 
 //***************************************************************************
-//
+// @brief 제약 조건 정보 조회 쿼리 생성
+// @param tableName 테이블 명 (기본값: 빈 문자열)
+// @return 제약 조건 정보 조회 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEGetConstraintsInfoQuery(_tstring tableName = _T(""))
 {
 	_tstring query = _T("");
@@ -633,7 +643,10 @@ inline _tstring ORACLEGetConstraintsInfoQuery(_tstring tableName = _T(""))
 }
 
 //***************************************************************************
-//
+// @brief 인덱스 정보 조회 쿼리 생성
+// @param tableName 테이블 명 (기본값: 빈 문자열)
+// @return 인덱스 상세 정보 조회 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEGetIndexInfoQuery(_tstring tableName = _T(""))
 {
 	_tstring query = _T("");
@@ -668,7 +681,10 @@ inline _tstring ORACLEGetIndexInfoQuery(_tstring tableName = _T(""))
 }
 
 //***************************************************************************
-//
+// @brief 파티션 정보 조회 쿼리 생성
+// @param tableName 테이블 명 (기본값: 빈 문자열)
+// @return 파티션 및 서브파티션 상세 정보 조회 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEGetPartitionInfoQuery(_tstring tableName = _T(""))
 {
 	_tstring query = _T("");
@@ -692,7 +708,7 @@ inline _tstring ORACLEGetPartitionInfoQuery(_tstring tableName = _T(""))
 	query = query + "\n" + "INNER JOIN SYS.USER_TAB_PARTITIONS b";
 	query = query + "\n" + "ON a.TABLE_NAME = b.TABLE_NAME";
 	query = query + "\n" + "LEFT OUTER JOIN SYS.USER_TAB_SUBPARTITIONS c";
-	query = query + "\n" + "ON a.TABLE_NAME = c.TABLE_NAME AND b.PARTITION_NAME = c.PARTITION_NAME";
+	query = query + "\n" + "ON a.TABLE_NAME = c.PARTITION_NAME = c.PARTITION_NAME";
 
 	if( tableName != "" )
 		query = query + "\n" + "ORDER BY b.PARTITION_NAME ASC, b.PARTITION_POSITION ASC, c.SUBPARTITION_POSITION ASC, a.COLUMN_POSITION ASC";
@@ -702,7 +718,10 @@ inline _tstring ORACLEGetPartitionInfoQuery(_tstring tableName = _T(""))
 }
 
 //***************************************************************************
-//
+// @brief 외래키 정보 조회 쿼리 생성
+// @param tableName 테이블 명 (기본값: 빈 문자열)
+// @return 외래키 상세 정보 조회 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEGetForeignKeyInfoQuery(_tstring tableName = _T(""))
 {
 	_tstring query = _T("");
@@ -749,7 +768,10 @@ inline _tstring ORACLEGetForeignKeyInfoQuery(_tstring tableName = _T(""))
 }
 
 //***************************************************************************
-//
+// @brief CHECK 제약 조건 정보 조회 쿼리 생성
+// @param tableName 테이블 명 (기본값: 빈 문자열)
+// @return CHECK 제약 조건 정보 조회 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEGetCheckConstInfoQuery(_tstring tableName = _T(""))
 {
 	_tstring query = _T("");
@@ -773,7 +795,10 @@ inline _tstring ORACLEGetCheckConstInfoQuery(_tstring tableName = _T(""))
 }
 
 //***************************************************************************
-//
+// @brief 트리거 목록 정보 조회 쿼리 생성
+// @param tableName 테이블 명 (기본값: 빈 문자열)
+// @return 트리거 정보 조회 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEGetTriggerInfoQuery(_tstring tableName = _T(""))
 {
 	_tstring query = _T("");
@@ -795,7 +820,9 @@ inline _tstring ORACLEGetTriggerInfoQuery(_tstring tableName = _T(""))
 }
 
 //***************************************************************************
-//
+// @brief 프로시저 목록 조회 쿼리 생성
+// @return 프로시저 목록 조회 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEGetProcedureListQuery()
 {
 	_tstring query = _T("");
@@ -809,7 +836,10 @@ inline _tstring ORACLEGetProcedureListQuery()
 }
 
 //***************************************************************************
-//
+// @brief 프로시저 정보 조회 쿼리 생성
+// @param procName 프로시저 명 (기본값: 빈 문자열)
+// @return 프로시저 정보 조회 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEGetProcedureInfoQuery(_tstring procName = _T(""))
 {
 	_tstring query = _T("");
@@ -831,7 +861,10 @@ inline _tstring ORACLEGetProcedureInfoQuery(_tstring procName = _T(""))
 }
 
 //***************************************************************************
-//
+// @brief 프로시저 매개변수 정보 조회 쿼리 생성
+// @param procName 프로시저 명 (기본값: 빈 문자열)
+// @return 프로시저 매개변수 정보 조회 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEGetProcedureParamInfoQuery(_tstring procName = _T(""))
 {
 	_tstring query = _T("");
@@ -867,7 +900,9 @@ inline _tstring ORACLEGetProcedureParamInfoQuery(_tstring procName = _T(""))
 }
 
 //***************************************************************************
-//
+// @brief 함수 목록 조회 쿼리 생성
+// @return 함수 목록 조회 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEGetFunctionListQuery()
 {
 	_tstring query = _T("");
@@ -881,7 +916,10 @@ inline _tstring ORACLEGetFunctionListQuery()
 }
 
 //***************************************************************************
-//
+// @brief 함수 정보 조회 쿼리 생성
+// @param funcName 함수 명 (기본값: 빈 문자열)
+// @return 함수 정보 조회 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEGetFunctionInfoQuery(_tstring funcName = _T(""))
 {
 	_tstring query = _T("");
@@ -903,7 +941,10 @@ inline _tstring ORACLEGetFunctionInfoQuery(_tstring funcName = _T(""))
 }
 
 //***************************************************************************
-//
+// @brief 함수 매개변수 정보 조회 쿼리 생성
+// @param funcName 함수 명 (기본값: 빈 문자열)
+// @return 함수 매개변수 정보 조회 SQL 쿼리
+//***************************************************************************
 inline _tstring ORACLEGetFunctionParamInfoQuery(_tstring funcName = _T(""))
 {
 	_tstring query = _T("");
@@ -917,7 +958,7 @@ inline _tstring ORACLEGetFunctionParamInfoQuery(_tstring funcName = _T(""))
 	query = query + " WHEN b.DATA_TYPE = 'NUMBER' AND b.DATA_SCALE > 0 THEN '(' || TO_CHAR(b.DATA_PRECISION) || ',' || TO_CHAR(b.DATA_SCALE) || ')'";
 	query = query + " WHEN b.DATA_TYPE = 'NUMBER' AND b.DATA_PRECISION > 0 AND b.DATA_SCALE = 0 THEN '(' || TO_CHAR(b.DATA_PRECISION) || ')'";
 	query = query + " WHEN b.DATA_TYPE = 'NUMBER' AND b.DATA_PRECISION IS NULL THEN ''";
-	query = query + " WHEN b.DATA_TYPE IN('CHAR', 'NCHAR', 'VARCHAR2', 'NVARCHAR2', 'DATE') THEN (CASE WHEN b.DATA_LENGTH > 0 THEN '(' || TO_CHAR(b.DATA_LENGTH) || ')' ELSE '' END)";
+	query = query + " WHEN b.DATA_TYPE IN('CHAR', 'NCHAR', 'VARCHAR2', 'NVARCHAR2', 'DATE') THEN (CASE WHEN b.DATA_LENGTH > 0 THEN '(' || TO_CHAR(a.DATA_LENGTH) || ')' ELSE '' END)";
 	query = query + " ELSE '' END";
 	query = query + ") AS \"datatype_desc\", '' AS \"param_comment\"";
 	query = query + "\n" + "FROM SYS.USER_OBJECTS a";
@@ -938,4 +979,4 @@ inline _tstring ORACLEGetFunctionParamInfoQuery(_tstring funcName = _T(""))
 	return query;
 }
 
-#endif // ndef __DBORACLEQUERY_H__
+#endif // ndef UC_DBORACLEQUERY_H

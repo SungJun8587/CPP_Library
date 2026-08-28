@@ -4,20 +4,12 @@
 //
 //***************************************************************************
 
-#ifndef __IOCPSESSION_H__
-#define __IOCPSESSION_H__
+#ifndef UC_IOCPSESSION_H
+#define UC_IOCPSESSION_H
 
-#ifndef __IOCPCORE_H__
-#include <Network/IocpCore.h>
-#endif
-
-#ifndef __IOCPEVENT_H__
-#include <Network/IocpEvent.h>
-#endif
-
-#ifndef __RINGBUFFER_H__
+#include <Network/IOCP/IocpCore.h>
+#include <Network/IOCP/IocpEvent.h>
 #include <Network/RingBuffer.h>
-#endif
 
 #include <atomic>
 #include <mutex>
@@ -188,4 +180,4 @@ private:
 	ConnectEvent			_connectEvent;                   // 비동기 연결(ConnectEx) 요청 및 완료 처리를 위한 OVERLAPPED 이벤트 객체 (클라이언트 전용)
 };
 
-#endif // ndef __IOCPSESSION_H__
+#endif // ndef UC_IOCPSESSION_H

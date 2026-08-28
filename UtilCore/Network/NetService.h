@@ -4,12 +4,10 @@
 //
 //***************************************************************************
 
-#ifndef __NETSERVICE_H__
-#define __NETSERVICE_H__
+#ifndef UC_NETSERVICE_H
+#define UC_NETSERVICE_H
 
-#ifndef __NETADDRESS_H__
 #include <Network/NetAddress.h>
-#endif
 
 #include <functional>
 #include <set>
@@ -86,4 +84,4 @@ protected:
 	std::condition_variable _sessionsEmptyCv;
 };
 
-#endif // ndef __NETSERVICE_H__
+#endif // ndef UC_NETSERVICE_H

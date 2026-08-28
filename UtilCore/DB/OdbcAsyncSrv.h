@@ -4,21 +4,23 @@
 //
 //***************************************************************************
 
-#ifndef __ODBCASYNCSRV__H__
-#define __ODBCASYNCSRV__H__
+#ifndef UC_ODBCASYNCSRV_H
+#define UC_ODBCASYNCSRV_H
 
-#ifndef __ODBCCONNPOOL_H__
 #include <DB/OdbcConnPool.h>
-#endif
-
-#ifndef __CHUNKED_SWAPQUEUE_H__
 #include <Containers/Queue/ChunkedSwapQueue.h>
-#endif
 
+//***************************************************************************
+// @brief 비동기 ODBC 데이터베이스 서비스 클래스
+// @details 비동기 DB 요청 큐를 관리하고 커넥션 풀을 통해 스레드 세이프하게 쿼리를 처리합니다.
+//***************************************************************************
 class COdbcAsyncSrv
 {
 	typedef std::unordered_map<uint16, std::shared_ptr<CDBAsyncSrvHandler>>	COMMAND_MAP;
 
+	//***************************************************************************
+	// @brief 경고 임계값 상수 정의
+	//***************************************************************************
 	enum
 	{
 		MAX_WARNING_QUERY_QUEUE_SIZE = 100000,
@@ -32,17 +34,29 @@ public:
 
 	std::shared_ptr<CDBAsyncSrvHandler> Regist(const BYTE command, std::shared_ptr<CDBAsyncSrvHandler> const handler);
 
-	// CSwapQueue의 원자적 카운터를 사용하여 락 없이 빠름
+	//***************************************************************************
+	// @brief 대기 중인 쿼리 큐의 크기 조회
+	// @return 현재 큐에 쌓여있는 요청 수
+	//***************************************************************************
 	int GetQueryQueueSize() const {
 		return static_cast<int>(_queueDBAsyncRq.GetSize());
 	}
+
+	//***************************************************************************
+	// @brief 큐가 비어 있는지 확인
+	// @return 큐가 비어 있으면 true, 그렇지 않으면 false
+	//***************************************************************************
 	bool IsEmpty() const {
 		return _queueDBAsyncRq.IsEmpty();
 	}
+
 	int Push(std::unique_ptr<st_DBAsyncRq> pAsyncRq);
 	std::unique_ptr<st_DBAsyncRq> Pop(CQueue<std::unique_ptr<st_DBAsyncRq>>& localQueue);
 
-	// [Back-pressure] CSwapQueue 크기 기준으로 대기
+	//***************************************************************************
+	// @brief 백프레셔 처리: 지정한 최대 용량을 초과할 경우 큐 삽입 대기
+	// @param maxCapacity 큐의 최대 허용 용량
+	//***************************************************************************
 	void WaitPushCapacity(size_t maxCapacity) {
 		std::unique_lock<std::mutex> lock(_mutex);
 		_cvProducer.wait(lock, [this, maxCapacity]() {
@@ -50,14 +64,24 @@ public:
 			});
 	}
 
+	//***************************************************************************
+	// @brief 현재 처리 중인 잔여 요청 수 조회
+	// @return 처리 대기 및 실행 중인 총 요청 수
+	//***************************************************************************
 	int32 GetOutstandingRequests() const {
 		return _nOutstandingRequests.load(std::memory_order_relaxed);
 	}
 
+	//***************************************************************************
+	// @brief 처리 중인 요청 수 1 증가
+	//***************************************************************************
 	void AddOutstandingRequest() {
 		_nOutstandingRequests.fetch_add(1, std::memory_order_relaxed);
 	}
 
+	//***************************************************************************
+	// @brief 처리 중인 요청 수 1 감소
+	//***************************************************************************
 	void SubOutstandingRequest() {
 		_nOutstandingRequests.fetch_sub(1, std::memory_order_relaxed);
 	}
@@ -67,6 +91,10 @@ public:
 
 	void StartIoThreads();
 	bool Action();
+
+	//***************************************************************************
+	// @brief 스레드 중단 플래그를 설정하고 대기 중인 조건 변수 깨움
+	//***************************************************************************
 	void StopThread() {
 		_bStopThread.store(true);
 		_cva.notify_all();
@@ -103,4 +131,4 @@ private:
 	std::condition_variable		_cvProducer;						// 생산자 대기 조건 변수
 };
 
-#endif // ndef __ODBCASYNCSRV__H__
+#endif // ndef UC_ODBCASYNCSRV_H

@@ -4,16 +4,11 @@
 //
 //***************************************************************************
 
-#ifndef __ORDEREDMAP_H__
-#define __ORDEREDMAP_H__
+#ifndef UC_ORDEREDMAP_H
+#define UC_ORDEREDMAP_H
 
-#ifndef __BASEREDEFINEDATATYPE_H__
 #include <BaseRedefineDataType.h>
-#endif
-
-#ifndef	__CONTAINERS_H__
 #include <Memory/Containers.h>
-#endif
 
 #include <shared_mutex>
 
@@ -50,4 +45,4 @@ protected:
 
 #include "OrderedMap.inl"
 
-#endif // ndef __ORDEREDMAP_H__
+#endif // ndef UC_ORDEREDMAP_H

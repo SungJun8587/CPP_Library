@@ -4,12 +4,10 @@
 //
 //***************************************************************************
 
-#ifndef __HTTPRESPONSEPARSER_H__
-#define __HTTPRESPONSEPARSER_H__
+#ifndef UC_HTTPRESPONSEPARSER_H
+#define UC_HTTPRESPONSEPARSER_H
 
-#ifndef	__HTTPPARSEUTIL_H__
 #include <Network/HTTP/HttpParseUtil.h>
-#endif
 
 #include <cstdint>
 #include <cstring>
@@ -430,4 +428,4 @@ private:
 	bool m_connectionClose = false; // "Connection: close" 응답 헤더 존재 여부
 };
 
-#endif // ndef __HTTPRESPONSEPARSER_H__
+#endif // ndef UC_HTTPRESPONSEPARSER_H

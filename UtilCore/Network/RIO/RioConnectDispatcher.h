@@ -4,20 +4,12 @@
 //
 //***************************************************************************
 
-#ifndef __RIOCONNECTDISPATCHER_H__
-#define __RIOCONNECTDISPATCHER_H__
+#ifndef UC_RIOCONNECTDISPATCHER_H
+#define UC_RIOCONNECTDISPATCHER_H
 
-#ifndef __RIOCOMMON_H__
 #include <Network/RIO/RioCommon.h>
-#endif
-
-#ifndef __RIOSESSION_H__
 #include <Network/RIO/RioSession.h>
-#endif
-
-#ifndef __RIOCONNECTEVENT_H__
 #include <Network/RIO/RioConnectEvent.h>
-#endif
 
 #include <WinSock2.h>
 #include <thread>
@@ -94,4 +86,4 @@ private:
 	std::atomic<bool> _running{ false };	// Start()~Shutdown() 사이 실행 상태 플래그, WorkerLoop()의 종료 조건으로도 사용
 };
 
-#endif // ndef __RIOCONNECTDISPATCHER_H__
+#endif // ndef UC_RIOCONNECTDISPATCHER_H

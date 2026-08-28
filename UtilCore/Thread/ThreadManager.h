@@ -7,38 +7,17 @@
 //        TLS 캐시 등)을 초기화/정리하는 훅(InitTLS/DestroyTLS)을 제공.
 //***************************************************************************
 
-#ifndef __THREADMANAGER_H__
-#define __THREADMANAGER_H__
+#ifndef UC_THREADMANAGER_H
+#define UC_THREADMANAGER_H
 
-#pragma once
-
-#ifndef _THREAD_
 #include <thread>
-#endif
-
-#ifndef _FUNCTIONAL_
 #include <functional>
-#endif
-
-#ifndef _ATOMIC_
 #include <atomic>
-#endif
-
-#ifndef _MUTEX_
 #include <mutex>
-#endif
 
-#ifndef __BASEREDEFINEDATATYPE_H__
 #include <BaseRedefineDataType.h>
-#endif
-
-#ifndef __BASETLS_H__
 #include <BaseTLS.h>
-#endif
-
-#ifndef	__CONTAINERS_H__
 #include <Memory/Containers.h>
-#endif
 
 //***************************************************************************
 // @brief 워커 스레드의 생성/종료(Join)/TLS 초기화-정리를 전담하는 클래스.
@@ -138,4 +117,4 @@ private:
     std::atomic<bool>       _bShuttingDown{ false };    // 전체 종료 절차 진입 여부 플래그
 };
 
-#endif // ndef __THREADMANAGER_H__
+#endif // ndef UC_THREADMANAGER_H

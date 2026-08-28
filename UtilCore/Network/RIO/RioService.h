@@ -4,28 +4,14 @@
 //
 //***************************************************************************
 
-#ifndef __RIOSERVICE_H__
-#define __RIOSERVICE_H__
+#ifndef UC_RIOSERVICE_H
+#define UC_RIOSERVICE_H
 
-#ifndef __NET_SERVICE_H__
 #include <Network/NetService.h>
-#endif
-
-#ifndef __RIO_CORE_H__
-#include <Network/Rio/RioCore.h>
-#endif
-
-#ifndef __RIO_LISTENER_H__
-#include <Network/Rio/RioListener.h>
-#endif
-
-#ifndef __RIOCONNECTDISPATCHER_H__
-#include <Network/Rio/RioConnectDispatcher.h>
-#endif
-
-#ifndef __RIOSESSIONMANAGER_H__
-#include <Network/Rio/RioSessionManager.h>
-#endif
+#include <Network/RIO/RioCore.h>
+#include <Network/RIO/RioListener.h>
+#include <Network/RIO/RioConnectDispatcher.h>
+#include <Network/RIO/RioSessionManager.h>
 
 class CRioBuffer;
 
@@ -230,4 +216,4 @@ private:
 	uint32_t			_workerThreadCount = 0;					// StartWorkers()에 넘길 워커 스레드 개수 (0=자동)
 };
 
-#endif // ndef __RIOSERVICE_H__
+#endif // ndef UC_RIOSERVICE_H

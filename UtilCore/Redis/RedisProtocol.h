@@ -4,12 +4,10 @@
 //
 //***************************************************************************
 
-#ifndef __REDISPROTOCOL_H__
-#define __REDISPROTOCOL_H__
+#ifndef UC_REDISPROTOCOL_H
+#define UC_REDISPROTOCOL_H
 
-#ifndef __BASEREDEFINEDATATYPE_H__
 #include <BaseRedefineDataType.h>
-#endif
 
 #include <string>
 #include <vector>
@@ -64,4 +62,4 @@ struct RedisValue
 
 using RedisCallback = std::function<void(const RedisValue&)>;
 
-#endif // ndef __REDISPROTOCOL_H__
+#endif // ndef UC_REDISPROTOCOL_H

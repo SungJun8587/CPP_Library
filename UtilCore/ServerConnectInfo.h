@@ -4,14 +4,10 @@
 //
 //***************************************************************************
 
-#ifndef __SERVERCONNECTINFO_H__
-#define __SERVERCONNECTINFO_H__
+#ifndef UC_SERVERCONNECTINFO_H
+#define UC_SERVERCONNECTINFO_H
 
-#pragma once
-
-#ifndef	__COMMONUTIL_H__
-#include <CommonUtil.h>
-#endif
+#include <Util/CommonUtil.h>
 
 class CServerNode
 {
@@ -189,4 +185,4 @@ public:
 	uint32			_nDbIndex;
 };
 
-#endif // ndef __SERVERCONNECTINFO_H__
+#endif // ndef UC_SERVERCONNECTINFO_H

@@ -80,7 +80,6 @@
     <ClInclude Include="Memory\RawAllocator.h" />
     <ClInclude Include="Memory\RefCountable.h" />
     <ClInclude Include="Memory\Singleton.h" />
-    <ClInclude Include="Memory\Stream.h" />
     <ClInclude Include="Network\HTTP\HttpClient.h" />
     <ClInclude Include="Network\HTTP\HttpClientCore.h" />
     <ClInclude Include="Network\HTTP\HttpConnPool.h" />
@@ -136,6 +135,7 @@
     <ClInclude Include="Redis\RedisConnectionPool.h" />
     <ClInclude Include="Redis\RedisParser.h" />
     <ClInclude Include="Redis\RedisProtocol.h" />
+    <ClInclude Include="Redis\RedisRedefineDataType.h" />
     <ClInclude Include="Redis\RedisResultSet.h" />
     <ClInclude Include="Redis\RedisService.h" />
     <ClInclude Include="ServerConfig.h" />
@@ -213,7 +213,6 @@
     <ClCompile Include="Memory\MemBuffer.cpp" />
     <ClCompile Include="Memory\Memory.cpp" />
     <ClCompile Include="Memory\MemoryPool.cpp" />
-    <ClCompile Include="Memory\Stream.cpp" />
     <ClCompile Include="Network\IOCP\IocpCore.cpp" />
     <ClCompile Include="Network\IOCP\IocpEvent.cpp" />
     <ClCompile Include="Network\IOCP\IocpListener.cpp" />

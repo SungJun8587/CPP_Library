@@ -4,24 +4,22 @@
 // 
 //***************************************************************************
 
-#ifndef __BASETLS_H__
-#define __BASETLS_H__
-
-#pragma once
+#ifndef UC_BASETLS_H
+#define UC_BASETLS_H
 
 extern thread_local uint32				LThreadId;
 extern thread_local uint64				LEndTickCount;
 
-#ifdef __DEADLOCKPROFILER_H__
+#ifdef UC_DEADLOCKPROFILER_H
 	extern thread_local CStack<int32>	LLockStack;
 #endif
 
-#ifdef __SENDBUFFER_H__
+#ifdef UC_SENDBUFFER_H
 	extern thread_local CSendBufferChunkRef	LSendBufferChunk;
 #endif
 
-#ifdef __JOBQUEUE_H__
+#ifdef UC_JOBQUEUE_H
 	extern thread_local CJobQueue*		LCurrentJobQueue;
 #endif
 
-#endif // ndef __BASETLS_H__
+#endif // ndef UC_BASETLS_H

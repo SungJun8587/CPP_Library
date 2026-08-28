@@ -7,19 +7,19 @@
 #include "pch.h"
 #include "BaseGlobal.h"
 
-#ifdef __MEMORY_H__
+#ifdef UC_MEMORY_H
 CMemory* gpMemory = nullptr;
 #endif
 
-#ifdef __GLOBALQUEUE_H__
+#ifdef UC_GLOBALQUEUE_H
 CGlobalQueue* gpGlobalQueue = nullptr;
 #endif
 
-#ifdef __JOBTIMER_H__
+#ifdef UC_JOBTIMER_H
 CJobTimer* gpJobTimer = nullptr;
 #endif
 
-#ifdef __THREADMANAGER_H__
+#ifdef UC_THREADMANAGER_H
 CThreadManager* gpThreadManager = nullptr;
 #endif
 
@@ -65,19 +65,19 @@ namespace BaseGlobal
 	//        CMemory 기반 풀 할당)를 안전하게 사용할 수 있습니다.
 	void Init()
 	{
-#ifdef __MEMORY_H__
+#ifdef UC_MEMORY_H
 		gpMemory = new CMemory();
 #endif
 
-#ifdef __GLOBALQUEUE_H__
+#ifdef UC_GLOBALQUEUE_H
 		gpGlobalQueue = new CGlobalQueue();
 #endif
 
-#ifdef __JOBTIMER_H__
+#ifdef UC_JOBTIMER_H
 		gpJobTimer = new CJobTimer();
 #endif
 
-#ifdef __THREADMANAGER_H__
+#ifdef UC_THREADMANAGER_H
 		gpThreadManager = new CThreadManager();
 #endif	
 
@@ -96,7 +96,7 @@ namespace BaseGlobal
 		//    JoinThreads()가 각 워커 스레드의 자연 종료를 대기하며,
 		//    그 과정에서 워커 스레드들의 CMemory TLS 캐시가 이미
 		//    gpMemory의 전역 풀로 반납 완료된다.
-#ifdef __THREADMANAGER_H__
+#ifdef UC_THREADMANAGER_H
 		if( gpThreadManager != nullptr ) delete gpThreadManager;
 #endif	
 
@@ -104,11 +104,11 @@ namespace BaseGlobal
 		if( gpDeadLockProfiler != nullptr ) delete gpDeadLockProfiler;
 #endif	
 
-#ifdef __JOBTIMER_H__
+#ifdef UC_JOBTIMER_H
 		if( gpJobTimer != nullptr ) delete gpJobTimer;
 #endif
 
-#ifdef __GLOBALQUEUE_H__
+#ifdef UC_GLOBALQUEUE_H
 		if( gpGlobalQueue != nullptr ) delete gpGlobalQueue;
 #endif
 
@@ -117,7 +117,7 @@ namespace BaseGlobal
 		//    gpMemory를 delete하기 직전 반드시 이 호출이 필요하다.
 		// 3) CMemory는 다른 시스템들이 내부적으로 참조할 수 있으므로
 		//    반드시 가장 마지막에 파괴한다.
-#ifdef __MEMORY_H__
+#ifdef UC_MEMORY_H
 		CMemory::FlushCurrentThreadCache();
 		if( gpMemory != nullptr ) delete gpMemory;
 #endif	

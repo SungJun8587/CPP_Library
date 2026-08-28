@@ -4,8 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __HTTPPARSEUTIL_H__
-#define __HTTPPARSEUTIL_H__
+#ifndef UC_HTTPPARSEUTIL_H
+#define UC_HTTPPARSEUTIL_H
 
 #include <string>
 #include <string_view>
@@ -69,4 +69,4 @@ namespace HTTP
 	}
 }
 
-#endif // ndef __HTTPPARSEUTIL_H__
+#endif // ndef UC_HTTPPARSEUTIL_H

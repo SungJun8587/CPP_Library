@@ -4,12 +4,11 @@
 //
 //***************************************************************************
 
-#ifndef __MPMCLOCKFREEQUEUE_H__
-#define __MPMCLOCKFREEQUEUE_H__
+#ifndef UC_MPMCLOCKFREEQUEUE_H
+#define UC_MPMCLOCKFREEQUEUE_H
 
-#ifndef	__QUEUECOMMON_H__
+#include <BaseRedefineDataType.h>
 #include <Containers/Queue/QueueCommon.h>
-#endif
 
 //***************************************************************************
 // @class MPMCLockFreeQueue
@@ -251,4 +250,4 @@ private:
     std::atomic<int> m_WaitingPoppers{ 0 }, m_WaitingPushers{ 0 };         // 현재 대기 중인 소비자 및 생산자의 스레드 수
 };
 
-#endif // __MPMCLOCKFREEQUEUE_H__
+#endif // ndef UC_MPMCLOCKFREEQUEUE_H

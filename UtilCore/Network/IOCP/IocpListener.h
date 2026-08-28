@@ -4,28 +4,14 @@
 //
 //***************************************************************************
 
-#ifndef __IOCPLISTENER_H__
-#define __IOCPLISTENER_H__
+#ifndef UC_IOCPLISTENER_H
+#define UC_IOCPLISTENER_H
 
-#ifndef	__NETADDRESS_H__
 #include <Network/NetAddress.h>
-#endif
-
-#ifndef	__SOCKETUTILS_H__
 #include <Network/SocketUtils.h>
-#endif
-
-#ifndef	__IOCPCOMMON_H__
 #include <Network/IOCP/IocpCommon.h>
-#endif
-
-#ifndef __IOCPCORE_H__
 #include <Network/IOCP/IocpCore.h>
-#endif
-
-#ifndef __IOCPEVENT_H__
 #include <Network/IOCP/IocpEvent.h>
-#endif
 
 #include <functional>
 #include <atomic>
@@ -181,4 +167,4 @@ private:
     std::condition_variable    _retryDrainCv;              // 마지막 retry 스레드가 종료 시 notify
 };
 
-#endif // ndef __IOCPLISTENER_H__
+#endif // ndef UC_IOCPLISTENER_H

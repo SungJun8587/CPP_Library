@@ -4,10 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __CRASHDUMPHANDLER_H__
-#define __CRASHDUMPHANDLER_H__
-
-#pragma once
+#ifndef UC_CRASHDUMPHANDLER_H
+#define UC_CRASHDUMPHANDLER_H
 
 #include <cstddef>
 
@@ -148,4 +146,4 @@ private:
 #endif
 };
 
-#endif // ndef __CRASHDUMPHANDLER_H__
+#endif // ndef UC_CRASHDUMPHANDLER_H

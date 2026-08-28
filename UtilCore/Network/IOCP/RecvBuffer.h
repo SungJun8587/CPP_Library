@@ -4,12 +4,10 @@
 //
 //***************************************************************************
 
-#ifndef __RECVBUFFER_H__
-#define __RECVBUFFER_H__
+#ifndef UC_RECVBUFFER_H
+#define UC_RECVBUFFER_H
 
-#ifndef	__IOCPCOMMON_H__
 #include <Network/IOCP/IocpCommon.h>
-#endif
 
 //***************************************************************************
 // @class RecvBuffer
@@ -49,4 +47,4 @@ private:
 	CVector<BYTE>	_buffer;			// 수신 데이터 저장 버퍼
 };
 
-#endif // ndef __RECVBUFFER_H__
+#endif // ndef UC_RECVBUFFER_H

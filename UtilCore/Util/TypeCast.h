@@ -19,12 +19,10 @@
 //       사전에 명확히 정의되어 있고 고정되어 있는 경우에 적합합니다.
 //************************************************---------------------------
 
-#ifndef __TYPECAST_H__
-#define __TYPECAST_H__
+#ifndef UC_TYPECAST_H
+#define UC_TYPECAST_H
 
-#ifndef	__BASEREDEFINEDATATYPE_H__
 #include <BaseRedefineDataType.h>
-#endif
 
 //************************************************---------------------------
 // @struct TypeList
@@ -275,4 +273,4 @@ bool CanCast(shared_ptr<From> ptr)
 #define DECLARE_TL		using TL = TL; int32 _typeId;
 #define INIT_TL(Type)	_typeId = IndexOf<TL, Type>::value;
 
-#endif // ndef __TYPECAST_H__
+#endif // ndef UC_TYPECAST_H

@@ -4,10 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __NETWORKCOMMON_H__
-#define __NETWORKCOMMON_H__
-
-#pragma once
+#ifndef UC_NETWORKCOMMON_H
+#define UC_NETWORKCOMMON_H
 
 #include <winsock2.h>
 #include <mswsock.h>
@@ -54,4 +52,4 @@
 
 #include <Network/NetworkFactory.h>
 
-#endif // ndef __NETWORKCOMMON_H__
+#endif // ndef UC_NETWORKCOMMON_H

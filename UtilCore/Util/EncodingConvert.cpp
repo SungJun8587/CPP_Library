@@ -15,7 +15,7 @@
 //***************************************************************************
 wstring AnsiToUnicode(const std::string& ansi)
 {
-#ifdef __ICONVUTIL_H__
+#ifdef UC_ICONVUTIL_H
 	if( ansi.empty() ) return L"";
 	try
 	{
@@ -40,7 +40,7 @@ wstring AnsiToUnicode(const std::string& ansi)
 //***************************************************************************
 string UnicodeToAnsi(const std::wstring& unicode)
 {
-#ifdef __ICONVUTIL_H__
+#ifdef UC_ICONVUTIL_H
 	if( unicode.empty() ) return "";
 	try
 	{
@@ -65,7 +65,7 @@ string UnicodeToAnsi(const std::wstring& unicode)
 //***************************************************************************
 string UnicodeToUtf8(const std::wstring& unicode)
 {
-#ifdef __ICONVUTIL_H__
+#ifdef UC_ICONVUTIL_H
 	if( unicode.empty() ) return "";
 	try
 	{
@@ -90,7 +90,7 @@ string UnicodeToUtf8(const std::wstring& unicode)
 //***************************************************************************
 wstring Utf8ToUnicode(const std::string& utf8)
 {
-#ifdef __ICONVUTIL_H__
+#ifdef UC_ICONVUTIL_H
 	if( utf8.empty() ) return L"";
 	try
 	{
@@ -115,7 +115,7 @@ wstring Utf8ToUnicode(const std::string& utf8)
 //***************************************************************************
 string AnsiToUtf8(const std::string& ansi)
 {
-#ifdef __ICONVUTIL_H__
+#ifdef UC_ICONVUTIL_H
 	if( ansi.empty() ) return "";
 	try
 	{
@@ -140,7 +140,7 @@ string AnsiToUtf8(const std::string& ansi)
 //***************************************************************************
 string Utf8ToAnsi(const std::string& utf8)
 {
-#ifdef __ICONVUTIL_H__
+#ifdef UC_ICONVUTIL_H
 	if( utf8.empty() ) return "";
 	try
 	{

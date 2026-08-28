@@ -4,14 +4,10 @@
 //
 //***************************************************************************
 
-#ifndef __SERVERCONFIG_H__
-#define __SERVERCONFIG_H__
+#ifndef UC_SERVERCONFIG_H
+#define UC_SERVERCONFIG_H
 
-#pragma once
-
-#ifndef	__SERVERCONNECTINFO_H__
 #include <ServerConnectInfo.h>
-#endif
 
 class CServerConfig : public CSingleton<CServerConfig>
 {
@@ -79,4 +75,4 @@ private:
 	CVector<CRedisNode>			_redisNodeVec;
 };
 
-#endif // ndef __SERVERCONFIG_H__
+#endif // ndef UC_SERVERCONFIG_H

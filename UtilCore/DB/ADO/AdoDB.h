@@ -4,8 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __ADODB_H__
-#define __ADODB_H__
+#ifndef UC_ADODB_H
+#define UC_ADODB_H
 
 #include <comutil.h>
 
@@ -19,6 +19,11 @@
 #import "C:\Program Files\Common Files\System\ado\msado15.dll" no_namespace rename("EOF", "adoEOF")
 #pragma warning(pop) 
 
+//***************************************************************************
+// @brief ADO(ActiveX Data Objects) 기반 데이터베이스 제어 클래스
+// @detail 데이터베이스 연결, 트랜잭션 처리, 쿼리 및 저장 프로시저 실행,
+//         레코드셋 조회를 위한 랩퍼(Wrapper) 기능을 제공합니다.
+//***************************************************************************
 class CAdoDB
 {
 public:
@@ -102,4 +107,4 @@ private:
 	EDBClass        m_DbClass;  // 현재 연결된 데이터베이스 종류 분류
 };
 
-#endif // ndef __ADODB_H__
+#endif // ndef UC_ADODB_H

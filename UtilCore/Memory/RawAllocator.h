@@ -13,10 +13,8 @@
 //        매크로로 결정되므로 매 호출마다 오버헤드가 없습니다.)
 //***************************************************************************
 
-#ifndef __RAWALLOCATOR_H__
-#define __RAWALLOCATOR_H__
-
-#pragma once
+#ifndef UC_RAWALLOCATOR_H
+#define UC_RAWALLOCATOR_H
 
 #include <cassert>  // assert
 
@@ -189,4 +187,4 @@ namespace RawAllocator
     }
 }
 
-#endif // __RAWALLOCATOR_H__
+#endif // ndef UC_RAWALLOCATOR_H

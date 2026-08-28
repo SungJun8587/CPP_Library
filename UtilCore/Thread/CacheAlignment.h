@@ -7,10 +7,8 @@
 //  특정 락 구현에 종속되지 않으므로 SpinLock.h와 별도로 분리했다.
 //***************************************************************************
 
-#ifndef __CACHEALIGNMENT_H__
-#define __CACHEALIGNMENT_H__
-
-#pragma once
+#ifndef UC_CACHEALIGNMENT_H
+#define UC_CACHEALIGNMENT_H
 
 #include <atomic>
 #include <cstddef>
@@ -45,4 +43,4 @@ template <typename T>
 inline constexpr bool kCachePaddedAtomicSizeCheck =
 sizeof(CachePaddedAtomic<T>) == kCacheLineSize;
 
-#endif // ndef __CACHEALIGNMENT_H__
+#endif // ndef UC_CACHEALIGNMENT_H

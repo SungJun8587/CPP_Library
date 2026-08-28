@@ -4,20 +4,12 @@
 //
 //***************************************************************************
 
-#ifndef __CHUNKED_BLOCKINGQUEUE_H__
-#define __CHUNKED_BLOCKINGQUEUE_H__
+#ifndef UC_CHUNKEDBLOCKINGQUEUE_H
+#define UC_CHUNKEDBLOCKINGQUEUE_H
 
-#ifndef __BASEREDEFINEDATATYPE_H__
 #include <BaseRedefineDataType.h>
-#endif
-
-#ifndef	__CONTAINERS_H__
-#include <Memory/Containers.h>
-#endif
-
-#ifndef	__QUEUECOMMON_H__
 #include <Containers/Queue/QueueCommon.h>
-#endif
+#include <Memory/Containers.h>
 
 //***************************************************************************
 // @class CChunkedBlockingQueue
@@ -190,4 +182,4 @@ private:
     size_t                  _maxQueueSize{ 0 };         // 큐 최대 크기 (0 = 무제한)
 };
 
-#endif // __CHUNKED_BLOCKINGQUEUE_H__
+#endif // ndef UC_CHUNKEDBLOCKINGQUEUE_H

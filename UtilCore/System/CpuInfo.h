@@ -4,16 +4,11 @@
 //
 //***************************************************************************
 
-#ifndef __CPUINFO_H__
-#define __CPUINFO_H__
+#ifndef UC_CPUINFO_H
+#define UC_CPUINFO_H
 
-#ifndef __SYSTEMBASEDEFINE_H__
 #include <System/SystemBaseDefine.h>
-#endif
-
-#ifndef __HWINFOSTRUCTS_H__
 #include <System/HwInfoStructs.h>
-#endif
 
 #include <cstdint>
 #include <intrin.h>
@@ -342,4 +337,4 @@ private:
 	HWINFO_CPU	m_Cpu; // CPU 종합 정보 구조체
 };
 
-#endif // ndef __CPUINFO_H__
+#endif // ndef UC_CPUINFO_H

@@ -4,12 +4,10 @@
 //
 //***************************************************************************
 
-#ifndef __HTTPURL_H__
-#define __HTTPURL_H__
+#ifndef UC_HTTPURL_H
+#define UC_HTTPURL_H
 
-#ifndef	__HTTPPARSEUTIL_H__
-#include <Network/HTTP/HttpParseUtil.h> // HTTP::EqualsIgnoreCaseAscii
-#endif
+#include <Network/HTTP/HttpParseUtil.h>
 
 #include <string>
 #include <string_view>
@@ -96,4 +94,4 @@ inline bool ParseHttpUrl(std::string_view url, CHttpUrl& out)
 	return !out.host.empty();
 }
 
-#endif // ndef __HTTPURL_H__
+#endif // ndef UC_HTTPURL_H

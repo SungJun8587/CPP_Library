@@ -4,12 +4,11 @@
 //
 //***************************************************************************
 
-#ifndef __IOCPSESSIONMANAGER_H__
-#define __IOCPSESSIONMANAGER_H__
+#ifndef UC_IOCPSESSIONMANAGER_H
+#define UC_IOCPSESSIONMANAGER_H
 
-#ifndef __CLUSTERSPINMAP_H__
+#include <Network/IOCP/IocpCommon.h>
 #include <Containers/Map/ClusterSpinMap.h>
-#endif
 
 #include <memory>
 #include <atomic>
@@ -52,4 +51,4 @@ private:
     std::atomic<uint64_t> _nextSessionId{ 0 };                                              // 세션 ID 자동 증가 카운터
 };
 
-#endif // ndef __IOCPSESSIONMANAGER_H__
+#endif // ndef UC_IOCPSESSIONMANAGER_H

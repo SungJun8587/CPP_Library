@@ -8,10 +8,8 @@
 // - ReadLock → WriteLock 승격 불가 — 데드락 유발
 //***************************************************************************
 
-#ifndef __SRWLOCK_H__
-#define __SRWLOCK_H__
-
-#pragma once
+#ifndef UC_SRWLOCK_H
+#define UC_SRWLOCK_H
 
 #include <windows.h>
 #include <cassert>
@@ -259,4 +257,4 @@ private:
 #define SRW_WRITE_LOCK      CSRWCustomLockGuard<CSRWLock> __write_lock_guard__(_lock, SRWLockType::Write, __func__)
 #define SRW_READ_LOCK       CSRWCustomLockGuard<CSRWLock> __read_lock_guard__(_lock, SRWLockType::Read, __func__)
 
-#endif // ndef __SRWLOCK_H__
+#endif // ndef UC_SRWLOCK_H

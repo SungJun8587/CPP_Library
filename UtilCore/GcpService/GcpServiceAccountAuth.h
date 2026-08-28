@@ -4,16 +4,11 @@
 //
 //***************************************************************************
 
-#ifndef __GCPSERVICEACCOUNTAUTH_H__
-#define __GCPSERVICEACCOUNTAUTH_H__
+#ifndef UC_GCPSERVICEACCOUNTAUTH_H
+#define UC_GCPSERVICEACCOUNTAUTH_H
 
-#ifndef	__BASE64URLUTIL_H__
 #include <GcpService/Base64UrlUtil.h>
-#endif
-
-#ifndef	__JSONFIELDEXTRACT_H__
 #include <GcpService/JsonFieldExtract.h>
-#endif
 
 #include <openssl/evp.h>
 #include <openssl/pem.h>
@@ -317,4 +312,4 @@ private:
 	std::vector<std::function<void(bool, std::string)>> _pendingCallbacks; // 갱신 진행 중 쌓인 대기 콜백
 };
 
-#endif // ndef __GCPSERVICEACCOUNTAUTH_H__
+#endif // ndef UC_GCPSERVICEACCOUNTAUTH_H

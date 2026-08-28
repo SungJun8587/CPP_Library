@@ -1,6 +1,6 @@
 ﻿
-#ifndef __QUEUECOMMON_H__
-#define __QUEUECOMMON_H__
+#ifndef UC_QUEUECOMMON_H
+#define UC_QUEUECOMMON_H
 
 #include <atomic>
 #include <cstddef>
@@ -25,4 +25,4 @@
 constexpr std::size_t LFQ_CACHE_LINE_SIZE = 64;
 
 
-#endif // __QUEUECOMMON_H__
+#endif // ndef UC_QUEUECOMMON_H

@@ -4,10 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __DBCOMMON_H__
-#define __DBCOMMON_H__
-
-#pragma once
+#ifndef UC_DBCOMMON_H
+#define UC_DBCOMMON_H
 
 #include <DB/DBEnum.h>
 #include <DB/DBMSSQLQuery.h>
@@ -15,4 +13,4 @@
 #include <DB/DBORACLEQuery.h>
 #include <DB/DBSQLQuery.h>
 
-#endif // ndef __DBCOMMON_H__
+#endif // ndef UC_DBCOMMON_H

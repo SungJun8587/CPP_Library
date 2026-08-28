@@ -1,33 +1,25 @@
-
+ï»¿
 //***************************************************************************
 // GcpAuthHttpClient.h : Helper to create GcpTokenFetchFn using CHttpClient
 //
 //***************************************************************************
 
-#ifndef __GCPAUTHHTTPCLIENT_H__
-#define __GCPSERVICEACCOUNTAUTH_H__
+#ifndef UC_GCPAUTHHTTPCLIENT_H
+#define UC_GCPAUTHHTTPCLIENT_H
 
-#ifndef	__JSONFIELDEXTRACT_H__
 #include <GcpService/JsonFieldExtract.h>
-#endif
-
-#ifndef	__GCPSERVICEACCOUNTAUTH_H__
 #include <GcpService/GcpServiceAccountAuth.h>
-#endif
-
-#ifndef	__HTTPCLIENT_H__
 #include <Network/HTTP/HttpClient.h>
-#endif
 
 namespace gcp_auth
 {
 	//***************************************************************************
-		// @brief CHttpClient ÀÎ½ºÅÏ½º¸¦ »ç¿ëÇÏ¿© OAuth2 ÅäÅ« ±³È¯¿ë GcpTokenFetchFnÀ» »ı¼ºÇÕ´Ï´Ù.
-		// @param httpClient CHttpClientÀÇ Æ÷ÀÎÅÍ (nullptr Àü´Ş ½Ã ½ÇÆĞ Ã³¸®)
-		// @return GcpTokenFetchFn CGcpAccessTokenProvider »ı¼º ½Ã Àü´ŞÇÒ Äİ¹é ÇÔ¼ö
-		// @details Google OAuth2 ¿£µåÆ÷ÀÎÆ®("https://oauth2.googleapis.com/token")·Î
-		//          JWT assertionÀ» POST(x-www-form-urlencoded)·Î Àü¼ÛÇÏ°í, 
-		//          ÀÀ´ä¹ŞÀº JSON¿¡¼­ access_token°ú expires_inÀ» ÃßÃâÇÏ¿© ¹İÈ¯ÇÕ´Ï´Ù.
+		// @brief CHttpClient ì¸ìŠ¤í„´ìŠ¤ë¥¼ ì‚¬ìš©í•˜ì—¬ OAuth2 í† í° êµí™˜ìš© GcpTokenFetchFnì„ ìƒì„±í•©ë‹ˆë‹¤.
+		// @param httpClient CHttpClientì˜ í¬ì¸í„° (nullptr ì „ë‹¬ ì‹œ ì‹¤íŒ¨ ì²˜ë¦¬)
+		// @return GcpTokenFetchFn CGcpAccessTokenProvider ìƒì„± ì‹œ ì „ë‹¬í•  ì½œë°± í•¨ìˆ˜
+		// @details Google OAuth2 ì—”ë“œí¬ì¸íŠ¸("https://oauth2.googleapis.com/token")ë¡œ
+		//          JWT assertionì„ POST(x-www-form-urlencoded)ë¡œ ì „ì†¡í•˜ê³ , 
+		//          ì‘ë‹µë°›ì€ JSONì—ì„œ access_tokenê³¼ expires_inì„ ì¶”ì¶œí•˜ì—¬ ë°˜í™˜í•©ë‹ˆë‹¤.
 		//***************************************************************************
 	inline GcpTokenFetchFn CreateTokenFetcher(CHttpClient* httpClient)
 	{
@@ -39,7 +31,7 @@ namespace gcp_auth
 					return;
 				}
 
-				// Google OAuth2 ÅäÅ« ±³È¯ ¿äÃ» (RFC 7523 JWT-bearer profile)
+				// Google OAuth2 í† í° êµí™˜ ìš”ì²­ (RFC 7523 JWT-bearer profile)
 				httpClient->PostForm("https://oauth2.googleapis.com/token",
 					{
 						{"grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"},
@@ -47,11 +39,11 @@ namespace gcp_auth
 					},
 					[onDone](HttpResponse resp)
 					{
-						// HTTP Åë½Å ½ÇÆĞ ¶Ç´Â Status Code°¡ 200 OK°¡ ¾Æ´Ñ °æ¿ì
+						// HTTP í†µì‹  ì‹¤íŒ¨ ë˜ëŠ” Status Codeê°€ 200 OKê°€ ì•„ë‹Œ ê²½ìš°
 						if( !resp.success || resp.statusCode != 200 )
 						{
-							// TODO: ÇÊ¿ä ½Ã ³»ºÎ ·Î°Å¸¦ ÅëÇØ resp.statusCode ¹× resp.body Ãâ·Â
-							// ¿¹: LOG_ERROR("OAuth2 Token Exchange Failed: code=%d, body=%s", resp.statusCode, resp.body.c_str());
+							// TODO: í•„ìš” ì‹œ ë‚´ë¶€ ë¡œê±°ë¥¼ í†µí•´ resp.statusCode ë° resp.body ì¶œë ¥
+							// ì˜ˆ: LOG_ERROR("OAuth2 Token Exchange Failed: code=%d, body=%s", resp.statusCode, resp.body.c_str());
 							onDone(false, "", 0);
 							return;
 						}
@@ -59,14 +51,14 @@ namespace gcp_auth
 						std::string token;
 						int64_t expiresIn = 0;
 
-						// JSON ÀÀ´ä¿¡¼­ access_token ÆÄ½Ì
+						// JSON ì‘ë‹µì—ì„œ access_token íŒŒì‹±
 						if( !json_extract::FindString(resp.body, "access_token", token) )
 						{
 							onDone(false, "", 0);
 							return;
 						}
 
-						// expires_in (º¸Åë 3600ÃÊ) ÆÄ½Ì
+						// expires_in (ë³´í†µ 3600ì´ˆ) íŒŒì‹±
 						json_extract::FindInt(resp.body, "expires_in", expiresIn);
 
 						onDone(true, token, expiresIn);
@@ -75,4 +67,4 @@ namespace gcp_auth
 	}
 }
 
-#endif // ndef __GCPAUTHHTTPCLIENT_H__
+#endif // ndef UC_GCPAUTHHTTPCLIENT_H

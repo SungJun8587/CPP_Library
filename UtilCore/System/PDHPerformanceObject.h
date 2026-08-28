@@ -4,12 +4,10 @@
 // 
 //***************************************************************************
 
-#ifndef __PDHPERFORMANCEOBJECT_H__
-#define __PDHPERFORMANCEOBJECT_H__
+#ifndef UC_PDHPERFORMANCEOBJECT_H
+#define UC_PDHPERFORMANCEOBJECT_H
 
-#ifndef __SYSTEMBASEDEFINE_H__
 #include <System/SystemBaseDefine.h>
-#endif
 
 #include <pdh.h>
 
@@ -177,4 +175,4 @@ private:
 	unsigned long m_nPeakNonPagedPoolUsage; // 최대 Non-Paged Pool 사용량 (Byte 단위)
 };
 
-#endif // ndef __PDHPERFORMANCEOBJECT_H__
+#endif // ndef UC_PDHPERFORMANCEOBJECT_H

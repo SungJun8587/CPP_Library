@@ -9,18 +9,11 @@
 //        유리할 때 xnew/xdelete 대신 사용합니다.
 //***************************************************************************
 
-#ifndef __OBJECTPOOL_H__
-#define __OBJECTPOOL_H__
+#ifndef UC_OBJECTPOOL_H
+#define UC_OBJECTPOOL_H
 
-#pragma once
-
-#ifndef	__MEMORYPOOL_H__
 #include <Memory/MemoryPool.h>
-#endif
-
-#ifndef __ALLOCATOR_H__
 #include <Memory/Allocator.h> 
-#endif
 
 template<typename Type>
 class CObjectPool
@@ -97,4 +90,4 @@ private:
 	static constexpr int32 s_allocSize = sizeof(Type) + sizeof(MemoryHeader);
 };
 
-#endif // ndef __OBJECTPOOL_H__
+#endif // ndef UC_OBJECTPOOL_H

@@ -4,8 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __SINGLETON_H__
-#define __SINGLETON_H__
+#ifndef UC_SINGLETON_H
+#define UC_SINGLETON_H
 
 template<typename T>
 class CSingleton
@@ -35,4 +35,4 @@ protected:
 
 #include "Singleton.inl"
 
-#endif // ndef __SINGLETON_H__
+#endif // ndef UC_SINGLETON_H

@@ -4,28 +4,14 @@
 //
 //***************************************************************************
 
-#ifndef __IOCPSERVICE_H__
-#define __IOCPSERVICE_H__
+#ifndef UC_IOCPSERVICE_H
+#define UC_IOCPSERVICE_H
 
-#ifndef __NET_SERVICE_H__
 #include <Network/NetService.h>
-#endif
-
-#ifndef __IOCPCORE_H__
 #include <Network/IOCP/IocpCore.h>
-#endif
-
-#ifndef __IOCPLISTENER_H__
 #include <Network/IOCP/IocpListener.h>
-#endif
-
-#ifndef __IOCPSESSIONMANAGER_H__
 #include <Network/IOCP/IocpSessionManager.h>
-#endif
-
-#ifndef __THREADMANAGER_H__
-#include <ThreadManager.h>
-#endif
+#include <Thread/ThreadManager.h>
 
 //***************************************************************************
 // @class CIocpServerService
@@ -171,4 +157,4 @@ private:
 	CThreadManager			_threadManager;         // 워커 스레드 수명 주기 및 TLS 관리자
 };
 
-#endif // ndef __IOCPSERVICE_H__
+#endif // ndef UC_IOCPSERVICE_H

@@ -5,10 +5,8 @@
 //	- 크로스플랫폼(Windows / Linux / macOS) 호환성을 고려하여 작성
 //***************************************************************************
 
-#ifndef __BASEREDEFINEDATATYPE_H__
-#define __BASEREDEFINEDATATYPE_H__
-
-#pragma once
+#ifndef UC_BASEREDEFINEDATATYPE_H
+#define UC_BASEREDEFINEDATATYPE_H
 
 // 공통으로 자주 사용되는 표준 라이브러리 헤더 포함
 #include <string>
@@ -117,4 +115,4 @@ USING_SHARED_PTR(CJobQueue);
 #define len16(arr)		static_cast<int16>(sizeof(arr)/sizeof(arr[0]))
 #define len32(arr)		static_cast<int32>(sizeof(arr)/sizeof(arr[0]))
 
-#endif // ndef __BASEREDEFINEDATATYPE_H__
+#endif // ndef UC_BASEREDEFINEDATATYPE_H

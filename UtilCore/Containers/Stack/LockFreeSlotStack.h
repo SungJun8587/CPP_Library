@@ -4,16 +4,11 @@
 //
 //***************************************************************************
 
-#ifndef __LOCKFREESLOTSTACK_H__
-#define __LOCKFREESLOTSTACK_H__
+#ifndef UC_LOCKFREESLOTSTACK_H
+#define UC_LOCKFREESLOTSTACK_H
 
-#ifndef __BASEREDEFINEDATATYPE_H__
 #include <BaseRedefineDataType.h>
-#endif
-
-#ifndef	__CONTAINERS_H__
 #include <Memory/Containers.h>
-#endif
 
 #include <atomic>
 #include <cassert>
@@ -163,4 +158,4 @@ private:
     alignas(8) std::atomic<uint64_t>_head{ 0 };         // 스택의 최상단 헤드 (버전 + 인덱스 패킹)
 };
 
-#endif // ndef __LOCKFREESLOTSTACK_H__
+#endif // ndef UC_LOCKFREESLOTSTACK_H

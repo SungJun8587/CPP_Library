@@ -4,18 +4,13 @@
 //
 //***************************************************************************
 
-#ifndef __STRINGUTIL_H__
-#define __STRINGUTIL_H__
+#ifndef UC_STRINGUTIL_H
+#define UC_STRINGUTIL_H
 
-#ifndef	_INC_TCHAR
 #include <tchar.h>
-#endif
-
-#ifndef __ATLBASE_H__
 #include <atlbase.h>
-#endif
 
-#ifdef	__MEMBUFFER_H__
+#ifdef	UC_MEMBUFFER_H
 bool	FolderPathPassing(CMemBuffer<TCHAR>& TFolderPath, const TCHAR* ptszFullFilePath);
 bool	FileNameExtPathPassing(CMemBuffer<TCHAR>& TFileNameExt, const TCHAR* ptszFullFilePath);
 bool	FileNameExtPassing(CMemBuffer<TCHAR>& FileName, CMemBuffer<TCHAR>& TFileExt, const TCHAR* ptszFileNameExt);
@@ -69,4 +64,4 @@ size_t		TokenCount(const _tstring& source, const _tstring& token);
 bool		Tokenize(std::vector<_tstring>& dests, const _tstring& source, const _tstring& token);
 #endif
 
-#endif // ndef __STRINGUTIL_H__
+#endif // ndef UC_STRINGUTIL_H

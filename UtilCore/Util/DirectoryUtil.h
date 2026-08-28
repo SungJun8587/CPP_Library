@@ -4,12 +4,10 @@
 //
 //***************************************************************************
 
-#ifndef __DIRECTORYUTIL_H__
-#define __DIRECTORYUTIL_H__
+#ifndef UC_DIRECTORYUTIL_H
+#define UC_DIRECTORYUTIL_H
 
-#ifndef __BASEREDEFINEDATATYPE_H__
 #include <BaseRedefineDataType.h>
-#endif
 
 #include <filesystem>
 
@@ -37,4 +35,4 @@ bool RemoveDirectoryRecursive(const std::filesystem::path& folder, bool bSelfDel
 bool CopyFileRecursive(const std::filesystem::path& sourceFolder, const std::filesystem::path& destFolder, const SH_APPLY_FILEINFO& shApplyFileInfo);
 bool MoveFileRecursive(const std::filesystem::path& sourceFolder, const std::filesystem::path& destFolder, const SH_APPLY_FILEINFO& shApplyFileInfo);
 
-#endif // __DIRECTORYUTIL_H__
+#endif // ndef UC_DIRECTORYUTIL_H

@@ -4,27 +4,18 @@
 //
 //***************************************************************************
 
-#ifndef __DBQUERYPROCESS_H__
-#define __DBQUERYPROCESS_H__
+#ifndef UC_DBQUERYPROCESS_H
+#define UC_DBQUERYPROCESS_H
 
-#pragma once
-
-#ifndef __BASEDEFINE_H__
 #include <BaseDefine.h>
-#endif
-
-#ifndef __BASEREDEFINEDATATYPE_H__
 #include <BaseRedefineDataType.h>
-#endif
+#include <DB/DBCommon.h> 
+#include <DB/BaseODBC.h> 
 
-#ifndef __DBCOMMON_H__
-#include <DBCommon.h> 
-#endif
-
-#ifndef __BASEODBC_H__
-#include <BaseODBC.h> 
-#endif
-
+//***************************************************************************
+// @brief 데이터베이스 쿼리 프로세스를 처리하는 클래스
+// @details 다양한 DBMS(MSSQL, MYSQL, ORACLE)에 대한 메타데이터 조회 및 DDL/DML 실행 기능을 제공합니다.
+//***************************************************************************
 class CDBQueryProcess
 {
 public:
@@ -119,8 +110,8 @@ public:
 	bool		ORACLEGetIndexRebuild(const TCHAR* ptszIndexName);
 
 private:
-	EDBClass	_dbClass;
-	CBaseODBC& _dbConn;
+	EDBClass	_dbClass; // DB 분류
+	CBaseODBC&	_dbConn;  // ODBC 커넥션 객체
 };
 
-#endif // ndef __DBQUERYPROCESS_H__
+#endif // ndef UC_DBQUERYPROCESS_H

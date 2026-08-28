@@ -4,28 +4,14 @@
 //
 //***************************************************************************
 
-#ifndef __RIO_SEND_H__
-#define __RIO_SEND_H__
+#ifndef UC_RIOSEND_H
+#define UC_RIOSEND_H
 
-#ifndef __RIOCOMMON_H__
-#include <Network/Rio/RioCommon.h>
-#endif
-
-#ifndef __RIOEVENT_H__
-#include <Network/Rio/RioEvent.h>
-#endif
-
-#ifndef __RIOOBJECT_H__
-#include <Network/Rio/RioObject.h>
-#endif
-
-#ifndef __RIOCORE_H__
-#include <Network/Rio/RioCore.h>
-#endif
-
-#ifndef __RIOSUBMISSIONHELPER_H__
-#include <Network/Rio/RioSubmissionHelper.h>
-#endif
+#include <Network/RIO/RioCommon.h>
+#include <Network/RIO/RioEvent.h>
+#include <Network/RIO/RioObject.h>
+#include <Network/RIO/RioCore.h>
+#include <Network/RIO/RioSubmissionHelper.h>
 
 class CRioCore;
 class CRioEvent;
@@ -76,4 +62,4 @@ public:
         DWORD flags = 0) noexcept;
 };
 
-#endif // ndef __RIO_SEND_H__
+#endif // ndef UC_RIOSEND_H

@@ -7,10 +7,8 @@
 //        멀티스레드 환경에서 블록을 안전하게 Push/Pop 할 수 있습니다.
 //***************************************************************************
 
-#ifndef __MEMORYPOOL_H__
-#define __MEMORYPOOL_H__
-
-#pragma once
+#ifndef UC_MEMORYPOOL_H
+#define UC_MEMORYPOOL_H
 
 enum
 {
@@ -104,4 +102,4 @@ private:
 	atomic<int32>				_reserveCount = 0;  // 현재 풀에 대기 중인 블록 수
 };
 
-#endif // ndef __MEMORYPOOL_H__
+#endif // ndef UC_MEMORYPOOL_H

@@ -4,15 +4,13 @@
 //
 //***************************************************************************
 
-#ifndef __UNIQNUMGENERATOR_H__
-#define __UNIQNUMGENERATOR_H__
+#ifndef UC_UNIQNUMGENERATOR_H
+#define UC_UNIQNUMGENERATOR_H
 
 #pragma warning ( push )
 #pragma warning( disable : 4006 4251 4786 )
 
-#ifndef __BITFIELD_H__
 #include <Util/BitField.h>
-#endif
 
 //***************************************************************************
 // @class CUniqNumGenerator
@@ -63,4 +61,4 @@ private:
 
 #pragma warning ( pop )
 
-#endif // ndef __UNIQNUMGENERATOR_H__
+#endif // ndef UC_UNIQNUMGENERATOR_H

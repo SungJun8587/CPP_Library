@@ -4,8 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __BITOPERATE_H__
-#define __BITOPERATE_H__
+#ifndef UC_BITOPERATE_H
+#define UC_BITOPERATE_H
 
 #include <cstddef>
 
@@ -43,4 +43,4 @@ protected:
 
 #include "BitOperate.inl"
 
-#endif // __BITOPERATE_H__
+#endif // ndef UC_BITOPERATE_H

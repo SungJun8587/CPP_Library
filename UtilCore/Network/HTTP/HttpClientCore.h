@@ -4,12 +4,10 @@
 //
 //***************************************************************************
 
-#ifndef __HTTPCLIENTCORE_H__
-#define __HTTPCLIENTCORE_H__
+#ifndef UC_HTTPCLIENTCORE_H
+#define UC_HTTPCLIENTCORE_H
 
-#ifndef	__HTTPRESPONSEPARSER_H__
 #include <Network/HTTP/HttpResponseParser.h>
-#endif
 
 #include <functional>
 #include <cstdint>
@@ -169,4 +167,4 @@ private:
 	HttpRequestCompletionHandler m_onComplete;          // 진행 중인 요청의 완료 콜백
 };
 
-#endif // ndef __HTTPCLIENTCORE_H__
+#endif // ndef UC_HTTPCLIENTCORE_H

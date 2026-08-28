@@ -4,12 +4,10 @@
 //
 //***************************************************************************
 
-#ifndef __WMI_H__
-#define __WMI_H__
+#ifndef UC_WMI_H
+#define UC_WMI_H
 
-#ifndef __ENCODINGCONVERT_H__
 #include <Util/EncodingConvert.h>
-#endif
 
 #include <WbemIdl.h>
 #include <comdef.h>
@@ -163,4 +161,4 @@ private:
 	HRESULT m_hrLastError;										// 가장 최근 연산의 HRESULT (진단용)
 };
 
-#endif // ndef __WMI_H__
+#endif // ndef UC_WMI_H

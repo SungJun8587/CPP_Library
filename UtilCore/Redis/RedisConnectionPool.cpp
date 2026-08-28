@@ -83,7 +83,7 @@ void CRedisConnectionPool::Clear()
 // @brief 풀에서 놀고 있는(Free) 커넥션을 팝함
 // @return 클라이언트 객체 포인터 (없을 시 nullptr)
 //***************************************************************************
-std::shared_ptr<CRedisClient> CRedisConnectionPool::PopConnection()
+CRedisClientRef CRedisConnectionPool::PopConnection()
 {
 	std::lock_guard<std::mutex> lock(_lock);
 
@@ -99,7 +99,7 @@ std::shared_ptr<CRedisClient> CRedisConnectionPool::PopConnection()
 // @brief 사용이 끝난 커넥션을 풀로 반납함
 // @param pClient 반납할 클라이언트 객체 포인터
 //***************************************************************************
-void CRedisConnectionPool::PushConnection(std::shared_ptr<CRedisClient> pClient)
+void CRedisConnectionPool::PushConnection(CRedisClientRef pClient)
 {
 	if( !pClient ) return;
 

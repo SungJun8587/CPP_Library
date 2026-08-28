@@ -4,8 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __HTTPMULTIPARTBUILDER_H__
-#define __HTTPMULTIPARTBUILDER_H__
+#ifndef UC_HTTPMULTIPARTBUILDER_H
+#define UC_HTTPMULTIPARTBUILDER_H
 
 #include <string>
 #include <string_view>
@@ -203,4 +203,4 @@ private:
 	bool _finalized = false;             // Build()로 닫는 경계선까지 마무리됐는지 여부
 };
 
-#endif // ndef __HTTPMULTIPARTBUILDER_H__
+#endif // ndef UC_HTTPMULTIPARTBUILDER_H

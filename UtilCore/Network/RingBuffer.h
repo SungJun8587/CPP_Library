@@ -4,16 +4,10 @@
 //
 //***************************************************************************
 
-#ifndef __RINGBUFFER_H__
-#define __RINGBUFFER_H__
+#ifndef UC_RINGBUFFER_H
+#define UC_RINGBUFFER_H
 
-#ifndef	__ALLOCATOR_H__
 #include <Memory/Allocator.h>
-#endif
-
-#ifndef	__IOCPCOMMON_H__
-#include <Network/IOCP/IocpCommon.h>
-#endif
 
 //***************************************************************************
 // @class CRingBuffer
@@ -228,4 +222,4 @@ private:
 	char* _write; // 다음에 데이터를 쓸 빈 공간이 위치한 버퍼 내 쓰기 커서 포인터
 };
 
-#endif // ndef __RINGBUFFER_H__
+#endif // ndef UC_RINGBUFFER_H

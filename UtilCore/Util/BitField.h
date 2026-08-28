@@ -4,8 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __BITFIELD_H__
-#define __BITFIELD_H__
+#ifndef UC_BITFIELD_H
+#define UC_BITFIELD_H
 
 #include <cstddef>
 
@@ -48,4 +48,4 @@ private:
 	bool _isExtern;						// 외부 버퍼 사용 여부
 };
 
-#endif // ndef __BITFIELD_H__
+#endif // ndef UC_BITFIELD_H

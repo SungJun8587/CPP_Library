@@ -4,8 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __ICONVUTIL_H__
-#define __ICONVUTIL_H__
+#ifndef UC_ICONVUTIL_H
+#define UC_ICONVUTIL_H
 
 #include <iconv.h>
 #include <memory>
@@ -119,4 +119,4 @@ namespace Iconv
 	};
 }
 
-#endif // ndef __ICONVUTIL_H__
+#endif // ndef UC_ICONVUTIL_H

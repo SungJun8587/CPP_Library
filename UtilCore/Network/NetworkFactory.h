@@ -4,8 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __NETWORKFACTORY_H__
-#define __NETWORKFACTORY_H__
+#ifndef UC_NETWORKFACTORY_H
+#define UC_NETWORKFACTORY_H
 
 #include <memory>
 #include <functional>
@@ -109,4 +109,4 @@ public:
 	);
 };
 
-#endif // ndef __NETWORKFACTORY_H__
+#endif // ndef UC_NETWORKFACTORY_H

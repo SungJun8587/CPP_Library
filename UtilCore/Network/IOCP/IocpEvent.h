@@ -4,12 +4,10 @@
 //
 //***************************************************************************
 
-#ifndef __IOCPEVENT_H__
-#define __IOCPEVENT_H__
+#ifndef UC_IOCPEVENT_H
+#define UC_IOCPEVENT_H
 
-#ifndef	__IOCPCOMMON_H__
 #include <Network/IOCP/IocpCommon.h>
-#endif
 
 //***************************************************************************
 // @class IocpEvent
@@ -183,4 +181,4 @@ public:
     CVector<CSendBufferRef>   sendBuffers;
 };
 
-#endif // ndef __IOCPEVENT_H__
+#endif // ndef UC_IOCPEVENT_H

@@ -4,12 +4,10 @@
 //
 //***************************************************************************
 
-#ifndef __ENCODINGCONVERT_H__
-#define __ENCODINGCONVERT_H__
+#ifndef UC_ENCODINGCONVERT_H
+#define UC_ENCODINGCONVERT_H
 
-#ifndef __WINCHARSETCONV_H__
 #include <Util/WinCharsetConv.h>
-#endif
 
 #ifdef _STRING_
 std::wstring AnsiToUnicode(const std::string& ansi);
@@ -38,4 +36,4 @@ std::string  AnsiToUtf8(const char* ansi, int32 dataLength);
 std::string  Utf8ToAnsi(const char* utf8, int32 dataLength);
 #endif
 
-#endif // ndef __ENCODINGCONVERT_H__
+#endif // ndef UC_ENCODINGCONVERT_H

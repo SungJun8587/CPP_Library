@@ -4,15 +4,13 @@
 //                   통합 동기화 객체 (PLock / PRWLock) 인터페이스 정의
 //***************************************************************************
 
-#ifndef __PLATFORMLOCK_H__
-#define __PLATFORMLOCK_H__
+#ifndef UC_PLATFORMLOCK_H
+#define UC_PLATFORMLOCK_H
 
-#pragma once
-
-#include "SpinLock.h"
+#include <Thread/SpinLock.h>
 
 #if defined(_WIN32) || defined(_WIN64)
-#include "SRWLock.h"
+#include <Thread/SRWLock.h>
 #define PLATFORM_LOCK_WINDOWS 1
 #else
 #define PLATFORM_LOCK_WINDOWS 0
@@ -290,4 +288,4 @@ private:
     const char* _name;	// 프로파일링 추적용 락 이름
 };
 
-#endif // ndef __PLATFORMLOCK_H__
+#endif // ndef UC_PLATFORMLOCK_H

@@ -4,10 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __IOCPCOMMON_H__
-#define __IOCPCOMMON_H__
-
-#pragma once
+#ifndef UC_IOCPCOMMON_H
+#define UC_IOCPCOMMON_H
 
 namespace Iocp
 {
@@ -88,6 +86,6 @@ namespace Iocp
     static constexpr ULONG_PTR QUIT_KEY = static_cast<ULONG_PTR>(-1);
 }
 
-#endif // ndef __IOCPCOMMON_H__
+#endif // ndef UC_IOCPCOMMON_H
 
 

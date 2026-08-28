@@ -4,14 +4,10 @@
 //
 //***************************************************************************
 
-#ifndef __REDISRESULTSET_H__
-#define __REDISRESULTSET_H__
+#ifndef UC_REDISRESULTSET_H
+#define UC_REDISRESULTSET_H
 
-#pragma once
-
-#ifndef __REDISPROTOCOL_H__
 #include <Redis/RedisProtocol.h>
-#endif
 
 #include <vector>
 #include <string>
@@ -109,4 +105,4 @@ private:
 	CVector<std::string>	_vecResultSplit;  // 문자열로 분할 및 보관된 결과 목록
 };
 
-#endif // ndef __REDISRESULTSET_H__
+#endif // ndef UC_REDISRESULTSET_H

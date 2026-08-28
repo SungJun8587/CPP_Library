@@ -4,10 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __RAPIDJSONUTIL_H__
-#define __RAPIDJSONUTIL_H__
-
-#pragma once
+#ifndef UC_RAPIDJSONUTIL_H
+#define UC_RAPIDJSONUTIL_H
 
 #include <iostream>
 #include <fstream>
@@ -313,4 +311,4 @@ private:
 
 #include <JSON/RapidJSONUtil.inl>
 
-#endif // ndef __RAPIDJSONUTIL_H__
+#endif // ndef UC_RAPIDJSONUTIL_H

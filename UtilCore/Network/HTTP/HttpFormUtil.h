@@ -4,8 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __HTTPFORMUTIL_H__
-#define __HTTPFORMUTIL_H__
+#ifndef UC_HTTPFORMUTIL_H
+#define UC_HTTPFORMUTIL_H
 
 #include <string>
 #include <string_view>
@@ -150,4 +150,4 @@ namespace HTTP
 	}
 }
 
-#endif // ndef __HTTPFORMUTIL_H__
+#endif // ndef UC_HTTPFORMUTIL_H

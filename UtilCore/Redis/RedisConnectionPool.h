@@ -4,16 +4,12 @@
 //
 //***************************************************************************
 
-#ifndef __REDISCONNECTIONPOOL_H__
-#define __REDISCONNECTIONPOOL_H__
+#ifndef UC_REDISCONNECTIONPOOL_H
+#define UC_REDISCONNECTIONPOOL_H
 
-#ifndef __IOCPCORE_H__
 #include <Network/IOCP/IocpCore.h>
-#endif
-
-#ifndef __REDISCLIENT_H__
+#include <Redis/RedisRedefineDataType.h>
 #include <Redis/RedisClient.h>
-#endif
 
 #include <vector>
 #include <queue>
@@ -46,19 +42,19 @@ public:
 	bool        SendCommand(const CVector<std::string>& vecArgs, RedisCallback fnCallback);
 
 private:
-	std::shared_ptr<CRedisClient> PopConnection();
-	void                          PushConnection(std::shared_ptr<CRedisClient> pClient);
+	CRedisClientRef		PopConnection();
+	void                PushConnection(CRedisClientRef pClient);
 
 private:
-	CIocpCoreRef                                _iocpCore;               // IOCP 코어 참조
-	std::string                                 _strIP;                  // 연결 대상 IP
-	uint16                                      _nPort = 0;              // 연결 대상 포트
+	CIocpCoreRef                    _iocpCore;               // IOCP 코어 참조
+	std::string                     _strIP;                  // 연결 대상 IP
+	uint16                          _nPort = 0;              // 연결 대상 포트
 
-	std::mutex                                  _lock;					  // 풀 동기화 락
-	CVector<std::shared_ptr<CRedisClient>>		_vecAllClients;          // 생성된 전체 클라이언트 리스트
-	CQueue<std::shared_ptr<CRedisClient>>		_queueFree;              // 사용 가능한 클라이언트 큐
+	std::mutex                      _lock;					  // 풀 동기화 락
+	CVector<CRedisClientRef>		_vecAllClients;          // 생성된 전체 클라이언트 리스트
+	CQueue<CRedisClientRef>			_queueFree;              // 사용 가능한 클라이언트 큐
 
-	std::atomic<bool>                           _bInitialized{ false };  // 풀 초기화 여부 플래그
+	std::atomic<bool>               _bInitialized{ false };  // 풀 초기화 여부 플래그
 };
 
-#endif // ndef __REDISCONNECTIONPOOL_H__
+#endif // ndef UC_REDISCONNECTIONPOOL_H

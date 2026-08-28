@@ -4,16 +4,11 @@
 //
 //***************************************************************************
 
-#ifndef __HTTPCONNPOOLMANAGER_H__
-#define __HTTPCONNPOOLMANAGER_H__
+#ifndef UC_HTTPCONNPOOLMANAGER_H
+#define UC_HTTPCONNPOOLMANAGER_H
 
-#ifndef	__HTTPCONNPOOLCOMMON_H__
 #include <Network/HTTP/HttpConnPoolCommon.h>
-#endif
-
-#ifndef	__NETADDRESS_H__
 #include <Network/NetAddress.h>
-#endif
 
 #include <functional>
 #include <memory>
@@ -394,4 +389,4 @@ private:
 	std::function<void()> _allSessionsClosedHandler; // 세션 수 0 도달 시 1회 호출될 콜백
 };
 
-#endif // ndef __HTTPCONNPOOLMANAGER_H__
+#endif // ndef UC_HTTPCONNPOOLMANAGER_H

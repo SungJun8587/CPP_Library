@@ -4,10 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __JOB_H__
-#define __JOB_H__
-
-#pragma once
+#ifndef UC_JOB_H
+#define UC_JOB_H
 
 #include <functional>
 
@@ -42,4 +40,4 @@ private:
 	function<void()> _callback; // 실행할 콜백 함수 객체
 };
 
-#endif // ndef __JOB_H__
+#endif // ndef UC_JOB_H

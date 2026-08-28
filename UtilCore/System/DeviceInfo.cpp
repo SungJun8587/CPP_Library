@@ -1,4 +1,4 @@
-
+ï»¿
 //***************************************************************************
 // DeviceInfo.cpp: implementation of Non-WMI Hardware Information Classes.
 //
@@ -20,9 +20,9 @@ namespace
 {
     //***************************************************************************
     // @struct RawDeviceInfo
-    // @brief SetupAPI·Î ¾ò´Â °øÅë ¼Ó¼º(Description/Manufacturer/HardwareId)¸¸ ´ã´Â
-    //        ³»ºÎ ÀÓ½Ã ±¸Á¶Ã¼. Ä«Å×°í¸®º° HWINFO_* ±¸Á¶Ã¼´Â ÇÊµå ÀÌ¸§ÀÌ ¼­·Î ´Ş¶ó¼­
-    //        (ProductName vs Description µî) ÀÌ °ªÀ» °¢ÀÚ ¾Ë¸ÂÀº ÇÊµå·Î ¿Å°Ü ´ã½À´Ï´Ù.
+    // @brief SetupAPIë¡œ ì–»ëŠ” ê³µí†µ ì†ì„±(Description/Manufacturer/HardwareId)ë§Œ ë‹´ëŠ”
+    //        ë‚´ë¶€ ì„ì‹œ êµ¬ì¡°ì²´. ì¹´í…Œê³ ë¦¬ë³„ HWINFO_* êµ¬ì¡°ì²´ëŠ” í•„ë“œ ì´ë¦„ì´ ì„œë¡œ ë‹¬ë¼ì„œ
+    //        (ProductName vs Description ë“±) ì´ ê°’ì„ ê°ì ì•Œë§ì€ í•„ë“œë¡œ ì˜®ê²¨ ë‹´ìŠµë‹ˆë‹¤.
     //***************************************************************************
     struct RawDeviceInfo
     {
@@ -32,12 +32,12 @@ namespace
     };
 
     //***************************************************************************
-    // @brief SMBIOS/µå¶óÀÌ¹ö¿¡¼­ ¾òÀº ANSI ¹®ÀÚ¿­À» TCHAR ¹öÆÛ·Î º¹»çÇÕ´Ï´Ù.
-    // @param dst      [out] º¹»ç¹ŞÀ» TCHAR ¹öÆÛ
-    // @param dstCount [in]  dstÀÇ ¹®ÀÚ °³¼ö(¹ÙÀÌÆ® ¾Æ´Ô)
-    // @param src      [in]  ¿øº» ANSI(char*) ¹®ÀÚ¿­
-    // @return ¾øÀ½
-    // @detail SMBIOS ¹®ÀÚ¿­Àº Ç×»ó ANSI¶ó, UNICODE ºôµåÀÏ ¶§¸¸ ½ÇÁ¦ º¯È¯ÀÌ ¹ß»ıÇÔ.
+    // @brief SMBIOS/ë“œë¼ì´ë²„ì—ì„œ ì–»ì€ ANSI ë¬¸ìì—´ì„ TCHAR ë²„í¼ë¡œ ë³µì‚¬í•©ë‹ˆë‹¤.
+    // @param dst      [out] ë³µì‚¬ë°›ì„ TCHAR ë²„í¼
+    // @param dstCount [in]  dstì˜ ë¬¸ì ê°œìˆ˜(ë°”ì´íŠ¸ ì•„ë‹˜)
+    // @param src      [in]  ì›ë³¸ ANSI(char*) ë¬¸ìì—´
+    // @return ì—†ìŒ
+    // @detail SMBIOS ë¬¸ìì—´ì€ í•­ìƒ ANSIë¼, UNICODE ë¹Œë“œì¼ ë•Œë§Œ ì‹¤ì œ ë³€í™˜ì´ ë°œìƒí•¨.
     //***************************************************************************
     void CopyToTChar(TCHAR* dst, size_t dstCount, const char* src)
     {
@@ -49,11 +49,11 @@ namespace
     }
 
     //***************************************************************************
-    // @brief ÁöÁ¤ÇÑ ÀåÄ¡ Å¬·¡½º(Display/Media/CDROM/Keyboard/Mouse/Monitor)¿¡ ¼ÓÇÑ
-    //        ÀåÄ¡¸¦ ÀüºÎ ¿­°ÅÇÏ¿© FriendlyName/HardwareID/Manufacturer¸¦ Ã¤¿ó´Ï´Ù.
-    // @param classGuid [in]  ¿­°ÅÇÒ SetupAPI ÀåÄ¡ Å¬·¡½º GUID
-    // @param outList   [out] °á°ú¸¦ Ã¤¿ö ³ÖÀ» RawDeviceInfo º¤ÅÍ
-    // @return bool ¿­°Å ÀÚÃ¼ÀÇ ¼º°ø ¿©ºÎ (ÀåÄ¡ 0°³µµ true - Å¬·¡½º ¿­°Å ½Ãµµ ¼º°ø)
+    // @brief ì§€ì •í•œ ì¥ì¹˜ í´ë˜ìŠ¤(Display/Media/CDROM/Keyboard/Mouse/Monitor)ì— ì†í•œ
+    //        ì¥ì¹˜ë¥¼ ì „ë¶€ ì—´ê±°í•˜ì—¬ FriendlyName/HardwareID/Manufacturerë¥¼ ì±„ì›ë‹ˆë‹¤.
+    // @param classGuid [in]  ì—´ê±°í•  SetupAPI ì¥ì¹˜ í´ë˜ìŠ¤ GUID
+    // @param outList   [out] ê²°ê³¼ë¥¼ ì±„ì›Œ ë„£ì„ RawDeviceInfo ë²¡í„°
+    // @return bool ì—´ê±° ìì²´ì˜ ì„±ê³µ ì—¬ë¶€ (ì¥ì¹˜ 0ê°œë„ true - í´ë˜ìŠ¤ ì—´ê±° ì‹œë„ ì„±ê³µ)
     //***************************************************************************
     bool EnumRawDevicesByClass(const GUID& classGuid, std::vector<RawDeviceInfo>& outList)
     {
@@ -120,10 +120,10 @@ CDriveInfo::~CDriveInfo()
 }
 
 //***************************************************************************
-// @brief Win32 API¸¦ ÅëÇØ °¢ ³í¸® µå¶óÀÌºêÀÇ °ø°£ ¹× ÆÄÀÏ ½Ã½ºÅÛÀ» ¼öÁıÇÕ´Ï´Ù.
-// @return BOOL Á¤º¸ ¼öÁı ¼º°ø ¿©ºÎ (TRUE: ¼º°ø, FALSE: ½ÇÆĞ)
-// @detail GetLogicalDrives·Î µå¶óÀÌºê ¹®ÀÚ¸¦ ¾ò°í, DRIVE_FIXEDÀÎ °Í¸¸ GetVolumeInformation/
-//         GetDiskFreeSpaceEx·Î ÆÄÀÏ½Ã½ºÅÛ°ú ¿ë·®À» Á¶È¸ÇÏ¸ç m_Drives¿¡ ÀüÃ¼ ÇÕ°è¸¦ ´©ÀûÇÕ´Ï´Ù.
+// @brief Win32 APIë¥¼ í†µí•´ ê° ë…¼ë¦¬ ë“œë¼ì´ë¸Œì˜ ê³µê°„ ë° íŒŒì¼ ì‹œìŠ¤í…œì„ ìˆ˜ì§‘í•©ë‹ˆë‹¤.
+// @return BOOL ì •ë³´ ìˆ˜ì§‘ ì„±ê³µ ì—¬ë¶€ (TRUE: ì„±ê³µ, FALSE: ì‹¤íŒ¨)
+// @detail GetLogicalDrivesë¡œ ë“œë¼ì´ë¸Œ ë¬¸ìë¥¼ ì–»ê³ , DRIVE_FIXEDì¸ ê²ƒë§Œ GetVolumeInformation/
+//         GetDiskFreeSpaceExë¡œ íŒŒì¼ì‹œìŠ¤í…œê³¼ ìš©ëŸ‰ì„ ì¡°íšŒí•˜ë©° m_Drivesì— ì „ì²´ í•©ê³„ë¥¼ ëˆ„ì í•©ë‹ˆë‹¤.
 //***************************************************************************
 BOOL CDriveInfo::GetInformation()
 {
@@ -149,7 +149,7 @@ BOOL CDriveInfo::GetInformation()
 
         TCHAR tszRoot[4] = { (TCHAR)(_T('A') + i), _T(':'), _T('\\'), _T('\0') };
 
-        if( GetDriveType(tszRoot) != DRIVE_FIXED ) // °íÁ¤ µå¶óÀÌºê¸¸ (¿ø°İ/ÀÌµ¿½Ä/CD-ROM Á¦¿Ü)
+        if( GetDriveType(tszRoot) != DRIVE_FIXED ) // ê³ ì • ë“œë¼ì´ë¸Œë§Œ (ì›ê²©/ì´ë™ì‹/CD-ROM ì œì™¸)
         {
             continue;
         }
@@ -197,11 +197,11 @@ CVideoCardInfo::~CVideoCardInfo()
 }
 
 //***************************************************************************
-// @brief SetupAPI¸¦ ÅëÇØ ½Ã½ºÅÛ¿¡ ÀåÂøµÈ ±×·¡ÇÈ Ä«µå Á¤º¸¸¦ ¼öÁıÇÕ´Ï´Ù.
-// @return BOOL Á¤º¸ ¼öÁı ¼º°ø ¿©ºÎ (TRUE: ¼º°ø, FALSE: ½ÇÆĞ)
-// @detail GUID_DEVCLASS_DISPLAY·Î ¿­°ÅÇÏ°í, µå¶óÀÌ¹ö ·¹Áö½ºÆ®¸® °ª
-//         HardwareInformation.qwMemorySize·Î VRAM Å©±â(MB, ¿øº»°ú ´ÜÀ§ ÅëÀÏ)¸¦
-//         Ãß°¡·Î ÀĞ½À´Ï´Ù. Manufacturer/HardwareId´Â HWINFO_VIDEOCARDÀÇ Sm Àü¿ë ÇÊµå.
+// @brief SetupAPIë¥¼ í†µí•´ ì‹œìŠ¤í…œì— ì¥ì°©ëœ ê·¸ë˜í”½ ì¹´ë“œ ì •ë³´ë¥¼ ìˆ˜ì§‘í•©ë‹ˆë‹¤.
+// @return BOOL ì •ë³´ ìˆ˜ì§‘ ì„±ê³µ ì—¬ë¶€ (TRUE: ì„±ê³µ, FALSE: ì‹¤íŒ¨)
+// @detail GUID_DEVCLASS_DISPLAYë¡œ ì—´ê±°í•˜ê³ , ë“œë¼ì´ë²„ ë ˆì§€ìŠ¤íŠ¸ë¦¬ ê°’
+//         HardwareInformation.qwMemorySizeë¡œ VRAM í¬ê¸°(MB, ì›ë³¸ê³¼ ë‹¨ìœ„ í†µì¼)ë¥¼
+//         ì¶”ê°€ë¡œ ì½ìŠµë‹ˆë‹¤. Manufacturer/HardwareIdëŠ” HWINFO_VIDEOCARDì˜ Sm ì „ìš© í•„ë“œ.
 //***************************************************************************
 BOOL CVideoCardInfo::GetInformation()
 {
@@ -244,7 +244,7 @@ BOOL CVideoCardInfo::GetInformation()
             CopyToTChar(pCard->m_tszManufacturer, _countof(pCard->m_tszManufacturer), buffer);
         }
 
-        // VRAM Å©±â (µå¶óÀÌ¹ö ·¹Áö½ºÆ®¸® °ª HardwareInformation.qwMemorySize, Byte -> MB º¯È¯)
+        // VRAM í¬ê¸° (ë“œë¼ì´ë²„ ë ˆì§€ìŠ¤íŠ¸ë¦¬ ê°’ HardwareInformation.qwMemorySize, Byte -> MB ë³€í™˜)
         HKEY hDrvKey = SetupDiOpenDevRegKey(hDevInfo, &devInfoData, DICS_FLAG_GLOBAL, 0, DIREG_DRV, KEY_READ);
         if( hDrvKey != INVALID_HANDLE_VALUE )
         {
@@ -284,10 +284,10 @@ CSoundCardInfo::~CSoundCardInfo()
 }
 
 //***************************************************************************
-// @brief SetupAPI¸¦ ÅëÇØ ¿Àµğ¿À ÀåÄ¡ ¸ñ·ÏÀ» ¼öÁıÇÕ´Ï´Ù.
-// @return BOOL Á¤º¸ ¼öÁı ¼º°ø ¿©ºÎ (TRUE: ¼º°ø, FALSE: ½ÇÆĞ)
-// @detail GUID_DEVCLASS_MEDIA·Î ¿­°ÅÇÑ µÚ Description/Manufacturer¸¦ HWINFO_SOUNDCARDÀÇ
-//         ProductName/CompanyName ÇÊµå·Î ¿Å°Ü ´ã½À´Ï´Ù (WMI ¹öÀü°ú ÇÊµå¸íÀÌ ´Ù¸§).
+// @brief SetupAPIë¥¼ í†µí•´ ì˜¤ë””ì˜¤ ì¥ì¹˜ ëª©ë¡ì„ ìˆ˜ì§‘í•©ë‹ˆë‹¤.
+// @return BOOL ì •ë³´ ìˆ˜ì§‘ ì„±ê³µ ì—¬ë¶€ (TRUE: ì„±ê³µ, FALSE: ì‹¤íŒ¨)
+// @detail GUID_DEVCLASS_MEDIAë¡œ ì—´ê±°í•œ ë’¤ Description/Manufacturerë¥¼ HWINFO_SOUNDCARDì˜
+//         ProductName/CompanyName í•„ë“œë¡œ ì˜®ê²¨ ë‹´ìŠµë‹ˆë‹¤ (WMI ë²„ì „ê³¼ í•„ë“œëª…ì´ ë‹¤ë¦„).
 //***************************************************************************
 BOOL CSoundCardInfo::GetInformation()
 {
@@ -333,10 +333,10 @@ CNetworkCardInfo::~CNetworkCardInfo()
 }
 
 //***************************************************************************
-// @brief GetAdaptersAddresses¸¦ ÅëÇØ ³×Æ®¿öÅ© ¾î´ğÅÍ ¸ñ·ÏÀ» ¼öÁıÇÕ´Ï´Ù.
-// @return BOOL Á¤º¸ ¼öÁı ¼º°ø ¿©ºÎ (TRUE: ¼º°ø, FALSE: ½ÇÆĞ)
-// @detail ¾î´ğÅÍ Description°ú MAC ÁÖ¼Ò(HWINFO_NETWORKCARDÀÇ Sm Àü¿ë ÇÊµå
-//         m_tszHardwareId ÀÚ¸®)¸¦ Ã¤¿ó´Ï´Ù.
+// @brief GetAdaptersAddressesë¥¼ í†µí•´ ë„¤íŠ¸ì›Œí¬ ì–´ëŒ‘í„° ëª©ë¡ì„ ìˆ˜ì§‘í•©ë‹ˆë‹¤.
+// @return BOOL ì •ë³´ ìˆ˜ì§‘ ì„±ê³µ ì—¬ë¶€ (TRUE: ì„±ê³µ, FALSE: ì‹¤íŒ¨)
+// @detail ì–´ëŒ‘í„° Descriptionê³¼ MAC ì£¼ì†Œ(HWINFO_NETWORKCARDì˜ Sm ì „ìš© í•„ë“œ
+//         m_tszHardwareId ìë¦¬)ë¥¼ ì±„ì›ë‹ˆë‹¤.
 //***************************************************************************
 BOOL CNetworkCardInfo::GetInformation()
 {
@@ -404,10 +404,10 @@ CCdromInfo::~CCdromInfo()
 }
 
 //***************************************************************************
-// @brief SetupAPI¸¦ ÅëÇØ ÀåÂøµÈ CD-ROM µå¶óÀÌºê ¸ñ·ÏÀ» ¼öÁıÇÕ´Ï´Ù.
-// @return BOOL Á¤º¸ ¼öÁı ¼º°ø ¿©ºÎ (TRUE: ¼º°ø, FALSE: ½ÇÆĞ)
-// @detail GUID_DEVCLASS_CDROMÀ¸·Î ¿­°Å. HWINFO_CDROM::m_tszName(µå¶óÀÌºê ¹®ÀÚ)Àº
-//         ¹Ì±¸ÇöÀÌ¶ó ºó ¹®ÀÚ¿­·Î ³²½À´Ï´Ù.
+// @brief SetupAPIë¥¼ í†µí•´ ì¥ì°©ëœ CD-ROM ë“œë¼ì´ë¸Œ ëª©ë¡ì„ ìˆ˜ì§‘í•©ë‹ˆë‹¤.
+// @return BOOL ì •ë³´ ìˆ˜ì§‘ ì„±ê³µ ì—¬ë¶€ (TRUE: ì„±ê³µ, FALSE: ì‹¤íŒ¨)
+// @detail GUID_DEVCLASS_CDROMìœ¼ë¡œ ì—´ê±°. HWINFO_CDROM::m_tszName(ë“œë¼ì´ë¸Œ ë¬¸ì)ì€
+//         ë¯¸êµ¬í˜„ì´ë¼ ë¹ˆ ë¬¸ìì—´ë¡œ ë‚¨ìŠµë‹ˆë‹¤.
 //***************************************************************************
 BOOL CCdromInfo::GetInformation()
 {
@@ -454,10 +454,10 @@ CKeyBoardInfo::~CKeyBoardInfo()
 }
 
 //***************************************************************************
-// @brief SetupAPI¸¦ ÅëÇØ Å°º¸µå ÀåÄ¡ ¸ñ·ÏÀ» ¼öÁıÇÕ´Ï´Ù.
-// @return BOOL Á¤º¸ ¼öÁı ¼º°ø ¿©ºÎ (TRUE: ¼º°ø, FALSE: ½ÇÆĞ)
-// @detail GUID_DEVCLASS_KEYBOARD·Î ¿­°Å. HWINFO_KEYBOARD::m_tszType(GetKeyboardType
-//         ±â¹İ À¯Çü ÆÇº°)Àº ¹Ì±¸ÇöÀÌ¶ó ºó ¹®ÀÚ¿­·Î ³²½À´Ï´Ù.
+// @brief SetupAPIë¥¼ í†µí•´ í‚¤ë³´ë“œ ì¥ì¹˜ ëª©ë¡ì„ ìˆ˜ì§‘í•©ë‹ˆë‹¤.
+// @return BOOL ì •ë³´ ìˆ˜ì§‘ ì„±ê³µ ì—¬ë¶€ (TRUE: ì„±ê³µ, FALSE: ì‹¤íŒ¨)
+// @detail GUID_DEVCLASS_KEYBOARDë¡œ ì—´ê±°. HWINFO_KEYBOARD::m_tszType(GetKeyboardType
+//         ê¸°ë°˜ ìœ í˜• íŒë³„)ì€ ë¯¸êµ¬í˜„ì´ë¼ ë¹ˆ ë¬¸ìì—´ë¡œ ë‚¨ìŠµë‹ˆë‹¤.
 //***************************************************************************
 BOOL CKeyBoardInfo::GetInformation()
 {
@@ -503,10 +503,10 @@ CMouseInfo::~CMouseInfo()
 }
 
 //***************************************************************************
-// @brief SetupAPI¸¦ ÅëÇØ ¸¶¿ì½º ÀåÄ¡ ¸ñ·ÏÀ» ¼öÁıÇÕ´Ï´Ù.
-// @return BOOL Á¤º¸ ¼öÁı ¼º°ø ¿©ºÎ (TRUE: ¼º°ø, FALSE: ½ÇÆĞ)
-// @detail GUID_DEVCLASS_MOUSE·Î ¿­°Å. HWINFO_MOUSE::m_tszNameÀº ¹Ì±¸ÇöÀÌ¶ó
-//         ºó ¹®ÀÚ¿­·Î ³²½À´Ï´Ù.
+// @brief SetupAPIë¥¼ í†µí•´ ë§ˆìš°ìŠ¤ ì¥ì¹˜ ëª©ë¡ì„ ìˆ˜ì§‘í•©ë‹ˆë‹¤.
+// @return BOOL ì •ë³´ ìˆ˜ì§‘ ì„±ê³µ ì—¬ë¶€ (TRUE: ì„±ê³µ, FALSE: ì‹¤íŒ¨)
+// @detail GUID_DEVCLASS_MOUSEë¡œ ì—´ê±°. HWINFO_MOUSE::m_tszNameì€ ë¯¸êµ¬í˜„ì´ë¼
+//         ë¹ˆ ë¬¸ìì—´ë¡œ ë‚¨ìŠµë‹ˆë‹¤.
 //***************************************************************************
 BOOL CMouseInfo::GetInformation()
 {
@@ -553,9 +553,9 @@ CMonitorInfo::~CMonitorInfo()
 }
 
 //***************************************************************************
-// @brief SetupAPI¸¦ ÅëÇØ ¿¬°áµÈ ¸ğ´ÏÅÍ ÀåÄ¡ ¸ñ·ÏÀ» ¼öÁıÇÕ´Ï´Ù.
-// @return BOOL Á¤º¸ ¼öÁı ¼º°ø ¿©ºÎ (TRUE: ¼º°ø, FALSE: ½ÇÆĞ)
-// @detail GUID_DEVCLASS_MONITOR·Î ¿­°ÅÇÕ´Ï´Ù.
+// @brief SetupAPIë¥¼ í†µí•´ ì—°ê²°ëœ ëª¨ë‹ˆí„° ì¥ì¹˜ ëª©ë¡ì„ ìˆ˜ì§‘í•©ë‹ˆë‹¤.
+// @return BOOL ì •ë³´ ìˆ˜ì§‘ ì„±ê³µ ì—¬ë¶€ (TRUE: ì„±ê³µ, FALSE: ì‹¤íŒ¨)
+// @detail GUID_DEVCLASS_MONITORë¡œ ì—´ê±°í•©ë‹ˆë‹¤.
 //***************************************************************************
 BOOL CMonitorInfo::GetInformation()
 {

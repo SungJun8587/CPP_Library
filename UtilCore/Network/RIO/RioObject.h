@@ -4,16 +4,11 @@
 //
 //***************************************************************************
 
-#ifndef __RIOOBJECT_H__
-#define __RIOOBJECT_H__
+#ifndef UC_RIOOBJECT_H
+#define UC_RIOOBJECT_H
 
-#ifndef __RIOCOMMON_H__
 #include <Network/RIO/RioCommon.h>
-#endif
-
-#ifndef __RIOEVENT_H__
 #include <Network/RIO/RioEvent.h>
-#endif
 
 class CRioEvent;
 
@@ -73,4 +68,4 @@ private:
     std::atomic<uint32_t> _ioCount{ 0 };        // 현재 진행 중인 비동기 RIO I/O 카운터
 };
 
-#endif // ndef __RIOOBJECT_H__
+#endif // ndef UC_RIOOBJECT_H

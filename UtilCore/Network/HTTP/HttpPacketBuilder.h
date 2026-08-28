@@ -4,16 +4,11 @@
 //
 //***************************************************************************
 
-#ifndef __HTTPPACKETBUILDER_H__
-#define __HTTPPACKETBUILDER_H__
+#ifndef UC_HTTPPACKETBUILDER_H
+#define UC_HTTPPACKETBUILDER_H
 
-#ifndef	__BASEREDEFINEDATATYPE_H__
-#include "BaseRedefineDataType.h"
-#endif
-
-#ifndef	__NETWORKREDEFINEDATATYPE_H__
+#include <BaseRedefineDataType.h>
 #include <Network/NetworkRedefineDataType.h>
-#endif
 
 #include <string_view>
 #include <vector>
@@ -353,4 +348,4 @@ private:
 	std::string_view m_reason{ "OK" };        // 상태 메시지 (Reason-Phrase)
 };
 
-#endif // ndef __HTTPPACKETBUILDER_H__
+#endif // ndef UC_HTTPPACKETBUILDER_H

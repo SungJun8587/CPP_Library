@@ -4,43 +4,29 @@
 //
 //***************************************************************************
 
-#ifndef __ODBCCONNPOOL_H__
-#define __ODBCCONNPOOL_H__
+#ifndef UC_ODBCCONNPOOL_H
+#define UC_ODBCCONNPOOL_H
 
-#ifndef	__ALLOCATOR_H__
 #include <Memory/Allocator.h>
-#endif
-
-#ifndef __CONTAINERS_H__
 #include <Memory/Containers.h>
-#endif
-
-#ifndef __CACHEALIGNMENT_H__
 #include <Thread/CacheAlignment.h>
-#endif
-
-#ifndef __PLATFORMLOCK_H__
 #include <Thread/PlatformLock.h>
-#endif
-
-#ifndef __THREADMANAGER_H__
 #include <Thread/ThreadManager.h>
-#endif
-
-#ifndef __BASEODBC_H__
 #include <DB/BaseODBC.h>
-#endif
-
-#ifndef __DELAYEDTASKQUEUE_H__
 #include <Containers/Queue/DelayedTaskQueue.h>
-#endif
 
+//***************************************************************************
+// @brief ODBC 커넥션 풀 클래스
+// @details 커넥션의 인라인 할당, 재연결 워커, 헬스체크 및 슬롯 관리를 수행하는 스레드 세이프 커넥션 풀입니다.
+//***************************************************************************
 class COdbcConnPool : public BaseAllocator
 {
 private:
 	//***************************************************************************
 	// @struct TQuarantineItem
-	// @brief 참조 카운트가 남아 즉시 삭제하지 못하고 격리된 오래된 커넥션의 정보를 담는 구조체
+	// @brief 격리된 커넥션 정보 구조체
+	// @details 참조 카운트가 남아 즉시 삭제하지 못하고 격리된 오래된 커넥션의 정보를 보관합니다.
+	//***************************************************************************
 	struct TQuarantineItem
 	{
 		CBaseODBC* pConn;                  // 격리 대상 커넥션 포인터
@@ -53,7 +39,9 @@ private:
 public:
 	//***************************************************************************
 	// @struct TReconnectConfig
-	// @brief 재연결 워커 수 및 지수 백오프 정책을 정의하는 설정 구조체
+	// @brief 재연결 정책 설정 구조체
+	// @details 재연결 워커 수 및 지수 백오프 정책을 정의합니다.
+	//***************************************************************************
 	struct TReconnectConfig
 	{
 		int32	nWorkerCount = 4;			// 재연결을 전담하는 백그라운드 워커 스레드 수
@@ -73,6 +61,10 @@ public:
 	void		ReleaseOdbcConn(int32 nType);
 	CBaseODBC* GetPooledConnUnsafe(int32 nType) const;
 
+	//***************************************************************************
+	// @brief 최대 풀 크기 조회
+	// @return 커넥션 풀의 고정 최대 슬롯 크기
+	//***************************************************************************
 	int32		GetMaxPoolSize(void) const { return _nMaxPoolSize; }
 	int32		PopFreeSlotIndex(void);
 
@@ -81,6 +73,12 @@ public:
 
 protected:
 	void		Clear(void);
+
+	//***************************************************************************
+	// @brief 슬롯 인덱스 유효성 검사
+	// @param nType 검사할 슬롯 인덱스
+	// @return 인덱스가 유효한 범위 내에 있으면 true, 그렇지 않으면 false
+	//***************************************************************************
 	bool		IsValidIndex(int32 nType) const { return nType >= 0 && nType < _nMaxPoolSize; }
 	static bool	ValidateReconnectConfig(const TReconnectConfig& cfg);
 
@@ -114,7 +112,7 @@ protected:
 	//-------------------------------------------------------------------------
 	// 멤버 변수 정의
 	//-------------------------------------------------------------------------
-	EDBClass								_dbClass;                       // 대상 데이터베이스 종류
+	EDBClass								_dbClass;                        // 대상 데이터베이스 종류
 	TCHAR									_tszDSN[DATABASE_DSN_STRLEN];   // 데이터소스 이름(DSN) 연결 문자열
 	const int32								_nMaxPoolSize;                  // 커넥션 풀의 고정 최대 슬롯 크기
 
@@ -150,8 +148,8 @@ protected:
 	std::atomic<int32>			_nDesiredWorkerCount;          // 런타임 설정으로 목표하는 재연결 워커 스레드 수
 
 	std::mutex					_reconnectQueueMutex;          // 재연결 대기열 큐 보호용 뮤텍스
-	std::condition_variable		_reconnectQueueCv;			   // 재연결 대기열에 작업 추가를 알리는 조건 변수
-	CQueue<int32>				_reconnectPendingSlots;		   // 재연결 대상 슬롯 인덱스들을 보관하는 대기열 큐
+	std::condition_variable		_reconnectQueueCv;             // 재연결 대기열에 작업 추가를 알리는 조건 변수
+	CQueue<int32>				_reconnectPendingSlots;        // 재연결 대상 슬롯 인덱스들을 보관하는 대기열 큐
 
 	// 자원 격리(Quarantine) 관련 멤버
 	PLock						_globalQuarantineLock;         // 격리 큐 보호용 단독 락
@@ -160,13 +158,17 @@ protected:
 
 //***************************************************************************
 // @class OdbcConnGuard
-// @brief RAII 패턴을 사용하여 ODBC 커넥션 슬롯의 획득과 자동 반환을 보장하는 스마트 가드 클래스
+// @brief RAII 패턴 스마트 가드 클래스
+// @details RAII 패턴을 사용하여 ODBC 커넥션 슬롯의 획득과 자동 반환을 보장합니다.
+//***************************************************************************
 class OdbcConnGuard
 {
 public:
 	//***************************************************************************
-	// @brief OdbcConnGuard 생성자입니다. 커넥션 풀에서 사용 가능한 커넥션을 즉시 할당받습니다.
+	// @brief OdbcConnGuard 생성자
+	// @details 커넥션 풀에서 사용 가능한 커넥션을 즉시 할당받습니다.
 	// @param pPool 커넥션을 할당받을 COdbcConnPool 객체 포인터
+	//***************************************************************************
 	explicit OdbcConnGuard(COdbcConnPool* pPool)
 		: _pPool(pPool), _pConn(nullptr), _nAllocatedIndex(-1)
 	{
@@ -187,7 +189,9 @@ public:
 	}
 
 	//***************************************************************************
-	// @brief OdbcConnGuard 소멸자입니다. 획득했던 커넥션 슬롯을 풀에 안전하게 반환합니다.
+	// @brief OdbcConnGuard 소멸자
+	// @details 획득했던 커넥션 슬롯을 풀에 안전하게 반환합니다.
+	//***************************************************************************
 	~OdbcConnGuard() noexcept
 	{
 		if( _pPool != nullptr && _nAllocatedIndex != -1 && _pConn != nullptr )
@@ -196,9 +200,28 @@ public:
 		}
 	}
 
+	//***************************************************************************
+	// @brief 멤버 접근 역참조 연산자
+	// @return 내부 커넥션 객체 포인터
+	//***************************************************************************
 	CBaseODBC* operator->() const noexcept { return _pConn; }
+
+	//***************************************************************************
+	// @brief 원시 포인터 조회
+	// @return 내부 커넥션 객체 포인터
+	//***************************************************************************
 	CBaseODBC* get() const noexcept { return _pConn; }
+
+	//***************************************************************************
+	// @brief nullptr 비교 동등 연산자
+	// @return 커넥션 포인터가 nullptr이면 true, 그렇지 않으면 false
+	//***************************************************************************
 	bool operator==(std::nullptr_t) const noexcept { return _pConn == nullptr; }
+
+	//***************************************************************************
+	// @brief nullptr 비교 부등 연산자
+	// @return 커넥션 포인터가 nullptr가 아니면 true, 그렇지 않으면 false
+	//***************************************************************************
 	bool operator!=(std::nullptr_t) const noexcept { return _pConn != nullptr; }
 
 	OdbcConnGuard(const OdbcConnGuard&) = delete;
@@ -210,4 +233,4 @@ private:
 	int32			_nAllocatedIndex;   // 선점된 슬롯의 인덱스 번호
 };
 
-#endif // ndef __ODBCCONNPOOL_H__
+#endif // ndef UC_ODBCCONNPOOL_H

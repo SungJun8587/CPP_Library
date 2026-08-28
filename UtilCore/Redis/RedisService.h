@@ -4,16 +4,12 @@
 //
 //***************************************************************************
 
-#ifndef __REDISSERVICE_H__
-#define __REDISSERVICE_H__
+#ifndef UC_REDISSERVICE_H
+#define UC_REDISSERVICE_H
 
-#ifndef __REDISCONNECTIONPOOL_H__
+#include <Redis/RedisRedefineDataType.h>
 #include <Redis/RedisConnectionPool.h>
-#endif
-
-#ifndef __JOBQUEUE_H__
 #include <Job/JobQueue.h>
-#endif
 
 //***************************************************************************
 // @brief 외부 모듈에 노출되는 최상위 Redis 네트워크 서비스 파사드(Facade) 클래스
@@ -34,15 +30,15 @@
 class CRedisService
 {
 public:
-	CRedisService(CIocpCoreRef iocpCore, std::shared_ptr<CJobQueue> pJobQueue);
+	CRedisService(CIocpCoreRef iocpCore, CJobQueueRef pJobQueue);
 	~CRedisService();
 
 	bool Init(const std::string& strIP, const uint16 nPort, const int32 nPoolSize);
 	bool SendCommand(const CVector<std::string>& vecArgs, RedisCallback fnMainThreadCallback);
 
 private:
-	std::shared_ptr<CRedisConnectionPool>	_pool;     // 내부 커넥션 풀
-	std::shared_ptr<CJobQueue>				_jobQueue; // 스레드 디스패칭용 JobQueue 참조
+	CRedisConnectionPoolRef		_pool;     // 내부 커넥션 풀
+	CJobQueueRef				_jobQueue; // 스레드 디스패칭용 JobQueue 참조
 };
 
-#endif // ndef __REDISSERVICE_H__
+#endif // ndef UC_REDISSERVICE_H

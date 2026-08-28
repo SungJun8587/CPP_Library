@@ -13,12 +13,10 @@
 //                      DateTimeUtil.cpp 에 있습니다.
 //***************************************************************************
 
-#ifndef __DATETIMEUTIL_H__
-#define __DATETIMEUTIL_H__
+#ifndef UC_DATETIMEUTIL_H
+#define UC_DATETIMEUTIL_H
 
-#ifndef __BASEREDEFINEDATATYPE_H__
-#include "BaseRedefineDataType.h"
-#endif
+#include <BaseRedefineDataType.h>
 
 #include <chrono>
 #include <ctime>
@@ -227,4 +225,4 @@ namespace ptime
 	time_t ShiftGmtToLocal(const time_t& t);
 }
 
-#endif // ndef __DATETIMEUTIL_H__
+#endif // ndef UC_DATETIMEUTIL_H

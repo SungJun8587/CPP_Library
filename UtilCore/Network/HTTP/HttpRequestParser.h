@@ -4,12 +4,10 @@
 //
 //***************************************************************************
 
-#ifndef __HTTPREQUESTPARSER_H__
-#define __HTTPREQUESTPARSER_H__
+#ifndef UC_HTTPREQUESTPARSER_H
+#define UC_HTTPREQUESTPARSER_H
 
-#ifndef	__HTTPPARSEUTIL_H__
 #include <Network/HTTP/HttpParseUtil.h>
-#endif
 
 #include <cstdint>
 #include <cstring>
@@ -469,4 +467,4 @@ private:
 	size_t m_lastFeedConsumed = 0; // 직전 Feed() 호출에서 실제로 소비한 바이트 수 (GetLastFeedConsumed() 참고)
 };
 
-#endif // ndef __HTTPREQUESTPARSER_H__
+#endif // ndef UC_HTTPREQUESTPARSER_H

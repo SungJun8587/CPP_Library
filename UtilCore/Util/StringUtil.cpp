@@ -7,7 +7,7 @@
 #include "pch.h"
 #include "StringUtil.h"
 
-#ifdef	__MEMBUFFER_H__
+#ifdef	UC_MEMBUFFER_H
 //***************************************************************************
 //Function to passing FolderPath to FullFilePath 
 bool FolderPathPassing(CMemBuffer<TCHAR>& TFolderPath, const TCHAR* ptszFullFilePath)

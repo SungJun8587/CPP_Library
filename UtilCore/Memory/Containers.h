@@ -4,14 +4,10 @@
 //
 //***************************************************************************
 
-#ifndef __CONTAINERS_H__
-#define __CONTAINERS_H__
+#ifndef UC_CONTAINERS_H
+#define UC_CONTAINERS_H
 
-#pragma once
-
-#ifndef	__ALLOCATOR_H__
 #include <Memory/Allocator.h>
-#endif
 
 #include <vector>
 #include <list>
@@ -100,4 +96,4 @@ public:
 	using std::unordered_map<_Kty, _TMain, _Hasher, _Keyeq, _Alloc>::unordered_map;
 };
 
-#endif // ndef __CONTAINERS_H__
+#endif // ndef UC_CONTAINERS_H

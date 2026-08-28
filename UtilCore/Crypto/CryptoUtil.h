@@ -4,17 +4,15 @@
 //
 //***************************************************************************
 
-#ifndef __CRYPTOUTIL_H__
-#define __CRYPTOUTIL_H__
+#ifndef UC_CRYPTOUTIL_H
+#define UC_CRYPTOUTIL_H
+
+#include <BaseRedefineDataType.h>
 
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <openssl/sha.h>
 #include <openssl/md5.h>
-
-#ifndef	__BASEREDEFINEDATATYPE_H__
-#include <BaseRedefineDataType.h>
-#endif
 
 #pragma comment(lib, LIB_NAME("libcrypto"))
 #pragma comment(lib, LIB_NAME("libssl"))
@@ -275,4 +273,4 @@ namespace Crypto
 	};
 }
 
-#endif // ndef __CRYPTOUTIL_H__
+#endif // ndef UC_CRYPTOUTIL_H

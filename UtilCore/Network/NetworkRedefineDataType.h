@@ -4,14 +4,10 @@
 // 
 //***************************************************************************
 
-#ifndef __NETWORKREDEFINEDATATYPE_H__
-#define __NETWORKREDEFINEDATATYPE_H__
+#ifndef UC_NETWORKREDEFINEDATATYPE_H
+#define UC_NETWORKREDEFINEDATATYPE_H
 
-#pragma once
-
-#ifndef	__BASEREDEFINEDATATYPE_H__
 #include <BaseRedefineDataType.h>
-#endif
 
 USING_SHARED_PTR(CSession);
 USING_SHARED_PTR(CNetService);
@@ -41,4 +37,4 @@ USING_SHARED_PTR(CHttpSessionRio);
 USING_SHARED_PTR(CHttpConnPoolManager);
 USING_SHARED_PTR(CHttpClient);
 
-#endif // ndef __NETWORKREDEFINEDATATYPE_H__
+#endif // ndef UC_NETWORKREDEFINEDATATYPE_H

@@ -4,8 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __LOG_H__
-#define __LOG_H__
+#ifndef UC_LOG_H
+#define UC_LOG_H
 
 #define LOG_MAX_BUFFER_SIZE 8300
 
@@ -166,4 +166,4 @@ private:
 	CLog m_LogType[static_cast<short>(ELOG_TYPE::LOG_TYPE_MAX_NUM)]; // 로그 타입별 CLog 인스턴스 배열
 };
 
-#endif // ndef __LOG_H__
+#endif // ndef UC_LOG_H

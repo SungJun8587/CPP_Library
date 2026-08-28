@@ -4,12 +4,10 @@
 //
 //***************************************************************************
 
-#ifndef __REDISPARSER_H__
-#define __REDISPARSER_H__
+#ifndef UC_REDISPARSER_H
+#define UC_REDISPARSER_H
 
-#ifndef __REDISPROTOCOL_H__
 #include <Redis/RedisProtocol.h>
-#endif
 
 //***************************************************************************
 // @brief RESP 프로토콜 스트림 파싱을 담당하는 클래스
@@ -44,4 +42,4 @@ private:
 	std::string _pendingBuffer;		// 미완성 패킷 버퍼링
 };
 
-#endif // ndef __REDISPARSER_H__
+#endif // ndef UC_REDISPARSER_H

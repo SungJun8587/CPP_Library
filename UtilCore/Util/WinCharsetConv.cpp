@@ -301,7 +301,7 @@ DWORD Utf8ToAnsi(char* ansi, size_t ansi_size, const char* utf8, const size_t ut
 	return error;
 }
 
-#ifdef __MEMBUFFER_H__
+#ifdef UC_MEMBUFFER_H
 //***************************************************************************
 // @brief CMemBuffer를 사용하여 ANSI 문자열을 Unicode(WideChar) 문자열로 변환합니다.
 // @param unicode [out] 변환된 Unicode 문자열을 저장할 CMemBuffer 버퍼 객체

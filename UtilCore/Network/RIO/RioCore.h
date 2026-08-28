@@ -4,20 +4,12 @@
 //
 //***************************************************************************
 
-#ifndef __RIOCORE_H__
-#define __RIOCORE_H__
+#ifndef UC_RIOCORE_H
+#define UC_RIOCORE_H
 
-#ifndef __RIOCOMMON_H__
 #include <Network/RIO/RioCommon.h>
-#endif
-
-#ifndef __RIOEVENT_H__
 #include <Network/RIO/RioEvent.h>
-#endif
-
-#ifndef __RIOEVENTPOOL_H__
 #include <Network/RIO/RioEventPool.h>
-#endif
 
 #include <vector>
 
@@ -617,4 +609,4 @@ private:
     Rio::ShutdownResult _lastShutdownResult{ Rio::ShutdownResult::Success }; // 마지막 Shutdown 결과
 };
 
-#endif // ndef __RIOCORE_H__
+#endif // ndef UC_RIOCORE_H

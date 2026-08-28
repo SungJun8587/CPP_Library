@@ -4,10 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __CALCULATEDELAPSEDTIME_H__
-#define __CALCULATEDELAPSEDTIME_H__
-
-#pragma once
+#ifndef UC_CALCULATEDELAPSEDTIME_H
+#define UC_CALCULATEDELAPSEDTIME_H
 
 #include <string>
 
@@ -262,4 +260,4 @@ private:
 };
 #endif
 
-#endif // ndef __CALCULATEDELAPSEDTIME_H__
+#endif // ndef UC_CALCULATEDELAPSEDTIME_H

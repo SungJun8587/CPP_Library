@@ -4,27 +4,25 @@
 // 
 //***************************************************************************
 
-#ifndef __BASEGLOBAL_H__
-#define __BASEGLOBAL_H__
+#ifndef UC_BASEGLOBAL_H
+#define UC_BASEGLOBAL_H
 
-#pragma once
-
-#ifdef __MEMORY_H__
+#ifdef UC_MEMORY_H
 	class CMemory;
 	extern class CMemory*	gpMemory;
 #endif
 
-#ifdef __GLOBALQUEUE_H__
+#ifdef UC_GLOBALQUEUE_H
 	class CGlobalQueue;
 	extern class CGlobalQueue*	gpGlobalQueue;
 #endif
 
-#ifdef __JOBTIMER_H__
+#ifdef UC_JOBTIMER_H
 	class CJobTimer;
 	extern class CJobTimer*		gpJobTimer;
 #endif
 
-#ifdef __THREADMANAGER_H__	
+#ifdef UC_THREADMANAGER_H	
 	class CThreadManager;
 	extern class CThreadManager*	gpThreadManager;
 #endif
@@ -40,4 +38,4 @@ namespace BaseGlobal
 	void Destroy();
 }
 
-#endif // ndef __BASEGLOBAL_H__
+#endif // ndef UC_BASEGLOBAL_H

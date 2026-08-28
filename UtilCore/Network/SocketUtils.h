@@ -4,16 +4,11 @@
 //
 //***************************************************************************
 
-#ifndef __SOCKETUTILS_H__
-#define __SOCKETUTILS_H__
+#ifndef UC_SOCKETUTILS_H
+#define UC_SOCKETUTILS_H
 
-#ifndef __BASEREDEFINEDATATYPE_H__
 #include <BaseRedefineDataType.h>
-#endif
-
-#ifndef __NETADDRESS_H__
 #include <Network/NetAddress.h>
-#endif
 
 class CNetAddress;
 
@@ -134,4 +129,4 @@ private:
 	static const WINSOCK_ERRORCODE_INFO _errTableKr[];           // 한글 에러 코드 매핑 테이블
 };
 
-#endif // ndef __SOCKETUTILS_H__
+#endif // ndef UC_SOCKETUTILS_H

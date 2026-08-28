@@ -1,12 +1,11 @@
-﻿//***************************************************************************
+﻿
+//***************************************************************************
 // RioCommon.h: Common header file for Rio including macros, constants, and types.
 //
 //***************************************************************************
 
-#ifndef __RIOCOMMON_H__
-#define __RIOCOMMON_H__
-
-#pragma once
+#ifndef UC_RIOCOMMON_H
+#define UC_RIOCOMMON_H
 
 //***************************************************************************
 // @brief Windows 헤더 빌드 최적화 (불필요한 API 헤더 포함 제외)
@@ -350,4 +349,4 @@ namespace Rio
     constexpr ULONG kRequestQueueMaxSendDataBuffers = 1UL;
 }
 
-#endif // ndef __RIOCOMMON_H__
+#endif // ndef UC_RIOCOMMON_H

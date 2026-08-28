@@ -4,8 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __SESSION_H__
-#define __SESSION_H__
+#ifndef UC_SESSION_H
+#define UC_SESSION_H
 
 #include <functional>
 #include <memory>
@@ -60,4 +60,4 @@ private:
 	DisconnectHandler		_onDisconnected = nullptr;
 };
 
-#endif // ndef __SESSION_H__
+#endif // ndef UC_SESSION_H

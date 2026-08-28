@@ -4,20 +4,15 @@
 //
 //***************************************************************************
 
-#ifndef __XLNTUTIL_H__
-#define __XLNTUTIL_H__
+#ifndef UC_XLNTUTIL_H
+#define UC_XLNTUTIL_H
 
 #include <tuple>
 #include <vector>
 #include <xlnt/xlnt.hpp>
 
-#ifndef	__BASEREDEFINEDATATYPE_H__
 #include <BaseRedefineDataType.h>
-#endif
-
-#ifndef	__ENCODINGCONVERT_H__
-#include </Util/EncodingConvert.h>
-#endif
+#include <Util/EncodingConvert.h>
 
 #pragma comment(lib, LIB_NAME("xlnt"))
 
@@ -390,4 +385,4 @@ namespace Xlnt
 
 #include "Excel/XlntUtil.inl"
 
-#endif // ndef __XLNTUTIL_H__
+#endif // ndef UC_XLNTUTIL_H

@@ -4,8 +4,8 @@
 //
 //***************************************************************************
 
-#ifndef __REDISCOMMANDBUILDER_H__
-#define __REDISCOMMANDBUILDER_H__
+#ifndef UC_REDISCOMMANDBUILDER_H
+#define UC_REDISCOMMANDBUILDER_H
 
 #include <string>
 #include <vector>
@@ -41,4 +41,4 @@ public:
 	}
 };
 
-#endif // ndef __REDISCOMMANDBUILDER_H__
+#endif // ndef UC_REDISCOMMANDBUILDER_H

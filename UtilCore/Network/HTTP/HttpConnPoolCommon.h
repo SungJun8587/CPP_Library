@@ -4,12 +4,10 @@
 //
 //***************************************************************************
 
-#ifndef __HTTPCONNPOOLCOMMON_H__
-#define __HTTPCONNPOOLCOMMON_H__
+#ifndef UC_HTTPCONNPOOLCOMMON_H
+#define UC_HTTPCONNPOOLCOMMON_H
 
-#ifndef	__HTTPCLIENTCORE_H__
 #include <Network/HTTP/HttpClientCore.h>
-#endif
 
 #include <functional>
 #include <memory>
@@ -76,4 +74,4 @@ public:
 };
 using IHttpConnPoolRef = std::shared_ptr<IHttpConnPool>;
 
-#endif // ndef __HTTPCONNPOOLCOMMON_H__
+#endif // ndef UC_HTTPCONNPOOLCOMMON_H
