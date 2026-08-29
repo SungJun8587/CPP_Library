@@ -27,9 +27,9 @@
         │                              ▼
         │                        RawAllocator (raw 메모리 소스)
         │                              │
-        │              ┌───────────────┼───────────────┐
-        │              ▼               ▼               ▼
-        │         mimalloc         jemalloc         malloc (fallback)
+        │              ┌───────────────┼───────────────┬───────────────┐
+        │              ▼               ▼               ▼               ▼
+        │         mimalloc         jemalloc         tcmalloc      malloc (fallback)
         │
         └── (부트스트랩 전용) BaseAllocator ──► RawAllocator
 
@@ -85,11 +85,14 @@ public:
 
 **아레나 구조**: 프로세스 시작 후 첫 `StompAllocator::Alloc` 호출 시점에 큰 가상 주소 공간(기본 256GB)을 `call_once`로 한 번만 예약(`MEM_RESERVE`)해 둡니다. "가상 주소 공간 예약"이라는 상대적으로 무거운 커널 작업이 프로세스 생애 동안 단 한 번만 일어나므로, `_STOMP`를 켠 채로 대량의 할당/해제가 반복되는 통합 테스트에서도 예약 자체를 반복하지 않습니다.
 
-**영역 구조 — 메타데이터 1페이지 + 데이터 N페이지**: 각 할당은 `[메타데이터 1페이지][데이터 페이지들]` 형태로 이루어집니다. 데이터는 항상 첫 데이터 페이지 안(페이지 크기 미만의 오프셋)에서 시작해 마지막 데이터 페이지의 끝에서 정확히 끝나므로, `Release`가 데이터 포인터의 페이지 시작 주소를 역산하면 언제나 "첫 데이터 페이지의 시작"이 나오고, 그 바로 앞 페이지가 메타데이터 페이지입니다. 이 성질 덕분에 크기 조회를 위한 별도의 해시맵 조회 없이 포인터 산술만으로 메타데이터를 즉시 찾습니다. 메타데이터 페이지에는 이 영역의 데이터 크기와 이중 반납 탐지용 원자적 플래그(`freed`)가 들어 있으며, 한번 커밋되면 프로세스 종료 시까지 디커밋되지 않습니다(재사용 대기 중에도 유효한 SLIST 링크 노드로 계속 쓰이기 위함) — 디커밋되는 것은 오직 데이터 페이지뿐이라 use-after-free 탐지 능력은 그대로 유지됩니다.
+**영역 구조 — 데이터 N페이지 + 전용 가드 페이지, 메타데이터는 힙**: 각 할당은 아레나 안에서 `[데이터 페이지들][가드 페이지 1개]` 형태로 예약됩니다. 이 중 실제로 커밋(`MEM_COMMIT`)되는 것은 데이터 페이지뿐이며, 가드 페이지는 주소 공간만 예약된 채 절대 커밋되지 않습니다. 데이터는 항상 마지막 데이터 페이지의 끝에서 정확히 끝나므로, 그 바로 뒤는 곧바로 가드 페이지입니다. 아레나는 단조 증가하는 범프 커서로 영역을 나눠주는데, 이 커서가 가드 페이지 몫까지 함께 전진시켜 그 자리를 다음 할당에 절대 재사용하지 않으므로, "다음 할당이 아직 이 자리를 커밋하지 않았는가"라는 타이밍에 기대지 않고도 데이터 영역 끝을 1바이트라도 넘는 접근은 항상 접근 위반(Access Violation)으로 크래시합니다. (아레나 없이 가드 페이지만으로 자연히 보호받던 이전 세대 설계는, 장시간 실행되는 서버에서 인접 영역이 나중에 다른 할당으로 커밋되면 그 자리를 침범하는 오버런이 크래시 대신 조용한 데이터 오염으로 이어질 수 있었습니다 — 전용 가드 페이지는 이 타이밍 의존성을 구조적으로 없앱니다.)
 
-**완전 락프리 재사용**: 디커밋된 영역은 버려지지 않고, 데이터 크기별로 별도의 Lock-free SLIST(`CMemoryPool`과 동일한 방식)에 등록되어 같은 크기의 다음 `Alloc`이 재사용합니다. 메타데이터 페이지가 항상 상주하므로 그 메타데이터 자체를 SLIST 노드로 재사용할 수 있어, 반납/재사용 경로 전체가 락 없이 동작합니다. "지금까지 한 번도 등장한 적 없는 새로운 크기"를 위한 SLIST 헤더를 맵에 처음 등록하는 순간에만 `shared_mutex`의 배타 락을 아주 짧게 잡고(이중 확인 잠금 패턴), 이미 존재하는 크기에 대한 이후의 모든 반복 조회는 공유 락(읽기)만으로 끝납니다. 이 재사용 구조 덕분에, 장시간 실행되는 스트레스 테스트에서도 예약된 아레나가 데이터 크기 종류 수에 비례해서만 소모되고, 반복되는 할당/해제 횟수에는 비례해서 소모되지 않습니다.
+각 영역의 메타데이터(`RegionMeta` — 데이터 시작 주소, 데이터 영역 크기, 이중 반납 탐지 플래그, Fallback 여부)는 아레나 내부가 아니라 `RawAllocator`를 통해 일반 힙에서 별도로 할당됩니다. `AllocationHeader`가 사용자 포인터 바로 앞에서 이 `RegionMeta*`를 직접 들고 있으므로, `Release`는 페이지 시작 주소를 역산하는 대신 헤더에서 포인터 하나만 읽으면 곧바로 메타데이터에 도달합니다. 메타데이터를 힙에 두는 덕분에 `Release` 시 데이터 페이지 전체를 예외 없이 `MEM_DECOMMIT`할 수 있어(예전처럼 "재사용을 위해 영구 상주해야 하는 페이지"가 아레나 안에 남지 않음), 반납된 영역의 물리 메모리를 실제로 OS에 돌려줍니다. 재사용을 기다리는 `RegionMeta` 자체는 데이터 크기별 free-list에 대기하는 동안 계속 힙에 남아있지만, 그 크기는 페이지 단위가 아니라 포인터 몇 개 수준(수십 바이트)이라 이전 세대 대비 상주 비용이 훨씬 낮습니다.
+
+**완전 락프리 재사용**: 데이터 페이지는 디커밋되어 돌아가지만, 그 페이지를 가리키던 `RegionMeta`는 버려지지 않고 데이터 크기별 Lock-free SLIST(`CMemoryPool`과 동일한 방식)에 등록되어 같은 크기의 다음 `Alloc`이 재사용합니다. `RegionMeta`가 힙에 상주해 항상 유효하므로 그 자체를 SLIST 노드로 재사용할 수 있어, 반납/재사용 경로 전체가 락 없이 동작합니다. "지금까지 한 번도 등장한 적 없는 새로운 크기"를 위한 SLIST 헤더를 맵에 처음 등록하는 순간에만 `shared_mutex`의 배타 락을 아주 짧게 잡고(이중 확인 잠금 패턴), 이미 존재하는 크기에 대한 이후의 모든 반복 조회는 공유 락(읽기)만으로 끝납니다. 이 재사용 구조 덕분에, 장시간 실행되는 스트레스 테스트에서도 예약된 아레나가 데이터 크기 종류 수에 비례해서만 소모되고, 반복되는 할당/해제 횟수에는 비례해서 소모되지 않습니다.
 
 - 이중 반납 탐지: `Release`는 메타데이터의 `freed` 플래그를 `exchange(1)`으로 원자적으로 확인/설정합니다. 이미 반납된 상태(1)라면 즉시 `ASSERT_CRASH`로 잡아내며, 이 검사 자체가 락 없이 이루어집니다.
+- **Fallback 영역의 해제**: 아레나가 고갈되어 `VirtualAlloc`으로 직접 예약·커밋한 Fallback 영역은 재사용 대상이 아니므로, `Release`는 해당 가상 주소 범위를 `VirtualFree(MEM_RELEASE)`로 완전히 반환하고 그 영역의 `RegionMeta`도(힙에 있으므로) 함께 `delete`합니다. 반면 일반 아레나 할당은 데이터 페이지만 `MEM_DECOMMIT`하고 `RegionMeta`는 free-list에 등록해 재사용을 기다립니다. `Cleanup()`을 호출하면 이때 아직 free-list에 남아 재사용을 기다리던 `RegionMeta`들도 모두 순회하며 힙에서 해제한 뒤, 마지막으로 아레나 전체를 `VirtualFree`합니다.
 - 주소 재사용과 진단 능력의 트레이드오프: 디커밋된 데이터 페이지를 재사용한다는 것은, 아주 오래전에 반납된 뒤에도 그 주소를 들고 있는 진짜 댕글링 포인터가 그 주소가 다른 할당으로 재사용된 시점 이후에 접근하면 크래시 대신 조용한 오염으로 이어질 수 있다는 뜻입니다. 다만 이는 아레나 없이 `VirtualFree(MEM_RELEASE)`로 완전히 반환하는 방식에서도 OS가 해제된 가상 주소를 이후 다른 `VirtualAlloc` 호출에 재사용할 수 있었던 것과 동일한 성격의 특성입니다.
 
 **사용 시점**: 메모리 손상 버그(오버런, 댕글링 포인터로 인한 오염 등)를 추적할 때만 `_STOMP`를 켜고 재현 → 문제 지점에서 즉시 크래시 → 콜스택 확인 → 원인 수정 후 다시 끔.
@@ -104,17 +107,19 @@ public:
 
 `StlAllocator<T>`는 표준 Allocator 요구사항(`value_type`, `allocate`, `deallocate`)에 더해, 서로 다른 타입 간 리바인딩 생성자와 대입 연산자도 갖추고 있습니다. 상태가 없는 allocator라 실제로 할 일은 없지만, 일부 STL 구현체(특히 구버전 MSVC)가 이 대입 연산자를 요구하기 때문에 명시적으로 정의해 둔 것입니다.
 
-**전역 `MakeShared` — xnew/xdelete 기반 커스텀 삭제자 `shared_ptr`**: `Allocator.h`는 (3.7절의 `CObjectPool<Type>::MakeShared`와는 별개로) 특정 타입 전용 풀 없이 임의의 `Type`에 바로 쓸 수 있는 전역 템플릿 함수 `MakeShared<Type>(args...)`도 제공합니다.
+**확장 정렬 할당(`AllocAligned`/`ReleaseAligned`)도 gpMemory 풀을 그대로 경유**: `gpMemory`(`CMemory`)는 내부적으로 `SLIST_ALIGNMENT`(16바이트) 단위로만 블록을 관리하므로, `alignof(T)`가 그보다 큰 타입(`alignas(32)` 이상의 SIMD 데이터 등)은 그 정렬을 직접 보장해 줄 수 없습니다. 그렇다고 이런 타입을 raw 정렬 할당으로 완전히 우회시키면, 캐시 라인 정렬이 잦은 이 프로젝트(`CMemoryPool`, `TlsBucket` 등)의 특성상 반복 할당/해제되는 타입 상당수가 풀링 이점을 아예 못 받게 됩니다. 대신 `PoolAllocator::AllocAligned`는 "요청 크기 + 정렬 여유분 + 원본 포인터 저장 공간"만큼을 `gpMemory->Allocate()`로 통상 크기 할당받은 뒤, 반환 직전 주소를 요청 정렬에 맞춰 올림 보정하고 그 앞 8바이트에 원본 포인터를 저장해 둡니다. `ReleaseAligned`는 그 8바이트를 역산해 원본 포인터로 `gpMemory->Release()`를 호출합니다. 이 덕분에 정렬 요구가 큰 타입도 `gpMemory` 크기별 풀을 그대로 타 반복 할당/해제 패턴에서 풀링 이점을 얻으며, 대가는 `alignment + 8`바이트 수준의 약간의 오버헤드입니다.
+
+**전역 `MakeShared` — `allocate_shared` + `StlAllocator` 기반 `shared_ptr`**: `Allocator.h`는 특정 타입 전용 풀 없이 임의의 `Type`에 바로 쓸 수 있는 전역 템플릿 함수 `MakeShared<Type>(args...)`도 제공합니다.
 
 ```cpp
 template<typename Type, typename... Args>
-shared_ptr<Type> MakeShared(Args&&... args)
+std::shared_ptr<Type> MakeShared(Args&&... args)
 {
-	return shared_ptr<Type>{ xnew<Type>(static_cast<Args&&>(args)...), xdelete<Type> };
+	return std::allocate_shared<Type>(StlAllocator<Type>(), std::forward<Args>(args)...);
 }
 ```
 
-객체 자체는 `xnew`를 통해 `gpMemory`의 크기별 공유 풀 경로를 그대로 타지만, `shared_ptr`은 `allocate_shared`가 아니라 포인터+커스텀 삭제자 생성자로 만들어지므로 참조 카운트 제어 블록은 이와 별도로 할당됩니다 — 즉 객체 1회(풀 경로) + 제어 블록 1회(표준 `shared_ptr` 내부 할당), 총 2회의 할당이 발생합니다. 어떤 `Type`이든 그 타입 전용 `CObjectPool`을 미리 준비해 둘 필요 없이 바로 쓸 수 있다는 것이 장점이며, 이 2회 할당을 1회로 합치고 싶다면(대신 그 타입 전용 풀이 먼저 존재해야 함) 3.7절의 `CObjectPool<Type>::MakeShared`를 사용합니다.
+`std::allocate_shared`와 `StlAllocator<Type>`을 결합해, 객체와 참조 카운트 컨트롤 블록을 하나의 블록으로 묶어 `gpMemory`의 크기별 공유 풀에서 단 1회만 할당합니다. 어떤 `Type`이든 그 타입 전용 풀을 미리 준비해 둘 필요 없이 바로 쓸 수 있다는 것이 장점입니다.
 
 ### 3.5 CMemoryPool — 크기별 Lock-free 프리리스트
 
@@ -123,10 +128,10 @@ shared_ptr<Type> MakeShared(Args&&... args)
 - **`Push`**: 블록을 "미사용"으로 표시(`allocSize = 0`)한 뒤 `InterlockedPushEntrySList`로 SLIST에 되돌립니다.
 - **`Pop`**: SLIST에서 블록을 꺼냅니다. 비어있으면 `RawAllocator::AllocAligned`로 새로 할당합니다. 즉 풀은 "상한 없이 필요할 때마다 늘어나는" 동적 프리리스트입니다.
 - `MemoryHeader`가 Windows `SLIST_ENTRY`를 상속하고 있어서, 별도의 `next` 포인터 없이 헤더 자체가 링크드리스트 노드로 재사용됩니다 — 메모리 오버헤드를 최소화하는 설계입니다.
-- `_useCount`/`_reserveCount`는 각각 "현재 사용 중", "현재 대기 중"인 블록 수를 추적하는 통계용 원자 카운터입니다.
-- **캐시 라인 격리**: 클래스 전체를 64바이트(일반적인 CPU 캐시 라인 크기) 경계에 정렬해, 서로 다른 `CMemoryPool` 인스턴스끼리 캐시 라인을 공유하는 false sharing을 방지합니다. 또한 SLIST 헤더(원자 연산으로 매번 갱신)와 순수 통계 카운터(`_useCount`/`_reserveCount`)를 서로 다른 캐시 라인에 두어, 통계를 읽는 동작이 SLIST Pop/Push의 원자 연산과 캐시 라인을 두고 경합하지 않게 합니다.
+- `_poolCheckedOutCount`/`_poolReserveCount`는 각각 "이 풀의 SLIST 밖으로 나간(반납되지 않은) 블록 수", "현재 이 풀의 SLIST에 대기 중인 블록 수"를 추적하는 통계용 원자 카운터입니다. 이 두 값은 어디까지나 "이 풀 하나의 SLIST 출입"만 반영하는 풀 단위 지표라는 점에 유의해야 합니다 — 상위 계층인 `CMemory`가 TLS 배치 캐시로 블록을 미리 꺼내 쌓아두므로, `_poolCheckedOutCount`에는 아직 사용자에게 전달되지 않고 TLS 캐시에 대기 중인 블록도 포함됩니다. 실제로 "지금 살아있는 할당이 몇 개인가"가 필요하면 이 풀 단위 카운터 대신 `CMemory::GetLiveAllocationCount()`(3.6절)를 사용해야 합니다.
+- **캐시 라인 격리**: 클래스 전체를 64바이트(일반적인 CPU 캐시 라인 크기) 경계에 정렬해, 서로 다른 `CMemoryPool` 인스턴스끼리 캐시 라인을 공유하는 false sharing을 방지합니다. 또한 SLIST 헤더(원자 연산으로 매번 갱신)와 순수 통계 카운터(`_poolCheckedOutCount`/`_poolReserveCount`)를 서로 다른 캐시 라인에 두어, 통계를 읽는 동작이 SLIST Pop/Push의 원자 연산과 캐시 라인을 두고 경합하지 않게 합니다.
 
-**`MemoryHeader::allocSize`가 `atomic<int32>`인 이유**: 이 값은 단순 통계가 아니라 "이 블록이 살아있는지(>0), 반납되었는지(0)"를 판별하는 이중 반납(double free) 탐지 수단입니다. 두 스레드가 극단적인 타이밍에 같은 포인터를 동시에 반납하려는 경쟁 상황에서도 탐지가 놓치지 않으려면 "값을 읽고 0인지 확인한 뒤 0으로 바꾸는" 과정 자체가 원자적이어야 합니다. 일반 `int32`였다면 두 스레드가 동시에 "아직 0이 아님"을 확인하고 둘 다 반납을 진행해버리는 TOCTOU(Time-Of-Check-To-Time-Of-Use) 경쟁이 이론상 가능합니다. `exchange()`로 "읽고 0으로 바꾸기"를 단일 원자 연산으로 묶으면, 두 스레드 중 정확히 하나만 원래 값(>0)을 받고 나머지는 이미 0이 된 값을 받게 되어 이중 반납을 경쟁 상태 없이 감지합니다(`CMemory::Release`, `CObjectPool::Push`에서 이 방식 사용). `atomic<int32>`는 대부분의 플랫폼에서 일반 `int32`와 크기/정렬이 동일하고 lock-free이므로, 헤더 크기나 `SLIST_ALIGNMENT` 요구사항에 영향을 주지 않습니다.
+**`MemoryHeader::allocSize`가 `atomic<size_t>`인 이유**: 이 값은 단순 통계가 아니라 "이 블록이 살아있는지(>0), 반납되었는지(0)"를 판별하는 이중 반납(double free) 탐지 수단입니다. 두 스레드가 극단적인 타이밍에 같은 포인터를 동시에 반납하려는 경쟁 상황에서도 탐지가 놓치지 않으려면 "값을 읽고 0인지 확인한 뒤 0으로 바꾸는" 과정 자체가 원자적이어야 합니다. 일반 `size_t`였다면 두 스레드가 동시에 "아직 0이 아님"을 확인하고 둘 다 반납을 진행해버리는 TOCTOU(Time-Of-Check-To-Time-Of-Use) 경쟁이 이론상 가능합니다. `exchange()`로 "읽고 0으로 바꾸기"를 단일 원자 연산으로 묶으면, 두 스레드 중 정확히 하나만 원래 값(>0)을 받고 나머지는 이미 0이 된 값을 받게 되어 이중 반납을 경쟁 상태 없이 감지합니다(`CMemory::Release`, `CObjectPool::Push`에서 이 방식 사용). `size_t`를 쓰는 이유는 이 값이 헤더를 포함한 전체 할당 크기를 그대로 담기 때문으로, `int32` 등으로 좁히면 대형 할당 경로(`MAX_ALLOC_SIZE` 초과분)에서 값이 잘릴 수 있습니다. `MemoryHeader`는 `DECLSPEC_ALIGN(SLIST_ALIGNMENT)`(16바이트) 제약상 어차피 16바이트로 패딩되므로, `atomic<size_t>`(x64 기준 8바이트)를 쓰더라도 헤더 크기나 정렬 요구사항에는 영향이 없습니다.
 
 **`MemoryHeader` 생성자가 경쟁 상태 없이 안전한 이유**: `AttachHeader`가 raw 메모리 위에 `MemoryHeader(size)`를 placement new로 얹는 시점에는, 이 헤더를 가리키는 다른 포인터가 아직 어디에도 존재하지 않습니다(방금 `RawAllocator`/`InterlockedPopEntrySList`에서 이 스레드가 단독으로 받아온 블록이기 때문). 따라서 `allocSize` 필드의 최초 초기화 자체는 원자 연산일 필요가 없고, 이 블록이 SLIST에 올라가거나 사용자에게 반환되어 다른 스레드가 접근할 수 있게 된 "이후" 시점부터만 atomic 연산(`exchange` 등)으로 접근이 보호되면 충분합니다.
 
@@ -138,11 +143,13 @@ shared_ptr<Type> MakeShared(Args&&... args)
 - 예를 들어 1~32바이트 요청은 모두 32바이트 풀로 라우팅됩니다(내부 단편화를 일부 감수하는 대신 풀 개수를 줄여 관리 비용을 낮춤).
 - `MAX_ALLOC_SIZE`(4096바이트)를 초과하는 요청은 풀을 거치지 않고 `RawAllocator::AllocAligned`/`FreeAligned`로 직접 처리합니다.
 - `Allocate`/`Release`는 데이터 포인터 앞의 `MemoryHeader`를 attach/detach하며, 헤더의 `allocSize` 값을 보고 "풀 반납 대상인지, raw 해제 대상인지"를 판별합니다.
-- `ComputePoolIndex`는 세 구간(32/128/256 단위, 경계 1024/2048) 각각에 대해 "이 구간에 속하는 길이"를 `ClampMin`/`ClampMax`로 0~구간폭 사이에 클램핑한 뒤, 각 구간 단위로 올림한 개수를 모두 더하는 방식입니다. `allocSize`가 실제로 속하지 않는 구간은 클램핑으로 기여분이 자동으로 0이 되므로, `if`/`else`로 어느 구간인지 먼저 판별하는 과정 자체가 없습니다. `ClampMin`/`ClampMax`는 단순 비교-삼항 형태라 Release 최적화 시 조건부 이동(cmov)으로 컴파일되어 실제 분기(jmp)가 발생하지 않으며, 표준 `std::min`/`std::max` 대신 이 이름을 쓰는 이유는 `Windows.h`가 `NOMINMAX` 미정의 시 `min`/`max`를 매크로로 정의해 이름이 충돌할 수 있기 때문입니다. 이 수식은 생성자의 세 단계 구간 생성 로직과 반드시 일치해야 하므로, 생성자가 풀을 만들 때마다 `ComputePoolIndex()`의 결과와 실제 `_pools` 인덱스가 같은지 `ASSERT_CRASH`로 교차 검증합니다.
+- `ComputePoolIndex`는 세 구간(32/128/256 단위, 경계 1024/2048) 각각에 대해 "이 구간에 속하는 길이"를 `(std::min)`/`(std::max)`를 조합한 클램핑 식으로 0~구간폭 사이에 제한한 뒤, 각 구간 단위로 올림한 개수를 모두 더하는 방식입니다(`len1 = min(size, 1024)`, `len2 = min(max(size-1024, 0), 1024)`, `len3 = max(size-2048, 0)`). `allocSize`가 실제로 속하지 않는 구간은 클램핑으로 기여분이 자동으로 0이 되므로, `if`/`else`로 어느 구간인지 먼저 판별하는 과정 자체가 없습니다. 이 비교-삼항 형태의 클램핑 식은 Release 최적화 시 조건부 이동(cmov)으로 컴파일되어 실제 분기(jmp)가 발생하지 않는 경향이 있으며, `std::min`/`std::max`를 괄호로 감싸(`(std::min)`) 호출하는 이유는 `Windows.h`가 `NOMINMAX` 미정의 시 `min`/`max`를 매크로로 정의해 이름이 충돌할 수 있기 때문입니다. 이 수식은 생성자의 세 단계 구간 생성 로직과 반드시 일치해야 하므로, 생성자가 풀을 만들 때마다 `ComputePoolIndex()`의 결과와 실제 `_pools` 인덱스가 같은지 `ASSERT_CRASH`로 교차 검증합니다.
   - 예) `allocSize=48` → 1구간 길이 `len1=48` → `count1=(48+31)>>5=2` → `poolIndex=2-1=1` (0번 풀=32B, 1번 풀=64B이므로 48B 요청은 64B 풀로 올림 배정됨 — 생성자의 "32단위로 올림 배정"과 동일한 결과)
-- `Allocate`는 `size`가 0 이하이거나, `size + sizeof(MemoryHeader)` 계산이 `int32` 범위를 넘어설 정도로 비정상적으로 큰 경우를 `int64` 산술로 먼저 검증한 뒤 `ASSERT_CRASH`로 걸러냅니다. 이 검증이 없으면 오버플로로 `allocSize`가 음수가 되어 풀 인덱스 계산이 잘못된 값을 가리키는 메모리 오염으로 이어질 수 있습니다.
+- `Allocate`는 `size`가 0 이하인 경우와, `size + sizeof(MemoryHeader)`를 더하는 산술 자체가 오버플로하지 않는지(`size`가 `SIZE_MAX - sizeof(MemoryHeader)`를 넘는지)를 먼저 `ASSERT_CRASH`로 걸러냅니다. `allocSize`가 헤더 포함 크기를 그대로 담는 `size_t`이므로 이 계산 전체가 `size_t` 산술로 이루어지며, 이 검증이 없으면 오버플로로 `allocSize`가 실제보다 훨씬 작은 값으로 랩어라운드되어 풀 인덱스 계산이 잘못된 값을 가리키는 메모리 오염으로 이어질 수 있습니다.
 - `Release`는 `header->allocSize`를 `exchange(0)`으로 원자적으로 읽고 표시합니다. 같은 포인터로 `Release`가 동시에 두 번 호출되어도(경쟁 상태 포함) 둘 중 정확히 하나만 원래 값을 받고 나머지는 이미 0이 된 값을 받아 `ASSERT_CRASH`로 즉시 걸립니다.
 - **생성자의 구간별 명시적 시작**: 32~1024/1024~2048/2048~4096 세 구간을 만드는 `for`문 세 개가 모두 같은 `size` 변수를 공유합니다. 만약 두 번째·세 번째 구간이 "이전 구간이 끝난 값에서 이어서 시작"했다면(`size += 128`처럼 증가만 하고 재설정하지 않으면), 이전 구간 종료값(예: 1056)에서 그대로 이어받아 시작하게 되어 풀 크기가 32/128/256 단위 경계와 어긋나는 값(1056, 1184, ...)이 생성됩니다. 그래서 두 번째 구간은 항상 `1024 + 128`에서, 세 번째 구간은 항상 `2048 + 256`에서 명시적으로 다시 시작합니다. 이 경계 어긋남이 다시 발생하더라도 곧바로 드러나도록, 풀을 생성할 때마다 그 크기에 대한 `ComputePoolIndex()` 결과가 실제 `_pools` 인덱스와 일치하는지 `ASSERT_CRASH`로 즉시 검증합니다.
+
+**살아있는 할당 수 추적(`GetLiveAllocationCount`)**: 각 `CMemoryPool`의 `_poolCheckedOutCount`(3.5절)는 TLS 배치 충전 시점에 갱신되는 풀 단위 통계라, TLS 캐시에 아직 대기 중인(사용자에게 전달되지 않은) 블록까지 포함해 "실제 살아있는 할당 수"로 쓰기에는 부정확합니다. 이를 위해 `CMemory`는 별도의 `atomic<int64> _liveAllocationCount`를 두고, `Allocate()`가 데이터 포인터를 반환하기 직전과 `Release()`가 유효한 반납을 확인한 직후에만 정확히 하나씩 증감시킵니다(`_STOMP` 경로 포함, TLS 캐시 히트 여부와 무관). `CMemory::GetLiveAllocationCount()`로 조회할 수 있으며, 메모리 누수 여부를 모니터링하거나(프로세스 종료 시점에 0이 아니면 누수 의심) 부하 테스트에서 순간 할당량을 관찰하는 용도로 사용합니다. `WarmUp()`으로 미리 채워넣기만 하고 아직 아무도 `Allocate()`하지 않은 블록은 이 카운터에 포함되지 않습니다.
 
 ### 3.7 CObjectPool — 타입 전용 오브젝트 풀
 
@@ -152,8 +159,7 @@ shared_ptr<Type> MakeShared(Args&&... args)
 - **타입 전용 풀의 지연 초기화**: `CMemoryPool` 인스턴스는 클래스 정적 멤버가 아니라 함수 지역 정적 변수(`GetPool()` 내부의 Meyer's Singleton)로 관리됩니다. C++11부터 함수 지역 정적 변수의 동적 초기화는 최초 사용 시점에 정확히 한 번, 스레드 안전하게 이루어짐이 표준으로 보장되므로, 다른 번역 단위의 전역/정적 객체 생성자에서 이 풀을 먼저 참조하더라도 초기화 순서 문제가 발생하지 않습니다.
 - **`_STOMP` 연동**: `_STOMP` 빌드에서는 풀을 거치지 않고 `StompAllocator`로 대체되므로, `StompAllocator`의 아레나 최적화(3.3절)를 자동으로 함께 사용합니다.
 - **TLS 배치 캐시 없음**: `CMemory`와 달리 스레드 로컬 배치 캐시가 없어, `Pop()`/`Push()`가 매번 `CMemoryPool`의 원자 연산(`InterlockedPop/PushEntrySList`)을 직접 호출합니다. 이 풀을 쓰는 타입이 초당 수만~수십만 번 생성/파괴되는 극단적 핫패스라면 멀티코어 경합이 그대로 남아있다는 뜻입니다. 이는 결함이 아니라 의도적으로 단순하게 유지한 설계이며, 실제 사용 타입의 생성 빈도가 그 정도로 높아지면 그때 `CMemory`와 동일한 TLS 배치 캐시를 얹는 것을 고려할 수 있습니다.
-- **`CObjectPool<Type>::MakeShared`는 이 타입 전용 풀을 쓰지 않음**: 만약 `Pop`/`Push`를 `{ Pop(...), Push }` 형태의 커스텀 삭제자로 그대로 감싸 `shared_ptr`을 만든다면(3.4절의 전역 `MakeShared`가 `xnew`/`xdelete`로 하는 것과 동일한 패턴), 참조 카운트 제어 블록을 위한 힙 할당이 객체 할당과 별도로(총 2회) 발생합니다. `CObjectPool<Type>::MakeShared`는 대신 `std::allocate_shared<Type>(StlAllocator<Type>(), args...)`를 사용해 객체와 제어 블록을 하나의 블록으로 묶어 단 한 번만 할당합니다. 다만 이 결합된 블록의 크기는 `sizeof(Type)`이 아니라 (제어 블록 + `Type`)이며 표준 라이브러리 구현마다 다르므로, 이 타입 전용의 고정 크기 풀(`GetPool()`)에는 그대로 흘려보낼 수 없습니다(풀의 고정 블록 크기를 넘어서는 버퍼 오버플로우가 될 수 있음). 그래서 `StlAllocator<Type>`을 통해 `gpMemory`의 크기별 공유 풀이 실제 필요한 크기에 맞는 풀을 알아서 찾도록 합니다. 즉 `Pop()`/`Push()`로 만든 객체는 이 타입 전용 풀을, `CObjectPool<Type>::MakeShared()`로 만든 객체는 `gpMemory`의 공유 풀을 사용하는 것으로 역할이 나뉩니다.
-  - 참고로 3.4절의 전역 `MakeShared<Type>(args...)`는 이 타입 전용 풀(`GetPool()`)과는 무관하게, `xnew`로 객체만 `gpMemory`의 공유 풀 경로를 태우고 제어 블록은 별도 할당하는 절충안입니다 — 어떤 `Type`이든 전용 풀 없이 바로 쓸 수 있는 대신 할당이 1회가 아닌 2회입니다.
+- **`shared_ptr`이 필요하면 전역 `MakeShared<Type>()`을 사용**: `CObjectPool<Type>`은 이 타입 전용 풀(`GetPool()`)만 다루며 자체 `MakeShared`를 제공하지 않습니다. `allocate_shared`가 만드는 블록은 `sizeof(Type)`이 아니라 (컨트롤 블록 + `Type`) 크기이고 이는 표준 라이브러리 구현마다 달라, 애초에 `GetPool()`(고정 크기 풀)로 그대로 흘려보낼 수 없기 때문입니다. `Pop()`/`Push()`로 만든 객체는 이 타입 전용 풀을 쓰고, `shared_ptr`이 필요하면 3.4절의 전역 `MakeShared<Type>()`(`StlAllocator<Type>` 경유로 `gpMemory`의 공유 풀을 사용)을 대신 씁니다.
 
 ## 4. 실행 흐름 예시
 
@@ -171,7 +177,7 @@ xdelete(p);                    // 소멸자 호출 → PoolAllocator::Release �
 4. 해당 `CMemoryPool::Pop()` — SLIST에 여유 블록이 있으면 즉시 반환, 없으면 `RawAllocator`로 신규 할당
 5. `MemoryHeader::AttachHeader`로 헤더를 얹고 데이터 포인터 반환
 
-`shared_ptr`이 필요하다면 `xnew`/`xdelete` 쌍 대신 전역 `MakeShared<Player>()`를 쓸 수 있습니다(3.4절) — 객체는 동일하게 풀 경로를 타되, 참조 카운트 제어 블록은 별도로 할당됩니다.
+`shared_ptr`이 필요하다면 `xnew`/`xdelete` 쌍 대신 전역 `MakeShared<Player>()`를 쓸 수 있습니다(3.4절) — 객체와 참조 카운트 컨트롤 블록이 하나로 묶여 `gpMemory` 공유 풀에서 단 1회에 할당됩니다.
 
 ### 4.2 디버깅 시 (오버런 의심)
 
@@ -282,7 +288,6 @@ xdelete(p);                    // 소멸자 호출 → PoolAllocator::Release �
 | 정적 소멸 순서 문제 | `thread_local TlsCache`의 소멸자가 `gpMemory->_pools`를 참조하므로 전역 시스템 파괴 순서가 정확해야 함. `BaseGlobal::Destroy()`의 파괴 순서 + `CMemory::FlushCurrentThreadCache()` + `ThreadManager::DestroyTLS()`의 명시적 flush로 안전하게 관리됨(5-2절 참고). `CThreadManager` 밖에서 만들어진 스레드가 `PoolAllocator`를 쓰는 경우 동일한 규칙을 수동으로 지켜야 하며, 지키지 못하더라도 `DrainBuckets`의 `gpMemory` null 체크가 크래시를 누수로 완화함 |
 | 입력 검증 범위 | `Allocate(size)`는 `size <= 0`이거나 오버플로가 발생할 정도로 큰 `size`를 `ASSERT_CRASH`로 걸러내지만, 이는 명백히 잘못된 호출부 버그를 조기에 드러내기 위한 것이지 임의의 악의적 입력을 견디는 방어 계층은 아님 |
 | `USE_GPMEMORY` 빌드 분기 | `PoolAllocator`(및 `DrainBuckets`)가 이 매크로로 게이트되어 있어, 정의 여부에 따라 `xnew`/`StlAllocator`가 풀 경로를 탈지 표준 힙(`::operator new`/`delete`)으로 직접 갈지가 전체 빌드 단위로 갈림. 매크로를 잘못 끈 채 배포하면 풀링/락프리/TLS 캐시 이점이 조용히 전부 사라지므로 빌드 구성 관리가 필요함 |
-| `MakeShared` 두 가지 버전 | 전역 `MakeShared<Type>`(3.4절, `xnew`+커스텀 삭제자, 할당 2회)과 `CObjectPool<Type>::MakeShared`(3.7절, `allocate_shared`, 할당 1회이지만 그 타입 전용 풀이 미리 필요)는 이름은 같지만 서로 다른 함수이며 트레이드오프도 다름. 어느 쪽을 쓸지는 "그 타입 전용 풀을 이미 쓰고 있는가"로 결정 |
 
 ## 7. 사용 가이드 요약
 
@@ -293,7 +298,7 @@ xdelete(p);                    // 소멸자 호출 → PoolAllocator::Release �
 - **서버 시작 시점 지연 스파이크 완화**: 자주 쓰이는 주요 크기에 한해 `CMemory::WarmUp(allocDataSize, count)`를 선별적으로 호출.
 - **`CThreadManager` 밖에서 만든 스레드가 `PoolAllocator`를 쓸 경우**: 그 스레드 종료 직전 반드시 `CMemory::FlushCurrentThreadCache()`를 직접 호출.
 - **메모리 풀 시스템을 아직 연결하지 않은 빌드(단위 테스트 등)**: `USE_GPMEMORY`를 정의하지 않으면 `xnew`/`xdelete`/`StlAllocator`가 `gpMemory` 없이도 표준 힙으로 동작함(대신 풀링/락프리 이점은 없음).
-- **`shared_ptr`이 필요할 때**: 타입 전용 풀이 아직 없다면 전역 `MakeShared<Type>()`(3.4절)를, 이미 그 타입의 `CObjectPool<Type>`을 쓰고 있다면 `CObjectPool<Type>::MakeShared()`(3.7절)를 사용 — 후자가 할당 1회로 더 저렴함.
+- **`shared_ptr`이 필요할 때**: `CObjectPool<Type>`을 이미 쓰고 있는지 여부와 무관하게 전역 `MakeShared<Type>()`(3.4절)를 사용 — `CObjectPool<Type>`은 자체 `MakeShared`를 제공하지 않습니다.
 
 ## 8. Containers.h — STL 컨테이너 래퍼
 
@@ -321,7 +326,7 @@ CMap<int, Player*> players;  // std::map<int, Player*, less<int>, StlAllocator<p
 | `IsPowerOfTwo` | `size_t alignment` | 검사할 정렬 값(바이트 단위) | `bool` | `alignment`가 2의 거듭제곱인지 검사(0은 `false`) |
 | `Alloc` | `size_t size` | 할당할 바이트 크기 | `void*` (실패 시 `nullptr` 가능) | 정렬 요구 없는 raw 메모리 할당. 매크로에 따라 mimalloc/jemalloc/tcmalloc/malloc으로 컴파일 타임 분기 |
 | `Free` | `void* ptr` | 해제할 포인터 | `void` | `Alloc`으로 받은 메모리 해제. `ptr == nullptr`이면 즉시 반환 |
-| `AllocAligned` | `size_t size` | 할당할 바이트 크기 | `void*` (실패 시 `nullptr` 가능) | 정렬된 raw 메모리 할당. 라이브러리별 인자 순서 차이를 내부에서 흡수 |
+| `AllocAligned` | `size_t size` | 할당할 바이트 크기 | `void*` (실패 시 `nullptr` 가능) | 정렬된 raw 메모리 할당. 라이브러리별 인자 순서 차이를 내부에서 흡수. 아무 라이브러리도 안 쓰고 Windows도 아닌 최후 C11 fallback은 `aligned_alloc`(size가 alignment의 배수여야 하는 제약으로 내부 단편화 발생) 대신 그런 제약이 없는 `posix_memalign`을 사용해 요청한 만큼만 정확히 할당 |
 | | `size_t alignment` | 정렬 기준(바이트 단위, 2의 거듭제곱) | | |
 | `FreeAligned` | `void* ptr` | 해제할 포인터 | `void` | `AllocAligned`로 받은 메모리 해제(플랫폼별 전용 해제 함수 사용) |
 
@@ -333,7 +338,7 @@ CMap<int, Player*> players;  // std::map<int, Player*, less<int>, StlAllocator<p
 
 | 함수 | 파라미터 | 설명 | 반환값 | 함수 설명 |
 |---|---|---|---|---|
-| `static void* Alloc` | `int32 size` | 할당 바이트 크기 | `void*` | `RawAllocator::Alloc`에 위임 |
+| `static void* Alloc` | `size_t size` | 할당 바이트 크기 | `void*` | `RawAllocator::Alloc`에 위임 |
 | `static void Release` | `void* ptr` | 해제할 포인터 | `void` | `RawAllocator::Free`에 위임 |
 | `operator new` | `size_t size` | 할당할 바이트 크기 | `void*` | 단일 객체 할당 (RawAllocator 경유) |
 | `operator new[]` | `size_t size` | 할당할 바이트 크기 | `void*` | 배열 할당 (RawAllocator 경유) |
@@ -359,7 +364,9 @@ CMap<int, Player*> players;  // std::map<int, Player*, less<int>, StlAllocator<p
 | 이름 | 값 | 설명 |
 |---|---|---|
 | `PAGE_SIZE` | `0x1000` | 페이지 크기(4096바이트) |
+| `ALIGNMENT` | `16` | `AllocationHeader`/사용자 데이터 배치 정렬 기준(바이트) |
 | `ARENA_RESERVE_SIZE` | `256 * 1024 * 1024 * 1024` (256GB) | 예약할 가상 주소 공간 크기 |
+| `ALLOCATION_MAGIC` | `0x5543414C4C4F4341` ("UCALLOCA") | `AllocationHeader::magic` 오염/이중 해제 탐지용 매직 넘버 |
 
 **정적 멤버 변수**
 
@@ -369,24 +376,34 @@ CMap<int, Player*> players;  // std::map<int, Player*, less<int>, StlAllocator<p
 | `s_arenaCursor` | `atomic<int8*>` | 현재 커밋 커서 오프셋 |
 | `s_arenaInitFlag` | `once_flag` | 아레나 1회 초기화 플래그 |
 | `s_sizeClassMapLock` | `shared_mutex` | Free-List 맵 동기화 락 |
-| `s_sizeClassFreeLists` | `unordered_map<int64, unique_ptr<SLIST_HEADER>>` | 데이터 크기별 Lock-free Free-List 맵 |
+| `s_sizeClassFreeLists` | `unordered_map<size_t, unique_ptr<SLIST_HEADER>>` | 데이터 크기별 Lock-free Free-List 맵 |
 
-**내부 구조체 `RegionMeta`(`SLIST_ENTRY` 상속)**
+**내부 구조체 `AllocationHeader`(사용자 포인터 바로 앞에 배치)**
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `meta` | `RegionMeta*` | 이 할당이 속한 영역의 메타데이터(힙 할당) 포인터 |
+| `magic` | `uint64` | `ALLOCATION_MAGIC` 값으로 채워지는 오염/유효성 탐지용 매직 넘버 |
+
+**내부 구조체 `RegionMeta`(`SLIST_ENTRY` 상속, `RawAllocator`로 힙에서 할당)**
 
 | 필드 | 타입 | 설명 |
 |---|---|---|
 | `dataPagesBase` | `int8*` | 데이터 페이지 영역 시작 주소 |
-| `dataRegionSize` | `int64` | 데이터 영역 크기(PAGE_SIZE 단위) |
+| `dataRegionSize` | `size_t` | 데이터 영역 크기(PAGE_SIZE 단위) |
 | `freed` | `atomic<int32>` | 0=사용 중, 1=반납됨(이중 해제 탐지) |
+| `isFallback` | `bool` | 아레나 고갈로 Direct `VirtualAlloc`한 Fallback 영역인지 여부 |
 
 **함수**
 
 | 함수 | 파라미터 | 설명 | 반환값 | 함수 설명 |
 |---|---|---|---|---|
-| `static void* Alloc` | `int32 size` | 요청 데이터 크기 | `void*` | 페이지 끝단에 정렬된 디버그 메모리 할당 |
-| `static void Release` | `void* ptr` | 반납할 포인터 | `void` | 디버그 메모리 반납(디커밋 + Free-List 등록) |
+| `static void* Alloc` | `size_t size` | 요청 데이터 크기 | `void*` | 데이터 페이지 끝단 + 전용 가드 페이지로 보호되는 디버그 메모리 할당 |
+| `static void Release` | `void* ptr` | 반납할 포인터 | `void` | 디버그 메모리 반납(일반: 데이터 페이지 DECOMMIT + Free-List 등록 / Fallback: 전체 `VirtualFree` + `RegionMeta` 힙 해제) |
 | `static void EnsureArenaInitialized` | 없음 | — | `void` | 아레나 공간을 `call_once`로 최초 1회 예약 |
-| `static SLIST_HEADER* GetOrCreateSizeClassFreeList` | `int64 dataRegionSize` | 데이터 영역 크기 | `SLIST_HEADER*` | 크기별 Free-List 헤더 조회/생성(이중 확인 잠금) |
+| `static SLIST_HEADER* GetOrCreateSizeClassFreeList` | `size_t dataRegionSize` | 데이터 영역 크기 | `SLIST_HEADER*` | 크기별 Free-List 헤더 조회/생성(이중 확인 잠금) |
+| `static int8* ReserveArenaRegion` | `size_t size` | 예약받고자 하는 총 영역 크기(가드 페이지 포함) | `int8*`(고갈 시 `nullptr`) | 아레나 범프 커서를 CAS로 원자적으로 전진시켜 영역 예약 |
+| `static void Cleanup` | 없음 | — | `void` | 각 크기별 free-list에 남은 `RegionMeta`를 모두 힙에서 해제한 뒤 아레나 전체를 `VirtualFree`. 이후 재사용 불가 |
 
 ### 9.4 PoolAllocator
 
@@ -396,8 +413,12 @@ CMap<int, Player*> players;  // std::map<int, Player*, less<int>, StlAllocator<p
 
 | 함수 | 파라미터 | 설명 | 반환값 | 함수 설명 |
 |---|---|---|---|---|
-| `static void* Alloc` | `int32 size` | 요청 크기 | `void*` | `USE_GPMEMORY` 정의 시 `gpMemory->Allocate`, 아니면 `::operator new`로 폴백 |
+| `static void* Alloc` | `size_t size` | 요청 크기 | `void*` | `USE_GPMEMORY` 정의 시 `gpMemory->Allocate`, 아니면 `::operator new`로 폴백 |
+| `static void* AllocAligned` | `size_t size` | 요청 크기 | `void*` | `USE_GPMEMORY` 정의 시 `gpMemory->Allocate`에 정렬 여유분+원본 포인터 저장 공간을 얹어 할당한 뒤 반환 주소를 정렬에 맞춰 올림 보정(gpMemory 풀 경유), 아니면 `::operator new(size, align_val_t)`로 폴백 |
+| | `size_t alignment` | 요구 정렬 바이트 단위(2의 거듭제곱) | | |
 | `static void Release` | `void* ptr` | 반납할 포인터 | `void` | `USE_GPMEMORY` 정의 시 `gpMemory->Release`, 아니면 `::operator delete`로 폴백 |
+| `static void ReleaseAligned` | `void* ptr` | 반납할 포인터 | `void` | `USE_GPMEMORY` 정의 시 `ptr` 앞 8바이트에 저장된 원본 포인터를 역산해 `gpMemory->Release`, 아니면 `::operator delete(ptr, align_val_t)`로 폴백 |
+| | `size_t alignment` | 할당 시 사용한 정렬 바이트 단위 | | |
 
 ### 9.5 StlAllocator\<T\>
 
@@ -421,7 +442,7 @@ CMap<int, Player*> players;  // std::map<int, Player*, less<int>, StlAllocator<p
 |---|---|---|---|---|
 | `xnew<Type>` | `Args&&... args` | 생성자에 전달할 가변 인자 | `Type*` | `PoolAllocator::Alloc(sizeof(Type))` 후 placement new |
 | `xdelete<Type>` | `Type* obj` | 파괴할 객체 포인터 | `void` | 소멸자 호출 후 `PoolAllocator::Release` |
-| `MakeShared<Type>` | `Args&&... args` | 생성자에 전달할 가변 인자 | `shared_ptr<Type>` | `xnew` + `xdelete` 커스텀 삭제자 기반. 객체 1회(풀) + 제어 블록 1회, 총 2회 할당 |
+| `MakeShared<Type>` | `Args&&... args` | 생성자에 전달할 가변 인자 | `shared_ptr<Type>` | `std::allocate_shared<Type>(StlAllocator<Type>(), args...)` 기반. 객체+제어 블록을 하나로 묶어 `gpMemory` 공유 풀에서 단일 할당 |
 
 ### 9.7 MemoryHeader (`SLIST_ENTRY` 상속)
 
@@ -429,16 +450,16 @@ CMap<int, Player*> players;  // std::map<int, Player*, less<int>, StlAllocator<p
 
 | 변수 | 타입 | 설명 |
 |---|---|---|
-| `allocSize` | `atomic<int32>` | 헤더 포함 전체 할당 크기. `0`이면 "풀에 반납된 상태"를 의미(이중 반납 탐지 플래그 겸용) |
+| `allocSize` | `atomic<size_t>` | 헤더 포함 전체 할당 크기. `0`이면 "풀에 반납된 상태"를 의미(이중 반납 탐지 플래그 겸용) |
 | (상속) `Next` | `PSLIST_ENTRY`(`SLIST_ENTRY` 상속분) | SLIST/TLS 로컬 free-list 연결 포인터로 재사용 |
 
 **함수**
 
 | 함수 | 파라미터 | 설명 | 반환값 | 함수 설명 |
 |---|---|---|---|---|
-| `MemoryHeader(int32 size)` | `int32 size` | 헤더 포함 전체 크기 | — | `allocSize`를 `size`로 초기화하는 생성자 |
+| `MemoryHeader(size_t size)` | `size_t size` | 헤더 포함 전체 크기 | — | `allocSize`를 `size`로 초기화하는 생성자 |
 | `static void* AttachHeader` | `MemoryHeader* header` | 헤더를 얹을 원시 메모리 시작 주소 | `void*` | raw 메모리에 헤더를 placement new로 얹고 데이터 포인터 반환 |
-| | `int32 size` | 헤더를 포함한 전체 할당 크기 | | |
+| | `size_t size` | 헤더를 포함한 전체 할당 크기 | | |
 | `static MemoryHeader* DetachHeader` | `void* ptr` | 데이터 포인터 | `MemoryHeader*` | 데이터 포인터에서 헤더 주소를 역산 |
 
 ### 9.8 CMemoryPool
@@ -448,18 +469,18 @@ CMap<int, Player*> players;  // std::map<int, Player*, less<int>, StlAllocator<p
 | 변수 | 타입 | 설명 |
 |---|---|---|
 | `_header` | `SLIST_HEADER` | Lock-free SLIST 헤더(Interlocked API로 조작) |
-| `_allocSize` | `int32` | 이 풀이 다루는 고정 블록 크기 |
-| `_useCount` | `atomic<int32>` | 현재 사용 중인 블록 수(통계). `_header`와 다른 캐시 라인에 정렬 |
-| `_reserveCount` | `atomic<int32>` | 현재 풀에 대기 중인 블록 수(통계) |
+| `_allocSize` | `size_t` | 이 풀이 다루는 고정 블록 크기 |
+| `_poolCheckedOutCount` | `atomic<int32>` | 이 풀의 SLIST 밖으로 나간(반납되지 않은) 블록 수(통계). TLS 캐시 대기분 포함 — `_header`와 다른 캐시 라인에 정렬 |
+| `_poolReserveCount` | `atomic<int32>` | 현재 이 풀의 SLIST에 대기 중인 블록 수(통계) |
 
 **함수**
 
 | 함수 | 파라미터 | 설명 | 반환값 | 함수 설명 |
 |---|---|---|---|---|
-| `CMemoryPool(int32 allocSize)` | `int32 allocSize` | 고정 블록 크기 | — | `_allocSize` 설정, SLIST 헤더 초기화 |
+| `CMemoryPool(size_t allocSize)` | `size_t allocSize` | 고정 블록 크기 | — | `_allocSize` 설정, SLIST 헤더 초기화 |
 | `~CMemoryPool()` | 없음 | — | — | SLIST에 남은 블록을 모두 꺼내 raw 해제 |
-| `void Push` | `MemoryHeader* ptr` | 반납할 블록 | `void` | `allocSize=0` 표시 후 SLIST에 반납, `_useCount--`/`_reserveCount++` |
-| `MemoryHeader* Pop` | 없음 | — | `MemoryHeader*` | SLIST에서 꺼내거나(비었으면 raw 신규 할당), `_useCount++`(재사용 시 `_reserveCount--`) |
+| `void Push` | `MemoryHeader* ptr` | 반납할 블록 | `void` | `allocSize=0` 표시 후 SLIST에 반납, `_poolCheckedOutCount--`/`_poolReserveCount++` |
+| `MemoryHeader* Pop` | 없음 | — | `MemoryHeader*` | SLIST에서 꺼내거나(비었으면 raw 신규 할당), `_poolCheckedOutCount++`(재사용 시 `_poolReserveCount--`) |
 
 ### 9.9 CMemory
 
@@ -478,6 +499,7 @@ CMap<int, Player*> players;  // std::map<int, Player*, less<int>, StlAllocator<p
 | `_tlsBatchSizeTable` | `int16[POOL_COUNT]` | 풀 인덱스별 TLS 배치 충전 개수 |
 | `_tlsMaxCountTable` | `int16[POOL_COUNT]` | 풀 인덱스별 TLS 로컬 캐시 상한 |
 | `_tlsCache` (static thread_local) | `TlsCache` | 스레드마다 독립적인 로컬 캐시 인스턴스 |
+| `_liveAllocationCount` (static) | `atomic<int64>` | `Allocate()`/`Release()` 호출 시점에만 직접 증감되는 실제 살아있는 할당 수(TLS 캐싱과 무관하게 정확) |
 
 **중첩 구조체 `TlsBucket`**
 
@@ -499,12 +521,13 @@ CMap<int, Player*> players;  // std::map<int, Player*, less<int>, StlAllocator<p
 |---|---|---|---|---|
 | `CMemory()` | 없음 | — | — | 3개 구간(32/128/256단위)의 `CMemoryPool` 생성 및 TLS 배치/상한 테이블 계산 |
 | `~CMemory()` | 없음 | — | — | 모든 `CMemoryPool` delete |
-| `void* Allocate` | `int32 size` | 요청 데이터 크기(헤더 제외) | `void*` | 헤더 포함 크기 계산 후 `_STOMP`/대형/TLS 경로로 분기해 할당 |
+| `void* Allocate` | `size_t size` | 요청 데이터 크기(헤더 제외) | `void*` | 헤더 포함 크기 계산 후 `_STOMP`/대형/TLS 경로로 분기해 할당 |
 | `void Release` | `void* ptr` | `Allocate`가 반환한 포인터 | `void` | 헤더 역산 후 `_STOMP`/대형/TLS 경로로 분기해 반납 |
-| `void WarmUp` | `int32 allocDataSize` | 워밍업할 풀의 데이터 크기(헤더 제외) | `void` | 지정 크기 풀에 raw 블록 `count`개 미리 채워 넣음 |
-| | `int32 count` | 미리 채워 넣을 블록 개수 | | |
+| `void WarmUp` | `size_t allocDataSize` | 워밍업할 풀의 데이터 크기(헤더 제외) | `void` | 지정 크기 풀에 raw 블록 `count`개 미리 채워 넣음 |
+| | `size_t count` | 미리 채워 넣을 블록 개수 | | |
 | `static void FlushCurrentThreadCache` | 없음 | — | `void` | 호출 스레드의 TLS 캐시를 즉시 전역 풀로 반납 |
-| `static int32 ComputePoolIndex` | `int32 allocSize` | 헤더 포함 전체 크기 | `int32` | 분기 없는 수식으로 `_pools`/`TlsCache::buckets` 인덱스 계산 |
+| `static int64 GetLiveAllocationCount` | 없음 | — | `int64` | `Allocate()`했지만 아직 `Release()`되지 않은 블록 수(TLS 캐시 대기분 제외, 실제 살아있는 할당만) |
+| `static int32 ComputePoolIndex` | `size_t allocSize` | 헤더 포함 전체 크기 | `int32` | 분기 없는 수식으로 `_pools`/`TlsCache::buckets` 인덱스 계산 |
 | `static int32 DetermineTlsBatchSize` | `int32 allocSize` | 헤더 포함 전체 블록 크기 | `int32` | 크기 구간별 TLS 배치 충전 개수 결정(64/32/4) |
 | `static int32 DetermineTlsMaxCount` | `int32 allocSize` | 헤더 포함 전체 블록 크기 | `int32` | `DetermineTlsBatchSize`의 4배로 로컬 캐시 상한 결정 |
 | `static void DrainBuckets` | `TlsBucket* buckets` | 비워낼 `TlsBucket` 배열(크기 `POOL_COUNT`) | `void` | 버킷에 남은 블록을 원래 속했던 전역 풀로 반납(`gpMemory` null 체크 포함) |
@@ -515,7 +538,7 @@ CMap<int, Player*> players;  // std::map<int, Player*, less<int>, StlAllocator<p
 
 | 변수 | 타입 | 설명 |
 |---|---|---|
-| `s_allocSize` | `static constexpr int32` | `sizeof(Type) + sizeof(MemoryHeader)` — Type 하나(헤더 포함) 당 블록 크기 |
+| `s_allocSize` | `static constexpr size_t` | `sizeof(Type) + sizeof(MemoryHeader)` — Type 하나(헤더 포함) 당 블록 크기 |
 
 **함수**
 
@@ -523,7 +546,6 @@ CMap<int, Player*> players;  // std::map<int, Player*, less<int>, StlAllocator<p
 |---|---|---|---|---|
 | `static Type* Pop` | `Args&&... args` | 생성자에 전달할 가변 인자 | `Type*` | 타입 전용 풀(또는 `_STOMP`)에서 블록을 받아 placement new로 객체 생성 |
 | `static void Push` | `Type* obj` | 파괴할 객체 포인터 | `void` | 이중 반납 원자적 확인 후 소멸자 호출, 타입 전용 풀에 반납 |
-| `static shared_ptr<Type> MakeShared` | `Args&&... args` | 생성자에 전달할 가변 인자 | `shared_ptr<Type>` | `allocate_shared` + `StlAllocator<Type>` 사용, `gpMemory` 공유 풀에서 단일 할당 |
 | `static CMemoryPool& GetPool` (private) | 없음 | — | `CMemoryPool&` | Meyer's Singleton으로 타입 전용 풀 지연 초기화 |
 
 ### 9.11 Containers.h — 컨테이너 래퍼 목록

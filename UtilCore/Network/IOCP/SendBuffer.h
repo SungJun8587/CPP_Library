@@ -34,7 +34,7 @@ public:
 	CSendBuffer(CSendBufferChunkRef owner, BYTE* buffer, uint32 allocSize);
 	~CSendBuffer();
 
-	BYTE* Buffer() { return _buffer; }
+	BYTE*		Buffer() { return _buffer; }
 	uint32		AllocSize() { return _allocSize; }
 	uint32		WriteSize() { return _writeSize; }
 	void		Close(uint32 writeSize);
@@ -65,7 +65,7 @@ class CSendBufferChunk : public enable_shared_from_this<CSendBufferChunk>
 {
 	enum
 	{
-		SEND_BUFFER_CHUNK_SIZE = 6000
+		SEND_BUFFER_CHUNK_SIZE = 8192
 	};
 
 public:
@@ -77,7 +77,7 @@ public:
 	void				Close(uint32 writeSize);
 
 	bool				IsOpen() { return _open; }
-	BYTE* Buffer() { return &_buffer[_usedSize]; }
+	BYTE*				Buffer() { return &_buffer[_usedSize]; }
 	uint32				FreeSize() { return static_cast<uint32>(_buffer.size()) - _usedSize; }
 
 private:

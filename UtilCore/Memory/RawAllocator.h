@@ -20,23 +20,23 @@
 
 // 1. 매크로 정의에 따른 헤더 포함 및 라이브러리 링크
 #if defined(USE_MIMALLOC)
-    #pragma comment(lib, LIB_NAME("mimalloc")) // 또는 사용하시는 LIB_NAME("mimalloc")
-    #include <mimalloc.h>
+#pragma comment(lib, LIB_NAME("mimalloc")) // 또는 사용하시는 LIB_NAME("mimalloc")
+#include <mimalloc.h>
 
 #elif defined(USE_JEMALLOC)
-    #pragma comment(lib, LIB_NAME("jemalloc"))
-    #include <jemalloc/jemalloc.h>
+#pragma comment(lib, LIB_NAME("jemalloc"))
+#include <jemalloc/jemalloc.h>
 
 #elif defined(USE_TCMALLOC)
-    #pragma comment(lib, LIB_NAME("libtcmalloc_minimal"))
-    #include <gperftools/tcmalloc.h>
+#pragma comment(lib, LIB_NAME("libtcmalloc_minimal"))
+#include <gperftools/tcmalloc.h>
 
 #else
-    #include <cstdlib>          // ::malloc, ::free, ::aligned_alloc (C11 fallback)
+#include <cstdlib>          // ::malloc, ::free, ::aligned_alloc (C11 fallback)
 
-    #if defined(_WIN32)
-        #include <malloc.h>     // ::_aligned_malloc, ::_aligned_free
-    #endif
+#if defined(_WIN32)
+#include <malloc.h>     // ::_aligned_malloc, ::_aligned_free
+#endif
 #endif
 
 namespace RawAllocator
@@ -146,10 +146,22 @@ namespace RawAllocator
         return ::_aligned_malloc(size, alignment);
 
 #else
-        // 표준 C11 fallback
-        // aligned_alloc은 size가 alignment의 배수가 아니면 UB이므로 배수로 올림 보정합니다.
-        size_t alignedSize = (size + alignment - 1) & ~(alignment - 1);
-        return ::aligned_alloc(alignment, alignedSize);
+        // 표준 C11 fallback (Linux/POSIX)
+        // aligned_alloc은 size가 alignment의 배수가 아니면 UB라 요청 크기를
+        // alignment 단위로 올림 보정해야 해서, alignment가 클수록(예: 64) 내부
+        // 단편화가 커질 수 있습니다. posix_memalign은 이 제약이 없어(2의 거듭제곱
+        // alignment만 만족하면 size는 임의 값 그대로 사용 가능) 요청한 만큼만
+        // 정확히 할당합니다. 해제는 일반 free()로 동일하게 가능합니다.
+        // 다만 posix_memalign은 aligned_alloc에는 없던 별도 조건으로 alignment가
+        // sizeof(void*)의 배수여야 합니다 - 이 파일의 모든 호출부는 항상 16 이상의
+        // 2의 거듭제곱을 넘기므로(따라서 자동으로 8의 배수이므로) 실질적으로는
+        // 항상 만족되지만, 향후 더 작은 정렬 값으로 호출되는 실수를 조기에 드러내기
+        // 위해 명시적으로 검증합니다.
+        assert((alignment % sizeof(void*)) == 0 && "posix_memalign은 alignment가 sizeof(void*)의 배수여야 합니다.");
+
+        void* ptr = nullptr;
+        const int result = ::posix_memalign(&ptr, alignment, size);
+        return (result == 0) ? ptr : nullptr;
 #endif
     }
 
@@ -181,7 +193,7 @@ namespace RawAllocator
         ::_aligned_free(ptr);
 
 #else
-        // 표준 C11 fallback: aligned_alloc으로 할당한 메모리는 일반 free로 해제 가능합니다.
+        // 표준 C11 fallback: posix_memalign으로 할당한 메모리는 일반 free로 해제 가능합니다.
         ::free(ptr);
 #endif
     }

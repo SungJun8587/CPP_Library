@@ -18,7 +18,7 @@
 //***************************************************************************
 void CJobQueue::DoAsync(CallbackType&& callback)
 {
-	Push(CObjectPool<CJob>::MakeShared(std::move(callback)));
+	Push(MakeShared<CJob>(std::move(callback)));
 }
 
 //***************************************************************************
@@ -29,7 +29,7 @@ void CJobQueue::DoAsync(CallbackType&& callback)
 //***************************************************************************
 void CJobQueue::DoTimer(uint64 tickAfterMs, CallbackType&& callback)
 {
-	CJobRef job = CObjectPool<CJob>::MakeShared(std::move(callback));
+	CJobRef job = MakeShared<CJob>(std::move(callback));
 	if( gpJobTimer != nullptr ) gpJobTimer->Reserve(tickAfterMs, shared_from_this(), job);
 }
 

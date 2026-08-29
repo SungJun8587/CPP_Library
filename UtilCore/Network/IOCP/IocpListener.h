@@ -154,11 +154,11 @@ private:
     void    ProcessAccept(AcceptEvent* acceptEvent);
 
 private:
-    std::atomic<SOCKET>     _listenSocket{ INVALID_SOCKET };   // 리스닝 소켓 핸들 (IOCP 워커와 Stop() 호출 스레드가 동시 접근)
-    CIocpCoreRef            _iocpCore = nullptr;                // 연동할 IOCP 코어 참조
-    IocpSessionFactory      _sessionFactory = nullptr;          // 세션 생성 팩터리
-    OnAcceptCallback        _onAcceptCallback = nullptr;        // Accept 완료 알림 콜백
-    CVector<AcceptEvent*>   _acceptEvents;                      // 생성된 AcceptEvent 관리 벡터
+    std::atomic<SOCKET>         _listenSocket{ INVALID_SOCKET };    // 리스닝 소켓 핸들 (IOCP 워커와 Stop() 호출 스레드가 동시 접근)
+    CIocpCoreRef                _iocpCore = nullptr;                // 연동할 IOCP 코어 참조
+    IocpSessionFactory          _sessionFactory = nullptr;          // 세션 생성 팩터리
+    OnAcceptCallback            _onAcceptCallback = nullptr;        // Accept 완료 알림 콜백
+    std::vector<AcceptEvent*>   _acceptEvents;                      // 생성된 AcceptEvent 관리 벡터
 
     // 재시도 스레드 생명주기 관리
     std::atomic<bool>          _closing{ false };        // true가 되면 RegisterAccept/ScheduleRetry가 즉시 포기

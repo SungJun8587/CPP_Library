@@ -7,50 +7,71 @@
 #ifndef UC_RINGBUFFER_H
 #define UC_RINGBUFFER_H
 
+#include <cassert>
+#include <cstdint>
+#include <limits>
+#include <stdexcept>
+#include <utility>
+
+#include <WinSock2.h>
+#include <MSWSock.h>
+
 #include <Memory/Allocator.h>
 
 //***************************************************************************
 // @class CRingBuffer
-// @brief 멀티스레드 및 IOCP 환경의 제로카피(Zero-Copy) 네트워킹에 최적화된 링 버퍼 클래스입니다.
+// @brief IOCP/RIO 환경의 제로카피(Zero-Copy) 네트워킹에 사용할 수 있도록 설계된 링 버퍼 클래스입니다.
 //
 // @details
-// 윈도우 IOCP(Input/Output Completion Port) 환경에서 WSABUF를 이용한 제로카피 I/O를 수행할 수 있도록
+// 윈도우 IOCP(WSABUF) 및 RIO(RIO_BUF) 환경에서 제로카피 I/O를 수행할 수 있도록
 // 버퍼의 여유/사용 영역을 최대 2개의 연속된 메모리 청크로 나누어 제공합니다.
 //
 // 주요 처리 및 특징:
-//  - 제로카피 네트워킹 지원 (GetWSARecvBuffers, GetWSASendBuffers)
+//  - 제로카피 네트워킹 지원 (GetWSARecvBuffers, GetWSASendBuffers, GetRioRecvBuffers, GetRioSendBuffers)
 //  - 부분 처리(Partial Enqueue/Dequeue) 및 Peek 모드 지원
 //  - 고성능 메모리 관리 및 안전한 타입 캐스팅 검증
 //
-// 주의사항 (Note):
-//  1) 이 클래스 자체는 동기화를 수행하지 않습니다(락프리 아님).
-//     멀티스레드 환경(프로듀서/컨슈머 분리 등)에서 사용할 경우 호출자가 외부에서 락(SRWLOCK 등)을 걸어 접근을 직렬화해야 합니다.
-//  2) GetWSARecvBuffers()/GetWSASendBuffers()로 얻은 포인터를 실제 I/O에 사용하는 동안(Overlapped 완료 전)
-//     같은 방향(recv 또는 send)으로 다시 이 함수들을 호출해 새 I/O를 걸면 안 됩니다. 소켓당 recv 1개, send 1개까지만 
-//     동시에 in-flight 상태를 가정합니다.
+// [중요 계약 및 주의사항 (Critical Notes)]:
+//  1) 동기화 미지원 (Thread Safety):
+//     이 클래스 자체는 내부 동기화를 수행하지 않습니다 (락프리 아님).
+//     멀티스레드 환경에서는 호출자(예: CRioSession)가 SRWLOCK 등을 통해 접근을 직렬화해야 합니다.
+//  2) Move Semantics (이동 연산 계약):
+//     이동 연산(Move)에 의해 이동된(moved-from) CRingBuffer 객체는 
+//     소멸(Destruction) 또는 새로운 값으로의 이동 대입(Move Assignment) 외의
+//     일반적인 RingBuffer 연산(Enqueue, Dequeue, GetSize 등)에 절대 사용할 수 없습니다.
+//  3) Overlap 금지 (Buffer Overlap Contract):
+//     Enqueue/Dequeue/Peek에 전달되는 외부 데이터 버퍼(data, outData)는 
+//     RingBuffer 내부 메모리 영역과 절대 중첩(Overlap)되어서는 안 됩니다.
+//  4) I/O Outstanding Lifetime & Cursor Safety (IOCP / RIO 필수 규칙):
+//     GetWSARecvBuffers / GetWSASendBuffers / GetRioRecvBuffers / GetRioSendBuffers 로 얻은
+//     포인터/버퍼 정보를 실제 I/O에 게시(In-flight)한 경우, **Completion(완료 통지)이 발생하기 전까지**:
+//       - 해당 메모리 영역을 덮어쓰거나 재사용해서는 안 됩니다.
+//       - MoveReadBuffer(), MoveWriteBuffer(), Clear() 등을 호출하여 커서를 조작해서는 안 됩니다.
+//     소켓/세션당 동시에 진행 중인 I/O는 Recv 1개, Send 1개 이하를 전제로 설계되었습니다.
 //***************************************************************************
 class CRingBuffer : public BaseAllocator
 {
-	enum Constants
+	enum Constants : int64
 	{
 		BUFFER_SIZE_DEFAULT = 10240
 	};
 
 public:
 	CRingBuffer();
-	CRingBuffer(int bufferSize);
+	explicit CRingBuffer(int64 bufferSize);
 	~CRingBuffer();
 
 	CRingBuffer(const CRingBuffer&) = delete;
 	CRingBuffer& operator=(const CRingBuffer&) = delete;
+
 	CRingBuffer(CRingBuffer&& other) noexcept;
 	CRingBuffer& operator=(CRingBuffer&& other) noexcept;
 
 	//***************************************************************************
-	// @brief 링버퍼의 전체 용량을 반환합니다 (실제 사용 가능한 최대 데이터 크기).
-	// @return 전체 버퍼 크기 (바이트)
+	// @brief 링버퍼에 저장 가능한 최대 데이터 크기(논리 Capacity, N-1)를 반환합니다.
+	// @return 최대 저장 가능 데이터 크기 (바이트)
 	//***************************************************************************
-	int64 GetSizeTotal() const
+	int64 GetCapacity() const
 	{
 		return _end - _begin - 1;
 	}
@@ -107,10 +128,10 @@ public:
 		return _end - _read;
 	}
 
-	bool Enqueue(const char* data, int64 requestSize, int64* outEnqueueSize, bool isPartialEnqueueAvailable = false);
-	bool Dequeue(char* outData, int64 requestSize, int64* outDequeueSize, bool isPartialDequeueAvailable = true, bool isPeekMode = false);
+	bool Enqueue(const char* data, int64 requestSize, int64* outEnqueueSize = nullptr, bool isPartialEnqueueAvailable = false);
+	bool Dequeue(char* outData, int64 requestSize, int64* outDequeueSize = nullptr, bool isPartialDequeueAvailable = true, bool isPeekMode = false);
 
-	bool Peek(char* outData, int64 requestSize, int64* outPeekSize, bool isPartialPeekAvailable = true);
+	bool Peek(char* outData, int64 requestSize, int64* outPeekSize = nullptr, bool isPartialPeekAvailable = true);
 
 	int GetWSARecvBuffers(WSABUF(&outBuffers)[2]) const;
 	int GetWSASendBuffers(WSABUF(&outBuffers)[2]) const;
@@ -120,6 +141,7 @@ public:
 
 	//***************************************************************************
 	// @brief 링버퍼의 모든 데이터를 초기화하고 읽기/쓰기 커서를 시작점으로 되돌립니다.
+	// @note 진행 중인(In-flight) Async I/O가 없을 때만 안전하게 호출할 수 있습니다.
 	//***************************************************************************
 	void Clear()
 	{
@@ -201,17 +223,12 @@ private:
 	// @brief int64 크기 값을 WSABUF::len(ULONG, 32bit)으로 안전하게 캐스팅합니다.
 	// @param value 캐스팅할 int64 크기 값
 	// @return ULONG 타입으로 변환된 값
-	// @note 버퍼 총 용량이 int32 범위 이하로 제한되어 있으나, 방어적 코드로서
-	//        Debug 빌드에서는 assert, Release 빌드에서는 clamp 처리를 수행합니다.
 	//***************************************************************************
 	static ULONG SafeCastToULong(int64 value)
 	{
 		constexpr int64 maxVal = static_cast<int64>((std::numeric_limits<ULONG>::max)());
 
-		assert(value >= 0 && value <= maxVal && "WSABUF 길이가 ULONG 범위를 초과했습니다.");
-
-		if( value < 0 ) return 0;
-		if( value > maxVal ) return static_cast<ULONG>(maxVal);
+		assert(value >= 0 && value <= maxVal && "WSABUF/RIO_BUF 길이가 ULONG 범위를 초과했습니다.");
 
 		return static_cast<ULONG>(value);
 	}

@@ -23,6 +23,10 @@ CSendBuffer::CSendBuffer(CSendBufferChunkRef owner, BYTE* buffer, uint32 allocSi
 //***************************************************************************
 CSendBuffer::~CSendBuffer()
 {
+	if( _closed == false )
+	{
+		Close(0);
+	}
 }
 
 //***************************************************************************
@@ -77,7 +81,7 @@ CSendBufferRef CSendBufferChunk::Open(uint32 allocSize)
 		return nullptr;
 
 	// MakeShared 할당 수행 후 성공 시에만 _open = true 설정 (이슈 9번 해결)
-	CSendBufferRef buffer = CObjectPool<CSendBuffer>::MakeShared(shared_from_this(), Buffer(), allocSize);
+	CSendBufferRef buffer = MakeShared<CSendBuffer>(shared_from_this(), Buffer(), allocSize);
 	if( buffer != nullptr )
 	{
 		_open = true;
@@ -123,7 +127,7 @@ CSendBufferRef CSendBufferManager::Open(uint32 size)
 //***************************************************************************
 CSendBufferChunkRef CSendBufferManager::GetChunk()
 {
-	CSendBufferChunkRef chunk(CObjectPool<CSendBufferChunk>::Pop(), CObjectPool<CSendBufferChunk>::Push);
+	CSendBufferChunkRef chunk = MakeShared<CSendBufferChunk>();
 	chunk->Reset();
 	return chunk;
 }
