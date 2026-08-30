@@ -37,12 +37,12 @@ CIocpListener::~CIocpListener()
 // @param iocpCore IOCP 코어 참조 객체
 // @param netAddr 리슨할 네트워크 주소 (IP/Port)
 // @param sessionFactory 세션 생성 람다/함수 포인터
-// @param acceptCount 동시 대기할 AcceptEx 수 (Accept Pool 크기)
+// @param acceptPoolSize 동시 대기할 AcceptEx 개수 (기본 kDefaultAcceptPoolSize)
 // @param onAccept Accept 완료 시 호출될 외부 후속 처리 콜백
 // @return bool 성공 여부
 //***************************************************************************
 bool CIocpListener::StartAccept(CIocpCoreRef iocpCore, CNetAddress netAddr, IocpSessionFactory sessionFactory,
-    int32 acceptCount, OnAcceptCallback onAccept)
+    uint32 acceptPoolSize, OnAcceptCallback onAccept)
 {
     _iocpCore = iocpCore;
     _sessionFactory = sessionFactory;
@@ -78,11 +78,12 @@ bool CIocpListener::StartAccept(CIocpCoreRef iocpCore, CNetAddress netAddr, Iocp
         return false;
 
     // 6. 설정된 개수만큼 AcceptEvent 생성 및 AcceptEx 사전 등록 (Accept Pool)
-    for( int32 i = 0; i < acceptCount; i++ )
+    _acceptEvents.reserve(static_cast<size_t>(acceptPoolSize));
+
+    for( uint32 i = 0; i < acceptPoolSize; i++ )
     {
         AcceptEvent* acceptEvent = xnew<AcceptEvent>();
         _acceptEvents.push_back(acceptEvent);
-
         RegisterAccept(acceptEvent);
     }
 

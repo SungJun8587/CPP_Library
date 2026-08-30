@@ -17,7 +17,6 @@
 
 #include <BaseRedefineDataType.h>
 #include <BaseTLS.h>
-#include <Memory/Containers.h>
 
 //***************************************************************************
 // @brief 워커 스레드의 생성/종료(Join)/TLS 초기화-정리를 전담하는 클래스.
@@ -112,9 +111,9 @@ private:
     void DestroyTLS();
 
 private:
-    CVector<std::thread>    _threads;                   // 관리 중인 워커 스레드 핸들 목록
-    mutable std::mutex      _lock;                      // 스레드 목록 동기화를 위한 뮤텍스
-    std::atomic<bool>       _bShuttingDown{ false };    // 전체 종료 절차 진입 여부 플래그
+    std::vector<std::thread>    _threads;                   // 관리 중인 워커 스레드 핸들 목록
+    mutable std::mutex          _lock;                      // 스레드 목록 동기화를 위한 뮤텍스
+    std::atomic<bool>           _bShuttingDown{ false };    // 전체 종료 절차 진입 여부 플래그
 };
 
 #endif // ndef UC_THREADMANAGER_H

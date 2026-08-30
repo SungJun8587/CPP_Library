@@ -47,6 +47,20 @@ public:
 		::memset(_columnIndex, 0, sizeof(_columnIndex));
 		_paramFlag = 0;
 		_columnFlag = 0;
+	}
+
+	// 복사 생성자 및 대입 연산자 금지 (소멸자에서 ClearStmt 중복 호출 방지)
+	CDBBind(const CDBBind&) = delete;
+	CDBBind& operator=(const CDBBind&) = delete;
+
+	//***************************************************************************
+	// @brief CDBBind 소멸자입니다.
+	// @detail 객체가 스코프를 벗어나 소멸될 때 자동으로 바인딩 및 구문(Stmt)을 정리합니다.
+	//***************************************************************************
+	~CDBBind()
+	{
+		_paramFlag = 0;
+		_columnFlag = 0;
 		_dbConn.ClearStmt();
 	}
 
@@ -241,7 +255,7 @@ public:
 	}
 
 protected:
-	CBaseODBC& _dbConn;													// ODBC 연결 제어 객체 참조
+	CBaseODBC&		_dbConn;											// ODBC 연결 제어 객체 참조
 	_tstring		_query;												// 바인딩 대상 SQL 쿼리 문자열
 	SQLLEN			_paramIndex[ParamCount > 0 ? ParamCount : 1];		// 파라미터 길이/상태 지시자 배열
 	SQLLEN			_columnIndex[ColumnCount > 0 ? ColumnCount : 1];	// 컬럼 길이/상태 지시자 배열

@@ -94,7 +94,7 @@ public:
 	//***************************************************************************
 	template<typename SessionType = CHttpSessionIocp>
 	static std::shared_ptr<CHttpClient> CreateIocp(CIocpCoreRef iocpCore, SSL_CTX* sslCtx = nullptr,
-		int32 minIdlePerHost = 2, int32 maxConnectionsPerHost = 8, uint32_t workerThreadCountPerHost = 1)
+		int32 minIdlePerHost = 2, int32 maxConnectionsPerHost = 8, uint32 workerThreadCountPerHost = 1)
 	{
 		auto httpManager = CreateHttpConnPoolManagerIocp<SessionType>(iocpCore, minIdlePerHost, maxConnectionsPerHost, workerThreadCountPerHost);
 		std::shared_ptr<CHttpConnPoolManager> httpsManager;
@@ -110,7 +110,7 @@ public:
 	//***************************************************************************
 	template<typename SessionType = CHttpSessionRio>
 	static std::shared_ptr<CHttpClient> CreateRio(CRioCoreRef rioCore, SSL_CTX* sslCtx = nullptr,
-		int32 minIdlePerHost = 2, int32 maxConnectionsPerHost = 8, uint32_t workerThreadCountPerHost = 1)
+		int32 minIdlePerHost = 2, int32 maxConnectionsPerHost = 8, uint32 workerThreadCountPerHost = 1)
 	{
 		auto httpManager = CreateHttpConnPoolManagerRio<SessionType>(rioCore, minIdlePerHost, maxConnectionsPerHost, workerThreadCountPerHost);
 		std::shared_ptr<CHttpConnPoolManager> httpsManager;

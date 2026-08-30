@@ -151,7 +151,7 @@ bool CBaseODBC::GetData(int32 iColNum, _TMain& tValue)
 
 	CDBColAttr& dbCol = m_DBColAttrMgr(tValue);
 
-	nRet = SQLGetData(m_hStmt, iColNum, dbCol.m_nCDataType, dbCol.m_ptrBuffer, dbCol.m_nBufferLength, &lDataLength);
+	nRet = SQLGetData(m_hStmt, iColNum, dbCol.m_nTargetType, dbCol.m_ptrBuffer, dbCol.m_nBufferLength, &lDataLength);
 	if( lDataLength == SQL_NO_TOTAL || lDataLength == SQL_NULL_DATA )
 		return false;
 	return nRet == SQL_SUCCESS || nRet == SQL_SUCCESS_WITH_INFO;

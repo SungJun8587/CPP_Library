@@ -55,7 +55,7 @@ public:
 	// @param workerThreadCount RIO 완료 처리용 워커 스레드 개수 (기본값 0 = CRioCore가
 	//        hardware_concurrency()/2로 자동 산정)
 	//***************************************************************************
-	CRioServerService(CNetAddress address, CRioCoreRef rioCore, SessionFactory factory, int32 maxSessionCount = 1, uint32_t workerThreadCount = 0);
+	CRioServerService(CNetAddress address, CRioCoreRef rioCore, SessionFactory factory, int32 maxSessionCount = 1, uint32 workerThreadCount = 0);
 
 	//***************************************************************************
 	// @brief 소멸자 (기본 소멸자 — 실제 자원 정리는 Close()가 담당)
@@ -104,7 +104,7 @@ private:
 	CRioSessionManager _sessionManager;					// 서버 서비스가 소유하는 RIO 세션 매니저
 	CRioEventPool	_eventPool;							// 이 서비스 소속 세션들이 공유하는 RIO 이벤트 풀
 	CRioBufferRef	_globalRecvBuffer;					// 클라이언트 비동기 수신(RIOReceive)용 글로벌 CRioBuffer 객체
-	uint32_t		_workerThreadCount = 0;				// StartWorkers()에 넘길 워커 스레드 개수 (0=자동)
+	uint32		_workerThreadCount = 0;				// StartWorkers()에 넘길 워커 스레드 개수 (0=자동)
 };
 
 //***************************************************************************
@@ -130,7 +130,7 @@ public:
 	// @param maxSessionCount 생성 및 관리할 최대 클라이언트 세션 수 (기본값: 1)
 	// @param workerThreadCount RIO 완료 처리용 워커 스레드 개수 (기본값 0 = 자동 산정)
 	//***************************************************************************
-	CRioClientService(CNetAddress address, CRioCoreRef rioCore, SessionFactory factory, int32 maxSessionCount = 1, uint32_t workerThreadCount = 0);
+	CRioClientService(CNetAddress address, CRioCoreRef rioCore, SessionFactory factory, int32 maxSessionCount = 1, uint32 workerThreadCount = 0);
 
 	//***************************************************************************
 	// @brief 소멸자 (기본 소멸자 — 실제 자원 정리는 Close()가 담당)
@@ -213,7 +213,7 @@ private:
 	CRioEventPool		_eventPool;								// 이 서비스 소속 세션들이 공유하는 RIO 이벤트 풀
 	CRioBufferRef		_globalRecvBuffer;						// 클라이언트 비동기 수신(RIOReceive)용 글로벌 CRioBuffer 객체
 	CRioConnectDispatcher _connectDispatcher;					// ConnectEx 완료 통지 전용 디스패처 (CRioCore와 무관, 이 서비스가 소유)
-	uint32_t			_workerThreadCount = 0;					// StartWorkers()에 넘길 워커 스레드 개수 (0=자동)
+	uint32			_workerThreadCount = 0;					// StartWorkers()에 넘길 워커 스레드 개수 (0=자동)
 };
 
 #endif // ndef UC_RIOSERVICE_H

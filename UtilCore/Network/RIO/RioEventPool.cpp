@@ -34,8 +34,9 @@ bool CRioEventPool::Initialize(size_t capacity)
     {
         try
         {
+            // 생성자가 이미 _state를 Free로 기본 초기화하므로 별도 초기 상태
+            // 설정 호출이 필요 없습니다.
             ::new (&newBlock[i]) CRioEvent();
-            _DEBUG_SET_INITIAL_STATE(&newBlock[i]);
             ++constructedCount;
         }
         catch( ... )
@@ -92,10 +93,11 @@ CRioEvent* CRioEventPool::Alloc() noexcept
             evt = _head;
             _head = _head->GetNextFree();
 
-#ifdef _DEBUG
-            assert(evt->GetDebugState() == Rio::EEventState::Free &&"Double Allocation or Corrupted Event State Detected!");
-            evt->SetDebugState(Rio::EEventState::InUse);
-#endif
+            // 이중 Alloc/Free 탐지 - release 빌드에서도 항상 검사합니다.
+            // Free List에는 Free 상태인 이벤트만 있어야 하므로, 여기서
+            // Free가 아니라면 free list 자체가 이미 오염된 것입니다.
+            ASSERT_CRASH(evt->GetState() == Rio::EEventState::Free && "Double Allocation or Corrupted Event State Detected!");
+            evt->SetState(Rio::EEventState::InUse);
 
             evt->SetNextFree(nullptr);
 
@@ -123,15 +125,22 @@ void CRioEventPool::Free(CRioEvent* evt) noexcept
 
     PLockGuard guard(_lock, __FUNCTION__);
 
-#ifdef _DEBUG
-
-    if( evt->GetDebugState() != Rio::EEventState::InUse )
+    //***********************************************************************
+    // 이중 Free 탐지 - release 빌드에서도 항상 검사합니다.
+    //
+    // 여기서 걸러내지 못하면 아래 evt->SetNextFree(_head); _head = evt;가
+    // 그대로 실행되어, 이미 Free List에 들어있는 evt를 다시 head로 밀어넣게
+    // 됩니다. 그 시점의 _head가 바로 evt 자신이라면(가장 흔한 이중 반납
+    // 패턴) evt->Next가 자기 자신을 가리키는 self-loop가 만들어지고, 그
+    // 앞에 있던 나머지 Free List 전체가 유실됩니다 - 이후 Alloc()은 같은
+    // evt 하나만 영원히 반복 반환하고 풀은 크래시 없이 조용히 무너집니다.
+    // 그래서 반드시 Free List를 건드리기 전에 먼저 걸러내야 합니다.
+    //***********************************************************************
+    if( evt->GetState() != Rio::EEventState::InUse )
     {
-        assert(false && "CRioEventPool::Free double-free or invalid state detected");
+        ASSERT_CRASH(false && "CRioEventPool::Free double-free or invalid state detected");
         return;
     }
-
-#endif
 
     //***********************************************************************
     // Event 내부 상태 정리
@@ -139,12 +148,7 @@ void CRioEventPool::Free(CRioEvent* evt) noexcept
     // 반드시 Free List publish 이전에 수행합니다.
     //***********************************************************************
     evt->Reset();
-
-#ifdef _DEBUG
-
-    evt->SetDebugState(Rio::EEventState::Free);
-
-#endif
+    evt->SetState(Rio::EEventState::Free);
 
     //***********************************************************************
     // Free List에 publish (단일 락 내부에서 atomic transaction 보장)
@@ -160,7 +164,7 @@ void CRioEventPool::Free(CRioEvent* evt) noexcept
 
     if( previous == 0 )
     {
-        assert(false && "CRioEventPool::Free inUseCount underflow");
+        ASSERT_CRASH(false && "CRioEventPool::Free inUseCount underflow");
 
         // 방어적으로 복구
         _inUseCount.fetch_add(1, std::memory_order_relaxed);
@@ -183,11 +187,10 @@ void CRioEventPool::Release() noexcept
 
     if( inUseCount != 0 )
     {
-        assert(false && "CRioEventPool::Release() called while events are still InUse");
+        ASSERT_CRASH(false && "CRioEventPool::Release() called while events are still InUse");
         return;
     }
 
-#ifdef _DEBUG
     for( size_t i = 0; i < _memoryBlocks.size(); ++i )
     {
         void* rawBuffer = _memoryBlocks[i].ptr;
@@ -200,14 +203,13 @@ void CRioEventPool::Release() noexcept
 
         for( size_t j = 0; j < count; ++j )
         {
-            if( blockPtr[j].GetDebugState() != Rio::EEventState::Free )
+            if( blockPtr[j].GetState() != Rio::EEventState::Free )
             {
-                assert(false && "Releasing CRioEventPool while an event is still InUse!");
+                ASSERT_CRASH(false && "Releasing CRioEventPool while an event is still InUse!");
                 return;
             }
         }
     }
-#endif
 
     for( size_t i = 0; i < _memoryBlocks.size(); ++i )
     {
@@ -261,31 +263,14 @@ void CRioEventPool::RecordExhaustion()
             const ULONGLONG missedCount = _exhaustionCount.exchange(0, std::memory_order_relaxed);
             const size_t currentCapacity = GetCapacity();
 
-            (void)missedCount;
-            (void)currentCapacity;
+            // 이전에는 missedCount/currentCapacity를 계산만 해두고 실제 로그를
+            // 남기지 않아(그냥 (void) 캐스트로 버림) 풀 고갈이 운영 중 완전히
+            // 무음으로 삼켜졌습니다. 풀 고갈은 반드시 알아야 하는 이벤트이므로
+            // 실제로 로그를 남깁니다. (LOG_WARNING의 실제 시그니처/포맷 지정자는
+            // 프로젝트 로깅 매크로에 맞게 조정하십시오 - 여기서는 RioService.cpp에서
+            // 이미 쓰고 있는 LOG_WARNING(_T("...")) 관례를 그대로 따랐습니다.)
+            LOG_WARNING(_T("[CRioEventPool] Pool exhausted %llu time(s) in the last 5s (capacity=%zu)"),
+                missedCount, currentCapacity);
         }
     }
 }
-
-#ifdef _DEBUG
-
-//***************************************************************************
-// @brief 디버그 빌드 전용 초기 상태 설정
-// @param evt 상태를 설정할 CRioEvent 객체 포인터
-//***************************************************************************
-void CRioEventPool::_DEBUG_SET_INITIAL_STATE(CRioEvent* evt)
-{
-    if( evt != nullptr )
-        evt->SetDebugState(Rio::EEventState::Free);
-}
-
-#else
-
-//***************************************************************************
-// @brief 릴리즈 빌드 전용 인라인 stub
-//***************************************************************************
-void CRioEventPool::_DEBUG_SET_INITIAL_STATE(CRioEvent*) noexcept
-{
-}
-
-#endif

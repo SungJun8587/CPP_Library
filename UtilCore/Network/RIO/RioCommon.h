@@ -190,7 +190,7 @@ namespace Rio
     //**********************************************************************************************************************
     // @brief 유효하지 않은 슬롯 인덱스를 나타내는 센티널(Sentinel) 상숫값
     // @details AllocSlot() 등의 함수가 슬롯 할당 실패 시 반환하거나, 초기화되지 않은 슬롯 인덱스를
-    //          표시할 때 사용합니다. uint32_t의 최댓값(0xFFFFFFFFu, UINT32_MAX)을 가리킵니다.
+    //          표시할 때 사용합니다. uint32의 최댓값(0xFFFFFFFFu, UINT32_MAX)을 가리킵니다.
     //**********************************************************************************************************************
     static constexpr uint32 kInvalidSlotIndex = 0xFFFFFFFFu;
 
@@ -273,7 +273,7 @@ namespace Rio
     //      - [최적화 및 용량 선정 이유]
     //        1. 수신 대기 동시성 보장: 순간적인 대규모 트래픽 유입 시 버퍼 부족으로 인한 패킷 드랍 방지.
     //***************************************************************************
-    constexpr uint32_t  kServiceGlobalRecvSlotCount = 1000;
+    constexpr uint32  kServiceGlobalRecvSlotCount = 1000;
 
     //***************************************************************************
     // @brief 개별 수신 슬롯의 크기 (8192 바이트 = 8KB)
@@ -281,7 +281,7 @@ namespace Rio
     //      - 글로벌 수신 버퍼 내에서 개별 패킷 데이터를 수신하기 위해 할당되는 각 슬롯의 바이트 용량입니다.
     //      - [관계 설명] 위에서 정의한 `kRecvBufferSlotSize`, `kMaxPacketSize`와 동일한 8KB 규격을 공유하여 일관성 유지.
     //***************************************************************************
-    constexpr uint32_t  kServiceGlobalRecvSlotSize = 8192;
+    constexpr uint32  kServiceGlobalRecvSlotSize = 8192;
 
     //***************************************************************************
     // @brief 서버 CQ(Completion Queue) 고유 식별자 (0x1000)
@@ -347,6 +347,22 @@ namespace Rio
     //      - [최적화 및 용량 선정 이유] 락 경합 방지 및 단일 전송 경로 유지를 위해 1(`1UL`)로 설정.
     //***************************************************************************
     constexpr ULONG kRequestQueueMaxSendDataBuffers = 1UL;
+
+    //***************************************************************************
+    // @brief Accept Pool에 상시 유지할 AcceptContext(=outstanding AcceptEx) 개수 기본값.
+    //        CIocpListener의 기본 acceptCount(10)와 동일한 수준으로 맞췄다.
+    //***************************************************************************
+    static constexpr uint32 kDefaultAcceptPoolSize = 10;
+
+    //***************************************************************************
+    // @brief Accept 전용 IOCP를 소비할 워커 스레드 기본 개수.
+    //        연결 시도 자체는 CRioConnectDispatcher와 마찬가지로 상대적으로
+    //        빈도가 낮고(데이터 송수신과 달리), 완료 처리(SetUpdateAcceptContext
+    //        ~ Callback)도 짧은 논블로킹 호출 위주라 1개로도 충분하다고 판단했다.
+    //        대규모 동시 접속 스트레스 테스트 결과에 따라 늘릴 수 있도록 Start()
+    //        파라미터로 노출한다.
+    //***************************************************************************
+    static constexpr uint32 kDefaultAcceptWorkerCount = 1;
 }
 
 #endif // ndef UC_RIOCOMMON_H

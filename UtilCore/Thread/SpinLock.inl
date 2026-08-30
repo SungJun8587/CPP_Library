@@ -20,16 +20,16 @@ namespace SpinLockDetail
     // @brief 조건이 충족될 때까지 CPU 일시 정지(Pause) 및 스레드 양보(Yield)를 반복하며 대기합니다.
     // @param shouldWait 대기 조건을 판별하는 프리디케이트 함수
     //***************************************************************************
-    template <uint32_t MaxPauseBackoff, uint32_t MaxYieldCount, typename Predicate>
+    template <uint32 MaxPauseBackoff, uint32 MaxYieldCount, typename Predicate>
     inline void SpinWait(Predicate&& shouldWait) noexcept
     {
-        uint32_t backoff = 1;
-        uint32_t yieldCount = 0;
+        uint32 backoff = 1;
+        uint32 yieldCount = 0;
         while( shouldWait() )
         {
             if( backoff <= MaxPauseBackoff )
             {
-                for( uint32_t i = 0; i < backoff; ++i ) SPINLOCK_PAUSE();
+                for( uint32 i = 0; i < backoff; ++i ) SPINLOCK_PAUSE();
                 backoff = (backoff <= MaxPauseBackoff / 2) ? backoff * 2 : MaxPauseBackoff;
             }
             else if( yieldCount < MaxYieldCount )
@@ -120,12 +120,12 @@ void RWSpinLock<Preset>::ReadLock(const char* name) noexcept
         SpinLockDetail::SpinWait<Preset::MaxPauseBackoff, Preset::MaxYieldCount>(
             [this]() noexcept
             {
-                const int32_t s = _state.load(std::memory_order_relaxed);
+                const int32 s = _state.load(std::memory_order_relaxed);
                 return (s & (RWSpinLockBits::WRITER_WAITING_MASK | RWSpinLockBits::WRITE_LOCKED)) != 0;
             }
         );
 
-        const int32_t prev = _state.fetch_add(RWSpinLockBits::READER_ONE, std::memory_order_acquire);
+        const int32 prev = _state.fetch_add(RWSpinLockBits::READER_ONE, std::memory_order_acquire);
         if( (prev & (RWSpinLockBits::WRITER_WAITING_MASK | RWSpinLockBits::WRITE_LOCKED)) == 0 )
         {
             if( ((prev + RWSpinLockBits::READER_ONE) & RWSpinLockBits::READER_COUNT_MASK) == 0 )
@@ -147,10 +147,10 @@ void RWSpinLock<Preset>::ReadLock(const char* name) noexcept
 template <typename Preset>
 bool RWSpinLock<Preset>::TryReadLock(const char* name) noexcept
 {
-    const int32_t s = _state.load(std::memory_order_relaxed);
+    const int32 s = _state.load(std::memory_order_relaxed);
     if( (s & (RWSpinLockBits::WRITER_WAITING_MASK | RWSpinLockBits::WRITE_LOCKED)) != 0 ) return false;
 
-    const int32_t prev = _state.fetch_add(RWSpinLockBits::READER_ONE, std::memory_order_acquire);
+    const int32 prev = _state.fetch_add(RWSpinLockBits::READER_ONE, std::memory_order_acquire);
     if( (prev & (RWSpinLockBits::WRITER_WAITING_MASK | RWSpinLockBits::WRITE_LOCKED)) == 0 )
     {
         if( ((prev + RWSpinLockBits::READER_ONE) & RWSpinLockBits::READER_COUNT_MASK) == 0 )
@@ -192,7 +192,7 @@ void RWSpinLock<Preset>::WriteLock(const char* name) noexcept
     if( name ) gpDeadLockProfiler->PushLock(name);
 #endif
 
-    const int32_t prev = _state.fetch_add(RWSpinLockBits::WRITER_ONE, std::memory_order_relaxed);
+    const int32 prev = _state.fetch_add(RWSpinLockBits::WRITER_ONE, std::memory_order_relaxed);
     if( ((prev + RWSpinLockBits::WRITER_ONE) & RWSpinLockBits::WRITER_WAITING_MASK) == 0 )
     {
         // [FIX] ReadLock/TryReadLock의 오버플로우 처리와 일관되게, FATAL 호출 전에
@@ -206,7 +206,7 @@ void RWSpinLock<Preset>::WriteLock(const char* name) noexcept
     SpinLockDetail::SpinWait<Preset::MaxPauseBackoff, Preset::MaxYieldCount>(
         [this]() noexcept
         {
-            int32_t expected = _state.load(std::memory_order_relaxed);
+            int32 expected = _state.load(std::memory_order_relaxed);
             if( (expected & (RWSpinLockBits::READER_COUNT_MASK | RWSpinLockBits::WRITE_LOCKED)) != 0 ) return true;
 
             return !_state.compare_exchange_strong(
@@ -247,11 +247,11 @@ bool RWSpinLock<Preset>::TryWriteLock(const char* name) noexcept
     // 보장 대상이 아니다 — 이는 의도된 동작이며 실수가 아니다. 여러 writer
     // 간의 엄격한 FIFO 순서가 필요한 경우 TryWriteLock() 대신 WriteLock()만
     // 사용해야 한다.
-    int32_t expected = _state.load(std::memory_order_relaxed);
+    int32 expected = _state.load(std::memory_order_relaxed);
     if( (expected & (RWSpinLockBits::READER_COUNT_MASK | RWSpinLockBits::WRITE_LOCKED)) != 0 )
         return false;
 
-    const int32_t desired = expected + RWSpinLockBits::WRITER_ONE + RWSpinLockBits::WRITE_LOCKED;
+    const int32 desired = expected + RWSpinLockBits::WRITER_ONE + RWSpinLockBits::WRITE_LOCKED;
     if( !_state.compare_exchange_strong(
         expected, desired,
         std::memory_order_acquire, std::memory_order_relaxed) )

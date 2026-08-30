@@ -22,7 +22,7 @@ CNetServiceRef CNetworkFactory::CreateServerService(
 	CNetAddress address,
 	SessionFactory factory,
 	int32 maxSessionCount,
-	uint32_t workerThreadCount,
+	uint32 workerThreadCount,
 	void* engineCoreRef)
 {
 	switch( engineType )
@@ -66,7 +66,7 @@ CNetServiceRef CNetworkFactory::CreateClientService(
 	CNetAddress address,
 	SessionFactory factory,
 	int32 maxSessionCount,
-	uint32_t workerThreadCount,
+	uint32 workerThreadCount,
 	void* engineCoreRef)
 {
 	switch( engineType )

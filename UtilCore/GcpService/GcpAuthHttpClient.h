@@ -23,7 +23,7 @@ namespace gcp_auth
 		//***************************************************************************
 	inline GcpTokenFetchFn CreateTokenFetcher(CHttpClient* httpClient)
 	{
-		return [httpClient](std::string jwtAssertion, std::function<void(bool success, std::string accessToken, int64_t expiresInSeconds)> onDone)
+		return [httpClient](std::string jwtAssertion, std::function<void(bool success, std::string accessToken, int64 expiresInSeconds)> onDone)
 			{
 				if( httpClient == nullptr )
 				{
@@ -49,7 +49,7 @@ namespace gcp_auth
 						}
 
 						std::string token;
-						int64_t expiresIn = 0;
+						int64 expiresIn = 0;
 
 						// JSON 응답에서 access_token 파싱
 						if( !json_extract::FindString(resp.body, "access_token", token) )

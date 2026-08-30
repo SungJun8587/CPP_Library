@@ -25,6 +25,7 @@
     <ClInclude Include="BaseRedefineDataType.h" />
     <ClInclude Include="BaseTLS.h" />
     <ClInclude Include="Containers\Map\ClusterSpinMap.h" />
+    <ClInclude Include="Containers\Map\ClusterSpinUnorderedMap.h" />
     <ClInclude Include="Containers\Map\OrderedMap.h" />
     <ClInclude Include="Containers\Map\UnOrderedMap.h" />
     <ClInclude Include="Containers\Queue\BlockingTaskQueue.h" />
@@ -315,6 +316,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Containers\Map\ClusterSpinMap.inl" />
+    <None Include="Containers\Map\ClusterSpinUnorderedMap.inl" />
     <None Include="Containers\Map\OrderedMap.inl" />
     <None Include="Containers\Map\UnOrderedMap.inl" />
     <None Include="DB\BaseODBC.inl" />

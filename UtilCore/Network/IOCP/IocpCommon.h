@@ -84,6 +84,24 @@ namespace Iocp
     // @details ULONG_PTR의 최댓값(-1)을 사용하여 일반 completion key와 구분합니다.
     //***************************************************************************
     static constexpr ULONG_PTR QUIT_KEY = static_cast<ULONG_PTR>(-1);
+
+    //***************************************************************************
+    // @brief CSendBufferChunk의 기본 메모리 청크 크기 (8KB / 8,192 Byte).
+    // @details
+    // 스레드별로 할당되어 SendBuffer들에 메모리를 공급하는 청크 단위 크기입니다.
+    // - 고정 크기 메모리 할당을 통해 동적 할당 오버헤드 및 단편화(Fragmentation) 최소화
+    // - std::array의 템플릿 크기 인자 및 버퍼 남은 용량(FreeSize) 계산에 활용
+    //***************************************************************************
+    static constexpr uint32 SEND_BUFFER_CHUNK_SIZE = 8192;
+
+    //***************************************************************************
+    // @brief Accept Pool에 상시 유지할 기본 AcceptContext 개수 (10개).
+    // @details
+    // 서버가 동시 접속 요청을 수락하기 위해 미리 게시(Post)해 두는 AcceptEx의 기본 수량입니다.
+    // - CIocpListener의 기본 Accept 요청 수(acceptCount)와 동기화된 기본값
+    // - 동시 접속 폭주(Connection Burst) 트래픽 환경에서는 수치를 늘려 대기열 병목 예방 권장
+    //***************************************************************************
+    static constexpr uint32 kDefaultAcceptPoolSize = 10;
 }
 
 #endif // ndef UC_IOCPCOMMON_H

@@ -35,6 +35,13 @@ class CRioBuffer;
 //      수행되는 락 동기화와, RIO I/O 진행 중 단 하나의 워커/제출 스레드만 이 객체에
 //      접근하도록 보장하는 Ownership Transfer 원칙에 의존합니다.
 //
+// [Lifecycle 상태(_state)]
+//      Free/InUse 전이는 CRioEventPool::Alloc()/Free()가 항상 자신의 _lock(PLock)
+//      아래에서만 수행하므로, 이 상태 자체는 원자 타입일 필요가 없습니다. 다만
+//      이중 Alloc/이중 Free를 탐지하는 안전장치는 release 빌드에서도 반드시
+//      살아있어야 합니다(놓치면 CRioEventPool의 Free List가 self-loop로 오염되며
+//      풀이 크래시 없이 조용히 무너짐) — 그래서 더 이상 _DEBUG로 게이팅하지 않습니다.
+//
 // [Lifecycle]
 //
 //      CRioEventPool::Alloc()
@@ -78,7 +85,7 @@ public:
     struct BufferBinding
     {
         CRioBuffer* buffer{ nullptr };                  // slot을 소유하는 CRioBuffer 포인터
-        uint32_t slotIndex{ Rio::kInvalidSlotIndex };   // 할당받은 버퍼 slot 인덱스
+        uint32 slotIndex{ Rio::kInvalidSlotIndex };   // 할당받은 버퍼 slot 인덱스
     };
 
 public:
@@ -107,7 +114,7 @@ public:
     CRioObjectRef TakeOwner() noexcept;
     CRioObjectRef GetOwnerShared() const noexcept;
 
-    bool BindBufferSlot(CRioBuffer* buffer, uint32_t slotIndex) noexcept;
+    bool BindBufferSlot(CRioBuffer* buffer, uint32 slotIndex) noexcept;
 
     //***************************************************************************
     // @brief 등록된 Buffer-slot binding 개수를 반환합니다.
@@ -148,35 +155,33 @@ public:
         return _nextFree;
     }
 
-#ifdef _DEBUG
     //***************************************************************************
-    // @brief 디버그 빌드에서 현재 Lifecycle 상태를 반환합니다.
+    // @brief 현재 Lifecycle 상태를 반환합니다.
+    // @details CRioEventPool::Alloc()/Free()의 이중 Alloc/Free 탐지에 쓰이며,
+    //          release 빌드에서도 항상 활성입니다(_lock으로 보호되는 호출부에서만
+    //          접근되므로 원자 타입일 필요는 없습니다).
     // @return EEventState (Free 또는 InUse)
     //***************************************************************************
-    Rio::EEventState GetDebugState() const noexcept
+    Rio::EEventState GetState() const noexcept
     {
-        return _debugState;
+        return _state;
     }
 
     //***************************************************************************
-    // @brief 디버그 빌드에서 Lifecycle 상태를 설정합니다.
+    // @brief Lifecycle 상태를 설정합니다.
     // @param state 설정하고자 하는 상태 값
     //***************************************************************************
-    void SetDebugState(Rio::EEventState state) noexcept
+    void SetState(Rio::EEventState state) noexcept
     {
-        _debugState = state;
+        _state = state;
     }
-#endif
 
 private:
-    Rio::EventType _eventType{ Rio::EventType::Receive };   // 1바이트(uint8_t) 크기의 송/수신 구분 플래그
+    Rio::EventType _eventType{ Rio::EventType::Receive };   // 1바이트(uint8) 크기의 송/수신 구분 플래그
     CRioObjectRef _owner;                                   // completion이 처리될 때까지 lifetime을 유지하는 Owner shared_ptr
     CVector<BufferBinding> _bufferBindings;                 // Scatter-Gather 지원을 위한 Buffer-slot ownership 목록
     CRioEvent* _nextFree{ nullptr };                        // CRioEventPool Free List 연결 포인터
-
-#ifdef _DEBUG
-    Rio::EEventState _debugState{ Rio::EEventState::Free }; // 디버그 전용 Lifecycle 상태 (Double-Free 및 UAF 검출용)
-#endif
+    Rio::EEventState _state{ Rio::EEventState::Free };      // Lifecycle 상태 (이중 Alloc/Free 및 UAF 검출용, release 빌드에서도 항상 활성)
 };
 
 #endif // ndef UC_RIOEVENT_H

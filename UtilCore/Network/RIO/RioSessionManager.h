@@ -8,7 +8,7 @@
 #define UC_RIOSESSIONMANAGER_H
 
 #include <Network/RIO/RioCommon.h>
-#include <Containers/Map/ClusterSpinMap.h>
+#include <Containers/Map/ClusterSpinUnorderedMap.h>
 
 #include <vector>
 #include <memory>
@@ -36,22 +36,22 @@ public:
 	CRioSessionManager& operator=(CRioSessionManager&&) noexcept = default;
 
 public:
-	uint64_t GenerateSessionId();
+	uint64 GenerateSessionId();
 
-	bool AddSession(uint64_t sessionId, CRioSessionRef session);
-	void RemoveSession(uint64_t sessionId);
-	CRioSessionRef FindSession(uint64_t sessionId) const;
+	bool AddSession(uint64 sessionId, CRioSessionRef session);
+	void RemoveSession(uint64 sessionId);
+	CRioSessionRef FindSession(uint64 sessionId) const;
 
 	size_t GetSessionCount() const;
-	void Broadcast(const void* data, uint16_t size);
+	void Broadcast(const void* data, uint16 size);
 
 	void BeginCloseAllSessions();
 	bool AreAllSessionsClosed() const;
 	void RemoveClosedSessions();
 
 private:
-	CClusterSpinMap<uint64_t, CRioSessionRef, Rio::kSessionClusterCnt, true> _sessions; // SessionId를 키로 하고, 클러스터별로 분산 처리하여 락 경합을 최소화하는 고성능 해시맵
-	std::atomic<uint64_t> _nextSessionId{ 0 };                                          // 세션 ID 자동 증가 카운터
+	CClusterSpinUnorderedMap<uint64, CRioSessionRef, Rio::kSessionClusterCnt, true> _sessions;	// SessionId를 키로 하고, 클러스터별로 분산 처리하여 락 경합을 최소화하는 고성능 해시맵
+	std::atomic<uint64> _nextSessionId{ 0 };														// 세션 ID 자동 증가 카운터
 };
 
 #endif // ndef UC_RIOSESSIONMANAGER_H

@@ -60,7 +60,7 @@ public:
 	bool		PrepareBindParam(const MYSQL_BIND* pbindParams);
 	bool		PrepareBindParam(const CVector<MYSQL_BIND>& bindParams);
 	bool		PrepareAttSet(enum enum_stmt_attr_type attr_type, const void* attr);
-	bool		PrepareExecute(uint64_t* pnIdx = nullptr);
+	bool		PrepareExecute(uint64* pnIdx = nullptr);
 
 	bool		Execute(const char* pszSQL);
 	bool		Execute(const wchar_t* pwszSQL);

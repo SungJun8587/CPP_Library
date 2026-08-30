@@ -85,8 +85,8 @@ namespace ptime
 	// 에서 UNICODE 여부에 따라 이미 정의됩니다. (UNICODE: wchar_t/std::wstring,
 	// 그 외: char/std::string) 이 파일은 그 정의를 그대로 사용합니다.
 
-	int64_t NowMillis();
-	int64_t NowMicros();
+	int64 NowMillis();
+	int64 NowMicros();
 	double MonotonicNowSec();
 
 	bool LocalTimeSafe(std::tm& out, const time_t& t);
@@ -114,7 +114,7 @@ namespace ptime
 	_tstring ToYYYYMMDDHHMMSS();
 	_tstring ToYYYY_MM_DD();
 
-	void SleepMillis(int64_t ms);
+	void SleepMillis(int64 ms);
 
 	//***************************************************************************
 	// @brief 고정밀 시간 측정용 스톱워치 클래스
@@ -143,9 +143,9 @@ namespace ptime
 		//***************************************************************************
 		// @brief 경과 시간을 밀리초(millisecond) 단위로 반환합니다.
 		// @details 시작 시간부터 현재 시점까지의 경과 시간을 계산하여 정수형으로 반환합니다.
-		// @return int64_t 경과된 밀리초 (ms)
+		// @return int64 경과된 밀리초 (ms)
 		//***************************************************************************
-		int64_t ElapsedMillis() const
+		int64 ElapsedMillis() const
 		{
 			return std::chrono::duration_cast<std::chrono::milliseconds>(
 				Clock::now() - m_start).count();
@@ -189,7 +189,7 @@ namespace ptime
 	//***************************************************************************
 
 	time_t Now();
-	time_t AddSeconds(const time_t& t, int64_t seconds);
+	time_t AddSeconds(const time_t& t, int64 seconds);
 	time_t AddDays(const time_t& t, int days);
 
 	long SecondsBetween(const time_t& t1, const time_t& t2);

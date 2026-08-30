@@ -33,7 +33,7 @@ enum class EHttpClientState
 // @brief 엔진(IOCP/RIO) 비의존 HTTP 요청/응답 오케스트레이션 로직
 //
 // @details
-//      CSession(IOCP/RIO 공통 베이스)의 Send(const void*, uint16_t) 인터페이스에만
+//      CSession(IOCP/RIO 공통 베이스)의 Send(const void*, uint16) 인터페이스에만
 //      의존한다. CIocpSession과 CRioSession은 OnRecv()/OnDataReceived() 수신
 //      훅의 계약이 서로 달라(전자는 반환값으로 처리 바이트 수 통지, 후자는
 //      파라미터 없이 호출되고 스스로 GetRecvBuffer()를 소비) 상속으로 공유할 수
@@ -58,8 +58,8 @@ public:
 	//***************************************************************************
 	// @brief 완성된 요청 패킷을 전송하고 응답 대기 상태로 전이합니다.
 	// @tparam SendFn 실제 바이트 전송 콜백 타입, 시그니처는
-	//         bool(const void* data, uint16_t size) — 세션의 Send()를 그대로
-	//         람다로 감싸서 넘기면 됨: [this](const void* d, uint16_t n) { return Send(d, n); }
+	//         bool(const void* data, uint16 size) — 세션의 Send()를 그대로
+	//         람다로 감싸서 넘기면 됨: [this](const void* d, uint16 n) { return Send(d, n); }
 	// @param data 완성된 요청 패킷 (예: CHttpRequestBuilderT::Build() 결과)
 	// @param len data의 길이
 	// @param onComplete 응답 완결 시 호출되는 콜백
@@ -78,7 +78,7 @@ public:
 		while( offset < len )
 		{
 			size_t chunk = std::min<size_t>(len - offset, 65535);
-			if( !sender(data + offset, static_cast<uint16_t>(chunk)) )
+			if( !sender(data + offset, static_cast<uint16>(chunk)) )
 				return false; // 부분 전송된 상태로 실패 — 호출부가 커넥션을 폐기해야 함
 			offset += chunk;
 		}

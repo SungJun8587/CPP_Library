@@ -97,7 +97,7 @@ namespace json_extract
 	// @param out [OUT] 찾은 값
 	// @return bool 찾았는지 여부
 	//***************************************************************************
-	inline bool FindInt(std::string_view json, std::string_view key, int64_t& out)
+	inline bool FindInt(std::string_view json, std::string_view key, int64& out)
 	{
 		std::string pattern;
 		pattern.reserve(key.size() + 3);

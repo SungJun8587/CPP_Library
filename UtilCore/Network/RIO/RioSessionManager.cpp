@@ -25,9 +25,9 @@ CRioSessionManager::~CRioSessionManager()
 
 //***************************************************************************
 // @brief 원자적으로 새로운 고유 SessionId를 발급합니다.
-// @return uint64_t 고유 세션 ID
+// @return uint64 고유 세션 ID
 //***************************************************************************
-uint64_t CRioSessionManager::GenerateSessionId()
+uint64 CRioSessionManager::GenerateSessionId()
 {
 	return _nextSessionId.fetch_add(1, std::memory_order_relaxed);
 }
@@ -38,7 +38,7 @@ uint64_t CRioSessionManager::GenerateSessionId()
 // @param session 세션 shared_ptr
 // @return 등록 성공 시 true, 실패 시 false
 //***************************************************************************
-bool CRioSessionManager::AddSession(uint64_t sessionId, CRioSessionRef session)
+bool CRioSessionManager::AddSession(uint64 sessionId, CRioSessionRef session)
 {
 	if( sessionId == 0 || session == nullptr )
 		return false;
@@ -50,7 +50,7 @@ bool CRioSessionManager::AddSession(uint64_t sessionId, CRioSessionRef session)
 // @brief SessionId를 기반으로 매니저에서 세션을 제거합니다.
 // @param sessionId 제거할 고유 세션 ID (Key)
 //***************************************************************************
-void CRioSessionManager::RemoveSession(uint64_t sessionId)
+void CRioSessionManager::RemoveSession(uint64 sessionId)
 {
 	if( sessionId == 0 )
 		return;
@@ -63,7 +63,7 @@ void CRioSessionManager::RemoveSession(uint64_t sessionId)
 // @param sessionId 찾을 고유 세션 ID (Key)
 // @return 세션 shared_ptr (존재하지 않을 경우 nullptr)
 //***************************************************************************
-CRioSessionRef CRioSessionManager::FindSession(uint64_t sessionId) const
+CRioSessionRef CRioSessionManager::FindSession(uint64 sessionId) const
 {
 	if( sessionId == 0 )
 		return nullptr;
@@ -87,7 +87,7 @@ size_t CRioSessionManager::GetSessionCount() const
 // @param data 전송할 데이터 포인터
 // @param size 전송할 데이터 크기 (바이트)
 //***************************************************************************
-void CRioSessionManager::Broadcast(const void* data, uint16_t size)
+void CRioSessionManager::Broadcast(const void* data, uint16 size)
 {
 	if( data == nullptr || size == 0 )
 	{

@@ -56,7 +56,7 @@
 | `GetClientInfo(ptszClientInfo, nBufferLength)` | `bool` | `mysql_get_client_info()`로 클라이언트 라이브러리 버전 문자열을 가져와 동일한 방식(`AnsiToUnicode`)으로 기록. |
 | `GetClientVersion(ulClientVersion)` | `bool` | `mysql_get_client_version()`으로 클라이언트 라이브러리 버전 정수값을 가져와 참조 인자에 대입. |
 
-> 5개 함수 각각은 해당 libmysql API 하나만 단독으로 호출한다. 서버 정보를 종합해서 한 줄로 로깅하는 동작은 이 함수들 자체가 아니라 `Connect()` 성공 시 캐릭터셋이 지정되지 않은 경우에 한해 `Connect()` 내부에서 위 함수들을 조합 호출하여 이루어진다.
+> 5개 함수 각각은 해당 libmysql API 하나만 단독으로 호출한다. 서버 정보를 종합해서 한 줄로 로깅하는 동작은 이 함수들 자체가 아니라, `Connect()` 성공 시 캐릭터셋 지정 여부와 무관하게(`mysql_set_character_set()` 적용 분기와는 별개로) `Connect()` 내부에서 위 함수들을 항상 조합 호출하여 이루어진다.
 
 #### 문자셋
 
@@ -83,7 +83,7 @@
 | 함수 | 반환값 | 설명 |
 |---|---|---|
 | `SelectDB(const char*)` | `bool` | `mysql_select_db()` 호출. 성공 시 `m_szSelectDBName`에 캐시, 실패 시 에러 로그. |
-| `SelectDB(const wchar_t*)` | `bool` | 와이드 문자열을 `UnicodeToAnsi`로 변환 후 위 오버로드와 동일 로직 수행. |
+| `SelectDB(const wchar_t*)` | `bool` | 와이드 문자열을 `UnicodeToAnsi`로 변환한 뒤, 결과가 비어 있거나 로컬 버퍼 `szSelectDBName[DATABASE_NAME_STRLEN]` 크기를 넘으면 즉시 실패 처리(오버로드 위임이 아닌 자체 검사). `SelectDB(const char*)`를 호출하는 것이 아니라 동일한 로직(성공 시 `m_szSelectDBName` 캐시, 실패 시 에러 로그)을 별도로 구현해 수행한다. |
 
 #### Prepared Statement
 

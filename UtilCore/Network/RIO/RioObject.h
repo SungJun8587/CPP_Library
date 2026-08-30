@@ -59,13 +59,13 @@ public:
 
     bool IncrementIoCount() noexcept;
     void DecrementIoCount() noexcept;
-    uint32_t GetIoCount() const noexcept;
+    uint32 GetIoCount() const noexcept;
     bool HasOutstandingIo() const noexcept;
 
     virtual void Dispatch(CRioEvent* rioEvent, ULONG bytesTransferred, LONG status) = 0;
 
 private:
-    std::atomic<uint32_t> _ioCount{ 0 };        // 현재 진행 중인 비동기 RIO I/O 카운터
+    std::atomic<uint32> _ioCount{ 0 };        // 현재 진행 중인 비동기 RIO I/O 카운터
 };
 
 #endif // ndef UC_RIOOBJECT_H

@@ -8,6 +8,7 @@
 #define UC_SENDBUFFER_H
 
 #include <Memory/Containers.h>
+#include <Memory/ObjectPool.h>
 #include <Network/IOCP/IocpCommon.h>
 
 #include <array>
@@ -63,11 +64,6 @@ private:
 //***************************************************************************
 class CSendBufferChunk : public enable_shared_from_this<CSendBufferChunk>
 {
-	enum
-	{
-		SEND_BUFFER_CHUNK_SIZE = 8192
-	};
-
 public:
 	CSendBufferChunk();
 	~CSendBufferChunk();
@@ -81,9 +77,9 @@ public:
 	uint32				FreeSize() { return static_cast<uint32>(_buffer.size()) - _usedSize; }
 
 private:
-	std::array<BYTE, SEND_BUFFER_CHUNK_SIZE>	_buffer = {};		// 청크 메모리 버퍼
-	bool										_open = false;		// 오픈 상태 여부
-	uint32										_usedSize = 0;		// 사용된 메모리 크기
+	std::array<BYTE, Iocp::SEND_BUFFER_CHUNK_SIZE>	_buffer = {};		// 청크 메모리 버퍼
+	bool											_open = false;		// 오픈 상태 여부
+	uint32											_usedSize = 0;		// 사용된 메모리 크기
 };
 
 //***************************************************************************

@@ -668,7 +668,7 @@ bool CBaseMySQL::PrepareAttSet(enum enum_stmt_attr_type attr_type, const void* a
 // @param pnIdx - INSERT 시 생성된 Auto Increment 인덱스를 받아올 포인터 (선택 사항)
 // @return 성공 시 true, 실패 시 false
 //***************************************************************************
-bool CBaseMySQL::PrepareExecute(uint64_t* pnIdx)
+bool CBaseMySQL::PrepareExecute(uint64* pnIdx)
 {
 	bool bResult = true;
 

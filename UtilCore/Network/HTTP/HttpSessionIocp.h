@@ -77,7 +77,7 @@ public:
 	{
 		_tlsEnabled = true;
 		return _tlsFilter.Initialize(sslCtx, sniHostname,
-			[this](const void* d, uint16_t n) { return Send(d, n); },
+			[this](const void* d, uint16 n) { return Send(d, n); },
 			[this](const char* data, size_t len) { _httpCore.FeedRecv(data, len); },
 			[this](bool success)
 			{
@@ -107,12 +107,12 @@ public:
 		if( _tlsEnabled )
 		{
 			return _httpCore.BeginRequest(
-				[this](const void* d, uint16_t n) { return _tlsFilter.SendPlaintext(d, n); },
+				[this](const void* d, uint16 n) { return _tlsFilter.SendPlaintext(d, n); },
 				data, len, std::move(onComplete));
 		}
 
 		return _httpCore.BeginRequest(
-			[this](const void* d, uint16_t n) { return Send(d, n); },
+			[this](const void* d, uint16 n) { return Send(d, n); },
 			data, len, std::move(onComplete));
 	}
 

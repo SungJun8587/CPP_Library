@@ -55,7 +55,7 @@ void COdbcAsyncSrv::Clear()
 	CQueue<std::unique_ptr<st_DBAsyncRq>> tempQueue;
 
 	// 안전하게 현재 남은 전체 사이즈만큼 척크 스왑을 수행하여 tempQueue로 이동
-	int64_t totalSize = _queueDBAsyncRq.GetSize();
+	int64 totalSize = _queueDBAsyncRq.GetSize();
 	if( totalSize > 0 )
 	{
 		_queueDBAsyncRq.SwapChunk(tempQueue, static_cast<size_t>(totalSize));
@@ -82,7 +82,7 @@ void COdbcAsyncSrv::FlushRemainingTasks()
 
 	// 큐에 남아있는 작업들을 안전하게 모두 가져옴
 	CQueue<std::unique_ptr<st_DBAsyncRq>> tempQueue;
-	int64_t totalSize = _queueDBAsyncRq.GetSize();
+	int64 totalSize = _queueDBAsyncRq.GetSize();
 	if( totalSize > 0 )
 	{
 		_queueDBAsyncRq.SwapChunk(tempQueue, static_cast<size_t>(totalSize));

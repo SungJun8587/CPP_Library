@@ -51,7 +51,7 @@ class CRioConnectDispatcher;
 //          DrainOverflowIntoSendBufferLocked()로 이어서 채워 넣습니다 — IOCP
 //          세션(CVector<CSendBufferRef> 큐, 오브젝트 풀 기반이라 사실상 무제한
 //          큐잉)과 "초과분은 메모리에 버퍼링" 동작을 일관되게 맞춘 것입니다.
-//          진행 정지(deadlock) 걱정이 없는 이유: 청크 하나는 Send()의 uint16_t
+//          진행 정지(deadlock) 걱정이 없는 이유: 청크 하나는 Send()의 uint16
 //          제약상 최대 65535바이트이고 _sendBuffer 용량은 정확히 65536바이트라,
 //          링버퍼가 완전히 비면 오버플로 큐의 다음 청크는 반드시 들어갈 수
 //          있습니다. 다만 매우 큰 body(예: 수십 MB 업로드)를 CHttpClientCore::
@@ -119,7 +119,7 @@ public:
 	//         clientSocket/requestQueue를 직접 정리해야 합니다(세션이 아직
 	//         Active가 아니므로 Close()로 자기 자신을 정리시킬 수 없음).
 	//***************************************************************************
-	bool Init(uint64_t sessionId, CRioCore* core, CRioBuffer* globalRecvBufferPool, SOCKET socket, RIO_RQ requestQueue) noexcept;
+	bool Init(uint64 sessionId, CRioCore* core, CRioBuffer* globalRecvBufferPool, SOCKET socket, RIO_RQ requestQueue) noexcept;
 
 	//***************************************************************************
 	// @brief ConnectEx로 비동기 연결을 게시합니다 (클라이언트 측 전용).
@@ -136,7 +136,7 @@ public:
 	//         별도로 정리할 것이 없습니다. 최종 연결 성공/실패는 항상
 	//         OnConnected()/OnDisconnected(reason) 오버라이드로 비동기 통지됩니다.
 	//***************************************************************************
-	bool ConnectAsync(CRioConnectDispatcher& dispatcher, uint64_t sessionId, CRioCore* core,
+	bool ConnectAsync(CRioConnectDispatcher& dispatcher, uint64 sessionId, CRioCore* core,
 		CRioBuffer* globalRecvBufferPool, const CNetAddress& remoteAddr);
 
 	//***************************************************************************
@@ -170,7 +170,7 @@ public:
 	// @param size 전송할 데이터 크기 (바이트)
 	// @return 전송 큐잉 및 처리 성공 시 true, 실패 시 false
 	//***************************************************************************
-	bool Send(const void* data, uint16_t size) noexcept;
+	bool Send(const void* data, uint16 size) noexcept;
 
 	//***************************************************************************
 	// @brief 소켓 핸들이 유효한 상태인지 확인합니다.
@@ -200,13 +200,13 @@ public:
 	// @brief 고유 세션 ID를 설정합니다.
 	// @param sessionId 설정할 고유 세션 ID
 	//***************************************************************************
-	void SetSessionId(uint64_t sessionId) noexcept { _sessionId = sessionId; }
+	void SetSessionId(uint64 sessionId) noexcept { _sessionId = sessionId; }
 
 	//***************************************************************************
 	// @brief 고유 세션 ID를 반환합니다.
-	// @return uint64_t 고유 세션 ID
+	// @return uint64 고유 세션 ID
 	//***************************************************************************
-	uint64_t GetSessionId() const noexcept { return _sessionId; }
+	uint64 GetSessionId() const noexcept { return _sessionId; }
 
 	//***************************************************************************
 	// @brief RIO Request Queue 핸들을 반환합니다.
@@ -284,7 +284,7 @@ private:
 	//          넣을 공간이 없으면 그 청크는 큐에 그대로 남겨두고 중단합니다
 	//          (Enqueue(..., exact=false)의 "전량 아니면 실패" 시맨틱과
 	//          일관성을 맞추기 위해 청크를 쪼개서 일부만 옮기지 않음). 청크는
-	//          항상 65535바이트 이하(Send()의 uint16_t 제약)이고 _sendBuffer
+	//          항상 65535바이트 이하(Send()의 uint16 제약)이고 _sendBuffer
 	//          용량은 정확히 65536바이트라, 링버퍼가 완전히 빈 상태라면 다음
 	//          청크 하나는 반드시 들어갈 수 있음이 보장됩니다 — 즉 이 드레인이
 	//          영원히 진행 못 하고 멈추는 경우는 없습니다.
@@ -344,7 +344,7 @@ private:
 	void FailConnect(Rio::CloseReason reason) noexcept;
 
 private:
-	uint64_t _sessionId{ 0 };                           // 고유 세션 ID
+	uint64 _sessionId{ 0 };                           // 고유 세션 ID
 
 	CRioCore* _core{ nullptr };                         // RIO Core 객체 포인터
 	CRioBuffer* _globalRecvBufferPool{ nullptr };       // 전역 수신 버퍼 풀 포인터

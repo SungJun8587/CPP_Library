@@ -85,10 +85,10 @@ void CIocpSession::ProcessConnect()
 //***************************************************************************
 // @brief 바이트 데이터 전송 요청 (RIO 인터페이스 호환)
 // @param data 전송할 데이터 포인터
-// @param size 전송할 바이트 크기 (uint16_t)
+// @param size 전송할 바이트 크기 (uint16)
 // @return bool 전송 요청 성공 여부
 //***************************************************************************
-bool CIocpSession::Send(const void* data, uint16_t size) noexcept
+bool CIocpSession::Send(const void* data, uint16 size) noexcept
 {
 	if( IsConnected() == false || data == nullptr || size == 0 )
 		return false;

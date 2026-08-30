@@ -455,27 +455,27 @@ inline CMap<Key, T> CRapidJSONUtil::GetObjectMap(const _tstring& key) const
 template <typename T>
 inline _tValue CRapidJSONUtil::ConvertToJSONValue(const T& value) const
 {
-	if constexpr( std::is_same<T, int16_t>::value )
+	if constexpr( std::is_same<T, int16>::value )
 	{
 		return _tValue(value);
 	}
-	else if constexpr( std::is_same<T, uint16_t>::value )
+	else if constexpr( std::is_same<T, uint16>::value )
 	{
 		return _tValue(value);
 	}
-	else if constexpr( std::is_same<T, int32_t>::value )
+	else if constexpr( std::is_same<T, int32>::value )
 	{
 		return _tValue(value);
 	}
-	else if constexpr( std::is_same<T, uint32_t>::value )
+	else if constexpr( std::is_same<T, uint32>::value )
 	{
 		return _tValue(value);
 	}
-	else if constexpr( std::is_same<T, int64_t>::value )
+	else if constexpr( std::is_same<T, int64>::value )
 	{
 		return _tValue(value);
 	}
-	else if constexpr( std::is_same<T, uint64_t>::value )
+	else if constexpr( std::is_same<T, uint64>::value )
 	{
 		return _tValue(value);
 	}
@@ -534,27 +534,27 @@ inline _tValue CRapidJSONUtil::ConvertToJSONValue(const T& value) const
 template <typename T>
 inline T CRapidJSONUtil::ConvertFromJSONValue(const _tValue& value) const
 {
-	if constexpr( std::is_same<T, int16_t>::value )
+	if constexpr( std::is_same<T, int16>::value )
 	{
 		return value.GetInt();
 	}
-	else if constexpr( std::is_same<T, uint16_t>::value )
+	else if constexpr( std::is_same<T, uint16>::value )
 	{
 		return value.GetUint();
 	}
-	else if constexpr( std::is_same<T, int32_t>::value )
+	else if constexpr( std::is_same<T, int32>::value )
 	{
 		return value.GetInt();
 	}
-	else if constexpr( std::is_same<T, uint32_t>::value )
+	else if constexpr( std::is_same<T, uint32>::value )
 	{
 		return value.GetUint();
 	}
-	else if constexpr( std::is_same<T, int64_t>::value )
+	else if constexpr( std::is_same<T, int64>::value )
 	{
 		return value.GetInt64();
 	}
-	else if constexpr( std::is_same<T, uint64_t>::value )
+	else if constexpr( std::is_same<T, uint64>::value )
 	{
 		return value.GetUint64();
 	}

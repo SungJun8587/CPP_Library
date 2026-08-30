@@ -41,7 +41,7 @@ public:
 	//***************************************************************************
 	virtual SOCKET			GetSocket() const = 0;
 
-	virtual bool			Send(const void* data, uint16_t size) noexcept = 0;
+	virtual bool			Send(const void* data, uint16 size) noexcept = 0;
 
 	// 연결 해제 이벤트 콜백 등록
 	void					SetDisconnectHandler(DisconnectHandler handler) { _onDisconnected = handler; }

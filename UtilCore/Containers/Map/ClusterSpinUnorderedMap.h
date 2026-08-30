@@ -1,28 +1,29 @@
-﻿//***************************************************************************
-// ClusterSpinMap.h : interface for the CClusterSpinMap class.
+﻿
+//***************************************************************************
+// ClusterSpinUnorderedMap.h : interface for the CClusterSpinUnorderedMap class.
 //
 //***************************************************************************
 
-#ifndef UC_CLUSTERSPINMAP_H
-#define UC_CLUSTERSPINMAP_H
+#ifndef UC_CLUSTERSPINUNORDEREDMAP_H
+#define UC_CLUSTERSPINUNORDEREDMAP_H
 
 #include <BaseRedefineDataType.h>
 #include <Thread/PlatformLock.h>
 
-#include <map>
+#include <unordered_map>
 
 //***************************************************************************
-// @class CClusterSpinMap
-// @brief Red-Black Tree(O(log N)) 기반의 클러스터링 분산 스핀 맵 클래스
+// @class CClusterSpinUnorderedMap
+// @brief Hash Table(O(1)) 기반의 클러스터링 분산 스핀 맵 클래스
 // @details 
 // [특징 및 사용 권장 대상]
-//   1. 데이터 정렬 필요성: Key 순서에 따른 정렬 상태 유지 및 범위 검색(Range Query)이 필요한 경우에 적합합니다.
-//   2. 안정적인 성능: 해시 충돌 위험 없이 최악의 경우에도 O(log N)의 시간 복잡도를 보장합니다.
+//   1. 단일 조회 최적화: 세션 매니저, 유저/객체 매니저 등 정렬이 필요 없고 SessionID/GUID 기반의 
+//      단일 검색, 삽입, 삭제가 지배적인 기능에 가장 이상적입니다.
+//   2. 락 경합 극소화: 평균 O(1) 처리 속도를 통해 스핀락(SpinLock) 점유 시간을 최소화하여 
+//      멀티스레드 동시 접근 시 최고 수준의 런타임 성능을 제공합니다.
 //   3. const 안전성: const 참조 및 const 멤버 함수를 완벽히 지원하여 임시 객체/Rvalue 넘김이 가능합니다.
 // [요구 조건]
-//   - Key 타입에 `<` (Less Than) 연산자가 정의되어 있어야 합니다.
-// [주의 사항]
-//   - 단순 Key 조회/삽입 작업만 수행 시 CClusterSpinUnorderedMap(O(1)) 대비 성능 및 락 경합 면에서 불리할 수 있습니다.
+//   - Key 타입에 대한 std::hash(또는 커스텀 Hash) 연산 및 `==` 연산자가 정의되어 있어야 합니다.
 //
 // [클러스터 개수(nClusterCnt) 최적화 가이드 및 선정 이유 (예: 16개 기준)]
 //   1. 2의 제곱수 최적화: 16 등 2의 제곱수 크기로 설정 시, 내부 해시 인덱스 연산(key % nClusterCnt)을 
@@ -33,23 +34,23 @@
 // [예시]
 //   - 대규모 하이엔드 서버 환경(32코어 이상, 수천 명 동접): 32 또는 64 권장
 //   - 소규모 서버 또는 테스트 환경(2 ~ 4코어): 8 또는 16 권장
-//*************************************************************************** 
-template<typename T1, typename T2, __int32 nClusterCnt, bool bInnerLock = true>
-class CClusterSpinMap
+//***************************************************************************
+template<typename T1, typename T2, __int32 nClusterCnt, bool bInnerLock = true, typename Hash = std::hash<T1>>
+class CClusterSpinUnorderedMap
 {
 public:
-	typedef CMap< T1, T2 >                 ObjectMap;
-	typedef std::pair< const T1, T2 >       ObjectMapPair;
+	typedef CUnorderedMap< T1, T2, Hash >	ObjectMap;
+	typedef std::pair< const T1, T2 >		ObjectMapPair;
 
-	CClusterSpinMap(void);
-	virtual ~CClusterSpinMap(void);
+	CClusterSpinUnorderedMap(void);
+	virtual ~CClusterSpinUnorderedMap(void);
 
 public:
-	size_t      getSize();
-	bool        InsertObject(T1 key, T2 object);
-	T2          FindObject(T1 key);
-	bool        FindObject(T1 key, T2& object);
-	bool        EraseObject(T1 key);
+	size_t		getSize();
+	bool		InsertObject(T1 key, T2 object);
+	T2			FindObject(T1 key);
+	bool		FindObject(T1 key, T2& object);
+	bool		EraseObject(T1 key);
 
 	//***************************************************************************
 	// @brief 클러스터 인덱스로 내부 해시맵 참조를 반환합니다. (전체 순회용)
@@ -98,7 +99,7 @@ public:
 
 	//***************************************************************************
 	// @brief 키에 해당하는 클러스터의 읽기 락을 획득합니다.
-	// @param key 락을 식별할 클러스터 키 (const 참조 지원)
+	// @param key 락을 식별할 클러스터 키
 	// @param name 락 추적용 이름 (선택 사항)
 	//***************************************************************************
 	void ReadLock(const T1& key, const char* name = nullptr) {
@@ -107,7 +108,7 @@ public:
 
 	//***************************************************************************
 	// @brief 키에 해당하는 클러스터의 읽기 락을 해제합니다.
-	// @param key 락을 식별할 클러스터 키 (const 참조 지원)
+	// @param key 락을 식별할 클러스터 키
 	// @param name 락 추적용 이름 (선택 사항)
 	//***************************************************************************
 	void ReadUnlock(const T1& key, const char* name = nullptr) {
@@ -116,7 +117,7 @@ public:
 
 	//***************************************************************************
 	// @brief 키에 해당하는 클러스터의 쓰기 락을 획득합니다.
-	// @param key 락을 식별할 클러스터 키 (const 참조 지원)
+	// @param key 락을 식별할 클러스터 키
 	// @param name 락 추적용 이름 (선택 사항)
 	//***************************************************************************
 	void WriteLock(const T1& key, const char* name = nullptr) {
@@ -125,7 +126,7 @@ public:
 
 	//***************************************************************************
 	// @brief 키에 해당하는 클러스터의 쓰기 락을 해제합니다.
-	// @param key 락을 식별할 클러스터 키 (const 참조 지원)
+	// @param key 락을 식별할 클러스터 키
 	// @param name 락 추적용 이름 (선택 사항)
 	//***************************************************************************
 	void WriteUnlock(const T1& key, const char* name = nullptr) {
@@ -134,7 +135,7 @@ public:
 
 	//***************************************************************************
 	// @brief 키에 해당하는 클러스터의 내부 해시맵 참조를 반환합니다.
-	// @param key 클러스터를 결정할 키 (const 참조 지원)
+	// @param key 클러스터를 결정할 키
 	// @return ObjectMap& 해당 클러스터의 맵 참조
 	//***************************************************************************
 	ObjectMap& GetObjectMap(const T1& key) {
@@ -163,7 +164,7 @@ protected:
 	// @return __int32 클러스터 인덱스
 	//***************************************************************************
 	__int32 getClusterIdx(const T1& key) const {
-		return static_cast<__int32>(key % nClusterCnt);
+		return static_cast<__int32>(Hash{}(key) % nClusterCnt);
 	}
 
 	//***************************************************************************
@@ -205,10 +206,10 @@ protected:
 	void clearObjectMap(void);
 
 public:
-	ObjectMap   m_ObjectMaps[nClusterCnt];   // 클러스터별로 데이터를 저장하는 해시맵 배열 (총 nClusterCnt개)
-	PRWLock     m_ObjectLocks[nClusterCnt];  // 각 클러스터의 동시성 제어를 위한 읽기/쓰기 락(RWLock) 배열
+	ObjectMap	m_ObjectMaps[nClusterCnt];	// 클러스터별로 데이터를 저장하는 해시맵 배열 (총 nClusterCnt개)
+	PRWLock		m_ObjectLocks[nClusterCnt];	// 각 클러스터의 동시성 제어를 위한 읽기/쓰기 락(RWLock) 배열
 };
 
-#include "ClusterSpinMap.inl"
+#include "ClusterSpinUnorderedMap.inl"
 
-#endif // ndef UC_CLUSTERSPINMAP_H
+#endif // ndef UC_CLUSTERSPINUNORDEREDMAP_H

@@ -16,9 +16,7 @@ CRioEvent::CRioEvent() noexcept
     , _owner(nullptr)
     , _bufferBindings()
     , _nextFree(nullptr)
-#ifdef _DEBUG
-    , _debugState(Rio::EEventState::Free)
-#endif
+    , _state(Rio::EEventState::Free)
 {
 }
 
@@ -31,10 +29,7 @@ CRioEvent::~CRioEvent() noexcept
     _owner.reset();
     _bufferBindings.clear();
     _nextFree = nullptr;
-
-#ifdef _DEBUG
-    _debugState = Rio::EEventState::Free;
-#endif
+    _state = Rio::EEventState::Free;
 }
 
 //***************************************************************************
@@ -44,9 +39,9 @@ CRioEvent::~CRioEvent() noexcept
 //***************************************************************************
 void CRioEvent::Initialize(Rio::EventType type, const CRioObjectRef& ownerObj) noexcept
 {
-#ifdef _DEBUG
-    assert(_debugState == Rio::EEventState::InUse && "CRioEvent must be InUse before Initialize()");
-#endif
+    // 이중 Alloc으로 인해 아직 InUse 전이가 안 된 이벤트에 Initialize()가
+    // 잘못 호출되는 상황을 release 빌드에서도 즉시 잡습니다.
+    ASSERT_CRASH(_state == Rio::EEventState::InUse && "CRioEvent must be InUse before Initialize()");
 
     _eventType = type;
     _owner = ownerObj;
@@ -60,23 +55,21 @@ void CRioEvent::Initialize(Rio::EventType type, const CRioObjectRef& ownerObj) n
 // @param slotIndex AllocSlot()으로 확보한 slot index
 // @return 성공 시 true, 실패 시 false
 //***************************************************************************
-bool CRioEvent::BindBufferSlot(CRioBuffer* buffer, uint32_t slotIndex) noexcept
+bool CRioEvent::BindBufferSlot(CRioBuffer* buffer, uint32 slotIndex) noexcept
 {
     if( buffer == nullptr )
     {
-        assert(false && "CRioEvent::BindBufferSlot buffer is null");
+        ASSERT_CRASH(false && "CRioEvent::BindBufferSlot buffer is null");
         return false;
     }
 
     if( slotIndex == Rio::kInvalidSlotIndex )
     {
-        assert(false && "CRioEvent::BindBufferSlot invalid slot index");
+        ASSERT_CRASH(false && "CRioEvent::BindBufferSlot invalid slot index");
         return false;
     }
 
-#ifdef _DEBUG
-    assert(_debugState == Rio::EEventState::InUse && "CRioEvent must be InUse before BindBufferSlot()");
-#endif
+    ASSERT_CRASH(_state == Rio::EEventState::InUse && "CRioEvent must be InUse before BindBufferSlot()");
 
     try
     {
@@ -84,7 +77,7 @@ bool CRioEvent::BindBufferSlot(CRioBuffer* buffer, uint32_t slotIndex) noexcept
     }
     catch( ... )
     {
-        assert(false && "CRioEvent::BindBufferSlot allocation failed");
+        ASSERT_CRASH(false && "CRioEvent::BindBufferSlot allocation failed");
         return false;
     }
 

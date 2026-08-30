@@ -33,7 +33,7 @@ public:
 	// @param maxSessionCount 최대 동시 접속 수 (기본값: 1)
 	// @param workerThreadCount IOCP 완료 처리용 워커 스레드 개수 (기본값: 0 = 하드웨어 코어 수 기반 자동 산정)
 	//***************************************************************************
-	CIocpServerService(CNetAddress address, CIocpCoreRef iocpCore, SessionFactory factory, int32 maxSessionCount = 1, uint32_t workerThreadCount = 0);
+	CIocpServerService(CNetAddress address, CIocpCoreRef iocpCore, SessionFactory factory, int32 maxSessionCount = 1, uint32 workerThreadCount = 0);
 
 	//***************************************************************************
 	// @brief CIocpServerService 소멸자
@@ -67,7 +67,7 @@ private:
 	CIocpCoreRef			_iocpCore = nullptr;    // 연동된 IOCP 코어 객체 참조
 	CIocpListenerRef		_listener = nullptr;    // 클라이언트 접속 수락 리스너
 	CIocpSessionManager		_sessionManager;        // 서버 서비스가 직접 소유하는 세션 매니저
-	uint32_t				_workerThreadCount = 0; // 구동할 IOCP 워커 스레드 개수 (0=자동)
+	uint32				_workerThreadCount = 0; // 구동할 IOCP 워커 스레드 개수 (0=자동)
 	CThreadManager			_threadManager;         // 워커 스레드 수명 주기 및 TLS 관리자
 };
 
@@ -90,7 +90,7 @@ public:
 	// @param maxSessionCount 생성할 세션 개수 (기본값: 1)
 	// @param workerThreadCount IOCP 완료 처리용 워커 스레드 개수 (기본값: 0 = 자동 산정)
 	//***************************************************************************
-	CIocpClientService(CNetAddress address, CIocpCoreRef iocpCore, SessionFactory factory, int32 maxSessionCount = 1, uint32_t workerThreadCount = 0);
+	CIocpClientService(CNetAddress address, CIocpCoreRef iocpCore, SessionFactory factory, int32 maxSessionCount = 1, uint32 workerThreadCount = 0);
 
 	//***************************************************************************
 	// @brief CIocpClientService 소멸자
@@ -153,7 +153,7 @@ public:
 
 private:
 	CIocpCoreRef			_iocpCore = nullptr;    // 연동된 IOCP 코어 객체 참조
-	uint32_t				_workerThreadCount = 0; // 구동할 IOCP 워커 스레드 개수 (0=자동)
+	uint32				_workerThreadCount = 0; // 구동할 IOCP 워커 스레드 개수 (0=자동)
 	CThreadManager			_threadManager;         // 워커 스레드 수명 주기 및 TLS 관리자
 };
 

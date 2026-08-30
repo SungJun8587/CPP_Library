@@ -35,7 +35,7 @@
 | 함수 | 설명 |
 |---|---|
 | `CAdoDB()` | `CoInitialize(NULL)` 호출로 COM 라이브러리 초기화, `m_pRs`/`m_pCmd`/`m_pCon`을 `NULL`로 초기화. |
-| `~CAdoDB()` | `ISOpen()`이면 `m_pCon->Close()`, `ISRSCon()`이면 `m_pRs->Close()`, `ISCommand()`이면 `m_pCmd->Cancel()`을 각각 호출해 정리한 뒤 `CoUninitialize()` 호출. |
+| `~CAdoDB()` | `ISOpen()`이면 `m_pCon->Close()` 후 `m_pCon = NULL`, `ISRSCon()`이면 `m_pRs->Close()` 후 `m_pRs = NULL`, `ISCommand()`이면 `m_pCmd->Cancel()` 후 `m_pCmd = NULL`을 각각 호출해 정리한 뒤 `CoUninitialize()` 호출. |
 
 #### 연결 관리
 
@@ -43,7 +43,6 @@
 |---|---|---|
 | `Connect(dbClass, lptszConnstring, nTimeOut)` | `int` | `Connection` COM 인스턴스를 생성하고 `ConnectionTimeout` 설정, `m_DbClass`에 DBMS 종류 저장 후 `m_pCon->Open(lptszConnstring, L"", L"", -1)` 실행. 성공 시 `Command`/`Recordset` 인스턴스를 생성하고 `ADO_OPEN_COMMAND_CREATE` 반환, 이어서 `GetHostInfo`/`GetDBMSName`/`GetServerVersion`/`GetCharacterSetName`을 호출해 네 값이 모두 조회되면 `LOG_DEBUG`로 서버 정보를 기록. 연결 실패 또는 예외 발생 시 `ADO_OPEN_ERROR` 반환. |
 | `GetDBCon()` | `BOOL` | `ISOpen()` 결과를 그대로 반환. |
-| `GetDBClass()` (헤더 인라인) | `EDBClass` | `m_DbClass` 반환. |
 | `ConClose()` | `void` | `ISOpen()`이면 `m_pCon->Close()`. |
 | `RSClose()` | `void` | `ISRSCon()`이면 `m_pRs->Close()`. |
 
@@ -107,7 +106,13 @@
 
 #### 필드 값 조회 — 이름 기반 (`GetFieldByName`, 오버로드 7종)
 
-`m_pRs->GetCollect((_variant_t)lptszFieldName)`을 호출하는 것을 제외하면 `GetFieldByIndex`와 동일한 7종 시그니처 구성과 NULL 처리 방식을 그대로 따른다.
+`m_pRs->GetCollect((_variant_t)lptszFieldName)`을 호출하는 것을 제외하면 `GetFieldByIndex`와 동일한 7종 시그니처 구성과 NULL 처리 방식을 따르되, `long` 오버로드는 분기 로직이 `GetFieldByIndex`와 다르다.
+
+| 시그니처 | 설명 |
+|---|---|
+| `(lptszFieldName, long& lFieldValue)` | `VT_I2`면 `iVal`, 그 외(VT_I4 포함 모든 나머지 타입)는 무조건 `lVal`로 대입 — `GetFieldByIndex`의 `long` 오버로드처럼 `VT_I4`/`VT_INT`를 별도 분기하거나 그 외 타입에 `static_cast<long>`을 적용하는 폴백이 없다. NULL이면 0. |
+| `(lptszFieldName, int32& nFieldValue)` | 내부적으로 위 `long` 오버로드 호출 후 캐스팅. |
+| 나머지 5종(`ulong`/`uint32`/`double`/`_tstring`/문자열 버퍼) | `GetFieldByIndex`의 해당 오버로드와 로직이 동일(NULL 처리 포함). |
 
 #### 필드 값 조회 — `GetRs` (Recordset 직접 참조, 오버로드 5종)
 

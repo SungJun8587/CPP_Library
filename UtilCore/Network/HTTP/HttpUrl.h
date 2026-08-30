@@ -22,7 +22,7 @@ struct CHttpUrl
 {
 	bool isHttps = false;             // scheme이 "https"였는지 여부
 	std::string host;                 // 호스트 이름 (IP 문자열일 수도 있음, DNS resolve는 안 함)
-	uint16_t port = 80;               // 포트 (명시 안 되면 scheme 기본값: http=80, https=443)
+	uint16 port = 80;               // 포트 (명시 안 되면 scheme 기본값: http=80, https=443)
 	std::string pathAndQuery = "/";   // 경로 + 쿼리스트링 ('/' 포함, fragment(#...)는 제외)
 };
 
@@ -84,7 +84,7 @@ inline bool ParseHttpUrl(std::string_view url, CHttpUrl& out)
 		auto res = std::from_chars(portSv.data(), portSv.data() + portSv.size(), portValue);
 		if (res.ec != std::errc() || portValue <= 0 || portValue > 65535)
 			return false;
-		out.port = static_cast<uint16_t>(portValue);
+		out.port = static_cast<uint16>(portValue);
 	}
 	else
 	{

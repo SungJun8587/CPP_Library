@@ -222,7 +222,7 @@ void CRioCore::RequestStop()
 // @brief 대기 중인 멀티 워커 스레드 전체에 IOCP Wake-up(Stop) 패킷을 포스팅합니다.
 // @param workerCount 깨울 목표 워커 스레드 수
 //***************************************************************************
-void CRioCore::WakeWorkers(uint32_t workerCount) noexcept
+void CRioCore::WakeWorkers(uint32 workerCount) noexcept
 {
     HANDLE iocp = _iocpHandle;
 
@@ -235,7 +235,7 @@ void CRioCore::WakeWorkers(uint32_t workerCount) noexcept
     // "wake-up" 패턴입니다. 이 패킷은 IsStopPacket()에서 completionKey==0 &&
     // overlapped==nullptr 조합으로 식별됩니다(RIO 자신의 completion은 항상
     // 유효한 CompletionKey/Overlapped 쌍을 가지므로 이 조합과 충돌하지 않음).
-    for( uint32_t i = 0; i < workerCount; ++i )
+    for( uint32 i = 0; i < workerCount; ++i )
     {
         if( !::PostQueuedCompletionStatus(iocp, 0, 0, nullptr) )
         {
@@ -1129,11 +1129,11 @@ void CRioCore::ProcessRioResult(Rio::RioCqType cqType, LONG status, ULONG bytesT
 //***************************************************************************
 bool CRioCore::IncrementIoCount() noexcept
 {
-    uint32_t current = _outstandingIo.load(std::memory_order_relaxed);
+    uint32 current = _outstandingIo.load(std::memory_order_relaxed);
 
     for( ;; )
     {
-        if( current == (std::numeric_limits<uint32_t>::max)() )
+        if( current == (std::numeric_limits<uint32>::max)() )
         {
             assert(false && "Outstanding I/O counter overflow");
             return false;
@@ -1151,7 +1151,7 @@ bool CRioCore::IncrementIoCount() noexcept
 //***************************************************************************
 void CRioCore::DecrementIoCount() noexcept
 {
-    uint32_t current = _outstandingIo.load(std::memory_order_relaxed);
+    uint32 current = _outstandingIo.load(std::memory_order_relaxed);
 
     for( ;; )
     {

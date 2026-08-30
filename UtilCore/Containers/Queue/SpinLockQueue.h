@@ -128,7 +128,7 @@ public:
 private:
     PLock                   _lock;              // 플랫폼 통합 단독 락 객체
     CQueue<T>               _items;             // 커스텀 CQueue<T> 기반 내부 큐
-    std::atomic<int64_t>    _size{ 0 };         // Empty()/Size()를 락 없이 조회하기 위한 카운터
+    std::atomic<int64>    _size{ 0 };         // Empty()/Size()를 락 없이 조회하기 위한 카운터
     std::atomic<bool>       _stopped{ false };  // 종료 플래그 추가
 };
 

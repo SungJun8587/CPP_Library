@@ -38,7 +38,7 @@ CRioSession::~CRioSession() noexcept
 // @return bool 성공 시 true. false면 이 세션은 Active로 전이하지 않으므로
 //         호출자가 socket/requestQueue를 직접 정리해야 합니다.
 //***************************************************************************
-bool CRioSession::Init(uint64_t sessionId, CRioCore* core, CRioBuffer* globalRecvBufferPool, SOCKET socket, RIO_RQ requestQueue) noexcept
+bool CRioSession::Init(uint64 sessionId, CRioCore* core, CRioBuffer* globalRecvBufferPool, SOCKET socket, RIO_RQ requestQueue) noexcept
 {
     assert(_state.load(std::memory_order_acquire) == Rio::SessionState::Created);
 
@@ -97,7 +97,7 @@ bool CRioSession::Init(uint64_t sessionId, CRioCore* core, CRioBuffer* globalRec
 //          AF_INET 소켓에 bind()가 실패한다(CNetAddress(ip, port) 생성자만
 //          sin_family=AF_INET을 명시적으로 세팅함 — NetAddress.h/.cpp 확인 후 발견/수정).
 //***************************************************************************
-bool CRioSession::ConnectAsync(CRioConnectDispatcher& dispatcher, uint64_t sessionId, CRioCore* core,
+bool CRioSession::ConnectAsync(CRioConnectDispatcher& dispatcher, uint64 sessionId, CRioCore* core,
     CRioBuffer* globalRecvBufferPool, const CNetAddress& remoteAddr)
 {
     assert(_state.load(std::memory_order_acquire) == Rio::SessionState::Created);
@@ -399,7 +399,7 @@ bool CRioSession::PostReceiveInternal() noexcept
 {
     Rio::CloseReason failureReason = Rio::CloseReason::None;
 
-    uint32_t slotIndex = Rio::kInvalidSlotIndex;
+    uint32 slotIndex = Rio::kInvalidSlotIndex;
     CRioEvent* rioEvent = nullptr;
 
     RIO_BUF rioBuf{};
@@ -559,7 +559,7 @@ void CRioSession::OnReceiveCompleted(CRioEvent* rioEvent, DWORD bytesTransferred
     }
 
     CRioBuffer* bufferPool = bindings[0].buffer;
-    const uint32_t slotIndex = bindings[0].slotIndex;
+    const uint32 slotIndex = bindings[0].slotIndex;
 
     if( bufferPool == nullptr )
     {
@@ -612,7 +612,7 @@ void CRioSession::OnReceiveCompleted(CRioEvent* rioEvent, DWORD bytesTransferred
 // @param size 전송할 데이터 크기 (바이트)
 // @return 전송 큐잉 및 처리 성공 시 true, 실패 시 false
 //***************************************************************************
-bool CRioSession::Send(const void* data, uint16_t size) noexcept
+bool CRioSession::Send(const void* data, uint16 size) noexcept
 {
     if( data == nullptr || size == 0 ) return false;
     if( !IsActive() ) return false;

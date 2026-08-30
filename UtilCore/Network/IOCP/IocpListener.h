@@ -103,7 +103,7 @@ public:
     }
 
 public:
-    bool    StartAccept(CIocpCoreRef iocpCore, CNetAddress netAddr, IocpSessionFactory sessionFactory, int32 acceptCount = 10, OnAcceptCallback onAccept = nullptr);
+    bool    StartAccept(CIocpCoreRef iocpCore, CNetAddress netAddr, IocpSessionFactory sessionFactory, uint32 acceptPoolSize = Iocp::kDefaultAcceptPoolSize, OnAcceptCallback onAccept = nullptr);
 
     //***************************************************************************
     // @brief Listen 소켓을 닫고, 진행 중인 모든 detached 재시도 스레드가 끝날

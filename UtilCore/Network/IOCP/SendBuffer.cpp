@@ -74,14 +74,14 @@ void CSendBufferChunk::Reset()
 //***************************************************************************
 CSendBufferRef CSendBufferChunk::Open(uint32 allocSize)
 {
-	ASSERT_CRASH(allocSize <= SEND_BUFFER_CHUNK_SIZE);
+	ASSERT_CRASH(allocSize <= Iocp::SEND_BUFFER_CHUNK_SIZE);
 	ASSERT_CRASH(_open == false);
 
 	if( allocSize > FreeSize() )
 		return nullptr;
 
 	// MakeShared 할당 수행 후 성공 시에만 _open = true 설정 (이슈 9번 해결)
-	CSendBufferRef buffer = MakeShared<CSendBuffer>(shared_from_this(), Buffer(), allocSize);
+	CSendBufferRef buffer = CObjectPool<CSendBuffer>::MakeShared(shared_from_this(), Buffer(), allocSize);
 	if( buffer != nullptr )
 	{
 		_open = true;
@@ -127,7 +127,7 @@ CSendBufferRef CSendBufferManager::Open(uint32 size)
 //***************************************************************************
 CSendBufferChunkRef CSendBufferManager::GetChunk()
 {
-	CSendBufferChunkRef chunk = MakeShared<CSendBufferChunk>();
+	CSendBufferChunkRef chunk = CObjectPool<CSendBufferChunk>::MakeShared();
 	chunk->Reset();
 	return chunk;
 }

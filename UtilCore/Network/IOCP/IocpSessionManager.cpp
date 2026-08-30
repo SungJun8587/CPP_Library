@@ -25,9 +25,9 @@ CIocpSessionManager::~CIocpSessionManager()
 
 //***************************************************************************
 // @brief 원자적으로 새로운 고유 SessionId를 발급합니다.
-// @return uint64_t 고유 세션 ID
+// @return uint64 고유 세션 ID
 //***************************************************************************
-uint64_t CIocpSessionManager::GenerateSessionId()
+uint64 CIocpSessionManager::GenerateSessionId()
 {
     return _nextSessionId.fetch_add(1, std::memory_order_relaxed);
 }
@@ -38,7 +38,7 @@ uint64_t CIocpSessionManager::GenerateSessionId()
 // @param session 세션 shared_ptr
 // @return 등록 성공 시 true, 실패 시 false
 //***************************************************************************
-bool CIocpSessionManager::AddSession(uint64_t sessionId, CIocpSessionRef session)
+bool CIocpSessionManager::AddSession(uint64 sessionId, CIocpSessionRef session)
 {
     if( sessionId == 0 || session == nullptr )
         return false;
@@ -50,7 +50,7 @@ bool CIocpSessionManager::AddSession(uint64_t sessionId, CIocpSessionRef session
 // @brief SessionId를 기반으로 매니저에서 세션을 제거합니다.
 // @param sessionId 제거할 고유 세션 ID (Key)
 //***************************************************************************
-void CIocpSessionManager::RemoveSession(uint64_t sessionId)
+void CIocpSessionManager::RemoveSession(uint64 sessionId)
 {
     if( sessionId == 0 )
         return;
@@ -63,7 +63,7 @@ void CIocpSessionManager::RemoveSession(uint64_t sessionId)
 // @param sessionId 찾을 고유 세션 ID (Key)
 // @return 세션 shared_ptr (존재하지 않을 경우 nullptr)
 //***************************************************************************
-CIocpSessionRef CIocpSessionManager::FindSession(uint64_t sessionId) const
+CIocpSessionRef CIocpSessionManager::FindSession(uint64 sessionId) const
 {
     if( sessionId == 0 )
         return nullptr;
@@ -91,7 +91,7 @@ size_t CIocpSessionManager::GetSessionCount() const
 //       CRioSessionManager::Broadcast()와 동일하게 ReadLock으로 스냅샷만 수집한
 //       뒤 락 밖에서 Send()를 호출하도록 수정.
 //***************************************************************************
-void CIocpSessionManager::Broadcast(const void* data, uint16_t size)
+void CIocpSessionManager::Broadcast(const void* data, uint16 size)
 {
     if( data == nullptr || size == 0 )
         return;

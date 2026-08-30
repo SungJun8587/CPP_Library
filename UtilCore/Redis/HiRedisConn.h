@@ -96,10 +96,10 @@ namespace RedisCpp
 		// 연결 정보 초기화
 		//
 		// 연결을 초기화 하는데 사용 되는 세부 사항. connect() 전에 사용한다. 직접 호출 가능
-		// bool connect(const std::string &host, const uint16_t port, const std::string& password, const uint32_t timeout);
+		// bool connect(const std::string &host, const uint16 port, const std::string& password, const uint32 timeout);
 		//***************************************************************************
-		void init(const std::string& host = "127.0.0.1", const uint16_t port = 6379,
-			const std::string& password = "", const uint32_t timeout = 0)
+		void init(const std::string& host = "127.0.0.1", const uint16 port = 6379,
+			const std::string& password = "", const uint32 timeout = 0)
 		{
 			_host = host;
 			_port = port;
@@ -213,8 +213,8 @@ namespace RedisCpp
 		//	@param [in] timeout .연결 시간 초과
 		//	@return 성공 true，실패 false
 		//***************************************************************************
-		bool connect(const std::string& host, const uint16_t port, const std::string& password =
-			"", const uint32_t timeout = 0)
+		bool connect(const std::string& host, const uint16 port, const std::string& password =
+			"", const uint32 timeout = 0)
 		{
 			// Init attribute.
 			init(host, port, password, timeout);
@@ -310,7 +310,7 @@ namespace RedisCpp
 		//	@param [in] retval 삽입 성공 후 list 길이
 		//	@return 실패 false，성공 true
 		//***************************************************************************
-		bool lpush(const std::string& key, const std::string& value, uint64_t& retval)
+		bool lpush(const std::string& key, const std::string& value, uint64& retval)
 		{
 			if( !_connected || !_redCtx )
 			{
@@ -389,7 +389,7 @@ namespace RedisCpp
 		// 지정된 범위의 list에 있는 요소를 가져온다.
 		//	@param [in] start 간격 시작 색인，stop 간격 끝 색인, valueList 간격 list
 		//***************************************************************************
-		bool lrange(const std::string& key, uint32_t start, int32_t end, ValueList& valueList)
+		bool lrange(const std::string& key, uint32 start, int32 end, ValueList& valueList)
 		{
 			if( !_connected || !_redCtx )
 			{
@@ -433,7 +433,7 @@ namespace RedisCpp
 		//	@param [in] retval 삽입 성공 후의 list 요소 수
 		//	@return 실패 false，성공 true
 		//***************************************************************************
-		bool rpush(const std::string& key, const std::string& value, uint64_t& retval)
+		bool rpush(const std::string& key, const std::string& value, uint64& retval)
 		{
 			if( !_connected || !_redCtx )
 			{
@@ -513,7 +513,7 @@ namespace RedisCpp
 		// list의 특정 위치에 데이터 넣기
 		//***************************************************************************
 		bool linsert(const std::string& key, INSERT_POS position, const std::string& pivot,
-			const std::string& value, int64_t& retval)
+			const std::string& value, int64& retval)
 		{
 			if( !_connected || !_redCtx )
 			{
@@ -579,7 +579,7 @@ namespace RedisCpp
 		// lindex key index
 		// index의 위치에 있는 데이터를 조회한다. 0 에서 시작한다
 		//***************************************************************************
-		bool lindex(const std::string& key, int32_t index, std::string& value)
+		bool lindex(const std::string& key, int32 index, std::string& value)
 		{
 			if( !_connected || !_redCtx )
 			{
@@ -623,7 +623,7 @@ namespace RedisCpp
 		// LLEN
 		// list에서 value의 개수를 조회 https://kwoncharlie.blog.me/220397447626
 		//***************************************************************************
-		bool llen(const std::string& key, uint64_t& retval)
+		bool llen(const std::string& key, uint64& retval)
 		{
 			if( !_connected || !_redCtx )
 			{
@@ -710,7 +710,7 @@ namespace RedisCpp
 		//***************************************************************************
 		//
 		//***************************************************************************
-		bool set(const std::string& key, const std::string& value, uint32_t& retval)
+		bool set(const std::string& key, const std::string& value, uint32& retval)
 		{
 			if( !_connected || !_redCtx )
 			{
@@ -727,7 +727,7 @@ namespace RedisCpp
 			}
 			else
 			{
-				retval = (uint32_t)reply->integer;
+				retval = (uint32)reply->integer;
 				ret = true;
 			}
 
@@ -742,7 +742,7 @@ namespace RedisCpp
 		//***************************************************************************
 		//
 		//***************************************************************************
-		bool del(const std::string& key, uint32_t& retval)
+		bool del(const std::string& key, uint32& retval)
 		{
 			if( !_connected || !_redCtx )
 			{
@@ -759,7 +759,7 @@ namespace RedisCpp
 			}
 			else
 			{
-				retval = (uint32_t)reply->integer;
+				retval = (uint32)reply->integer;
 				ret = true;
 			}
 
@@ -834,7 +834,7 @@ namespace RedisCpp
 		//	@return 성공 true，실패 false
 		//	@warning 실패 retval은 0，성공이라면 1
 		//***************************************************************************
-		bool hset(const std::string& key, const std::string& filed, const std::string& value, uint32_t& retval)
+		bool hset(const std::string& key, const std::string& filed, const std::string& value, uint32& retval)
 		{
 			if( !_connected || !_redCtx )
 			{
@@ -851,7 +851,7 @@ namespace RedisCpp
 			}
 			else
 			{
-				retval = (uint32_t)reply->integer;
+				retval = (uint32)reply->integer;
 				ret = true;
 			}
 
@@ -871,7 +871,7 @@ namespace RedisCpp
 		//	@return 성공 true，실패 false
 		//	@warning 실패는 retval 0，성공이라면 1
 		//***************************************************************************
-		bool hdel(const std::string& key, const std::string& filed, uint32_t& retval)
+		bool hdel(const std::string& key, const std::string& filed, uint32& retval)
 		{
 			{
 				if( !_connected || !_redCtx )
@@ -897,7 +897,7 @@ namespace RedisCpp
 					//std::cout<<"str = " << reply->str<<std::endl;
 					else
 					{
-						retval = (uint32_t)reply->integer;
+						retval = (uint32)reply->integer;
 						ret = true;
 					}
 				}
@@ -1072,9 +1072,9 @@ namespace RedisCpp
 		redisContext* _redCtx;		///< redis connector context
 
 		std::string _host;         		///< redis host
-		uint16_t _port;         		///< redis sever port
+		uint16 _port;         		///< redis sever port
 		std::string _password;         	///< redis server password
-		uint32_t _timeout;      		///< connect timeout second
+		uint32 _timeout;      		///< connect timeout second
 		bool _connected;			///< if connected
 
 		///< error number

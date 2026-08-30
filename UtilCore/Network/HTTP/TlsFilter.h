@@ -22,10 +22,10 @@
 //***************************************************************************
 // @brief 실제 소켓으로 암호문(ciphertext)을 내보내는 콜백. 세션의 Send()를
 //        그대로 감싸서 넘기면 된다. 시그니처는 CSession::Send()와 동일하게
-//        uint16_t 청크 단위 — CTlsFilter 내부에서 65535바이트 단위로 자동
+//        uint16 청크 단위 — CTlsFilter 내부에서 65535바이트 단위로 자동
 //        분할해 호출한다(CHttpClientCore::BeginRequest()와 동일한 제약/패턴).
 //***************************************************************************
-using TlsRawSendFn = std::function<bool(const void*, uint16_t)>;
+using TlsRawSendFn = std::function<bool(const void*, uint16)>;
 
 // 복호화된 평문이 도착했을 때 통지. data는 이 콜백이 끝나면 무효화되는 임시
 // 버퍼를 가리키므로, 호출부가 더 오래 보관해야 한다면 콜백 안에서 복사해야 함.
@@ -220,7 +220,7 @@ public:
 	// @return bool 성공 여부. 핸드셰이크가 아직 안 끝났거나 SSL_write 자체가
 	//         실패하면 false — 호출부(세션)가 커넥션을 폐기해야 한다.
 	//***************************************************************************
-	bool SendPlaintext(const void* data, uint16_t size)
+	bool SendPlaintext(const void* data, uint16 size)
 	{
 		std::vector<char> outgoing;
 		bool writeOk = false;
@@ -342,7 +342,7 @@ private:
 	}
 
 	//***************************************************************************
-	// @brief rawSend(uint16_t 청크 제약)에 맞춰 65535바이트 단위로 분할 전송합니다.
+	// @brief rawSend(uint16 청크 제약)에 맞춰 65535바이트 단위로 분할 전송합니다.
 	//***************************************************************************
 	void SendChunked(const char* data, size_t len)
 	{
@@ -353,7 +353,7 @@ private:
 		while( offset < len )
 		{
 			size_t chunk = (std::min)(len - offset, static_cast<size_t>(65535));
-			if( !_rawSend(data + offset, static_cast<uint16_t>(chunk)) )
+			if( !_rawSend(data + offset, static_cast<uint16>(chunk)) )
 				return; // 전송 실패 — 세션이 곧 끊길 것이므로 나머지는 포기
 			offset += chunk;
 		}

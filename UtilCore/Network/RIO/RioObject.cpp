@@ -33,7 +33,7 @@ CRioObject::CRioObject() noexcept
 //***************************************************************************
 CRioObject::~CRioObject() noexcept
 {
-    const uint32_t ioCount = _ioCount.load(std::memory_order_acquire);
+    const uint32 ioCount = _ioCount.load(std::memory_order_acquire);
 
     if( ioCount != 0 )
     {
@@ -52,11 +52,11 @@ CRioObject::~CRioObject() noexcept
 //***************************************************************************
 bool CRioObject::IncrementIoCount() noexcept
 {
-    uint32_t current = _ioCount.load(std::memory_order_relaxed);
+    uint32 current = _ioCount.load(std::memory_order_relaxed);
 
     for( ;; )
     {
-        if( current == (std::numeric_limits<uint32_t>::max)() )
+        if( current == (std::numeric_limits<uint32>::max)() )
         {
             assert(false && "CRioObject I/O counter overflow");
             return false;
@@ -86,7 +86,7 @@ void CRioObject::DecrementIoCount() noexcept
     // CAS가 실패할 경우 재시도용 값은 compare_exchange_weak의
     // failure order(relaxed)로 갱신되며, 실제 release-acquire 동기화는
     // CAS 성공 시의 release와 GetIoCount()의 acquire 페어링이 담당한다.
-    uint32_t current = _ioCount.load(std::memory_order_relaxed);
+    uint32 current = _ioCount.load(std::memory_order_relaxed);
 
     for( ;; )
     {
@@ -113,7 +113,7 @@ void CRioObject::DecrementIoCount() noexcept
 //      std::memory_order_acquire를 사용하여 DecrementIoCount()의 Release 오더링과
 //      동기화 페어(Acquire-Release semantics)를 이룹니다.
 //***************************************************************************
-uint32_t CRioObject::GetIoCount() const noexcept
+uint32 CRioObject::GetIoCount() const noexcept
 {
     return _ioCount.load(std::memory_order_acquire);
 }

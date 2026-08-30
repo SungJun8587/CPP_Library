@@ -9,6 +9,7 @@
 
 #include <BaseRedefineDataType.h>
 #include <BaseTLS.h>
+#include <Memory/ObjectPool.h>
 #include <Job/Job.h>
 #include <Containers/Queue/SpinLockQueue.h>
 #include <Job/JobTimer.h>

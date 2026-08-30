@@ -7,84 +7,75 @@
 #ifndef UC_ENDIAN_H
 #define UC_ENDIAN_H
 
-#ifdef WIN32
-	typedef signed __int8 int8_t;
-	typedef signed __int16 int16_t;
-	typedef signed __int32 int32_t;
-	typedef signed __int64 int64_t;
-	typedef unsigned __int8 uint8_t;
-	typedef unsigned __int16 uint16_t;
-	typedef unsigned __int32 uint32_t;
-	typedef unsigned __int64 uint64_t;
-#else // WIN32
+#ifndef WIN32
 	#include <stdint.h>
-#endif // WIN32
+#endif
 
 #define HAVE_LITTLE_ENDIAN
 
 //***************************************************************************
 //
-uint8_t HighByteFromBigEndian(const uint16_t& wData);
-uint16_t HighWordFromBigEndian(const uint32_t& dwData);
-uint8_t HighByteFromLittleEndian(const uint16_t& wData);
-uint16_t HighWordFromLittleEndian(const uint32_t& dwData);
+uint8 HighByteFromBigEndian(const uint16& wData);
+uint16 HighWordFromBigEndian(const uint32& dwData);
+uint8 HighByteFromLittleEndian(const uint16& wData);
+uint16 HighWordFromLittleEndian(const uint32& dwData);
 
-uint8_t LowByteFromBigEndian(const uint16_t& wData);
-uint16_t LowWordFromBigEndian(const uint32_t& dwData);
-uint8_t LowByteFromLittleEndian(const uint16_t& wData);
-uint16_t LowWordFromLittleEndian(const uint32_t& dwData);
+uint8 LowByteFromBigEndian(const uint16& wData);
+uint16 LowWordFromBigEndian(const uint32& dwData);
+uint8 LowByteFromLittleEndian(const uint16& wData);
+uint16 LowWordFromLittleEndian(const uint32& dwData);
 
-uint16_t BigEndianWord(const uint8_t& HighByte, const uint8_t& LowByte);
-uint32_t BigEndianDoubleWord(const uint16_t& HighWord, const uint16_t& LowWord);
-uint16_t LittleEndianWord(const uint8_t& HighByte, const uint8_t& LowByte);
-uint32_t LittleEndianDoubleWord(const uint16_t& HighWord, const uint16_t& LowWord);
+uint16 BigEndianWord(const uint8& HighByte, const uint8& LowByte);
+uint32 BigEndianDoubleWord(const uint16& HighWord, const uint16& LowWord);
+uint16 LittleEndianWord(const uint8& HighByte, const uint8& LowByte);
+uint32 LittleEndianDoubleWord(const uint16& HighWord, const uint16& LowWord);
 
-uint16_t BigEndianToHostEndian(const uint16_t wData);
-uint32_t BigEndianToHostEndian(const uint32_t dwData);
-uint16_t LittleEndianToHostEndian(const uint16_t wData);
-uint32_t LittleEndianToHostEndian(const uint32_t dwData);
+uint16 BigEndianToHostEndian(const uint16 wData);
+uint32 BigEndianToHostEndian(const uint32 dwData);
+uint16 LittleEndianToHostEndian(const uint16 wData);
+uint32 LittleEndianToHostEndian(const uint32 dwData);
 
-uint16_t HostEndianToBigEndian(const uint16_t wData);
-uint32_t HostEndianToBigEndian(const uint32_t dwData);
-uint16_t HostEndianToLittleEndian(const uint16_t wData);
-uint32_t HostEndianToLittleEndian(const uint32_t dwData);
+uint16 HostEndianToBigEndian(const uint16 wData);
+uint32 HostEndianToBigEndian(const uint32 dwData);
+uint16 HostEndianToLittleEndian(const uint16 wData);
+uint32 HostEndianToLittleEndian(const uint32 dwData);
 
-inline uint8_t HighByteFromHostEndian(const uint16_t& wData)
+inline uint8 HighByteFromHostEndian(const uint16& wData)
 {
 	return (wData >> 8);
 }
 
-inline uint16_t HighWordFromHostEndian(const uint32_t& dwData)
+inline uint16 HighWordFromHostEndian(const uint32& dwData)
 {
 	return (dwData >> 16);
 }
 
-inline uint32_t HostEndianDoubleWord(const uint16_t& HighWord, const uint16_t& LowWord)
+inline uint32 HostEndianDoubleWord(const uint16& HighWord, const uint16& LowWord)
 {
 	return (HighWord << 16) | LowWord;
 }
 
-inline uint16_t HostEndianWord(const uint8_t& HighByte, const uint8_t& LowByte)
+inline uint16 HostEndianWord(const uint8& HighByte, const uint8& LowByte)
 {
 	return (HighByte << 8) | LowByte;
 }
 
-inline uint8_t LowByteFromHostEndian(const uint16_t& wData)
+inline uint8 LowByteFromHostEndian(const uint16& wData)
 {
 	return (wData & 0xFF);
 }
 
-inline uint16_t LowWordFromHostEndian(const uint32_t& dwData)
+inline uint16 LowWordFromHostEndian(const uint32& dwData)
 {
 	return (dwData & 0xFFFF);
 }
 
-inline uint16_t ByteSwap2(const uint16_t InData)
+inline uint16 ByteSwap2(const uint16 InData)
 {
 	return (InData >> 8) | (InData << 8);
 }
 
-inline uint32_t ByteSwap4(const uint32_t InData)
+inline uint32 ByteSwap4(const uint32 InData)
 {
 	return ((InData >> 24) & 0x000000ff) |
 		((InData >> 8) & 0x0000ff00) |
@@ -92,7 +83,7 @@ inline uint32_t ByteSwap4(const uint32_t InData)
 		((InData << 24) & 0xff000000);
 }
 
-inline uint64_t ByteSwap8(const uint64_t InData)
+inline uint64 ByteSwap8(const uint64 InData)
 {
 	return ((InData >> 56) & 0x00000000000000ff) |
 		((InData >> 40) & 0x000000000000ff00) |

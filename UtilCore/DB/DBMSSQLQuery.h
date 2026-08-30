@@ -322,7 +322,7 @@ public:
 	bool	AllowRowLocks;														// 행 잠금 허용 여부 (ALLOW_ROW_LOCKS)
 	bool	AllowPageLocks;														// 페이지 잠금 허용 여부 (ALLOW_PAGE_LOCKS)
 	bool	HasFilter;															// 인덱스 필터 존재 여부(0/1)
-	TCHAR   tszFilterDefinition[DATABASE_WVARCHAR_MAX];						// 필터링된 인덱스 정의 식
+	TCHAR   tszFilterDefinition[DATABASE_WVARCHAR_MAX];							// 필터링된 인덱스 정의 식
 	int32	CompressionDelay;													// Columnstore 인덱스 압축 지연 시간(분)
 	bool	OptimizeForSequentialKey;											// 마지막 페이지 삽입 경합 최적화 여부
 	bool	StatisticsNoRecompute;												// 통계 재계산 여부 (STATISTICS_NORECOMPUTE)

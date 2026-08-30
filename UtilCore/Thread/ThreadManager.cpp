@@ -64,7 +64,7 @@ bool CThreadManager::CreateThread(std::function<void(void)> fncCallback)
 //***************************************************************************
 void CThreadManager::JoinThreads()
 {
-    CVector<std::thread> localThreads;
+    std::vector<std::thread> localThreads;
     {
         std::lock_guard<std::mutex> lock(_lock);
 
@@ -85,7 +85,7 @@ void CThreadManager::JoinThreads()
 //***************************************************************************
 void CThreadManager::JoinLastThreads(size_t count)
 {
-    CVector<std::thread> localThreads;
+    std::vector<std::thread> localThreads;
     {
         std::lock_guard<std::mutex> lock(_lock);
 
@@ -165,7 +165,7 @@ size_t CThreadManager::GetThreadCount() const
 //***************************************************************************
 void CThreadManager::InitTLS()
 {
-    static std::atomic<uint32_t> SThreadId = 1;
+    static std::atomic<uint32> SThreadId = 1;
     LThreadId = SThreadId.fetch_add(1);
 }
 

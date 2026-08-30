@@ -141,17 +141,17 @@ public:
     CRioBuffer& operator=(CRioBuffer&&) = delete;
 
 public:
-    bool Initialize(const RIO_EXTENSION_FUNCTION_TABLE* rioTable, uint32_t slotCount, uint32_t slotSize, size_t alignment = 64) noexcept;
+    bool Initialize(const RIO_EXTENSION_FUNCTION_TABLE* rioTable, uint32 slotCount, uint32 slotSize, size_t alignment = 64) noexcept;
     bool Shutdown() noexcept;
 
 public:
-    bool AllocSlot(uint32_t& outSlotIndex) noexcept;
-    bool FreeSlot(uint32_t slotIndex) noexcept;
+    bool AllocSlot(uint32& outSlotIndex) noexcept;
+    bool FreeSlot(uint32 slotIndex) noexcept;
 
 public:
-    bool GetRioBuffer(uint32_t slotIndex, RIO_BUF& outBuffer) const noexcept;
-    void* GetSlotAddress(uint32_t slotIndex) noexcept;
-    const void* GetSlotAddress(uint32_t slotIndex) const noexcept;
+    bool GetRioBuffer(uint32 slotIndex, RIO_BUF& outBuffer) const noexcept;
+    void* GetSlotAddress(uint32 slotIndex) noexcept;
+    const void* GetSlotAddress(uint32 slotIndex) const noexcept;
 
 public:
     //***************************************************************************
@@ -166,7 +166,7 @@ public:
     //***************************************************************************
     // @brief 전체 슬롯 개수를 반환합니다.
     //***************************************************************************
-    uint32_t GetSlotCount() const noexcept
+    uint32 GetSlotCount() const noexcept
     {
         std::shared_lock<std::shared_mutex> lock(_lifecycleMutex);
         return _slotCount;
@@ -175,7 +175,7 @@ public:
     //***************************************************************************
     // @brief 개별 슬롯 크기를 반환합니다.
     //***************************************************************************
-    uint32_t GetSlotSize() const noexcept
+    uint32 GetSlotSize() const noexcept
     {
         std::shared_lock<std::shared_mutex> lock(_lifecycleMutex);
         return _slotSize;
@@ -193,7 +193,7 @@ public:
     //***************************************************************************
     // @brief 현재 할당된 슬롯 개수를 반환합니다.
     //***************************************************************************
-    uint32_t GetAllocatedCount() const noexcept
+    uint32 GetAllocatedCount() const noexcept
     {
         return _allocatedCount.load(std::memory_order_acquire);
     }
@@ -201,7 +201,7 @@ public:
     //***************************************************************************
     // @brief 현재 사용 가능한 슬롯 개수를 반환합니다.
     //***************************************************************************
-    uint32_t GetFreeCount() const noexcept;
+    uint32 GetFreeCount() const noexcept;
 
     //***************************************************************************
     // @brief 초기화 여부를 반환합니다.
@@ -212,14 +212,14 @@ public:
         return _initialized;
     }
 
-    bool IsSlotAllocated(uint32_t slotIndex) const noexcept;
+    bool IsSlotAllocated(uint32 slotIndex) const noexcept;
 
 private:
     static bool IsPowerOfTwo(size_t value) noexcept;
     static bool IsValidAlignment(size_t alignment) noexcept;
 
-    bool ValidateSlotIndex(uint32_t slotIndex) const noexcept;
-    bool ValidateBufferParameters(uint32_t slotCount, uint32_t slotSize, size_t alignment) const noexcept;
+    bool ValidateSlotIndex(uint32 slotIndex) const noexcept;
+    bool ValidateBufferParameters(uint32 slotCount, uint32 slotSize, size_t alignment) const noexcept;
     bool ValidateRioTable(const RIO_EXTENSION_FUNCTION_TABLE* rioTable) const noexcept;
 
     bool AllocateMemory(size_t totalSize, size_t alignment) noexcept;
@@ -244,14 +244,14 @@ private:
     //***************************************************************************
     // 슬롯 설정 및 메모리 크기 정보
     //***************************************************************************
-    uint32_t _slotCount{ 0 };  // 버퍼 내 전체 슬롯 개수
-    uint32_t _slotSize{ 0 };   // 개별 슬롯 1개의 크기 (Bytes)
+    uint32 _slotCount{ 0 };  // 버퍼 내 전체 슬롯 개수
+    uint32 _slotSize{ 0 };   // 개별 슬롯 1개의 크기 (Bytes)
     size_t _totalSize{ 0 };    // 전체 메모리 할당 크기 (Bytes)
     size_t _alignment{ 0 };    // 메모리 바이트 정렬 단위 (예: 64 Bytes)
     
-    std::unique_ptr<std::atomic<uint8_t>[]> _slotState; // 각 슬롯의 현재 할당 상태(Free / Allocated)를 CAS로 추적하여 Double-Free를 검출하는 원자적 상태 배열
+    std::unique_ptr<std::atomic<uint8>[]> _slotState; // 각 슬롯의 현재 할당 상태(Free / Allocated)를 CAS로 추적하여 Double-Free를 검출하는 원자적 상태 배열
     std::unique_ptr<CLockFreeSlotStack> _freeStack;     // 사용 가능한 슬롯 인덱스(0 ~ _slotCount - 1)를 Pop/Push 방식으로 관리하는 Lock-Free 스택
-    std::atomic<uint32_t> _allocatedCount{ 0 };         // 현재 외부에서 할당하여 사용 중인 슬롯의 총 개수 (원자적 카운터)
+    std::atomic<uint32> _allocatedCount{ 0 };         // 현재 외부에서 할당하여 사용 중인 슬롯의 총 개수 (원자적 카운터)
     
     bool _initialized{ false };     // 버퍼 정상 초기화 완료 여부 플래그 (_lifecycleMutex 보호 하에 접근)
 };

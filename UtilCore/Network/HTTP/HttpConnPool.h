@@ -275,7 +275,7 @@ public:
 	{
 		TSessionRef session = std::static_pointer_cast<TSession>(sessionBase);
 
-		int64_t notifiedCount;
+		int64 notifiedCount;
 		if( !connected )
 		{
 			notifiedCount = _notifiedSessionCount.fetch_sub(1, std::memory_order_acq_rel) - 1;
@@ -289,7 +289,7 @@ public:
 		}
 
 		if( _sessionCountChangedHandler )
-			_sessionCountChangedHandler(static_cast<size_t>((std::max)(notifiedCount, static_cast<int64_t>(0))));
+			_sessionCountChangedHandler(static_cast<size_t>((std::max)(notifiedCount, static_cast<int64>(0))));
 	}
 
 	//***************************************************************************
@@ -302,10 +302,10 @@ public:
 	// @details 순수 함수라 타이머/스레드 없이 단위 테스트 가능하도록 public
 	//          static으로 노출한다.
 	//***************************************************************************
-	static int32 ComputeBackoffDelay(uint32_t failCount) noexcept
+	static int32 ComputeBackoffDelay(uint32 failCount) noexcept
 	{
-		uint32_t shift = (std::min<uint32_t>)(failCount, 6);
-		int64_t delay = static_cast<int64_t>(kBackoffBaseDelayMs) << shift;
+		uint32 shift = (std::min<uint32>)(failCount, 6);
+		int64 delay = static_cast<int64>(kBackoffBaseDelayMs) << shift;
 		if( delay > kBackoffMaxDelayMs )
 			delay = kBackoffMaxDelayMs;
 		return static_cast<int32>(delay);
@@ -472,7 +472,7 @@ private:
 		if( _clientService->GetCurrentSessionCount() >= _minIdle )
 			return;
 
-		uint32_t failCount = _consecutiveFailCount.fetch_add(1, std::memory_order_relaxed);
+		uint32 failCount = _consecutiveFailCount.fetch_add(1, std::memory_order_relaxed);
 		int32 delayMs = ComputeBackoffDelay(failCount);
 
 		_delayedTaskQueue.Reserve(delayMs, [this]()
@@ -503,7 +503,7 @@ private:
 private:
 	TServiceRef _clientService; // 이 풀이 소유하는 IOCP/RIO 클라이언트 서비스
 	std::function<void(size_t)> _sessionCountChangedHandler; // 활성 세션 수 변화 통지 콜백 (주로 CHttpConnPoolManager가 등록)
-	std::atomic<int64_t> _notifiedSessionCount{ 0 }; // OnSessionConnStateChanged()로 직접 받은 연결/해제 통지만으로 세는 카운터
+	std::atomic<int64> _notifiedSessionCount{ 0 }; // OnSessionConnStateChanged()로 직접 받은 연결/해제 통지만으로 세는 카운터
 	// (하위 CNetService::_sessions의 정리 타이밍 레이스를 피하기 위해
 	// GetActiveSessionCount() 대신 이 값을 _sessionCountChangedHandler에 씀 — 위 설명 참고)
 	int32 _minIdle;             // host당 항상 유지할 기준 커넥션 수 (ScheduleReconnect()가 지킴)
@@ -513,7 +513,7 @@ private:
 	std::vector<TSessionRef> _idleSessions;      // 요청을 받을 수 있는 유휴 세션 목록
 	std::deque<PendingRequest> _pendingRequests; // 유휴 세션이 없을 때 대기 중인 요청 큐
 
-	std::atomic<uint32_t> _consecutiveFailCount{ 0 }; // 지수 백오프용 연속 연결 실패 횟수
+	std::atomic<uint32> _consecutiveFailCount{ 0 }; // 지수 백오프용 연속 연결 실패 횟수
 	CDelayedTaskQueue _delayedTaskQueue;              // 재연결 작업 예약 큐
 	std::thread _taskThread;                          // _delayedTaskQueue.ProcessExpiredTasks() 전용 스레드
 };

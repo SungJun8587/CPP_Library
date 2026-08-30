@@ -540,7 +540,7 @@ namespace ptime
 	// @brief 현재 시각을 UNIX epoch 기준 밀리초로 반환합니다.
 	// @return epoch 이후 경과 밀리초
 	//***************************************************************************
-	int64_t NowMillis()
+	int64 NowMillis()
 	{
 		return std::chrono::duration_cast<std::chrono::milliseconds>(
 			Clock::now().time_since_epoch()).count();
@@ -550,7 +550,7 @@ namespace ptime
 	// @brief 현재 시각을 UNIX epoch 기준 마이크로초로 반환합니다.
 	// @return epoch 이후 경과 마이크로초
 	//***************************************************************************
-	int64_t NowMicros()
+	int64 NowMicros()
 	{
 		return std::chrono::duration_cast<std::chrono::microseconds>(
 			Clock::now().time_since_epoch()).count();
@@ -659,7 +659,7 @@ namespace ptime
 	// @brief 지정한 밀리초만큼 현재 스레드를 대기시킵니다.
 	// @param ms 대기 시간(밀리초)
 	//***************************************************************************
-	void SleepMillis(int64_t ms)
+	void SleepMillis(int64 ms)
 	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 	}
@@ -841,7 +841,7 @@ namespace ptime
 	// @param seconds 더할 초 (음수면 과거로 이동)
 	// @return 계산된 time_t 값
 	//***************************************************************************
-	time_t AddSeconds(const time_t& t, int64_t seconds)
+	time_t AddSeconds(const time_t& t, int64 seconds)
 	{
 		return static_cast<time_t>(t + seconds);
 	}

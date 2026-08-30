@@ -23,6 +23,11 @@
 //
 //      본 구현은 기존 프로젝트의 PLock을 이용하여 Free List 조작 구간만 보호합니다.
 //
+//      이중 Alloc/Free 탐지(CRioEvent::GetState()/SetState())는 이 _lock으로
+//      보호되는 구간 안에서만 수행되므로 원자 연산이 필요 없으며, release
+//      빌드에서도 항상 활성입니다 — 놓치면 Free List가 self-loop로 오염되며
+//      풀이 크래시 없이 조용히 무너지기 때문입니다.
+//
 // [IMPORTANT LIFETIME RULE]
 //      Alloc()/Free()가 실행 중인 동안 Release()가 동시에 호출되어서는 안 됩니다.
 //***************************************************************************
@@ -73,12 +78,6 @@ private:
     {
         return _inUseCount.load(std::memory_order_acquire);
     }
-
-#ifdef _DEBUG
-    void _DEBUG_SET_INITIAL_STATE(CRioEvent* evt);
-#else
-    void _DEBUG_SET_INITIAL_STATE(CRioEvent*) noexcept;
-#endif
 
 private:
     //***************************************************************************

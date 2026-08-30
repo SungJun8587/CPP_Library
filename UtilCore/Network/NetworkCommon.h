@@ -48,6 +48,8 @@
 #include <Network/RIO/RioSession.h>
 #include <Network/RIO/RioSessionManager.h>
 #include <Network/RIO/RioService.h>
+#include <Network/RIO/RioConnectEvent.h>
+#include <Network/RIO/RioConnectDispatcher.h>
 #endif
 
 #include <Network/NetworkFactory.h>

@@ -82,17 +82,17 @@ public:
 	// @brief 고유 세션 ID를 설정합니다.
 	// @param sessionId 설정할 고유 세션 ID
 	//***************************************************************************
-	void SetSessionId(uint64_t sessionId) noexcept { _sessionId = sessionId; }
+	void SetSessionId(uint64 sessionId) noexcept { _sessionId = sessionId; }
 
 	//***************************************************************************
 	// @brief 고유 세션 ID를 반환합니다.
-	// @return uint64_t 고유 세션 ID
+	// @return uint64 고유 세션 ID
 	//***************************************************************************
-	uint64_t GetSessionId() const noexcept { return _sessionId; }
+	uint64 GetSessionId() const noexcept { return _sessionId; }
 
 public:
 	void			ProcessConnect();	// CIocpListener의 OnAcceptCallback 등에서 연결 수락 완료 후 호출
-	bool			Send(const void* data, uint16_t size) noexcept;
+	bool			Send(const void* data, uint16 size) noexcept;
 
 	//***************************************************************************
 	// @brief ConnectEx로 비동기 연결을 게시합니다 (클라이언트 측 전용).
@@ -162,7 +162,7 @@ private:
 	void			FailConnect(Iocp::CloseReason reason);
 
 private:
-	uint64_t				_sessionId{ 0 };					// 고유 세션 ID
+	uint64				_sessionId{ 0 };					// 고유 세션 ID
 	SOCKET					_socket = INVALID_SOCKET;			// 통신에 사용되는 WinSock 소켓 핸들
 	CNetAddress				_netAddress;						// 원격 클라이언트의 IP 주소 및 포트 정보
 

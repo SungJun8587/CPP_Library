@@ -28,12 +28,12 @@ CRioListener::~CRioListener()
 // @param netAddr 리슨할 네트워크 주소 (IP/Port)
 // @param sessionFactory 세션 생성 팩터리
 // @param onAccept Accept 완료 시 호출될 콜백
-// @param acceptPoolSize 상시 유지할 outstanding AcceptEx 개수
-// @param acceptWorkerCount Accept 전용 IOCP를 소비할 워커 스레드 개수
+// @param acceptPoolSize 상시 유지할 outstanding AcceptEx 개수 (기본 kDefaultAcceptPoolSize)
+// @param acceptWorkerCount Accept 전용 IOCP를 소비할 워커 스레드 개수 (기본 kDefaultAcceptWorkerCount)
 // @return bool 성공 여부
 //***************************************************************************
-bool CRioListener::Start(CRioCoreRef rioCore, CNetAddress netAddr, RioSessionFactory sessionFactory, OnRioAcceptCallback onAccept,
-    uint32_t acceptPoolSize, uint32_t acceptWorkerCount)
+bool CRioListener::StartAccept(CRioCoreRef rioCore, CNetAddress netAddr, RioSessionFactory sessionFactory, OnRioAcceptCallback onAccept,
+    uint32 acceptPoolSize, uint32 acceptWorkerCount)
 {
     if( _isListening.load(std::memory_order_acquire) )
         return false;
@@ -100,7 +100,7 @@ bool CRioListener::Start(CRioCoreRef rioCore, CNetAddress netAddr, RioSessionFac
 
     try
     {
-        for( uint32_t i = 0; i < acceptWorkerCount; ++i )
+        for( uint32 i = 0; i < acceptWorkerCount; ++i )
         {
             _acceptWorkers.emplace_back(&CRioListener::AcceptWorkerLoop, this);
         }
@@ -121,7 +121,7 @@ bool CRioListener::Start(CRioCoreRef rioCore, CNetAddress netAddr, RioSessionFac
     {
         _acceptContexts.reserve(acceptPoolSize);
 
-        for( uint32_t i = 0; i < acceptPoolSize; ++i )
+        for( uint32 i = 0; i < acceptPoolSize; ++i )
         {
             auto context = std::make_unique<RioAcceptContext>();
             RioAcceptContext* rawContext = context.get();
@@ -144,7 +144,7 @@ bool CRioListener::Start(CRioCoreRef rioCore, CNetAddress netAddr, RioSessionFac
 // @param workerCount IOCP 동시성 힌트로 사용할 워커 스레드 개수
 // @return bool 성공 여부
 //***************************************************************************
-bool CRioListener::InitializeAcceptIocp(uint32_t workerCount)
+bool CRioListener::InitializeAcceptIocp(uint32 workerCount)
 {
     _acceptIocp = ::CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, workerCount);
     if( _acceptIocp == nullptr )

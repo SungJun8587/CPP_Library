@@ -19,7 +19,7 @@
 // @param maxSessionCount 최대 세션 수
 // @param workerThreadCount 워커 스레드 개수
 //***************************************************************************
-CIocpServerService::CIocpServerService(CNetAddress address, CIocpCoreRef iocpCore, SessionFactory factory, int32 maxSessionCount, uint32_t workerThreadCount)
+CIocpServerService::CIocpServerService(CNetAddress address, CIocpCoreRef iocpCore, SessionFactory factory, int32 maxSessionCount, uint32 workerThreadCount)
 	: CNetService(NetServiceType::Server, address, factory, maxSessionCount), _iocpCore(iocpCore), _workerThreadCount(workerThreadCount)
 {
 }
@@ -37,7 +37,7 @@ bool CIocpServerService::Start()
 	if( CanStart() == false || _iocpCore == nullptr )
 		return false;
 
-	uint32_t workerThreadCount = _workerThreadCount;
+	uint32 workerThreadCount = _workerThreadCount;
 	if( workerThreadCount == 0 )
 	{
 		unsigned int hwThreads = std::thread::hardware_concurrency();
@@ -45,7 +45,7 @@ bool CIocpServerService::Start()
 	}
 
 	// 1. CThreadManager를 통해 워커 스레드 풀 구동 (자동 TLS 초기화 및 종료 감지 적용)
-	for( uint32_t i = 0; i < workerThreadCount; ++i )
+	for( uint32 i = 0; i < workerThreadCount; ++i )
 	{
 		bool created = _threadManager.CreateThread([this]() {
 			while( !_threadManager.IsShuttingDown() )
@@ -96,7 +96,7 @@ bool CIocpServerService::Start()
 				iocpSession->SetNetAddress(netAddr);
 				service->AddSession(iocpSession);
 
-				uint64_t sessionId = service->GetSessionManager().GenerateSessionId();
+				uint64 sessionId = service->GetSessionManager().GenerateSessionId();
 				iocpSession->SetSessionId(sessionId);
 				service->GetSessionManager().AddSession(sessionId, iocpSession);
 
@@ -172,7 +172,7 @@ void CIocpServerService::Close()
 // @param maxSessionCount 생성할 세션 개수
 // @param workerThreadCount 워커 스레드 개수
 //***************************************************************************
-CIocpClientService::CIocpClientService(CNetAddress address, CIocpCoreRef iocpCore, SessionFactory factory, int32 maxSessionCount, uint32_t workerThreadCount)
+CIocpClientService::CIocpClientService(CNetAddress address, CIocpCoreRef iocpCore, SessionFactory factory, int32 maxSessionCount, uint32 workerThreadCount)
 	: CNetService(NetServiceType::Client, address, factory, maxSessionCount), _iocpCore(iocpCore), _workerThreadCount(workerThreadCount)
 {
 }
@@ -247,7 +247,7 @@ bool CIocpClientService::Start()
 	if( CanStart() == false || _iocpCore == nullptr )
 		return false;
 
-	uint32_t workerThreadCount = _workerThreadCount;
+	uint32 workerThreadCount = _workerThreadCount;
 	if( workerThreadCount == 0 )
 	{
 		unsigned int hwThreads = std::thread::hardware_concurrency();
@@ -255,7 +255,7 @@ bool CIocpClientService::Start()
 	}
 
 	// 1. 클라이언트 워커 스레드 풀 구동
-	for( uint32_t i = 0; i < workerThreadCount; ++i )
+	for( uint32 i = 0; i < workerThreadCount; ++i )
 	{
 		bool created = _threadManager.CreateThread([this]() {
 			while( !_threadManager.IsShuttingDown() )

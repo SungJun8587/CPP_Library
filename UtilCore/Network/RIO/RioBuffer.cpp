@@ -87,7 +87,7 @@ bool CRioBuffer::IsValidAlignment(size_t alignment) noexcept
 // @note
 //     호출자는 lifecycle shared lock을 확보한 상태에서 호출합니다.
 //***************************************************************************
-bool CRioBuffer::ValidateSlotIndex(uint32_t slotIndex) const noexcept
+bool CRioBuffer::ValidateSlotIndex(uint32 slotIndex) const noexcept
 {
     if( !_initialized ) return false;
     if( slotIndex >= _slotCount ) return false;
@@ -104,7 +104,7 @@ bool CRioBuffer::ValidateSlotIndex(uint32_t slotIndex) const noexcept
 // @param alignment 메모리 정렬 단위 (Bytes)
 // @return bool 파라미터 유효성 여부
 //***************************************************************************
-bool CRioBuffer::ValidateBufferParameters(uint32_t slotCount, uint32_t slotSize, size_t alignment) const noexcept
+bool CRioBuffer::ValidateBufferParameters(uint32 slotCount, uint32 slotSize, size_t alignment) const noexcept
 {
     if( slotCount == 0 || slotSize == 0 ) return false;
     if( !IsValidAlignment(alignment) ) return false;
@@ -259,7 +259,7 @@ void CRioBuffer::ResetRuntimeState() noexcept
 // @param alignment 메모리 정렬 단위 (Bytes)
 // @return bool 초기화 성공 여부
 //***************************************************************************
-bool CRioBuffer::Initialize(const RIO_EXTENSION_FUNCTION_TABLE* rioTable, uint32_t slotCount, uint32_t slotSize, size_t alignment) noexcept
+bool CRioBuffer::Initialize(const RIO_EXTENSION_FUNCTION_TABLE* rioTable, uint32 slotCount, uint32 slotSize, size_t alignment) noexcept
 {
     std::unique_lock<std::shared_mutex> lifecycleLock(_lifecycleMutex);
 
@@ -331,7 +331,7 @@ bool CRioBuffer::Initialize(const RIO_EXTENSION_FUNCTION_TABLE* rioTable, uint32
     //***********************************************************************
     try
     {
-        _slotState = std::make_unique<std::atomic<uint8_t>[]>(slotCount);
+        _slotState = std::make_unique<std::atomic<uint8>[]>(slotCount);
     }
     catch( ... )
     {
@@ -343,9 +343,9 @@ bool CRioBuffer::Initialize(const RIO_EXTENSION_FUNCTION_TABLE* rioTable, uint32
     //***********************************************************************
     // 모든 slot은 최초 Free 상태
     //***********************************************************************
-    for( uint32_t i = 0; i < slotCount; ++i )
+    for( uint32 i = 0; i < slotCount; ++i )
     {
-        _slotState[i].store(static_cast<uint8_t>(Rio::SlotState::Free), std::memory_order_relaxed);
+        _slotState[i].store(static_cast<uint8>(Rio::SlotState::Free), std::memory_order_relaxed);
     }
 
     //***********************************************************************
@@ -409,7 +409,7 @@ bool CRioBuffer::Initialize(const RIO_EXTENSION_FUNCTION_TABLE* rioTable, uint32
 //     내부 buffer를 파괴할 수 없습니다.
 //
 //***************************************************************************
-bool CRioBuffer::AllocSlot(uint32_t& outSlotIndex) noexcept
+bool CRioBuffer::AllocSlot(uint32& outSlotIndex) noexcept
 {
     outSlotIndex = Rio::kInvalidSlotIndex;
 
@@ -419,7 +419,7 @@ bool CRioBuffer::AllocSlot(uint32_t& outSlotIndex) noexcept
     if( _freeStack == nullptr || _slotState == nullptr ) return false;
     if( _buffer == nullptr || _bufferId == RIO_INVALID_BUFFERID ) return false;
 
-    uint32_t slotIndex = Rio::kInvalidSlotIndex;
+    uint32 slotIndex = Rio::kInvalidSlotIndex;
 
     //***********************************************************************
     // Lock-free free list에서 slot 하나 Pop
@@ -445,9 +445,9 @@ bool CRioBuffer::AllocSlot(uint32_t& outSlotIndex) noexcept
     //
     // 정상적인 free stack invariant가 유지된다면 반드시 성공해야 합니다.
     //***********************************************************************
-    uint8_t expected = static_cast<uint8_t>(Rio::SlotState::Free);
+    uint8 expected = static_cast<uint8>(Rio::SlotState::Free);
     const bool stateChanged = _slotState[slotIndex].compare_exchange_strong(
-        expected, static_cast<uint8_t>(Rio::SlotState::Allocated),
+        expected, static_cast<uint8>(Rio::SlotState::Allocated),
         std::memory_order_acq_rel, std::memory_order_acquire);
 
     if( !stateChanged )
@@ -462,19 +462,19 @@ bool CRioBuffer::AllocSlot(uint32_t& outSlotIndex) noexcept
     //***********************************************************************
     // allocated count 증가
     //***********************************************************************
-    const uint32_t previous = _allocatedCount.fetch_add(1, std::memory_order_acq_rel);
+    const uint32 previous = _allocatedCount.fetch_add(1, std::memory_order_acq_rel);
 
-    if( previous == (std::numeric_limits<uint32_t>::max)() )
+    if( previous == (std::numeric_limits<uint32>::max)() )
     {
         assert(false && "CRioBuffer allocated count overflow");
 
-        // 이론적으로 slotCount가 uint32_t 범위이므로 실제 발생하지 않아야 합니다.
+        // 이론적으로 slotCount가 uint32 범위이므로 실제 발생하지 않아야 합니다.
         // 그래도 방어적으로 state를 원복합니다.
         _allocatedCount.fetch_sub(1, std::memory_order_acq_rel);
 
-        uint8_t allocated = static_cast<uint8_t>(Rio::SlotState::Allocated);
+        uint8 allocated = static_cast<uint8>(Rio::SlotState::Allocated);
         const bool reverted = _slotState[slotIndex].compare_exchange_strong(
-            allocated, static_cast<uint8_t>(Rio::SlotState::Free),
+            allocated, static_cast<uint8>(Rio::SlotState::Free),
             std::memory_order_acq_rel, std::memory_order_acquire);
 
         if( !reverted )
@@ -510,7 +510,7 @@ bool CRioBuffer::AllocSlot(uint32_t& outSlotIndex) noexcept
 //     로 호출합니다.
 //
 //***************************************************************************
-bool CRioBuffer::FreeSlot(uint32_t slotIndex) noexcept
+bool CRioBuffer::FreeSlot(uint32 slotIndex) noexcept
 {
     std::shared_lock<std::shared_mutex> lifecycleLock(_lifecycleMutex);
 
@@ -528,9 +528,9 @@ bool CRioBuffer::FreeSlot(uint32_t slotIndex) noexcept
     //
     // 이미 Free 상태라면 double-free로 판단합니다.
     //***********************************************************************
-    uint8_t expected = static_cast<uint8_t>(Rio::SlotState::Allocated);
+    uint8 expected = static_cast<uint8>(Rio::SlotState::Allocated);
     const bool stateChanged = _slotState[slotIndex].compare_exchange_strong(
-        expected, static_cast<uint8_t>(Rio::SlotState::Free),
+        expected, static_cast<uint8>(Rio::SlotState::Free),
         std::memory_order_acq_rel, std::memory_order_acquire);
 
     if( !stateChanged )
@@ -550,7 +550,7 @@ bool CRioBuffer::FreeSlot(uint32_t slotIndex) noexcept
     //***********************************************************************
     // allocated count 감소
     //***********************************************************************
-    const uint32_t previous = _allocatedCount.fetch_sub(1, std::memory_order_acq_rel);
+    const uint32 previous = _allocatedCount.fetch_sub(1, std::memory_order_acq_rel);
 
     if( previous == 0 )
     {
@@ -582,7 +582,7 @@ bool CRioBuffer::FreeSlot(uint32_t slotIndex) noexcept
 //     RIO API에 직접 전달할 수 있는 descriptor입니다.
 //
 //***************************************************************************
-bool CRioBuffer::GetRioBuffer(uint32_t slotIndex, RIO_BUF& outBuffer) const noexcept
+bool CRioBuffer::GetRioBuffer(uint32 slotIndex, RIO_BUF& outBuffer) const noexcept
 {
     outBuffer.BufferId = RIO_INVALID_BUFFERID;
     outBuffer.Offset = 0;
@@ -595,8 +595,8 @@ bool CRioBuffer::GetRioBuffer(uint32_t slotIndex, RIO_BUF& outBuffer) const noex
     //***********************************************************************
     // slot은 caller가 AllocSlot()으로 확보한 상태여야 합니다.
     //***********************************************************************
-    const uint8_t state = _slotState[slotIndex].load(std::memory_order_acquire);
-    if( state != static_cast<uint8_t>(Rio::SlotState::Allocated) )
+    const uint8 state = _slotState[slotIndex].load(std::memory_order_acquire);
+    if( state != static_cast<uint8>(Rio::SlotState::Allocated) )
     {
         assert(false && "GetRioBuffer called for non-allocated slot");
         return false;
@@ -656,14 +656,14 @@ bool CRioBuffer::GetRioBuffer(uint32_t slotIndex, RIO_BUF& outBuffer) const noex
 // @param slotIndex 대상 슬롯 인덱스
 // @return void* 슬롯 메모리 시작 주소 (유효하지 않을 경우 nullptr)
 //***************************************************************************
-void* CRioBuffer::GetSlotAddress(uint32_t slotIndex) noexcept
+void* CRioBuffer::GetSlotAddress(uint32 slotIndex) noexcept
 {
     std::shared_lock<std::shared_mutex> lifecycleLock(_lifecycleMutex);
 
     if( !ValidateSlotIndex(slotIndex) ) return nullptr;
 
-    const uint8_t state = _slotState[slotIndex].load(std::memory_order_acquire);
-    if( state != static_cast<uint8_t>(Rio::SlotState::Allocated) ) return nullptr;
+    const uint8 state = _slotState[slotIndex].load(std::memory_order_acquire);
+    if( state != static_cast<uint8>(Rio::SlotState::Allocated) ) return nullptr;
 
     const size_t index = static_cast<size_t>(slotIndex);
     const size_t size = static_cast<size_t>(_slotSize);
@@ -673,7 +673,7 @@ void* CRioBuffer::GetSlotAddress(uint32_t slotIndex) noexcept
     const size_t offset = index * size;
     if( offset >= _totalSize || size > _totalSize - offset ) return nullptr;
 
-    return static_cast<uint8_t*>(_buffer) + offset;
+    return static_cast<uint8*>(_buffer) + offset;
 }
 
 //***************************************************************************
@@ -681,14 +681,14 @@ void* CRioBuffer::GetSlotAddress(uint32_t slotIndex) noexcept
 // @param slotIndex 대상 슬롯 인덱스
 // @return const void* 슬롯 메모리 시작 주소 (유효하지 않을 경우 nullptr)
 //***************************************************************************
-const void* CRioBuffer::GetSlotAddress(uint32_t slotIndex) const noexcept
+const void* CRioBuffer::GetSlotAddress(uint32 slotIndex) const noexcept
 {
     std::shared_lock<std::shared_mutex> lifecycleLock(_lifecycleMutex);
 
     if( !ValidateSlotIndex(slotIndex) ) return nullptr;
 
-    const uint8_t state = _slotState[slotIndex].load(std::memory_order_acquire);
-    if( state != static_cast<uint8_t>(Rio::SlotState::Allocated) ) return nullptr;
+    const uint8 state = _slotState[slotIndex].load(std::memory_order_acquire);
+    if( state != static_cast<uint8>(Rio::SlotState::Allocated) ) return nullptr;
 
     const size_t index = static_cast<size_t>(slotIndex);
     const size_t size = static_cast<size_t>(_slotSize);
@@ -698,20 +698,20 @@ const void* CRioBuffer::GetSlotAddress(uint32_t slotIndex) const noexcept
     const size_t offset = index * size;
     if( offset >= _totalSize || size > _totalSize - offset ) return nullptr;
 
-    return static_cast<const uint8_t*>(_buffer) + offset;
+    return static_cast<const uint8*>(_buffer) + offset;
 }
 
 //***************************************************************************
 // @brief 현재 free slot 개수를 반환합니다.
-// @return uint32_t 사용 가능한 슬롯 개수
+// @return uint32 사용 가능한 슬롯 개수
 //***************************************************************************
-uint32_t CRioBuffer::GetFreeCount() const noexcept
+uint32 CRioBuffer::GetFreeCount() const noexcept
 {
     std::shared_lock<std::shared_mutex> lifecycleLock(_lifecycleMutex);
 
     if( !_initialized ) return 0;
 
-    const uint32_t allocated = _allocatedCount.load(std::memory_order_acquire);
+    const uint32 allocated = _allocatedCount.load(std::memory_order_acquire);
     if( allocated > _slotCount )
     {
         assert(false && "CRioBuffer allocated count exceeds slot count");
@@ -726,13 +726,13 @@ uint32_t CRioBuffer::GetFreeCount() const noexcept
 // @param slotIndex 확인할 슬롯 인덱스
 // @return bool 할당(Allocated) 상태 여부
 //***************************************************************************
-bool CRioBuffer::IsSlotAllocated(uint32_t slotIndex) const noexcept
+bool CRioBuffer::IsSlotAllocated(uint32 slotIndex) const noexcept
 {
     std::shared_lock<std::shared_mutex> lifecycleLock(_lifecycleMutex);
 
     if( !_initialized || slotIndex >= _slotCount || _slotState == nullptr ) return false;
 
-    return _slotState[slotIndex].load(std::memory_order_acquire) == static_cast<uint8_t>(Rio::SlotState::Allocated);
+    return _slotState[slotIndex].load(std::memory_order_acquire) == static_cast<uint8>(Rio::SlotState::Allocated);
 }
 
 //***************************************************************************
@@ -790,7 +790,7 @@ bool CRioBuffer::Shutdown() noexcept
     //***********************************************************************
     // 현재 보유 중인 slot이 있으면 절대로 resource를 파괴하지 않습니다.
     //***********************************************************************
-    const uint32_t allocated = _allocatedCount.load(std::memory_order_acquire);
+    const uint32 allocated = _allocatedCount.load(std::memory_order_acquire);
     if( allocated != 0 )
     {
         assert(false && "CRioBuffer::Shutdown called with outstanding slots");
@@ -817,10 +817,10 @@ bool CRioBuffer::Shutdown() noexcept
     //
     // _allocatedCount == 0과 함께 이중 검증을 수행합니다.
     //***********************************************************************
-    for( uint32_t i = 0; i < _slotCount; ++i )
+    for( uint32 i = 0; i < _slotCount; ++i )
     {
-        const uint8_t state = _slotState[i].load(std::memory_order_acquire);
-        if( state != static_cast<uint8_t>(Rio::SlotState::Free) )
+        const uint8 state = _slotState[i].load(std::memory_order_acquire);
+        if( state != static_cast<uint8>(Rio::SlotState::Free) )
         {
             assert(false && "CRioBuffer slot remains allocated during Shutdown");
             return false;

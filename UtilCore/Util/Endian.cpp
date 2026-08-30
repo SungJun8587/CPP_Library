@@ -13,7 +13,7 @@
 
 //***************************************************************************
 //
-uint8_t HighByteFromBigEndian(const uint16_t& wData)
+uint8 HighByteFromBigEndian(const uint16& wData)
 {
 #ifdef HAVE_BIG_ENDIAN
 	return HighByteFromHostEndian(wData);
@@ -24,7 +24,7 @@ uint8_t HighByteFromBigEndian(const uint16_t& wData)
 
 //***************************************************************************
 //
-uint16_t HighWordFromBigEndian(const uint32_t& dwData)
+uint16 HighWordFromBigEndian(const uint32& dwData)
 {
 #ifdef HAVE_BIG_ENDIAN
 	return HighWordFromHostEndian(dwData);
@@ -35,7 +35,7 @@ uint16_t HighWordFromBigEndian(const uint32_t& dwData)
 
 //***************************************************************************
 //
-uint8_t HighByteFromLittleEndian(const uint16_t& wData)
+uint8 HighByteFromLittleEndian(const uint16& wData)
 {
 #ifdef HAVE_BIG_ENDIAN
 	return LowByteFromHostEndian(wData);
@@ -46,7 +46,7 @@ uint8_t HighByteFromLittleEndian(const uint16_t& wData)
 
 //***************************************************************************
 //
-uint16_t HighWordFromLittleEndian(const uint32_t& dwData)
+uint16 HighWordFromLittleEndian(const uint32& dwData)
 {
 #ifdef HAVE_BIG_ENDIAN
 	return LowWordFromHostEndian(dwData);
@@ -57,7 +57,7 @@ uint16_t HighWordFromLittleEndian(const uint32_t& dwData)
 
 //***************************************************************************
 //
-uint8_t LowByteFromBigEndian(const uint16_t& wData)
+uint8 LowByteFromBigEndian(const uint16& wData)
 {
 #ifdef HAVE_BIG_ENDIAN
 	return LowByteFromHostEndian(wData);
@@ -68,7 +68,7 @@ uint8_t LowByteFromBigEndian(const uint16_t& wData)
 
 //***************************************************************************
 //
-uint16_t LowWordFromBigEndian(const uint32_t& dwData)
+uint16 LowWordFromBigEndian(const uint32& dwData)
 {
 #ifdef HAVE_BIG_ENDIAN
 	return LowWordFromHostEndian(dwData);
@@ -79,7 +79,7 @@ uint16_t LowWordFromBigEndian(const uint32_t& dwData)
 
 //***************************************************************************
 //
-uint8_t LowByteFromLittleEndian(const uint16_t& wData)
+uint8 LowByteFromLittleEndian(const uint16& wData)
 {
 #ifdef HAVE_BIG_ENDIAN
 	return HighByteFromHostEndian(wData);
@@ -90,7 +90,7 @@ uint8_t LowByteFromLittleEndian(const uint16_t& wData)
 
 //***************************************************************************
 //
-uint16_t LowWordFromLittleEndian(const uint32_t& dwData)
+uint16 LowWordFromLittleEndian(const uint32& dwData)
 {
 #ifdef HAVE_BIG_ENDIAN
 	return HighWordFromHostEndian(dwData);
@@ -101,7 +101,7 @@ uint16_t LowWordFromLittleEndian(const uint32_t& dwData)
 
 //***************************************************************************
 //
-uint16_t BigEndianWord(const uint8_t& HighByte, const uint8_t& LowByte)
+uint16 BigEndianWord(const uint8& HighByte, const uint8& LowByte)
 {
 #ifdef HAVE_BIG_ENDIAN
 	return HostEndianWord(HighByte, LowByte);
@@ -112,7 +112,7 @@ uint16_t BigEndianWord(const uint8_t& HighByte, const uint8_t& LowByte)
 
 //***************************************************************************
 //
-uint32_t BigEndianDoubleWord(const uint16_t& HighWord, const uint16_t& LowWord)
+uint32 BigEndianDoubleWord(const uint16& HighWord, const uint16& LowWord)
 {
 #ifdef HAVE_BIG_ENDIAN
 	return HostEndianDoubleWord(HighWord, LowWord);
@@ -123,7 +123,7 @@ uint32_t BigEndianDoubleWord(const uint16_t& HighWord, const uint16_t& LowWord)
 
 //***************************************************************************
 //
-uint16_t LittleEndianWord(const uint8_t& HighByte, const uint8_t& LowByte)
+uint16 LittleEndianWord(const uint8& HighByte, const uint8& LowByte)
 {
 #ifdef HAVE_BIG_ENDIAN
 	return (LowByte << 8) | HighByte;
@@ -134,7 +134,7 @@ uint16_t LittleEndianWord(const uint8_t& HighByte, const uint8_t& LowByte)
 
 //***************************************************************************
 //
-uint32_t LittleEndianDoubleWord(const uint16_t& HighWord, const uint16_t& LowWord)
+uint32 LittleEndianDoubleWord(const uint16& HighWord, const uint16& LowWord)
 {
 #ifdef HAVE_BIG_ENDIAN
 	return (LowWord << 16) | HighWord;
@@ -145,7 +145,7 @@ uint32_t LittleEndianDoubleWord(const uint16_t& HighWord, const uint16_t& LowWor
 
 //***************************************************************************
 //
-uint16_t BigEndianToHostEndian(const uint16_t wData)
+uint16 BigEndianToHostEndian(const uint16 wData)
 {
 #ifdef HAVE_LITTLE_ENDIAN
 	return ByteSwap2(wData);
@@ -156,51 +156,7 @@ uint16_t BigEndianToHostEndian(const uint16_t wData)
 
 //***************************************************************************
 //
-uint32_t BigEndianToHostEndian(const uint32_t dwData)
-{
-#ifdef HAVE_LITTLE_ENDIAN
-	return ByteSwap4(dwData);
-#elif defined(HAVE_LITTLE_ENDIAN)
-	return dwData;
-#endif 
-}
-
-//***************************************************************************
-//
-uint16_t LittleEndianToHostEndian(const uint16_t wData)
-{
-#ifdef HAVE_BIG_ENDIAN
-	return ByteSwap2(wData);
-#elif defined(HAVE_LITTLE_ENDIAN)
-	return wData;
-#endif 
-}
-
-//***************************************************************************
-//
-uint32_t LittleEndianToHostEndian(const uint32_t dwData)
-{
-#ifdef HAVE_BIG_ENDIAN
-	return ByteSwap4(dwData);
-#elif defined(HAVE_LITTLE_ENDIAN)
-	return dwData;
-#endif 
-}
-
-//***************************************************************************
-//
-uint16_t HostEndianToBigEndian(const uint16_t wData)
-{
-#ifdef HAVE_LITTLE_ENDIAN
-	return ByteSwap2(wData);
-#elif defined(HAVE_LITTLE_ENDIAN)
-	return wData;
-#endif 
-}
-
-//***************************************************************************
-//
-uint32_t HostEndianToBigEndian(const uint32_t dwData)
+uint32 BigEndianToHostEndian(const uint32 dwData)
 {
 #ifdef HAVE_LITTLE_ENDIAN
 	return ByteSwap4(dwData);
@@ -211,7 +167,7 @@ uint32_t HostEndianToBigEndian(const uint32_t dwData)
 
 //***************************************************************************
 //
-uint16_t HostEndianToLittleEndian(const uint16_t wData)
+uint16 LittleEndianToHostEndian(const uint16 wData)
 {
 #ifdef HAVE_BIG_ENDIAN
 	return ByteSwap2(wData);
@@ -222,7 +178,51 @@ uint16_t HostEndianToLittleEndian(const uint16_t wData)
 
 //***************************************************************************
 //
-uint32_t HostEndianToLittleEndian(const uint32_t dwData)
+uint32 LittleEndianToHostEndian(const uint32 dwData)
+{
+#ifdef HAVE_BIG_ENDIAN
+	return ByteSwap4(dwData);
+#elif defined(HAVE_LITTLE_ENDIAN)
+	return dwData;
+#endif 
+}
+
+//***************************************************************************
+//
+uint16 HostEndianToBigEndian(const uint16 wData)
+{
+#ifdef HAVE_LITTLE_ENDIAN
+	return ByteSwap2(wData);
+#elif defined(HAVE_LITTLE_ENDIAN)
+	return wData;
+#endif 
+}
+
+//***************************************************************************
+//
+uint32 HostEndianToBigEndian(const uint32 dwData)
+{
+#ifdef HAVE_LITTLE_ENDIAN
+	return ByteSwap4(dwData);
+#elif defined(HAVE_LITTLE_ENDIAN)
+	return dwData;
+#endif 
+}
+
+//***************************************************************************
+//
+uint16 HostEndianToLittleEndian(const uint16 wData)
+{
+#ifdef HAVE_BIG_ENDIAN
+	return ByteSwap2(wData);
+#elif defined(HAVE_LITTLE_ENDIAN)
+	return wData;
+#endif 
+}
+
+//***************************************************************************
+//
+uint32 HostEndianToLittleEndian(const uint32 dwData)
 {
 #ifdef HAVE_BIG_ENDIAN
 	return ByteSwap4(dwData);

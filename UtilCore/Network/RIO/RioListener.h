@@ -91,22 +91,6 @@ using OnRioAcceptCallback = std::function<void(CRioSessionRef session, SOCKET cl
 class CRioListener : public std::enable_shared_from_this<CRioListener>
 {
 public:
-    //***************************************************************************
-    // @brief Accept Pool에 상시 유지할 AcceptContext(=outstanding AcceptEx) 개수 기본값.
-    //        CIocpListener의 기본 acceptCount(10)와 동일한 수준으로 맞췄다.
-    //***************************************************************************
-    static constexpr uint32_t kDefaultAcceptPoolSize = 10;
-
-    //***************************************************************************
-    // @brief Accept 전용 IOCP를 소비할 워커 스레드 기본 개수.
-    //        연결 시도 자체는 CRioConnectDispatcher와 마찬가지로 상대적으로
-    //        빈도가 낮고(데이터 송수신과 달리), 완료 처리(SetUpdateAcceptContext
-    //        ~ Callback)도 짧은 논블로킹 호출 위주라 1개로도 충분하다고 판단했다.
-    //        대규모 동시 접속 스트레스 테스트 결과에 따라 늘릴 수 있도록 Start()
-    //        파라미터로 노출한다.
-    //***************************************************************************
-    static constexpr uint32_t kDefaultAcceptWorkerCount = 1;
-
     CRioListener();
     virtual ~CRioListener();
 
@@ -127,8 +111,8 @@ public:
     // @return bool 소켓 생성/바인드/리슨, Accept IOCP 생성, 워커 시작, 초기 Pool 게시까지
     //         전부 성공하면 true
     //***************************************************************************
-    bool Start(CRioCoreRef rioCore, CNetAddress netAddr, RioSessionFactory sessionFactory, OnRioAcceptCallback onAccept = nullptr,
-        uint32_t acceptPoolSize = kDefaultAcceptPoolSize, uint32_t acceptWorkerCount = kDefaultAcceptWorkerCount);
+    bool StartAccept(CRioCoreRef rioCore, CNetAddress netAddr, RioSessionFactory sessionFactory, OnRioAcceptCallback onAccept = nullptr,
+        uint32 acceptPoolSize = Rio::kDefaultAcceptPoolSize, uint32 acceptWorkerCount = Rio::kDefaultAcceptWorkerCount);
 
     //***************************************************************************
     // @brief 리스너를 정지합니다.
@@ -180,7 +164,7 @@ private:
 
     static constexpr int32 kMaxAcceptRetry = 5;
 
-    bool InitializeAcceptIocp(uint32_t workerCount);
+    bool InitializeAcceptIocp(uint32 workerCount);
 
     //***************************************************************************
     // @brief 지정된 AcceptContext에 대해 신규 클라이언트 소켓을 만들고 AcceptEx를

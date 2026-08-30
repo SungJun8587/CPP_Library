@@ -56,7 +56,7 @@ public:
     // @param item 삽입할 데이터 항목
     // @return 푸시 후의 전체 큐 크기
     //***************************************************************************
-    int64_t PushAndGetSize(T item)
+    int64 PushAndGetSize(T item)
     {
         if( _stopped.load(std::memory_order_relaxed) )
             return _size.load(std::memory_order_relaxed);
@@ -82,7 +82,7 @@ public:
         {
             _inQueue.push(std::move(item));
         }
-        _size.fetch_add(static_cast<int64_t>(items.size()), std::memory_order_relaxed);
+        _size.fetch_add(static_cast<int64>(items.size()), std::memory_order_relaxed);
         items.clear();
     }
 
@@ -138,7 +138,7 @@ public:
         }
 
         // 이동시킨 만큼 전체 크기 카운터를 원자적으로 차감
-        _size.fetch_sub(static_cast<int64_t>(movedCount), std::memory_order_relaxed);
+        _size.fetch_sub(static_cast<int64>(movedCount), std::memory_order_relaxed);
     }
 
     //***************************************************************************
@@ -152,7 +152,7 @@ public:
     //***************************************************************************
     // @brief 현재 큐에 대기 중인 전체 아이템 개수를 반환합니다.
     //***************************************************************************
-    int64_t GetSize() const
+    int64 GetSize() const
     {
         return _size.load(std::memory_order_relaxed);
     }
@@ -173,7 +173,7 @@ public:
 private:
     PLock                   _lock;              // 플랫폼 통합 단독 락 객체
     CQueue<T>               _inQueue;           // 내부 입력을 받는 큐 버퍼
-    std::atomic<int64_t>    _size{ 0 };         // 락 경합 없는 빠른 크기 조회를 위한 아토믹 카운터
+    std::atomic<int64>    _size{ 0 };         // 락 경합 없는 빠른 크기 조회를 위한 아토믹 카운터
     std::atomic<bool>       _stopped{ false };  // 종료 플래그 추가
 };
 

@@ -71,10 +71,10 @@
 //***************************************************************************
 struct SpinLockPreset
 {
-    struct LightWeight { static constexpr uint32_t MaxPauseBackoff = 256;  static constexpr uint32_t MaxYieldCount = 16; };
-    struct Default { static constexpr uint32_t MaxPauseBackoff = 1024; static constexpr uint32_t MaxYieldCount = 64; };
-    struct HeavyContention { static constexpr uint32_t MaxPauseBackoff = 4096; static constexpr uint32_t MaxYieldCount = 128; };
-    struct OverSubscribed { static constexpr uint32_t MaxPauseBackoff = 32;   static constexpr uint32_t MaxYieldCount = 8; };
+    struct LightWeight { static constexpr uint32 MaxPauseBackoff = 256;  static constexpr uint32 MaxYieldCount = 16; };
+    struct Default { static constexpr uint32 MaxPauseBackoff = 1024; static constexpr uint32 MaxYieldCount = 64; };
+    struct HeavyContention { static constexpr uint32 MaxPauseBackoff = 4096; static constexpr uint32 MaxYieldCount = 128; };
+    struct OverSubscribed { static constexpr uint32 MaxPauseBackoff = 32;   static constexpr uint32 MaxYieldCount = 8; };
 };
 
 //***************************************************************************
@@ -174,18 +174,18 @@ private:
 //***************************************************************************
 struct RWSpinLockPreset
 {
-    struct ReadHeavy { static constexpr uint32_t MaxPauseBackoff = 512;  static constexpr uint32_t MaxYieldCount = 32; };
-    struct Default { static constexpr uint32_t MaxPauseBackoff = 1024; static constexpr uint32_t MaxYieldCount = 64; };
-    struct WriteContention { static constexpr uint32_t MaxPauseBackoff = 2048; static constexpr uint32_t MaxYieldCount = 128; };
+    struct ReadHeavy { static constexpr uint32 MaxPauseBackoff = 512;  static constexpr uint32 MaxYieldCount = 32; };
+    struct Default { static constexpr uint32 MaxPauseBackoff = 1024; static constexpr uint32 MaxYieldCount = 64; };
+    struct WriteContention { static constexpr uint32 MaxPauseBackoff = 2048; static constexpr uint32 MaxYieldCount = 128; };
 };
 
 namespace RWSpinLockBits
 {
-    inline constexpr int32_t WRITE_LOCKED = 0x00000001;
-    inline constexpr int32_t READER_COUNT_MASK = 0x0000FFFE;
-    inline constexpr int32_t READER_ONE = 0x00000002;
-    inline constexpr int32_t WRITER_WAITING_MASK = static_cast<int32_t>(0xFFFF0000u);
-    inline constexpr int32_t WRITER_ONE = 0x00010000;
+    inline constexpr int32 WRITE_LOCKED = 0x00000001;
+    inline constexpr int32 READER_COUNT_MASK = 0x0000FFFE;
+    inline constexpr int32 READER_ONE = 0x00000002;
+    inline constexpr int32 WRITER_WAITING_MASK = static_cast<int32>(0xFFFF0000u);
+    inline constexpr int32 WRITER_ONE = 0x00010000;
 } // namespace RWSpinLockBits
 
 //***************************************************************************
@@ -246,14 +246,14 @@ public:
 
 private:
     // SpinLock과 동일한 이유로, 언더플로우 가능성을 먼저 명확한 에러로 걸러낸다.
-    static_assert(sizeof(std::atomic<int32_t>) <= kCacheLineSize,
-        "std::atomic<int32_t> exceeds the configured cache line size");
+    static_assert(sizeof(std::atomic<int32>) <= kCacheLineSize,
+        "std::atomic<int32> exceeds the configured cache line size");
 
-    std::atomic<int32_t> _state{ 0 };		// 락의 상태를 관리하는 비트 필드 아토믹 변수
+    std::atomic<int32> _state{ 0 };		// 락의 상태를 관리하는 비트 필드 아토믹 변수
     // SpinLock과 동일한 이유(정렬과 크기는 별개 보장)로 명시적 패딩을 둔다.
     // hardware_destructive_interference_size가 64보다 큰 플랫폼에서는
     // 이 패딩과 객체 전체 크기도 그만큼 커진다 — 의도된 동작이다.
-    char _padding[kCacheLineSize - sizeof(std::atomic<int32_t>)]{};	// 캐시라인 크기 맞춤용 패딩 배열
+    char _padding[kCacheLineSize - sizeof(std::atomic<int32>)]{};	// 캐시라인 크기 맞춤용 패딩 배열
 };
 
 static_assert(sizeof(RWSpinLock<RWSpinLockPreset::Default>) == kCacheLineSize,

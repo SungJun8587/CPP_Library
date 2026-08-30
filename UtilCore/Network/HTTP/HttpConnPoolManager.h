@@ -23,7 +23,7 @@
 // @brief hostname을 CNetAddress로 변환하는 DNS resolve 콜백.
 // @return bool 성공 여부. 실패(호스트를 못 찾음 등) 시 false, outAddr은 미정의.
 //***************************************************************************
-using HttpDnsResolveFn = std::function<bool(const std::string& hostname, uint16_t port, CNetAddress& outAddr)>;
+using HttpDnsResolveFn = std::function<bool(const std::string& hostname, uint16 port, CNetAddress& outAddr)>;
 
 //***************************************************************************
 // @brief hostname + resolve된 주소로 CHttpConnPoolT<...> 인스턴스를 만드는 콜백.
@@ -115,7 +115,7 @@ public:
 	//          Start()한다. resolve 실패, 풀 생성 실패, Start() 실패 중 어느
 	//          것이든 onComplete를 즉시 success=false로 호출한다.
 	//***************************************************************************
-	void SendRequest(const std::string& hostname, uint16_t port, const char* data, size_t len, HttpRequestCompletionHandler onComplete)
+	void SendRequest(const std::string& hostname, uint16 port, const char* data, size_t len, HttpRequestCompletionHandler onComplete)
 	{
 		IHttpConnPoolRef pool = GetOrCreatePool(hostname, port);
 		if( !pool )
@@ -231,7 +231,7 @@ private:
 	// @param port 목적지 포트
 	// @return IHttpConnPoolRef 찾았거나 새로 만든 풀. resolve/생성/Start() 실패 시 nullptr.
 	//***************************************************************************
-	IHttpConnPoolRef GetOrCreatePool(const std::string& hostname, uint16_t port)
+	IHttpConnPoolRef GetOrCreatePool(const std::string& hostname, uint16 port)
 	{
 		std::string key = MakeKey(hostname, port);
 
@@ -297,7 +297,7 @@ private:
 	//***************************************************************************
 	// @brief hostname:port로 캐시 키 문자열을 만듭니다.
 	//***************************************************************************
-	static std::string MakeKey(const std::string& hostname, uint16_t port)
+	static std::string MakeKey(const std::string& hostname, uint16 port)
 	{
 		return hostname + ":" + std::to_string(port);
 	}

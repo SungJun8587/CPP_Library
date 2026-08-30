@@ -159,6 +159,8 @@
 | `template<_TMain> GetData(int32 iColNum, _TMain& tValue)` | 타입 매핑 후 즉시 조회. `lDataLength`가 `SQL_NO_TOTAL`/`SQL_NULL_DATA`면 `false` |
 | `GetData(int32 iColNum, TCHAR* ptszData, int32& nBufferLength)` | 문자열 조회, 유니코드/멀티바이트 분기 |
 
+> **`BindCol(ptszValue, nBufferLength, plDataLength)`(순번 자동 증가판)의 부수 효과**: 바인딩 성공 후 `nBufferLength = dbCol.m_nBufferLength;`로 호출자의 `nBufferLength` 참조 변수를 내부에서 계산된 버퍼 용량(유니코드 빌드에서는 `문자 수 × sizeof(WCHAR)`, 즉 바이트 단위)으로 덮어쓴다. 인덱스 지정판(`BindCol(iColIndex, ptszValue, nBufferLength, lDataLength)`)에는 이 재대입이 없다. 따라서 자동 증가판 호출 후 같은 `nBufferLength` 변수를 원래의 "문자 수" 의미로 재사용하면 유니코드 빌드에서 값이 어긋날 수 있다.
+
 ### 5.6 쿼리 준비/실행
 
 | 함수 | 설명 |

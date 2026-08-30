@@ -54,7 +54,7 @@ void CMySQLAsyncSrv::Clear()
 	// CSwapQueue를 비우기 위해 전체 크기만큼 척크 스왑 수행
 	CQueue<std::unique_ptr<st_DBAsyncRq>> tempQueue;
 
-	int64_t totalSize = _queueDBAsyncRq.GetSize();
+	int64 totalSize = _queueDBAsyncRq.GetSize();
 	if( totalSize > 0 )
 	{
 		_queueDBAsyncRq.SwapChunk(tempQueue, static_cast<size_t>(totalSize));
@@ -80,7 +80,7 @@ void CMySQLAsyncSrv::FlushRemainingTasks()
 	_cvProducer.notify_all();
 
 	CQueue<std::unique_ptr<st_DBAsyncRq>> tempQueue;
-	int64_t totalSize = _queueDBAsyncRq.GetSize();
+	int64 totalSize = _queueDBAsyncRq.GetSize();
 	if( totalSize > 0 )
 	{
 		_queueDBAsyncRq.SwapChunk(tempQueue, static_cast<size_t>(totalSize));

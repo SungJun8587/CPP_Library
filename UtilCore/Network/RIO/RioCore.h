@@ -113,7 +113,7 @@ public:
     // @return 스레드 생성 및 실행 성공 시 true, 실패 시 false
     //***************************************************************************
     template<typename F>
-    bool StartWorkers(uint32_t workerCount, F&& workerFunc)
+    bool StartWorkers(uint32 workerCount, F&& workerFunc)
     {
         std::unique_lock<std::mutex> lifecycleLock(_lifecycleMutex);
 
@@ -155,7 +155,7 @@ public:
             //    소속으로 등록한 뒤 사용자 루프(func)를 실행하고, 예외 발생 시
             //    FaultInternal()로 결함 상태 전이 후 정상적으로 스레드를 종료합니다.
             //    마지막 워커가 종료될 때만 _workerRunning을 false로 내립니다.
-            for( uint32_t i = 0; i < workerCount; ++i )
+            for( uint32 i = 0; i < workerCount; ++i )
             {
                 _workerThreads.emplace_back([this, sharedWorkerFunc]() noexcept
                     {
@@ -175,7 +175,7 @@ public:
 
                         _tlsWorkerCore = previousWorkerCore;
 
-                        const uint32_t remaining = _activeWorkerCount.fetch_sub(1, std::memory_order_acq_rel) - 1;
+                        const uint32 remaining = _activeWorkerCount.fetch_sub(1, std::memory_order_acq_rel) - 1;
                         if( remaining == 0 )
                         {
                             _workerRunning.store(false, std::memory_order_release);
@@ -194,7 +194,7 @@ public:
             //    되돌려 재시도 가능하게 합니다.
             _state.store(Rio::State::Stopping, std::memory_order_release);
 
-            const uint32_t createdWorkerCount = static_cast<uint32_t>(_workerThreads.size());
+            const uint32 createdWorkerCount = static_cast<uint32>(_workerThreads.size());
             WakeWorkers(createdWorkerCount);
 
             std::vector<std::thread> threadsToJoin = std::move(_workerThreads);
@@ -356,21 +356,21 @@ public:
 
     //***************************************************************************
     // @brief 현재 처리 중인 Outstanding I/O 개수를 반환합니다.
-    // @return uint32_t 진행 중인 I/O 개수
+    // @return uint32 진행 중인 I/O 개수
     //***************************************************************************
-    uint32_t GetOutstandingIoCount() const noexcept { return _outstandingIo.load(std::memory_order_acquire); }
+    uint32 GetOutstandingIoCount() const noexcept { return _outstandingIo.load(std::memory_order_acquire); }
 
     //***************************************************************************
     // @brief 현재 구동 중인 활성 워커 스레드 수량을 반환합니다.
-    // @return uint32_t 활성 워커 수
+    // @return uint32 활성 워커 수
     //***************************************************************************
-    uint32_t GetActiveWorkerCount() const noexcept { return _activeWorkerCount.load(std::memory_order_acquire); }
+    uint32 GetActiveWorkerCount() const noexcept { return _activeWorkerCount.load(std::memory_order_acquire); }
 
     //***************************************************************************
     // @brief 설정된 목표 워커 스레드 수량을 반환합니다.
-    // @return uint32_t 목표 워커 수
+    // @return uint32 목표 워커 수
     //***************************************************************************
-    uint32_t GetTargetWorkerCount() const noexcept { return _targetWorkerCount.load(std::memory_order_acquire); }
+    uint32 GetTargetWorkerCount() const noexcept { return _targetWorkerCount.load(std::memory_order_acquire); }
 
     //***************************************************************************
     // @brief 마지막 Shutdown 결과를 반환합니다.
@@ -405,7 +405,7 @@ private:
     // @brief 대기 중인 멀티 워커 스레드 전체에 IOCP Wake-up(Stop) 패킷을 포스팅합니다.
     // @param workerCount 깨울 목표 워커 스레드 수
     //***************************************************************************
-    void WakeWorkers(uint32_t workerCount) noexcept;
+    void WakeWorkers(uint32 workerCount) noexcept;
 
     //***************************************************************************
     // @brief 꺼내온 RIO 결과를 순회하며 각 이벤트를 처리(Dispatch)합니다.
@@ -584,14 +584,14 @@ private:
     std::atomic<bool> _workerRunning{ false };                   // Worker 실행 여부(전체 워커 중 1개 이상 실행 중)
     std::atomic<bool> _workerFaulted{ false };                   // Worker Fault 상태
 
-    std::atomic<uint32_t> _outstandingIo{ 0 }; // 현재 진행 중인 Outstanding I/O 개수
+    std::atomic<uint32> _outstandingIo{ 0 }; // 현재 진행 중인 Outstanding I/O 개수
 
     std::atomic<bool> _receiveCqCorrupted{ false }; // Receive CQ Corrupt 손상 플래그
     std::atomic<bool> _sendCqCorrupted{ false };    // Send CQ Corrupt 손상 플래그
 
     std::vector<std::thread> _workerThreads;       // 생성된 멀티 워커 스레드 객체 리스트
-    std::atomic<uint32_t> _activeWorkerCount{ 0 }; // 현재 구동 중인(자기 람다에 진입 완료한) 워커 스레드 수량
-    std::atomic<uint32_t> _targetWorkerCount{ 0 }; // StartWorkers()가 만들기로 한 목표 워커 스레드 수량
+    std::atomic<uint32> _activeWorkerCount{ 0 }; // 현재 구동 중인(자기 람다에 진입 완료한) 워커 스레드 수량
+    std::atomic<uint32> _targetWorkerCount{ 0 }; // StartWorkers()가 만들기로 한 목표 워커 스레드 수량
 
     mutable std::mutex _lifecycleMutex; // Lifecycle 동기화 Mutex
     std::shared_mutex _submissionMutex; // Submission 동기화 Shared Mutex

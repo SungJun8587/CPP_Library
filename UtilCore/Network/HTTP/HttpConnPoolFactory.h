@@ -53,7 +53,7 @@ using CHttpConnPoolRioRef = std::shared_ptr<CHttpConnPoolRio>;
 // @param outAddr [OUT] 조회 성공 시 채워지는 주소 (IPv4 첫 결과만 사용)
 // @return bool 성공 여부
 //***************************************************************************
-inline bool ResolveHostnameToNetAddress(const std::string& hostname, uint16_t port, CNetAddress& outAddr)
+inline bool ResolveHostnameToNetAddress(const std::string& hostname, uint16 port, CNetAddress& outAddr)
 {
 	_tstring tHostname;
 	tHostname.reserve(hostname.size());
@@ -96,7 +96,7 @@ inline bool ResolveHostnameToNetAddress(const std::string& hostname, uint16_t po
 //***************************************************************************
 template<typename SessionType = CHttpSessionIocp>
 inline IHttpConnPoolRef CreateHttpConnPoolIocp(CNetAddress hostAddr, CIocpCoreRef iocpCore,
-	int32 minIdle = 2, int32 maxConnections = 8, uint32_t workerThreadCount = 1)
+	int32 minIdle = 2, int32 maxConnections = 8, uint32 workerThreadCount = 1)
 {
 	using PoolType = CHttpConnPoolT<SessionType, std::shared_ptr<SessionType>, CIocpClientService, std::shared_ptr<CIocpClientService>>;
 
@@ -120,7 +120,7 @@ inline IHttpConnPoolRef CreateHttpConnPoolIocp(CNetAddress hostAddr, CIocpCoreRe
 //***************************************************************************
 template<typename SessionType = CHttpSessionRio>
 inline IHttpConnPoolRef CreateHttpConnPoolRio(CNetAddress hostAddr, CRioCoreRef rioCore,
-	int32 minIdle = 2, int32 maxConnections = 8, uint32_t workerThreadCount = 1)
+	int32 minIdle = 2, int32 maxConnections = 8, uint32 workerThreadCount = 1)
 {
 	using PoolType = CHttpConnPoolT<SessionType, std::shared_ptr<SessionType>, CRioClientService, std::shared_ptr<CRioClientService>>;
 
@@ -151,7 +151,7 @@ inline IHttpConnPoolRef CreateHttpConnPoolRio(CNetAddress hostAddr, CRioCoreRef 
 //***************************************************************************
 template<typename SessionType = CHttpSessionIocp>
 inline IHttpConnPoolRef CreateHttpsConnPoolIocp(CNetAddress hostAddr, const std::string& sniHostname, SSL_CTX* sslCtx,
-	CIocpCoreRef iocpCore, int32 minIdle = 2, int32 maxConnections = 8, uint32_t workerThreadCount = 1)
+	CIocpCoreRef iocpCore, int32 minIdle = 2, int32 maxConnections = 8, uint32 workerThreadCount = 1)
 {
 	using PoolType = CHttpConnPoolT<SessionType, std::shared_ptr<SessionType>, CIocpClientService, std::shared_ptr<CIocpClientService>>;
 
@@ -182,7 +182,7 @@ inline IHttpConnPoolRef CreateHttpsConnPoolIocp(CNetAddress hostAddr, const std:
 //***************************************************************************
 template<typename SessionType = CHttpSessionRio>
 inline IHttpConnPoolRef CreateHttpsConnPoolRio(CNetAddress hostAddr, const std::string& sniHostname, SSL_CTX* sslCtx,
-	CRioCoreRef rioCore, int32 minIdle = 2, int32 maxConnections = 8, uint32_t workerThreadCount = 1)
+	CRioCoreRef rioCore, int32 minIdle = 2, int32 maxConnections = 8, uint32 workerThreadCount = 1)
 {
 	using PoolType = CHttpConnPoolT<SessionType, std::shared_ptr<SessionType>, CRioClientService, std::shared_ptr<CRioClientService>>;
 
@@ -209,7 +209,7 @@ inline IHttpConnPoolRef CreateHttpsConnPoolRio(CNetAddress hostAddr, const std::
 //***************************************************************************
 template<typename SessionType = CHttpSessionIocp>
 inline std::shared_ptr<CHttpConnPoolManager> CreateHttpConnPoolManagerIocp(CIocpCoreRef iocpCore,
-	int32 minIdlePerHost = 2, int32 maxConnectionsPerHost = 8, uint32_t workerThreadCountPerHost = 1)
+	int32 minIdlePerHost = 2, int32 maxConnectionsPerHost = 8, uint32 workerThreadCountPerHost = 1)
 {
 	return std::make_shared<CHttpConnPoolManager>(
 		[iocpCore, minIdlePerHost, maxConnectionsPerHost, workerThreadCountPerHost](const std::string&, CNetAddress hostAddr) -> IHttpConnPoolRef
@@ -230,7 +230,7 @@ inline std::shared_ptr<CHttpConnPoolManager> CreateHttpConnPoolManagerIocp(CIocp
 //***************************************************************************
 template<typename SessionType = CHttpSessionRio>
 inline std::shared_ptr<CHttpConnPoolManager> CreateHttpConnPoolManagerRio(CRioCoreRef rioCore,
-	int32 minIdlePerHost = 2, int32 maxConnectionsPerHost = 8, uint32_t workerThreadCountPerHost = 1)
+	int32 minIdlePerHost = 2, int32 maxConnectionsPerHost = 8, uint32 workerThreadCountPerHost = 1)
 {
 	return std::make_shared<CHttpConnPoolManager>(
 		[rioCore, minIdlePerHost, maxConnectionsPerHost, workerThreadCountPerHost](const std::string&, CNetAddress hostAddr) -> IHttpConnPoolRef
@@ -255,7 +255,7 @@ inline std::shared_ptr<CHttpConnPoolManager> CreateHttpConnPoolManagerRio(CRioCo
 //***************************************************************************
 template<typename SessionType = CHttpSessionIocp>
 inline std::shared_ptr<CHttpConnPoolManager> CreateHttpsConnPoolManagerIocp(SSL_CTX* sslCtx, CIocpCoreRef iocpCore,
-	int32 minIdlePerHost = 2, int32 maxConnectionsPerHost = 8, uint32_t workerThreadCountPerHost = 1)
+	int32 minIdlePerHost = 2, int32 maxConnectionsPerHost = 8, uint32 workerThreadCountPerHost = 1)
 {
 	return std::make_shared<CHttpConnPoolManager>(
 		[sslCtx, iocpCore, minIdlePerHost, maxConnectionsPerHost, workerThreadCountPerHost]
@@ -278,7 +278,7 @@ inline std::shared_ptr<CHttpConnPoolManager> CreateHttpsConnPoolManagerIocp(SSL_
 //***************************************************************************
 template<typename SessionType = CHttpSessionRio>
 inline std::shared_ptr<CHttpConnPoolManager> CreateHttpsConnPoolManagerRio(SSL_CTX* sslCtx, CRioCoreRef rioCore,
-	int32 minIdlePerHost = 2, int32 maxConnectionsPerHost = 8, uint32_t workerThreadCountPerHost = 1)
+	int32 minIdlePerHost = 2, int32 maxConnectionsPerHost = 8, uint32 workerThreadCountPerHost = 1)
 {
 	return std::make_shared<CHttpConnPoolManager>(
 		[sslCtx, rioCore, minIdlePerHost, maxConnectionsPerHost, workerThreadCountPerHost]

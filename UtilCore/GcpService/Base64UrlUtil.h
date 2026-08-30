@@ -29,7 +29,7 @@ namespace base64url
 		size_t i = 0;
 		while( i + 3 <= data.size() )
 		{
-			uint32_t v = (static_cast<uint8_t>(data[i]) << 16) | (static_cast<uint8_t>(data[i + 1]) << 8) | static_cast<uint8_t>(data[i + 2]);
+			uint32 v = (static_cast<uint8>(data[i]) << 16) | (static_cast<uint8>(data[i + 1]) << 8) | static_cast<uint8>(data[i + 2]);
 			result.push_back(table[(v >> 18) & 0x3F]);
 			result.push_back(table[(v >> 12) & 0x3F]);
 			result.push_back(table[(v >> 6) & 0x3F]);
@@ -40,14 +40,14 @@ namespace base64url
 		size_t remaining = data.size() - i;
 		if( remaining == 1 )
 		{
-			uint32_t v = static_cast<uint8_t>(data[i]) << 16;
+			uint32 v = static_cast<uint8>(data[i]) << 16;
 			result.push_back(table[(v >> 18) & 0x3F]);
 			result.push_back(table[(v >> 12) & 0x3F]);
 			// 패딩 없음 (JWT 규격)
 		}
 		else if( remaining == 2 )
 		{
-			uint32_t v = (static_cast<uint8_t>(data[i]) << 16) | (static_cast<uint8_t>(data[i + 1]) << 8);
+			uint32 v = (static_cast<uint8>(data[i]) << 16) | (static_cast<uint8>(data[i + 1]) << 8);
 			result.push_back(table[(v >> 18) & 0x3F]);
 			result.push_back(table[(v >> 12) & 0x3F]);
 			result.push_back(table[(v >> 6) & 0x3F]);

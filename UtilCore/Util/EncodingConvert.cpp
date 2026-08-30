@@ -251,7 +251,7 @@ _tstring Utf8ToTString(const std::string& src)
 // @param dataLength 버퍼의 유효 문자(char) 개수
 // @return 변환된 std::wstring (실패 시 빈 문자열)
 //***************************************************************************
-std::wstring AnsiToUnicode(const char* ansi, int32_t dataLength)
+std::wstring AnsiToUnicode(const char* ansi, int32 dataLength)
 {
 	if( ansi == nullptr || dataLength <= 0 ) return L"";
 	return AnsiToUnicode(std::string(ansi, dataLength));
@@ -264,7 +264,7 @@ std::wstring AnsiToUnicode(const char* ansi, int32_t dataLength)
 // @param dataLength 버퍼의 유효 문자(wchar_t) 개수
 // @return 변환된 std::string (실패 시 빈 문자열)
 //***************************************************************************
-std::string UnicodeToAnsi(const wchar_t* unicode, int32_t dataLength)
+std::string UnicodeToAnsi(const wchar_t* unicode, int32 dataLength)
 {
 	if( unicode == nullptr || dataLength <= 0 ) return "";
 	return UnicodeToAnsi(std::wstring(unicode, dataLength));
@@ -277,7 +277,7 @@ std::string UnicodeToAnsi(const wchar_t* unicode, int32_t dataLength)
 // @param dataLength 버퍼의 유효 문자(wchar_t) 개수
 // @return 변환된 UTF-8 std::string (실패 시 빈 문자열)
 //***************************************************************************
-std::string UnicodeToUtf8(const wchar_t* unicode, int32_t dataLength)
+std::string UnicodeToUtf8(const wchar_t* unicode, int32 dataLength)
 {
 	if( unicode == nullptr || dataLength <= 0 ) return "";
 	return UnicodeToUtf8(std::wstring(unicode, dataLength));
@@ -290,7 +290,7 @@ std::string UnicodeToUtf8(const wchar_t* unicode, int32_t dataLength)
 // @param dataLength 버퍼의 유효 문자(char) 개수
 // @return 변환된 std::wstring (실패 시 빈 문자열)
 //***************************************************************************
-std::wstring Utf8ToUnicode(const char* utf8, int32_t dataLength)
+std::wstring Utf8ToUnicode(const char* utf8, int32 dataLength)
 {
 	if( utf8 == nullptr || dataLength <= 0 ) return L"";
 	return Utf8ToUnicode(std::string(utf8, dataLength));
@@ -303,7 +303,7 @@ std::wstring Utf8ToUnicode(const char* utf8, int32_t dataLength)
 // @param dataLength 버퍼의 유효 문자(char) 개수
 // @return 변환된 UTF-8 std::string (실패 시 빈 문자열)
 //***************************************************************************
-std::string AnsiToUtf8(const char* ansi, int32_t dataLength)
+std::string AnsiToUtf8(const char* ansi, int32 dataLength)
 {
 	if( ansi == nullptr || dataLength <= 0 ) return "";
 	return AnsiToUtf8(std::string(ansi, dataLength));
@@ -316,7 +316,7 @@ std::string AnsiToUtf8(const char* ansi, int32_t dataLength)
 // @param dataLength 버퍼의 유효 문자(char) 개수
 // @return 변환된 ANSI std::string (실패 시 빈 문자열)
 //***************************************************************************
-std::string Utf8ToAnsi(const char* utf8, int32_t dataLength)
+std::string Utf8ToAnsi(const char* utf8, int32 dataLength)
 {
 	if( utf8 == nullptr || dataLength <= 0 ) return "";
 	return Utf8ToAnsi(std::string(utf8, dataLength));

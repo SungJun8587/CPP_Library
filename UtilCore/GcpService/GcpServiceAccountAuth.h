@@ -106,7 +106,7 @@ inline bool SignRs256(std::string_view privateKeyPem, std::string_view data, std
 //          가능하다. exp는 iat+3600(1시간, Google OAuth2가 허용하는 최대값)으로
 //          고정한다.
 //***************************************************************************
-inline bool BuildSignedJwt(const GcpServiceAccountCredentials& creds, std::string_view scope, int64_t nowUnixSeconds, std::string& outJwt)
+inline bool BuildSignedJwt(const GcpServiceAccountCredentials& creds, std::string_view scope, int64 nowUnixSeconds, std::string& outJwt)
 {
 	// JWT 헤더 (RFC 7519) — RS256 고정이라 필드가 정적임, 문자열로 직접 조립.
 	static const char* header = R"({"alg":"RS256","typ":"JWT"})";
@@ -114,7 +114,7 @@ inline bool BuildSignedJwt(const GcpServiceAccountCredentials& creds, std::strin
 	// 클레임: iss(발급자=서비스 계정 이메일), scope, aud(토큰 발급 엔드포인트),
 	// iat(발급 시각), exp(만료 시각, 1시간 후) — Google의 JWT-bearer 플로우
 	// (RFC 7523) 규격에 맞춘 필드 구성.
-	int64_t exp = nowUnixSeconds + 3600;
+	int64 exp = nowUnixSeconds + 3600;
 	std::string claims = "{\"iss\":\"" + creds.clientEmail +
 		"\",\"scope\":\"" + std::string(scope) +
 		"\",\"aud\":\"" + creds.tokenUri +
@@ -138,7 +138,7 @@ inline bool BuildSignedJwt(const GcpServiceAccountCredentials& creds, std::strin
 //          전혀 몰라도 된다(mock으로 이 파일을 단위 테스트할 수 있는 이유).
 //***************************************************************************
 using GcpTokenFetchFn = std::function<void(std::string jwtAssertion,
-	std::function<void(bool success, std::string accessToken, int64_t expiresInSeconds)> onDone)>;
+	std::function<void(bool success, std::string accessToken, int64 expiresInSeconds)> onDone)>;
 
 //***************************************************************************
 // @class CGcpAccessTokenProvider
@@ -164,7 +164,7 @@ using GcpTokenFetchFn = std::function<void(std::string jwtAssertion,
 //
 // // 2. HTTP 전송 콜백 작성 (GcpTokenFetchFn 구현)
 // auto tokenFetcher = [](std::string jwtAssertion,
-//                        std::function<void(bool, std::string, int64_t)> onDone) {
+//                        std::function<void(bool, std::string, int64)> onDone) {
 //     // HTTP POST 요청 구성 (oauth2.googleapis.com/token)
 //     // Header: Content-Type: application/x-www-form-urlencoded
 //     // Body: grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion={jwtAssertion}
@@ -181,7 +181,7 @@ using GcpTokenFetchFn = std::function<void(std::string jwtAssertion,
 //             }
 //             // responseJson에서 access_token과 expires_in 파싱
 //             std::string accessToken;
-//             int64_t expiresIn = 0;
+//             int64 expiresIn = 0;
 //             json_extract::FindString(responseJson, "access_token", accessToken);
 //             json_extract::FindInt64(responseJson, "expires_in", expiresIn); // 보통 3600초
 //             
@@ -225,7 +225,7 @@ public:
 	//***************************************************************************
 	void GetAccessToken(std::function<void(bool success, std::string accessToken)> onDone)
 	{
-		int64_t now = NowUnixSeconds();
+		int64 now = NowUnixSeconds();
 		bool haveCached = false;
 		std::string cachedCopy;
 
@@ -260,7 +260,7 @@ public:
 			return;
 		}
 
-		_fetchFn(jwt, [this](bool success, std::string accessToken, int64_t expiresInSeconds)
+		_fetchFn(jwt, [this](bool success, std::string accessToken, int64 expiresInSeconds)
 			{
 				if( success )
 				{
@@ -291,16 +291,16 @@ private:
 
 	//***************************************************************************
 	// @brief 현재 시각을 UNIX epoch 초(seconds) 단위로 구합니다.
-	// @return int64_t UNIX epoch 초
+	// @return int64 UNIX epoch 초
 	//***************************************************************************
-	static int64_t NowUnixSeconds()
+	static int64 NowUnixSeconds()
 	{
 		return std::chrono::duration_cast<std::chrono::seconds>(
 			std::chrono::system_clock::now().time_since_epoch()).count();
 	}
 
 private:
-	static constexpr int64_t kRefreshMarginSeconds = 60; // 만료 60초 전부터는 미리 갱신 대상으로 취급
+	static constexpr int64 kRefreshMarginSeconds = 60; // 만료 60초 전부터는 미리 갱신 대상으로 취급
 
 	GcpServiceAccountCredentials _creds; // 서비스 계정 자격증명
 	std::string _scope;                  // 요청 OAuth2 스코프
@@ -308,7 +308,7 @@ private:
 
 	std::mutex _lock;                                                       // 아래 캐시/대기열 보호
 	std::string _cachedToken;                                               // 캐싱된 액세스 토큰
-	int64_t _expiryUnixSeconds = 0;                                         // 캐싱된 토큰의 만료 시각(UNIX epoch 초)
+	int64 _expiryUnixSeconds = 0;                                         // 캐싱된 토큰의 만료 시각(UNIX epoch 초)
 	std::vector<std::function<void(bool, std::string)>> _pendingCallbacks; // 갱신 진행 중 쌓인 대기 콜백
 };
 

@@ -550,6 +550,9 @@
     <ClInclude Include="Redis\RedisRedefineDataType.h">
       <Filter>Redis</Filter>
     </ClInclude>
+    <ClInclude Include="Containers\Map\ClusterSpinUnorderedMap.h">
+      <Filter>Containers\Map</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">
@@ -867,6 +870,9 @@
     </None>
     <None Include="Util\BitOperate.inl">
       <Filter>Util</Filter>
+    </None>
+    <None Include="Containers\Map\ClusterSpinUnorderedMap.inl">
+      <Filter>Containers\Map</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

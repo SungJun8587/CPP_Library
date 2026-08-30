@@ -24,7 +24,7 @@ bool CRioReceive::Receive(
     RIO_RQ requestQueue,
     const RIO_BUF& buffer,
     CRioBuffer* bufferOwner,
-    uint32_t slotIndex,
+    uint32 slotIndex,
     CRioEvent* rioEvent,
     CRioObject* owner,
     DWORD flags) noexcept

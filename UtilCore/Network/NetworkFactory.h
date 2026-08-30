@@ -84,7 +84,7 @@ public:
 		CNetAddress address,
 		SessionFactory factory,
 		int32 maxSessionCount = 1,
-		uint32_t workerThreadCount = 0,
+		uint32 workerThreadCount = 0,
 		void* engineCoreRef = nullptr
 	);
 
@@ -104,7 +104,7 @@ public:
 		CNetAddress address,
 		SessionFactory factory,
 		int32 maxSessionCount = 1,
-		uint32_t workerThreadCount = 0,
+		uint32 workerThreadCount = 0,
 		void* engineCoreRef = nullptr
 	);
 };

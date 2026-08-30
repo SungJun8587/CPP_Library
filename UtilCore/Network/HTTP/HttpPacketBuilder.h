@@ -49,7 +49,7 @@ namespace http
 // @details
 //      [char 네이티브인 이유] 이 클래스는 소켓으로 직접 나가는 와이어 바이트를
 //      조립한다. HTTP 요청/응답 라인·헤더는 RFC 7230상 항상 ASCII이고, 조립된
-//      결과는 CIocpSession/CRioSession의 Send(const void*, uint16_t)로 그대로
+//      결과는 CIocpSession/CRioSession의 Send(const void*, uint16)로 그대로
 //      전달돼야 한다. TCHAR(UNICODE 빌드에서 wchar_t) 기반으로 조립하면, 결국
 //      소켓에 나가기 직전에 다시 char로 재인코딩해야 하는 "낭비된 왕복"이 요청
 //      하나마다(hot path) 발생한다 — 임시 버퍼 힙 할당 + wchar_t->char 순회
