@@ -25,9 +25,18 @@
 //  - 대량의 요청이 몰릴 때 컨슈머의 부하 분산 및 스파이크 현상 방지
 //  - 큐 크기(_size)를 아토믹으로 실시간 모니터링해야 하는 경우
 // 
-// 패턴 최적화:
-//  - **SPMC(Single Producer, Multiple Consumer)** 환경에 최적화
-//    → 단일 프로듀서가 데이터를 넣고, 여러 컨슈머가 청킹 단위로 나눠 가져가며 부하를 분산
+// 동시성 패턴:
+//  - MPMC(Multiple Producer, Multiple Consumer)를 지원
+//  - 내부 큐 접근은 단일 락으로 직렬화
+//  - SwapChunk()를 통해 consumer별 처리량을 제한할 수 있음
+//
+// 정지(Stop) 관련 계약:
+//  - Stop()은 내부 락(_lock) 안에서 플래그를 세팅하므로, Stop()이 반환한 "이후" 시작되는
+//    모든 Push 계열 호출은 반드시 드롭된다(happens-before 보장). Stop()과 동시에 진행
+//    중이던 Push 호출은 락 선점 순서에 따라 정지 전/후 어느 쪽으로든 처리될 수 있다.
+//  - Push 계열 함수는 모두 "삽입 성공 여부"를 반환값으로 명시적으로 알려준다. 정지 상태에서
+//    호출되어 드롭된 경우와 정상 성공을 반환값만으로 구분할 수 있다.
+//  - Start()로 정지 상태를 해제하고 재사용할 수 있다.
 //***************************************************************************
 template<typename T>
 class CChunkedSwapQueue
@@ -39,29 +48,33 @@ public:
     //***************************************************************************
     // @brief 단일 아이템을 입력 큐에 안전하게 삽입합니다.
     // @param item 삽입할 데이터 항목
+    // @return 정지 상태가 아니어서 정상 삽입되었으면 true, 정지 상태라 드롭되었으면 false
     //***************************************************************************
-    void Push(T item)
+    bool Push(T item)
     {
-        if( _stopped.load(std::memory_order_relaxed) )
-            return;
-
         PLockGuard lock(_lock, __FUNCTION__);
+
+        // 정지 여부 확인과 실제 삽입을 같은 락 구간 안에서 처리해,
+        // Stop()과의 순서가 락 하나로 항상 직렬화되도록 한다.
+        if( _stopped.load(std::memory_order_relaxed) )
+            return false;
 
         _inQueue.push(std::move(item));
         _size.fetch_add(1, std::memory_order_relaxed);
+        return true;
     }
 
     //***************************************************************************
     // @brief 락 안에서 푸시와 크기 증가를 원자적으로 처리하여 갱신된 전체 크기를 반환합니다.
     // @param item 삽입할 데이터 항목
-    // @return 푸시 후의 전체 큐 크기
+    // @return 푸시 후의 전체 큐 크기(성공 시 항상 1 이상). 정지 상태라 드롭된 경우 -1을 반환한다.
     //***************************************************************************
     int64 PushAndGetSize(T item)
     {
-        if( _stopped.load(std::memory_order_relaxed) )
-            return _size.load(std::memory_order_relaxed);
-
         PLockGuard lock(_lock, __FUNCTION__);
+
+        if( _stopped.load(std::memory_order_relaxed) )
+            return -1;
 
         _inQueue.push(std::move(item));
         return _size.fetch_add(1, std::memory_order_relaxed) + 1;
@@ -69,14 +82,18 @@ public:
 
     //***************************************************************************
     // @brief 여러 아이템을 벡터 단위로 일괄 삽입합니다.
-    // @param items 삽입할 데이터 항목들이 담긴 벡터 (성공 시 내부 비워짐)
+    // @param items 삽입할 데이터 항목들이 담긴 벡터 (성공 시에만 내부가 비워짐)
+    // @return 정상적으로 일괄 삽입되었으면 true. 정지 상태라 드롭되었으면 false(items는 그대로 유지)
     //***************************************************************************
-    void PushBatch(CVector<T>& items)
+    bool PushBatch(CVector<T>& items)
     {
-        if( items.empty() || _stopped.load(std::memory_order_relaxed) )
-            return;
+        if( items.empty() )
+            return true;
 
         PLockGuard lock(_lock, __FUNCTION__);
+
+        if( _stopped.load(std::memory_order_relaxed) )
+            return false;
 
         for( auto& item : items )
         {
@@ -84,6 +101,7 @@ public:
         }
         _size.fetch_add(static_cast<int64>(items.size()), std::memory_order_relaxed);
         items.clear();
+        return true;
     }
 
     //***************************************************************************
@@ -123,6 +141,9 @@ public:
     //***************************************************************************
     void SwapChunk(CQueue<T>& outQueue, size_t maxCount)
     {
+        if( maxCount == 0 )
+            return;
+
         PLockGuard lock(_lock, __FUNCTION__);
 
         if( _inQueue.empty() )
@@ -131,7 +152,7 @@ public:
         size_t movedCount = 0;
         while( !_inQueue.empty() && movedCount < maxCount )
         {
-            // unique_ptr 소유권을 안전하게 outQueue로 이동
+            // T의 값을 이동하여 outQueue로 전달
             outQueue.push(std::move(_inQueue.front()));
             _inQueue.pop();
             ++movedCount;
@@ -159,10 +180,33 @@ public:
 
     //***************************************************************************
     // @brief 큐를 정지시키고 추가 푸시를 차단합니다.
+    // @details 내부 락(_lock) 안에서 플래그를 세팅하므로, 이 함수가 반환한 이후에
+    //          시작되는 모든 Push 계열 호출은 반드시 드롭된다(happens-before 보장).
+    // @note Start()는 큐를 비우거나 기존 데이터를 폐기하지 않습니다.
     //***************************************************************************
     void Stop()
     {
+        PLockGuard lock(_lock, __FUNCTION__);
         _stopped.store(true, std::memory_order_relaxed);
+    }
+
+    //***************************************************************************
+    // @brief 정지 상태를 해제해 다시 Push를 받을 수 있게 합니다.
+    // @details 큐 내용물 자체는 건드리지 않는다 — 재사용 전 비우려면 Swap()/SwapChunk()를
+    //          별도로 호출해야 한다.
+    //***************************************************************************
+    void Start()
+    {
+        PLockGuard lock(_lock, __FUNCTION__);
+        _stopped.store(false, std::memory_order_relaxed);
+    }
+
+    //***************************************************************************
+    // @brief 현재 정지 상태인지 조회합니다.
+    //***************************************************************************
+    bool IsStopped() const
+    {
+        return _stopped.load(std::memory_order_relaxed);
     }
 
     CChunkedSwapQueue(const CChunkedSwapQueue&) = delete;
@@ -173,8 +217,8 @@ public:
 private:
     PLock                   _lock;              // 플랫폼 통합 단독 락 객체
     CQueue<T>               _inQueue;           // 내부 입력을 받는 큐 버퍼
-    std::atomic<int64>    _size{ 0 };         // 락 경합 없는 빠른 크기 조회를 위한 아토믹 카운터
-    std::atomic<bool>       _stopped{ false };  // 종료 플래그 추가
+    std::atomic<int64>      _size{ 0 };         // 락 경합 없는 빠른 크기 조회를 위한 아토믹 카운터
+    std::atomic<bool>       _stopped{ false };  // 정지 플래그. Stop/Start는 _lock으로 직렬화, 조회는 lock-free
 };
 
 #endif // ndef UC_CHUNKEDSWAPQUEUE_H

@@ -75,20 +75,6 @@
 }
 
 //***************************************************************************
-// @brief 빌드 환경(_UNICODE)에 따라 문자열 및 메모리 제어 매크로를 분기 정의합니다.
-// @note _UNICODE 정의 여부에 따라 wmemset/memset, wmemcpy/memcpy, __FUNCTIONW__/__FUNCTION__으로 대체됩니다.
-//***************************************************************************
-#ifdef _UNICODE
-#	define _tmemset			wmemset
-#	define _tmemcpy			wmemcpy
-#	define __TFUNCTION__	__FUNCTIONW__
-#else
-#	define _tmemset			memset
-#	define _tmemcpy			memcpy
-#	define __TFUNCTION__	__FUNCTION__
-#endif
-
-//***************************************************************************
 // @brief Windows OS 버전에 따라 알맞은 Tick Count 함수를 매핑합니다.
 // @return DWORD/ULONGLONG 시스템 기동 후 경과된 시간(ms)
 // @note Windows Vista 이상(_WIN32_WINNT >= 0x0600)에서는 49.7일 오버플로우 문제를 방지하기 위해 GetTickCount64를 사용합니다.

@@ -15,8 +15,8 @@ public:
 	CServerNode(void)
 		: _nID(0), _nPort(0)
 	{
-		_tmemset(_tszServerName, 0, HOSTNAME_STRLEN);
-		_tmemset(_tszIP, 0, HOSTNAME_STRLEN);
+		memset(_tszServerName, 0, sizeof(_tszServerName));
+		memset(_tszIP, 0, sizeof(_tszIP));
 	}
 
 	void Init(const TCHAR* ptszServerName, const unsigned int nPort, const TCHAR* ptszIP)
@@ -56,12 +56,12 @@ public:
 	CDBNode(void)
 		: _nID(0), _dbClass(EDBClass::NONE), _nPort(0)
 	{
-		_tmemset(_tszDSN, 0, DATABASE_DSN_STRLEN);
-		_tmemset(_tszDSNDriver, 0, DATABASE_DSN_DRIVER_STRLEN);
-		_tmemset(_tszDBHost, 0, DATABASE_SERVER_NAME_STRLEN);
-		_tmemset(_tszDBName, 0, DATABASE_NAME_STRLEN);
-		_tmemset(_tszDBUserId, 0, DATABASE_DSN_USER_ID_STRLEN);
-		_tmemset(_tszDBPasswd, 0, DATABASE_DSN_USER_PASSWORD_STRLEN);
+		memset(_tszDSN, 0, sizeof(_tszDSN));
+		memset(_tszDSNDriver, 0, sizeof(_tszDSNDriver));
+		memset(_tszDBHost, 0, sizeof(_tszDBHost));
+		memset(_tszDBName, 0, sizeof(_tszDBName));
+		memset(_tszDBUserId, 0, sizeof(_tszDBUserId));
+		memset(_tszDBPasswd, 0, sizeof(_tszDBPasswd));
 	}
 
 	void Init(EDBClass dbClass, const TCHAR* ptszDSNDriver, const TCHAR* ptszDBHost, const unsigned int nPort, const TCHAR* ptszDBUserId, const TCHAR* ptszDBPasswd, const TCHAR* ptszDBName)
@@ -141,9 +141,9 @@ public:
 	CRedisNode(void)
 		: _nID(0), _nPort(0), _nDbIndex(0)
 	{
-		_tmemset(_tszDBHost, 0, DATABASE_SERVER_NAME_STRLEN);
-		_tmemset(_tszDBUserId, 0, DATABASE_DSN_USER_ID_STRLEN);
-		_tmemset(_tszDBPasswd, 0, DATABASE_DSN_USER_PASSWORD_STRLEN);
+		memset(_tszDBHost, 0, sizeof(_tszDBHost));
+		memset(_tszDBUserId, 0, sizeof(_tszDBUserId));
+		memset(_tszDBPasswd, 0, sizeof(_tszDBPasswd));
 	}
 
 	void Init(const TCHAR* ptszHost, const unsigned int nPort, const TCHAR* ptszUserId, const TCHAR* ptszPasswd, const unsigned int nDbIndex)

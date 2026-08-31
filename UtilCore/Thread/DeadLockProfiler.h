@@ -18,7 +18,7 @@
 #include <BaseTLS.h>
 #include <Memory/Containers.h>
 
-extern thread_local CStack<int32>	LLockStack;
+extern thread_local std::stack<int32>	LLockStack;
 
 //***************************************************************************
 // @brief 락 획득 순서를 추적하여 데드락 발생 여부를 감지하는 프로파일러 클래스입니다.
@@ -52,17 +52,17 @@ private:
 	void Dfs(int32 index);
 
 private:
-	CUnorderedMap<const char*, int32>	_nameToId;		// 락 이름으로 고유 ID를 조회하기 위한 맵
-	CUnorderedMap<int32, const char*>	_idToName;		// 락 ID로 고유 이름을 조회하기 위한 맵
-	CMap<int32, CSet<int32>>			_lockHistory;	// 락 간의 획득 순서 관계를 저장하는 인접 리스트 구조의 그래프
+	std::unordered_map<const char*, int32>	_nameToId;		// 락 이름으로 고유 ID를 조회하기 위한 맵
+	std::unordered_map<int32, const char*>	_idToName;		// 락 ID로 고유 이름을 조회하기 위한 맵
+	std::map<int32, std::set<int32>>		_lockHistory;	// 락 간의 획득 순서 관계를 저장하는 인접 리스트 구조의 그래프
 
-	std::mutex	_mutex;									// 프로파일러 내부 데이터 보호를 위한 뮤텍스
+	std::mutex	_mutex;										// 프로파일러 내부 데이터 보호를 위한 뮤텍스
 
 private:
-	CVector<int32>	_discoveredOrder;					// 노드가 발견된 순서를 기록하는 배열
-	int32			_discoveredCount = 0;				// 노드가 발견된 순서 카운트
-	CVector<bool>	_finished;							// Dfs(i)가 종료 되었는지 여부
-	CVector<int32>	_parent;
+	std::vector<int32>	_discoveredOrder;					// 노드가 발견된 순서를 기록하는 배열
+	int32				_discoveredCount = 0;				// 노드가 발견된 순서 카운트
+	std::vector<bool>	_finished;							// Dfs(i)가 종료 되었는지 여부
+	std::vector<int32>	_parent;
 };
 
 #endif // ndef UC_DEADLOCKPROFILER_H

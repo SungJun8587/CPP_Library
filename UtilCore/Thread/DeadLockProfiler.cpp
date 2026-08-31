@@ -37,7 +37,7 @@ void CDeadLockProfiler::PushLock(const char* name)
 		const int32 prevId = LLockStack.top();
 		if( lockId != prevId )
 		{
-			CSet<int32>& history = _lockHistory[prevId];
+			std::set<int32>& history = _lockHistory[prevId];
 			if( history.find(lockId) == history.end() )
 			{
 				history.insert(lockId);
@@ -74,11 +74,10 @@ void CDeadLockProfiler::CheckCycle()
 {
 	const int32 lockCount = static_cast<int32>(_nameToId.size());
 
-	// 💡 std::vector 대신 Containers.h의 CVector를 사용하도록 교체
-	_discoveredOrder = CVector<int32>(lockCount, -1);
+	_discoveredOrder = std::vector<int32>(lockCount, -1);
 	_discoveredCount = 0;
-	_finished = CVector<bool>(lockCount, false);
-	_parent = CVector<int32>(lockCount, -1);
+	_finished = std::vector<bool>(lockCount, false);
+	_parent = std::vector<int32>(lockCount, -1);
 
 	for( int32 lockId = 0; lockId < lockCount; lockId++ )
 		Dfs(lockId);
@@ -111,7 +110,7 @@ void CDeadLockProfiler::Dfs(int32 here)
 		return;
 	}
 
-	CSet<int32>& nextSet = findIt->second;
+	std::set<int32>& nextSet = findIt->second;
 	for( int32 there : nextSet )
 	{
 		// 아직 방문한 적이 없다면 방문한다.

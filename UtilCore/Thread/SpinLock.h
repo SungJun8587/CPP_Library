@@ -101,9 +101,10 @@ public:
 
     //***************************************************************************
     // @brief 락 획득을 비블로킹 방식으로 시도합니다.
+    // @param name 프로파일링 추적용 락 이름
     // @return 락 획득 성공 시 true, 실패 시 false
     //***************************************************************************
-    [[nodiscard]] bool TryLock() noexcept;
+    [[nodiscard]] bool TryLock(const char* name = nullptr) noexcept;
 
     //***************************************************************************
     // @brief 락을 해제합니다.
@@ -168,6 +169,47 @@ private:
 
 #define SPIN_USE_LOCK    mutable SpinLock<SpinLockPreset::LightWeight> _lock
 #define SPIN_LOCK         SpinLockGuard<SpinLockPreset::LightWeight> __spin_lock_guard__(_lock, __func__)
+
+//***************************************************************************
+// @brief SpinLock 객체의 비블로킹 획득을 시도하는 RAII 가드 클래스입니다.
+// @detail 객체 생성 시 비블로킹 락 획득을 시도하며, 획득 성공 시에만 소멸 시 해제합니다.
+//***************************************************************************
+template <typename Preset = SpinLockPreset::Default>
+class TrySpinLockGuard
+{
+public:
+    //***************************************************************************
+    // @brief 가드 객체를 생성하고 대상 락의 비블로킹 획득을 시도합니다.
+    // @param lock 관리할 SpinLock 객체
+    // @param name 프로파일링 추적용 락 이름
+    //***************************************************************************
+    explicit TrySpinLockGuard(SpinLock<Preset>& lock, const char* name = nullptr) noexcept
+        : _lock(lock), _name(name), _acquired(lock.TryLock(_name))
+    {
+    }
+
+    //***************************************************************************
+    // @brief 소멸자. 락 획득에 성공했던 경우에만 락을 해제합니다.
+    //***************************************************************************
+    ~TrySpinLockGuard() noexcept
+    {
+        if( _acquired )
+            _lock.Unlock(_name);
+    }
+
+    //***************************************************************************
+    // @brief 락 획득 성공 여부를 반환합니다.
+    // @return 락 획득 성공 시 true, 실패 시 false
+    //***************************************************************************
+    [[nodiscard]] bool IsAcquired() const { return _acquired; }
+
+    TrySpinLockGuard(const TrySpinLockGuard&) = delete;
+    TrySpinLockGuard& operator=(const TrySpinLockGuard&) = delete;
+private:
+    SpinLock<Preset>& _lock;	// 관리 중인 SpinLock 객체 레퍼런스
+    const char* _name;			// 프로파일링 추적용 락 이름
+    bool _acquired;			// 락 획득 성공 여부 플래그
+};
 
 //***************************************************************************
 //  [2] RWSpinLock

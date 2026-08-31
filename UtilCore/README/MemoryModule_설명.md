@@ -195,7 +195,7 @@ std::shared_ptr<Type> MakeShared(Args&&... args)
 
 ⑥ **TLS 배치 캐시 없음**: `CMemory`와 달리 스레드 로컬 배치 캐시가 없어, `Pop()`/`Push()`가 매번 `CMemoryPool`의 원자 연산(`InterlockedPop/PushEntrySList`)을 직접 호출합니다. 이 풀을 쓰는 타입이 초당 수만~수십만 번 생성/파괴되는 극단적 핫패스라면 멀티코어 경합이 그대로 남아있다는 뜻입니다. 이는 결함이 아니라 의도적으로 단순하게 유지한 설계이며, 실제 사용 타입의 생성 빈도가 그 정도로 높아지면 그때 `CMemory`와 동일한 TLS 배치 캐시를 얹는 것을 고려할 수 있습니다.
 
-⑦ **`shared_ptr`이 필요하면 전역 `MakeShared<Type>()`을 사용**: `CObjectPool<Type>`은 이 타입 전용 풀(`GetPool()`)만 다루며 자체 `MakeShared`를 제공하지 않습니다. `allocate_shared`가 만드는 블록은 `sizeof(Type)`이 아니라 (컨트롤 블록 + `Type`) 크기이고 이는 표준 라이브러리 구현마다 달라, 애초에 `GetPool()`(고정 크기 풀)로 그대로 흘려보낼 수 없기 때문입니다. `Pop()`/`Push()`로 만든 객체는 이 타입 전용 풀을 쓰고, `shared_ptr`이 필요하면 3.4절의 전역 `MakeShared<Type>()`(`StlAllocator<Type>` 경유로 `gpMemory`의 공유 풀을 사용)을 대신 씁니다.
+⑦ **`MakeShared()` — 타입 전용 풀 기반 `shared_ptr`**: `CObjectPool<Type>`은 자체 `MakeShared()`를 제공합니다. 내부적으로 `Pop(args...)`로 객체를 만든 뒤, `shared_ptr<Type>(포인터, &CObjectPool<Type>::Push)` 형태로 소멸 시 `Push()`가 호출되도록 커스텀 deleter를 지정합니다. 의도적으로 `std::allocate_shared()`를 쓰지 않는데, `allocate_shared`는 컨트롤 블록과 `Type` 객체를 하나로 묶어 (컨트롤 블록 + `Type`) 크기의 블록 하나를 할당하며 이 크기는 표준 라이브러리 구현마다 다릅니다. `GetPool()`은 `s_allocSize`(= `Type` + `MemoryHeader`)로 고정된 블록만 다루는 풀이라 그 가변 크기를 그대로 흘려보낼 수 없기 때문입니다. 그 대가로 `Type` 객체(타입 전용 풀)와 컨트롤 블록(기본 힙, `std::shared_ptr`의 기본 할당 경로)이 분리되어 총 2회 할당이 발생하지만, 대신 `Type` 자체는 다른 타입과 풀을 공유하지 않고 내부 단편화 없이 전용 풀에 남습니다. 3.4절의 전역 `MakeShared<Type>()`(1회 할당, `gpMemory` 공유 풀)과의 선택 기준은 6절/7-1절 비교를 참고하십시오.
 
 ## 4. 실행 흐름 예시
 
@@ -297,9 +297,15 @@ xdelete(p);                    // 소멸자 호출 → PoolAllocator::Release �
 
 이를 위해 세 가지 장치가 맞물려 동작합니다.
 
-**1) 파괴 순서 — 생성의 역순, `CMemory`는 항상 마지막**
+**1) 생성/파괴 순서 — 생성의 역순, `CMemory`는 항상 처음이자 마지막**
 
-`BaseGlobal::Destroy()`는 `gpThreadManager`를 `gpMemory`보다 먼저 파괴합니다. `Init()`은 `gpMemory`를 가장 먼저 만듭니다.
+`BaseGlobal::Init()`은 `gpMemory` → `gpGlobalQueue` → `gpJobTimer` → `gpDeadLockProfiler` → `gpThreadManager` 순으로 생성하고, `Destroy()`는 이 순서를 그대로 뒤집어(정확한 LIFO로) 파괴합니다(아래 "생성 순서"/"파괴 순서" 참고).
+
+각 전역 포인터의 선언 자체가 자신이 속한 헤더의 인클루드 가드 매크로(`UC_MEMORY_H`, `UC_GLOBALQUEUE_H`, `UC_JOBTIMER_H`, `UC_THREADMANAGER_H`)로 게이트됩니다 — 해당 헤더가 이 번역 단위에 포함되지 않았다면 그 전역 포인터는 컴파일조차 되지 않아, 시스템 하나를 통째로 링크에서 빼는 것이 가능합니다. `gpDeadLockProfiler`는 여기에 `USE_GPDEADLOCKPROFILER && _DEBUG` 조건이 추가로 걸려 디버그 빌드에서만 생성됩니다. `BaseGlobal.h`의 전역 포인터 선언 순서도 실제 생성 순서와 동일하게(`Memory → GlobalQueue → JobTimer → DeadLockProfiler → ThreadManager`) 맞춰져 있습니다.
+
+이 헤더 가드 게이팅은 3.4절의 `USE_GPMEMORY` 매크로와는 별개의 장치입니다 — `UC_MEMORY_H`는 "`gpMemory` 전역 변수 자체가 존재하는가"를 결정하고, `USE_GPMEMORY`는 "이미 존재하는 `gpMemory`를 `PoolAllocator`가 실제로 사용할 것인가"를 결정합니다.
+
+`Destroy()`의 각 `delete gpX;` 뒤에는 `gpX = nullptr;`가 따라와, `if (gpX != nullptr)` 가드와 합쳐져 두 가지를 함께 보장합니다: `Init()`이 일부만 성공하고 중단된 상황에서도 안전하게 정리할 수 있고, `Destroy()`가 실수로 두 번 호출되더라도(두 번째 호출은 모든 가드에서 걸려 아무 것도 하지 않으므로) 이중 해제(double-free)로 이어지지 않습니다. 다만 `Init()` 쪽에는 대칭되는 가드가 없어, `Destroy()` 없이 `Init()`을 두 번 호출하면 이전 인스턴스가 `delete` 없이 덮어써져 누수됩니다 — `Init()`/`Destroy()`가 각각 정확히 한 번씩만 호출된다는 아래 전제조건 ①에 기대고 있는 부분입니다.
 
 **2) `CMemory::FlushCurrentThreadCache()` — 메인 스레드용 수동 반납 진입점**
 
@@ -312,9 +318,23 @@ xdelete(p);                    // 소멸자 호출 → PoolAllocator::Release �
 
 ② 여러 `thread_local` 객체 간의 암묵적인 소멸 순서에 대한 의존을 줄일 수 있습니다.
 
-③ `CMemory` 모듈이 포함되지 않은 빌드에서도 `ThreadManager`가 독립적으로 컴파일되도록 `#ifdef __MEMORY_H__` 가드로 감싸져 있습니다.
+③ `CMemory` 모듈이 포함되지 않은 빌드에서도 `ThreadManager`가 독립적으로 컴파일되도록 `#ifdef UC_MEMORY_H` 가드로 감싸져 있습니다.
 
-### 최종 파괴 순서
+### 생성 순서
+
+```
+① gpMemory 생성  (다른 모든 전역 시스템이 내부적으로 xnew/xdelete를 쓸 수 있도록 가장 먼저)
+
+② gpGlobalQueue 생성
+
+③ gpJobTimer 생성
+
+④ gpDeadLockProfiler 생성  (USE_GPDEADLOCKPROFILER && _DEBUG 빌드에서만)
+
+⑤ gpThreadManager 생성
+```
+
+### 파괴 순서
 
 ```
 ① gpThreadManager 파괴  (워커 스레드 join → 각 워커의 TlsCache 자동 반납)
@@ -325,6 +345,8 @@ xdelete(p);                    // 소멸자 호출 → PoolAllocator::Release �
 
 ④ gpMemory 파괴  (반드시 마지막)
 ```
+
+①~④ 각 단계의 `delete`는 모두 `if (gpX != nullptr) { delete gpX; gpX = nullptr; }` 형태입니다. 이 파괴 순서는 위 "생성 순서"를 정확히 뒤집은 것(엄격한 LIFO)이라, 어떤 시스템도 자신보다 나중에 생성된 시스템이 이미 파괴된 상태에서 자기 소멸자를 실행하는 일이 없습니다.
 
 ### 전제조건 (코드로 자동 보장되지 않는 부분)
 
@@ -364,7 +386,7 @@ xdelete(p);                    // 소멸자 호출 → PoolAllocator::Release �
 
 ⑦ **메모리 풀 시스템을 아직 연결하지 않은 빌드(단위 테스트 등)**: `USE_GPMEMORY`를 정의하지 않으면 `xnew`/`xdelete`/`StlAllocator`가 `gpMemory` 없이도 표준 힙으로 동작함(대신 풀링/락프리 이점은 없음).
 
-⑧ **`shared_ptr`이 필요할 때**: `CObjectPool<Type>`을 이미 쓰고 있는지 여부와 무관하게 전역 `MakeShared<Type>()`(3.4절)를 사용 — `CObjectPool<Type>`은 자체 `MakeShared`를 제공하지 않습니다.
+⑧ **`shared_ptr`이 필요할 때**: 이미 `CObjectPool<Type>`(타입 전용 풀)을 쓰고 있는 타입이라면 `CObjectPool<Type>::MakeShared()`를 사용 — 객체는 전용 풀에 남고 컨트롤 블록만 별도로 할당됩니다(2회 할당). 그 외 일반 타입은 3.4절의 전역 `MakeShared<Type>()`을 사용 — 객체+컨트롤 블록이 `gpMemory` 공유 풀에서 1회에 할당됩니다.
 
 ### 7-1. BaseAllocator / PoolAllocator / CObjectPool\<Type\> 비교
 
@@ -374,10 +396,55 @@ xdelete(p);                    // 소멸자 호출 → PoolAllocator::Release �
 | 풀링 | 없음 — 매번 raw 할당/해제 | 있음 — 블록 재사용 | 있음 — `Type` 전용 블록만 재사용 |
 | 원자 연산 경감(TLS 배치 캐시) | 해당 없음 | 있음 — 스레드별 배치 충전으로 SLIST 경합 대폭 감소(5-1절) | 없음 — `Pop`/`Push`마다 SLIST 원자 연산 직접 호출 |
 | 지원 정렬 | `alignas(32)` 이상 확장 정렬도 `operator new(size_t, align_val_t)`로 완전 지원 | `SLIST_ALIGNMENT`(16B) 초과 시 `AllocAligned`가 `alignment+8`바이트 오버헤드로 지원 | `alignof(Type) <= 16`만 지원(초과 시 컴파일 에러, 3.7절) |
-| `shared_ptr` | 직접 미지원(`std::shared_ptr<T>(new T, ...)` 등을 직접 구성) | 전역 `MakeShared<Type>()` — 객체+컨트롤 블록 1회 할당 | 미지원 — 필요하면 전역 `MakeShared<Type>()`을 대신 사용 |
+| `shared_ptr` | 직접 미지원(`std::shared_ptr<T>(new T, ...)` 등을 직접 구성) | 전역 `MakeShared<Type>()` — `allocate_shared`로 객체+컨트롤 블록을 묶어 `gpMemory` 공유 풀에서 1회 할당 | `CObjectPool<Type>::MakeShared()` — 객체는 타입 전용 풀에서, 컨트롤 블록은 기본 힙에서 따로 할당(총 2회) |
 | 적합한 사용처 | ① `gpThreadManager`/`gpJobTimer`처럼 프로세스 시작 시 단 한 번만 생성되는 전역 매니저/싱글턴 객체<br>② 로그인/DB 등 외부 I/O로 어차피 지연이 큰 요청의 컨텍스트 객체<br>③ 월드맵/존 데이터, 설정 테이블처럼 서버 기동 시 1회 로드 후 프로세스 종료까지 유지되는 대형 객체<br>④ 리플레이/로그 덤프처럼 크기가 크고 생성 빈도가 낮은 버퍼 | ① 세션 객체(`CSession`), 플레이어/엔티티 객체 등 접속~해제 동안 유지되는 일반 게임 객체<br>② 패킷 디스패치용 Job/이벤트 객체, RPC 요청 컨텍스트<br>③ `CVector`/`CMap` 등 `Containers.h` 기반 컬렉션(인벤토리, 스킬 목록, 몬스터 AI 상태 등)<br>④ 채팅/알림처럼 가변 크기 페이로드를 담는 `StlAllocator` 기반 버퍼 | ① 초당 수만~수십만 개씩 생성/파괴되는 I/O 이벤트 구조체(`CRioEvent`, IOCP `OVERLAPPED` 확장)<br>② 패킷 파싱마다 새로 만들어지는 송신 청크(`CSendBufferChunk`)<br>③ 몬스터 투사체, 파티클, 충돌 판정용 임시 객체처럼 틱마다 대량 생성/소멸하는 단일 타입<br>④ 매치메이킹 큐 노드처럼 동일 타입이 압도적으로 자주 오가는 자료구조의 노드 |
 | 비용/트레이드오프 | 풀링 이점 없음(할당/해제가 항상 raw 경로) | 크기 구간 공유로 인한 내부 단편화, TLS 캐시 상주 메모리 | 타입별 전용 풀이라 풀 개수가 늘어날수록 관리 비용 증가, 멀티코어 경합이 그대로 남음 |
 
+### 7-2. 사용 예시
+
+**`BaseAllocator`**
+
+```cpp
+// ① 정적 메서드 직접 호출 — raw 버퍼가 그때그때 필요할 때
+void* buf = BaseAllocator::Alloc(1024);
+BaseAllocator::Release(buf);
+
+// ② 상속(믹스인) — new/delete가 자동으로 RawAllocator 경유
+class CJobTimer : public BaseAllocator
+{
+    // ...
+};
+
+CJobTimer* timer = new CJobTimer();   // 풀을 거치지 않고 raw 직결
+delete timer;
+```
+
+**`PoolAllocator`(`xnew`/`StlAllocator`/전역 `MakeShared`)**
+
+```cpp
+// xnew/xdelete — gpMemory의 크기 구간별 공유 풀 경유
+CSession* session = xnew<CSession>(socket);
+xdelete(session);
+
+// StlAllocator 기반 컨테이너(Containers.h) — 기본 할당자가 이미 PoolAllocator 경로
+CVector<int32> inventory;
+inventory.push_back(itemId);
+
+// 전역 MakeShared — 객체+컨트롤 블록을 gpMemory 공유 풀에서 1회 할당
+std::shared_ptr<CPlayer> player = MakeShared<CPlayer>(playerId);
+```
+
+**`CObjectPool<Type>`**
+
+```cpp
+// 타입 전용 풀에서 Pop/Push — 초당 수만~수십만 회 생성/파괴되는 타입에 적합
+CRioEvent* ev = CObjectPool<CRioEvent>::Pop();
+// ... ev 사용 ...
+CObjectPool<CRioEvent>::Push(ev);
+
+// 타입 전용 풀 기반 shared_ptr(3.7절 ⑦) — 소멸 시 자동으로 Push() 호출
+std::shared_ptr<CSendBufferChunk> chunk = CObjectPool<CSendBufferChunk>::MakeShared();
+```
 
 ## 8. Containers.h — STL 컨테이너 래퍼
 
@@ -628,6 +695,7 @@ CMap<int, Player*> players;  // std::map<int, Player*, less<int>, StlAllocator<p
 |---|---|---|---|---|
 | `static Type* Pop` | `Args&&... args` | 생성자에 전달할 가변 인자 | `Type*` | 타입 전용 풀(또는 `_STOMP`)에서 블록을 받아 placement new로 객체 생성 |
 | `static void Push` | `Type* obj` | 파괴할 객체 포인터 | `void` | 이중 반납 원자적 확인 후 소멸자 호출, 타입 전용 풀에 반납 |
+| `static shared_ptr<Type> MakeShared` | `Args&&... args` | 생성자에 전달할 가변 인자 | `shared_ptr<Type>` | `Pop(args...)`로 객체를 만든 뒤, 소멸자 대신 `CObjectPool<Type>::Push`를 커스텀 deleter로 쓰는 `shared_ptr` 구성. `allocate_shared`를 쓰지 않으므로 객체(타입 전용 풀)와 컨트롤 블록(기본 힙) 할당이 분리되어 2회 발생 |
 | `static constexpr size_t AlignUp` (private) | `size_t size` | 올림 대상 크기 | `size_t` | `size`를 `alignment`의 배수로 올림(`alignment`는 2의 거듭제곱) |
 | | `size_t alignment` | 정렬 단위 | | |
 | `static CMemoryPool& GetPool` (private) | 없음 | — | `CMemoryPool&` | Meyer's Singleton으로 타입 전용 풀 지연 초기화 |

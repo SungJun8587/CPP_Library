@@ -11,7 +11,7 @@
 [3] CDeadLockProfiler        — 락 이름 기반 획득 순서 그래프, 사이클(데드락) 탐지
 [2] PLock / PRWLock          — 플랫폼별 최적 프리미티브를 선택하는 통합 인터페이스
 [1] SpinLock<Preset>         — 크로스 플랫폼용 스핀락 (atomic<bool>)
-    RWSpinLock<Preset>       — 크로스 플랫폼용 읽기/쓰기 스핀락 (atomic<int32_t> 비트필드)
+    RWSpinLock<Preset>       — 크로스 플랫폼용 읽기/쓰기 스핀락 (atomic<int32> 비트필드)
     CSRWLock                 — Windows 네이티브 SRWLOCK 래퍼
 ```
 
@@ -33,13 +33,17 @@
   (b) 최종 `sizeof(SpinLock)`가 캐시라인 크기와 정확히 일치하는지를 각각 검증한다. 정렬(alignas)은
   시작 주소만 보장하고 크기는 보장하지 않는다는 전제를 명시적으로 문서화해 두었다.
 - 복사/이동 생성자·대입 전부 `delete` — 락은 고유 주소를 가져야 하므로 값 의미론을 원천 차단.
-- `Lock`/`Unlock`은 프로파일러 추적용 `name` 매개변수를 받고, `TryLock`은 받지 않는다(비블로킹
-  경로는 데드락 사이클과 무관하므로 profiler에 보고하지 않는 설계로 보인다).
+- `Lock`/`Unlock`은 프로파일러 추적용 `name` 매개변수를 받는다. `TryLock(const char* name = nullptr)`도
+  `name`을 받아, 실제 CAS 획득에 **성공했을 때만** `PushLock(name)`을 호출한다 — `RWSpinLock`의
+  `TryReadLock`/`TryWriteLock`과 동일한 "성공 시에만 기록" 원칙이다(이전에는 `TryLock`이 `name`
+  자체를 받지 않아 `Unlock(name)`과 짝을 맞추면 `PushLock` 없이 `PopLock`만 호출되어
+  `CDeadLockProfiler`가 `MULTIPLE_UNLOCK`/`INVALID_UNLOCK`으로 크래시하는 함정이 있었으나, `name`
+  매개변수가 추가되며 해소됨). 이를 감싸는 `TrySpinLockGuard`도 `SpinLockGuard`와 나란히 제공된다.
 - `SPIN_USE_LOCK`/`SPIN_LOCK` 매크로로 클래스에 손쉽게 락 필드와 RAII 가드를 부여.
 
 ### 2.2 RWSpinLock\<Preset\>
 
-- 단일 `atomic<int32_t> _state`에 4개 필드를 비트로 압축:
+- 단일 `atomic<int32> _state`에 4개 필드를 비트로 압축:
   - `WRITE_LOCKED` (bit0), `READER_COUNT` (bit1~15, `READER_ONE`씩 증감),
     `WRITER_WAITING` (bit16~31, `WRITER_ONE`씩 증감).
 - Writer-waiting 카운트를 상위 16비트에 별도로 두어, 활성 리더가 있는 동안에도 "쓰기 대기 중"임을
@@ -62,9 +66,13 @@
 - 소멸자는 `_DEBUG`에서만 `TryExclusiveLock()`으로 "현재 아무도 잠그지 않았는가"를 확인한다.
   성공하면(=잠겨 있지 않았음을 의미) 그 자리에서 획득한 락을 즉시 해제해 원상태로 되돌리고,
   실패하면 `assert`로 "잠긴 채로 소멸됨"을 알린다 — 획득 자체가 검사 수단으로 쓰이는 패턴이다.
-- 프로파일러 연동은 **성공한 획득에 한해서만** `PushLock`을 호출하고(`ExclusiveLock`은 블로킹이므로
-  항상 성공 후 호출, `TryExclusiveLock`은 성공 시에만 호출), 해제 시엔 항상 `PopLock`을 호출해
-  Push/Pop 짝을 맞춘다.
+- 프로파일러 연동은 API 성격에 따라 `PushLock` 호출 시점이 다르다. `ExclusiveLock`/`SharedLock`(블로킹)은
+  **실제 `AcquireSRWLock*` 호출보다 먼저** `PushLock`을 호출한다 — 블로킹으로 실제 멈추기 전에
+  의존성 그래프를 갱신해 두어야, 이 획득이 순환을 완성시키는 경우 `CheckCycle()`이 스레드가 실제로
+  영원히 블로킹되기 전에 `CRASH("DEADLOCK_DETECTED")`로 즉시 잡아낼 수 있기 때문이다. 반면
+  `TryExclusiveLock`/`TrySharedLock`(비블로킹)은 실제 획득에 **성공한 뒤에만** `PushLock`을 호출한다
+  (실패한 시도까지 기록하면 프로파일러 스택이 실제 소유 상태와 어긋난다). 해제 시엔 실제
+  `ReleaseSRWLock*`을 먼저 호출한 뒤 `PopLock`으로 짝을 맞춘다.
 - 4종 RAII 가드(`ExclusiveLockGuard`, `SharedLockGuard`, `TryExclusiveLockGuard`,
   `TrySharedLockGuard`) + `CSRWCustomLockGuard` + `SRW_WRITE_LOCK`/`SRW_READ_LOCK` 매크로로
   `RWSpinLock`과 동일한 사용 패턴을 Windows 네이티브 락에도 제공한다. 세 계층(SPIN/RWSPIN/SRW)의
@@ -95,9 +103,15 @@
 ### 4.3 공통 설계
 
 - 두 클래스 모두 복사/이동 전면 금지, `noexcept` 전제.
-- `#if PLATFORM_LOCK_WINDOWS` 분기 내부에서 미사용 `name` 매개변수를 `(void)name`으로
-  명시적으로 무시 처리 — Windows 경로는 profiler 연동을 `CSRWLock` 내부에 위임하고 있어
-  `PLock`/`PRWLock` 자체는 이름을 직접 사용하지 않지만, 시그니처 일관성을 위해 매개변수는 유지.
+- **`name`이 모든 경로에서 실제 하위 구현체까지 그대로 전달된다.** `PLock`/`PRWLock`의 모든 메서드
+  (`Lock`/`TryLock`/`Unlock`, `ReadLock`/`TryReadLock`/`ReadUnlock`/`WriteLock`/`TryWriteLock`/
+  `WriteUnlock`)는 Windows 분기에서 `_srwLock.ExclusiveLock(name)`처럼, 비-Windows 분기에서
+  `_spinLock.Lock(name)`/`_rwSpinLock.ReadLock(name)`처럼 `name`을 그대로 하위 구현체에
+  넘긴다. `PLock::TryLock()`도 마찬가지로 Windows에서는 `_srwLock.TryExclusiveLock(name)`,
+  비-Windows에서는 `_spinLock.TryLock(name)`을 호출해, 같은 클래스의 `PRWLock::TryReadLock`/
+  `TryWriteLock`과 동일하게 이름을 전달한다. 덕분에 `PLock`/`PRWLock`을 경유해도 하위
+  계층(`CSRWLock`/`SpinLockDefault`/`RWSpinLockDefault`)이 갖는 "성공 시에만 기록" 프로파일러
+  계약이 플랫폼과 무관하게 그대로 유지된다.
 - `PLockGuard`, `PRReadLockGuard`, `PRWriteLockGuard` 3종 RAII 가드가 하위 계층과 동일한
   이름 전달 패턴을 유지해, 상위 코드에서는 플랫폼을 몰라도 동일한 방식으로 프로파일링 태그를 남길 수 있다.
 
@@ -155,11 +169,11 @@
 |---|---|---|---|---|
 | 복사/이동 | 금지 | 금지 | 금지 | 금지 |
 | 캐시라인 정렬 | O (패딩+static_assert) | O (패딩+static_assert) | 해당 없음(OS 핸들) | 해당 없음(멤버 위임) |
-| profiler name 전달 | Lock/Unlock만 | 전 API | 전 API(성공 시만 Push) | 전 API(시그니처만, Windows는 내부 위임) |
-| RAII 가드 | SpinLockGuard | ReadLockGuard/WriteLockGuard/CustomLockGuard | 4종 개별 가드 + CSRWCustomLockGuard | PLockGuard/PRReadLockGuard/PRWriteLockGuard |
+| profiler name 전달 | 전 API(성공 시만 Push) | 전 API(블로킹은 획득 전, Try는 성공 시에만 Push) | 전 API(블로킹은 획득 전, Try는 성공 시에만 Push) | 전 API — 하위 구현체(`CSRWLock`/`SpinLockDefault`/`RWSpinLockDefault`)에 `name`을 그대로 전달(§4.3) |
+| RAII 가드 | SpinLockGuard/TrySpinLockGuard | ReadLockGuard/WriteLockGuard/CustomLockGuard | 4종 개별 가드 + CSRWCustomLockGuard | PLockGuard/PRReadLockGuard/PRWriteLockGuard |
 | 전용 매크로 | `SPIN_*` | `RWSPIN_*` | `SRW_*` | 없음(가드 직접 사용) |
 
-세 계층 모두 "이름 매개변수를 받아 profiler에 전달"하는 동일한 계약(contract)을 유지하고 있어,
+네 계층 모두 "이름 매개변수를 받아 profiler에 전달"하는 동일한 계약(contract)을 유지하고 있어,
 상위 계층(`PLock`/`PRWLock`)에서 하위 구현체를 완전히 교체해도 호출부 코드와 데드락 탐지
-연동 방식은 변하지 않는다. `CDeadLockProfiler`는 이 계약에 의존해 락 종류에 상관없이
+연동 방식은 변하지 않는다. `CDeadLockProfiler`는 이 계약에 의존해 락 종류·플랫폼에 상관없이
 이름 기반으로 전역 획득 순서 그래프를 구성한다.

@@ -25,8 +25,12 @@ class CAdoAsyncSrv
 	//***************************************************************************
 	enum
 	{
-		MAX_WARNING_QUERY_QUEUE_SIZE = 100000,
+		MAX_WARNING_QUERY_QUEUE_SIZE = 100000,			// 이 값 이상이면 심각(LOG_ERROR) 수준 경고 대상
+		MAX_WARNING_RESET_QUEUE_SIZE = 90000,			// 히스테리시스: 이 값 이하로 내려와야 경고를 재무장(rearm)함
+		INITIAL_WARN_QUEUE_SIZE = 1000,				// 시작 워밍업 중 사소한 큐 증가로 바로 경고가 찍히지 않도록 하는 최초 기준치
 	};
+
+	static constexpr int64 QUEUE_SIZE_WARN_COOLDOWN_MS = 5000;	// 큐 증가 경고(LOG_WARNING) 재발생 최소 간격(쿨다운)
 
 public:
 	CAdoAsyncSrv();
@@ -113,7 +117,7 @@ public:
 	int32						_nDBCount;					// DB 개수
 	bool						_bOpen;						// 서비스 오픈 여부
 	int32						_nMaxThreadCnt;				// 최대 스레드 수
-	CAdoConnPool**				_pAdoConnPools;				// ADO 연결 풀 배열
+	CAdoConnPool** _pAdoConnPools;				// ADO 연결 풀 배열
 
 public:
 	static std::shared_ptr<CAdoAsyncSrv> Instance();
@@ -126,7 +130,11 @@ protected:
 private:
 	std::atomic<bool>			_bStopThread;						// 스레드 중단 플래그
 	std::atomic<int32>			_nOutstandingRequests{ 0 };			// 처리 중 요청 수
-	int							_nLastWarnedQueueSize{ 2 };			// 마지막 경고 큐 크기
+
+	// 큐 크기 경고 관련 상태 — 모두 Pop()이 _mutex를 쥔 구간 안에서만 읽고 쓰므로 atomic이 아니어도 안전하다.
+	int							_nLastWarnedQueueSize{ INITIAL_WARN_QUEUE_SIZE };	// 마지막으로 LOG_WARNING을 남긴 큐 크기(새 최댓값 갱신 기준)
+	bool						_bMaxWarningActive{ false };						// MAX_WARNING_QUERY_QUEUE_SIZE 경고가 이미 발령된 상태인지(히스테리시스로 재무장)
+	std::chrono::steady_clock::time_point	_lastQueueSizeWarnTime{};				// 마지막 LOG_WARNING 시각(쿨다운 판단용)
 
 	std::mutex					_mutex;								// 동기화용 뮤텍스
 	std::condition_variable		_cva;								// 소비자 대기 조건 변수

@@ -27,7 +27,7 @@
 | 동적 워커 수 조정 | `SetReconnectConfig`로 런타임 중 재연결 워커 수/백오프 정책을 조정 가능 |
 | 격리(Quarantine) 큐 | 교체된 낡은 커넥션에 참조가 남아있으면 즉시 삭제하지 않고 격리 후 안전할 때 삭제 |
 | Safe Leak | 프로세스 종료 시점까지 참조가 남은 커넥션은 삭제를 포기(누수)하여 UAF 크래시를 방지 |
-| False sharing 방지 | 슬롯별 원자 배열(`_pAdoConns`, `_pRefCount`, `_pReconnecting`, `_pRetryFailCount`)을 `CachePaddedAtomic<T>[]`로, `_slotLocks`를 캐시라인 정렬된 `SpinLockDefault[]`로 구성해 슬롯 간 캐시라인 공유를 차단 |
+| False sharing 방지 | 슬롯별 원자 배열(`_pAdoConns`, `_pRefCount`, `_pReconnecting`, `_pRetryFailCount`)을 `CachePaddedAtomic<T>[]`로, `_slotLocks`를 슬롯별 단독 락인 `PLock[]`로 구성해 슬롯 간 캐시라인 공유를 차단 |
 | 할당자 분리 | `CAdoConnPool` 자신은 `BaseAllocator` 상속으로 RawAllocator 경로를, 내부 `CAdoDB` 커넥션은 `xnew`/`xdelete`(PoolAllocator)로 별도 관리 (§10 참고) |
 
 ## 3. 멤버 변수 설명
@@ -414,29 +414,73 @@ for( int32 i = 0; i < nDBCount; ++i )
   경로 양쪽에서 공용으로 각 풀을 안전하게 해제한다.
 - `Instance()`는 `std::make_shared`로 생성되는 진짜 싱글턴이다 — `T::operator new`를
   거치지 않으므로 `BaseAllocator` 상속은 이 클래스에는 적용하지 않는다(§10.3).
-- 큐 동기화는 `std::mutex` + `std::condition_variable`로 이루어진다. `Push()`는 큐 조작을
-  마치고 락을 해제한 뒤 `notify_one()`을 호출해, 깨어난 워커가 곧바로 락을 잡을 수 있게 한다.
-- `st_DBAsyncRq`는 `callIdent`별로 실제 쿼리 데이터를 담은 파생 구조체의 베이스이며,
-  `Action()`에서 베이스 포인터(`st_DBAsyncRq*`)로 `SAFE_DELETE`되는 것으로 보아 가상
-  소멸자를 갖는 구조로 설계되어 있다.
-- 쿼리가 타임아웃되어 처음 재시도될 때는 원본 요청 객체를 그대로 재사용해 `bReTry` 플래그만
-  세팅한 뒤 `Push()`로 재큐잉한다 — 파생 구조체를 통째로 다시 할당하지 않는다. 재큐잉이
-  실패하면(반환값 0, 서비스 종료 시점과 겹친 경우) 해당 객체는 직접 해제된다.
+- 요청 큐 `_queueDBAsyncRq`는 `CChunkedSwapQueue<std::unique_ptr<st_DBAsyncRq>>`다. 요청은
+  원시 포인터가 아니라 `std::unique_ptr`로 소유되며, 큐를 떠난 요청 객체는 `SAFE_DELETE` 같은
+  수동 해제 없이 `unique_ptr`가 스코프를 벗어나는 시점에 RAII로 자동 해제된다. `st_DBAsyncRq`/
+  `CDBAsyncSrvHandler`는 `COdbcAsyncSrv`와 동일하게 `DBAsyncSrv.h`의 공용 타입을 그대로
+  재사용하는 것으로 보인다(이 클래스 쪽에서 별도 재정의는 없다).
+- 큐 동기화는 두 겹이다 — `CChunkedSwapQueue` 자신의 내부 락이 큐 데이터(`_inQueue`/`_size`)를
+  보호하고, `CAdoAsyncSrv`의 `std::mutex`(`_mutex`) + `std::condition_variable`(`_cva`)는
+  그 위에서 블로킹 대기/기상을 담당한다. `Push()`는 `_mutex`를 잡은 채로
+  `_queueDBAsyncRq.PushAndGetSize()`와 `_cva.notify_one()`을 같은 임계구역 안에서 수행한다 —
+  `Pop()`이 `_cva.wait()`의 predicate(`!IsEmpty()`)를 검사하는 구간과 `Push()`의 push+notify
+  구간이 동일한 `_mutex`로 직렬화되어, "predicate 검사 직후·`wait()` 진입 직전"의 틈에 notify가
+  끼어들어 유실되는 lost-wakeup을 원천 차단한다. `Pop()`도 `SwapChunk()` 호출 전에 이미 같은
+  `_mutex`를 먼저 잡으므로, 잠금 순서는 항상 (`_mutex` → 큐 내부 락)으로 일관되어 데드락
+  위험은 없다.
+- 쿼리가 타임아웃되어 처음 재시도될 때는 원본 요청 객체(`unique_ptr`)를 그대로 `std::move`로
+  재사용해 `bReTry` 플래그만 세팅한 뒤 `Push()`로 재큐잉한다 — 파생 구조체를 통째로 다시
+  할당하지 않는다. 재큐잉이 실패하면(반환값 0, 서비스 종료 시점과 겹친 경우) 해당 `unique_ptr`는
+  `Push()` 내부에서 버려지는 즉시 소멸자에 의해 자동 해제된다 — 별도의 명시적 delete 호출이
+  없다.
 - `InitAdo`는 호출 시작 시 `_bStopThread`를 `false`로 재설정해, `StopThread()`
   이후 서비스를 다시 시작하는 시나리오에서도 워커 스레드들이 정상적으로 큐를 처리한다.
   `nMaxThreadCnt`가 `0`이면 `SYSTEM::CoreCount()`로 코어 수를 자동 산정한다. 또한 각
   DB 노드의 풀을 생성할 때 `TReconnectConfig.nWorkerCount`를 `max(4, nMaxThreadCnt / 4)`로
   산정해 전달함으로써, 재연결 워커 수가 풀 크기(= DB 비동기 워커 스레드 수)에 비례하도록 한다.
+  풀 할당 실패와 `Init()` 실패 각각에 `LOG_ERROR`를 남겨(`COdbcAsyncSrv::InitOdbc`와 동일한
+  수준으로) 어느 단계에서 실패했는지 로그만으로 구분할 수 있다.
 - `Action()`은 처리 결과가 `EDBReturnType::TIMEOUT`이고 아직 재시도한 적이 없을 때만
   재큐잉하며, 그 외 실패(`OK`가 아닌 다른 코드, 또는 이미 재시도한 `TIMEOUT`)는 별도
   경고 없이 요청을 해제하고 다음 요청으로 넘어간다.
-- `Clear()`는 DB 요청 큐를 비우는 역할만 담당한다. 등록된 핸들러(`_mapCommand`)는
-  `Clear()`의 영향을 받지 않으므로, 초기화가 중간에 실패해 `Clear()`가 호출되어도
-  `Regist()`로 등록해둔 핸들러는 그대로 유지된다.
+- `Clear()`는 DB 요청 큐를 비우는 역할만 담당한다. `GetSize()`로 크기를 먼저 읽어
+  `SwapChunk`로 그만큼만 옮기는 대신, 전용 `_queueDBAsyncRq.Swap(tempQueue)`로 그 시점의
+  큐 전체를 한 번의 락 구간 안에서 통째로 이관한다 — 대상 큐가 비어 있으므로 내부적으로
+  컨테이너 자체를 O(1)로 스왑하며, 크기 조회 이후 들어온 새 항목이 이번 드레인에서 누락되는
+  TOCTOU 여지도 없앤다. 등록된 핸들러(`_mapCommand`)는 `Clear()`의 영향을 받지 않으므로,
+  초기화가 중간에 실패해 `Clear()`가 호출되어도 `Regist()`로 등록해둔 핸들러는 그대로
+  유지된다.
 - `_nOutstandingRequests`(진행 중 요청 수)는 `Action()`과 `FlushRemainingTasks()` 양쪽에서
   요청을 최종 처리한 직후 `SubOutstandingRequest()`로 감소시킨다. 증가시키는
   `AddOutstandingRequest()` 호출은 `Push()` 이전, 즉 요청 생성 시점의 호출부 쪽 책임으로
-  보인다(본 구현 범위 안에서는 감소 호출만 확인된다).
+  보인다. `Action()`에서 `_mapCommand`에 `callIdent`가 등록돼 있지 않아 처리를 포기하는
+  경로도 `continue`하기 전에 `SubOutstandingRequest()`를 호출해, 미등록 `callIdent`가
+  들어와도 카운터가 영구히 어긋나지 않도록 한다. 다만 이 경로와 `ProcessAsyncCall()`이
+  `TIMEOUT` 외의 사유로 실패하는 경로는 여전히 별도의 에러 로그 없이 조용히 다음 요청으로
+  넘어간다 — `COdbcAsyncSrv::Action()`이 두 경우 모두 `LOG_ERROR`를 남기는 것과 다른 부분이다.
+
+### 11.1a `Pop()`의 배치 인출과 큐 크기 경고
+
+`Pop()`은 `COdbcAsyncSrv`와 동일하게 워커(소비자)별 로컬 큐(`localQueue`)를 두고, 비어 있을
+때만 `_mutex`를 잡아 `_cva.wait()`로 대기한 뒤 `_queueDBAsyncRq.SwapChunk(localQueue, 64)`로
+한 번에 최대 64개만 떼어온다 — 워커 하나가 백로그 전체를 독점하지 못하게 막고, 락을 잡는
+빈도를 항목 1개당 1회에서 최대 64개당 1회로 줄인다. 이 부분은 §11.1a(ODBC판) 설계와 동일하다.
+
+여기에 더해 `CAdoAsyncSrv`는 락을 쥔 상태에서 큐 크기 경고 로직을 추가로 수행한다(ODBC판에는
+없는 부분). 두 단계 경고 모두 문턱 교차 감지 + 쿨다운 방식으로 설계되어 있다:
+
+- **`LOG_ERROR` (심각 수준)**: `currentSize >= MAX_WARNING_QUERY_QUEUE_SIZE`(`100000`)를
+  처음 넘어서는 순간 1회만 발령한다(`_bMaxWarningActive` 플래그로 무장). 좁은 구간을
+  표본으로 삼지 않고 `>=` 비교 하나로만 판정하므로, 표본 사이에 크기가 크게 튀어도 경고가
+  누락되지 않는다. 이후 `currentSize`가 히스테리시스 하한인
+  `MAX_WARNING_RESET_QUEUE_SIZE`(`90000`) 아래로 실제로 내려와야 재무장되어, 문턱 근처에서
+  값이 오르내려도 매번 재알림하지 않는다.
+- **`LOG_WARNING` (증가 추세 알림)**: 여전히 "마지막으로 경고한 값(`_nLastWarnedQueueSize`,
+  초기값 `INITIAL_WARN_QUEUE_SIZE`=`1000`)보다 커질 때"를 후보 조건으로 삼지만, 실제 로그
+  출력은 `QUEUE_SIZE_WARN_COOLDOWN_MS`(`5000ms`) 쿨다운을 통과했을 때만 허용한다 — 큐가
+  계속 자라 매 `Pop()` 재획득마다 새 최댓값을 경신하는 상황(=시스템이 이미 과부하인 바로 그
+  타이밍)에도 로그가 최대 5초에 한 번으로 제한된다. 초기 기준치도 `2`에서 `1000`으로 올려,
+  기동 직후 워밍업 단계의 사소한 큐 증가만으로 경고가 찍히지 않게 했다.
 
 ### 11.2 스레드 생성
 
@@ -456,13 +500,18 @@ for( int32 i = 0; i < nDBCount; ++i )
 
 1. `_bStopThread`를 `true`로 설정하고 `_cva.notify_all()` / `_cvProducer.notify_all()`을
    호출해, 이후 새 `Push()`를 막고 대기 중이던 워커/생산자들이 종료 조건을 확인하도록 깨운다.
-2. `_mutex`를 짧게 잡은 상태에서 `_queueDBAsyncRq` 전체를 지역 임시 큐(`tempQueue`)로
-   `std::move`한다 — 잠금 구간을 큐 이관 한 번으로 최소화해, 그 사이 워커 스레드가
-   오래 블로킹되지 않게 한다.
-3. 잠금을 푼 뒤, 임시 큐에 옮겨 담은 요청들을 하나씩 꺼내 `_mapCommand`에서 핸들러를
-   찾아 `ProcessAsyncCall()`을 **호출부 스레드에서 직접** 실행한다. 핸들러를 찾지 못한
-   요청은 조용히 건너뛴다. 각 요청은 처리 후 `SubOutstandingRequest()` 호출과 함께
-   `SAFE_DELETE`로 해제한다.
+2. `_queueDBAsyncRq.Swap(tempQueue)`로 남은 전체 요청을 지역 임시 큐(`tempQueue`)로 한
+   번에 옮긴다 — `GetSize()`로 크기를 먼저 재는 절차 없이 그 시점의 큐를 통째로 이관하므로
+   잠금 구간이 짧고, 크기 조회와 실제 이관 사이에 새 요청이 끼어들 여지도 없다. `Clear()`와
+   동일하게 `CAdoAsyncSrv::_mutex`는 이 구간에서 쓰이지 않으며, 보호는 `CChunkedSwapQueue`
+   자신의 내부 락이 `Swap()` 호출 한 번 동안만 담당한다.
+3. 옮겨 담은 요청들을 하나씩 `std::move`로 꺼내 `_mapCommand`에서 핸들러를 찾아
+   `ProcessAsyncCall()`을 **호출부 스레드에서 직접** 실행한다. 여기서는 핸들러를 찾지
+   못해도 (`Action()`과 달리) `LOG_ERROR`를 남긴다 — `Action()`의 조용한 스킵과 다르게
+   종료 경로에서는 미등록 `callIdent`를 놓치지 않고 로그로 남기도록 되어 있다. 각 요청은
+   `unique_ptr`이므로 별도의 해제 호출 없이, 루프를 도는 동안 지역 변수가 재대입/소멸될 때
+   자동으로 메모리가 해제된다. `SubOutstandingRequest()` 호출은 핸들러를 찾았는지 여부와
+   무관하게(`pAsyncRq == nullptr`로 건너뛴 경우만 제외) 루프 맨 끝에서 항상 호출된다.
 4. 큐가 빌 때까지 반복한 뒤 완료 로그(`LOG_INFO`)를 남기고 반환한다.
 
 - `Action()`의 워커 루프에 있던 타임아웃 재시도 로직(§11.1의 `bReTry` 재큐잉)은 여기에는

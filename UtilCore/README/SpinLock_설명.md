@@ -8,10 +8,10 @@ C++17 기반 락프리 스핀락 2종(`SpinLock`, `RWSpinLock`)의 설계 배경
 
 | 구분 | `SpinLock` | `RWSpinLock` |
 |---|---|---|
-| 상태 표현 | `std::atomic<bool>` | `std::atomic<int32_t>` 비트마스크 |
+| 상태 표현 | `std::atomic<bool>` | `std::atomic<int32>` 비트마스크 |
 | 동시 접근 | 상호 배제 | Reader 다수 + Writer 단독 |
 | 공정성 | 없음 | Reader→Writer 기아 방지 (Writer 간 순서는 비보장) |
-| Guard | `SpinLockGuard` | `ReadLockGuard` / `WriteLockGuard` / `CustomLockGuard` |
+| Guard | `SpinLockGuard` / `TrySpinLockGuard` | `ReadLockGuard` / `WriteLockGuard` / `CustomLockGuard` |
 | 메모리 배치 | 1캐시라인 고정 | 1캐시라인 고정 |
 | 프로파일링 훅 | `USE_GPDEADLOCKPROFILER && _DEBUG`에서 `name` 인자로 데드락 프로파일러 연동 | 동일 |
 
@@ -83,16 +83,16 @@ while (true)
 ## 4. 적응형 백오프 3단계
 
 ```cpp
-template <uint32_t MaxPauseBackoff, uint32_t MaxYieldCount, typename Predicate>
+template <uint32 MaxPauseBackoff, uint32 MaxYieldCount, typename Predicate>
 inline void SpinWait(Predicate&& shouldWait) noexcept
 {
-    uint32_t backoff    = 1;
-    uint32_t yieldCount = 0;
+    uint32 backoff    = 1;
+    uint32 yieldCount = 0;
     while (shouldWait())
     {
         if (backoff <= MaxPauseBackoff)
         {
-            for (uint32_t i = 0; i < backoff; ++i) SPINLOCK_PAUSE();
+            for (uint32 i = 0; i < backoff; ++i) SPINLOCK_PAUSE();
             backoff = (backoff <= MaxPauseBackoff / 2) ? backoff * 2 : MaxPauseBackoff;
         }
         else if (yieldCount < MaxYieldCount)
@@ -154,22 +154,24 @@ yield 한도까지 소진하면 `sleep_for(1μs)` 후 `yieldCount`를 0으로 �
 ```cpp
 namespace RWSpinLockBits
 {
-    inline constexpr int32_t WRITE_LOCKED        = 0x00000001; // bit 0
-    inline constexpr int32_t READER_COUNT_MASK   = 0x0000FFFE; // bit 1~15
-    inline constexpr int32_t READER_ONE          = 0x00000002; // reader +1 단위
-    inline constexpr int32_t WRITER_WAITING_MASK = 0xFFFF0000; // bit 16~31
-    inline constexpr int32_t WRITER_ONE          = 0x00010000; // writer 대기 +1 단위
+    inline constexpr int32 WRITE_LOCKED        = 0x00000001; // bit 0
+    inline constexpr int32 READER_COUNT_MASK   = 0x0000FFFE; // bit 1~15
+    inline constexpr int32 READER_ONE          = 0x00000002; // reader +1 단위
+    inline constexpr int32 WRITER_WAITING_MASK = static_cast<int32>(0xFFFF0000u); // bit 16~31
+    inline constexpr int32 WRITER_ONE          = 0x00010000; // writer 대기 +1 단위
 }
 ```
 
-단일 `atomic<int32_t>`에 세 필드를 함께 담는 이유는 원자성 때문이다. 만약 "reader 수", "writer 대기 수", "쓰기 락 여부"를 세 개의 개별 원자 변수로 나눈다면, 그 세 변수 사이에는 원자성이 없다 — 어떤 스레드가 A를 갱신하고 B를 갱신하기 직전 사이의 틈을 다른 스레드가 관측할 수 있다. 하나의 워드로 합치면 단일 `load`/`fetch_add`/`compare_exchange`가 세 필드의 상태 전이 전체를 원자적으로 처리한다.
+단일 `atomic<int32>`에 세 필드를 함께 담는 이유는 원자성 때문이다. 만약 "reader 수", "writer 대기 수", "쓰기 락 여부"를 세 개의 개별 원자 변수로 나눈다면, 그 세 변수 사이에는 원자성이 없다 — 어떤 스레드가 A를 갱신하고 B를 갱신하기 직전 사이의 틈을 다른 스레드가 관측할 수 있다. 하나의 워드로 합치면 단일 `load`/`fetch_add`/`compare_exchange`가 세 필드의 상태 전이 전체를 원자적으로 처리한다.
+
+`WRITER_WAITING_MASK`만 `static_cast<int32>(0xFFFF0000u)`로 명시적 변환을 거치는 이유도 짚어둘 만하다. `0xFFFF0000`은 정수 리터럴 자체가 `int`(32비트, signed) 범위(`INT_MAX = 0x7FFFFFFF`)를 넘어서므로, 캐스트 없이 그대로 `int32` 상수에 대입하면 부호 있는 정수로의 축소 변환이 컴파일러/표준 버전에 따라 구현 정의(그리고 C++20 이전에는 처리 방식이 갈릴 수 있는) 동작이 된다. `0xFFFF0000u`로 먼저 부호 없는 값임을 명시하고 `static_cast<int32>`로 2의 보수 비트 패턴을 그대로 재해석시키면, 어떤 컴파일러에서도 항상 동일한 비트 패턴(상위 16비트가 모두 1)이 되는 것이 보장된다. 나머지 네 상수는 모두 `int32` 양수 범위 안에 들어오므로 이런 변환이 필요 없다.
 
 `RWSpinLockBits`가 별도 네임스페이스로 분리되고 `.inl` 내부에서 매번 `RWSpinLockBits::` 접두사로 정규화 참조되는 것도 설계상 이유가 있다. `SpinLock.inl`은 `SpinLock.h`에 `#include`되어, 그 헤더를 쓰는 모든 번역 단위에 그대로 펼쳐진다. 만약 여기서 `using namespace RWSpinLockBits`를 쓰면 그 심볼들이 헤더를 인클루드하는 모든 소스 파일의 전역 네임스페이스로 새어나간다. 완전한 정규화 참조를 쓰면 이 오염을 원천적으로 막을 수 있다.
 
 ### 5.2 Reader의 진입 — 낙관적 증가 후 검증(Optimistic-then-Verify)
 
 ```cpp
-const int32_t prev = _state.fetch_add(RWSpinLockBits::READER_ONE, std::memory_order_acquire);
+const int32 prev = _state.fetch_add(RWSpinLockBits::READER_ONE, std::memory_order_acquire);
 if ((prev & (RWSpinLockBits::WRITER_WAITING_MASK | RWSpinLockBits::WRITE_LOCKED)) == 0)
 {
     return; // 성공
@@ -185,7 +187,7 @@ TOCTOU(Time-Of-Check-Time-Of-Use) 경쟁을 피하는 방식이 핵심이다. "�
 
 ```cpp
 // 1단계: 선(先) 등록
-const int32_t prev = _state.fetch_add(RWSpinLockBits::WRITER_ONE, std::memory_order_relaxed);
+const int32 prev = _state.fetch_add(RWSpinLockBits::WRITER_ONE, std::memory_order_relaxed);
 if (((prev + RWSpinLockBits::WRITER_ONE) & RWSpinLockBits::WRITER_WAITING_MASK) == 0)
 {
     _state.fetch_sub(RWSpinLockBits::WRITER_ONE, std::memory_order_relaxed);
@@ -196,7 +198,7 @@ if (((prev + RWSpinLockBits::WRITER_ONE) & RWSpinLockBits::WRITER_WAITING_MASK) 
 SpinLockDetail::SpinWait<...>(
     [this]() noexcept
     {
-        int32_t expected = _state.load(std::memory_order_relaxed);
+        int32 expected = _state.load(std::memory_order_relaxed);
         if ((expected & (RWSpinLockBits::READER_COUNT_MASK | RWSpinLockBits::WRITE_LOCKED)) != 0) return true;
         return !_state.compare_exchange_strong(
             expected, expected | RWSpinLockBits::WRITE_LOCKED,
@@ -224,11 +226,11 @@ t3: writer W가 CAS 시도 → 또 실패
 ### 5.4 TryWriteLock — 카운터 필드와 플래그 필드를 구분해서 합성
 
 ```cpp
-int32_t expected = _state.load(std::memory_order_relaxed);
+int32 expected = _state.load(std::memory_order_relaxed);
 if ((expected & (RWSpinLockBits::READER_COUNT_MASK | RWSpinLockBits::WRITE_LOCKED)) != 0)
     return false;
 
-const int32_t desired = expected + RWSpinLockBits::WRITER_ONE + RWSpinLockBits::WRITE_LOCKED;
+const int32 desired = expected + RWSpinLockBits::WRITER_ONE + RWSpinLockBits::WRITE_LOCKED;
 
 if (!_state.compare_exchange_strong(expected, desired,
         std::memory_order_acquire, std::memory_order_relaxed))
@@ -269,7 +271,7 @@ return true;
 ### 5.5 TryReadLock — 성공 시에만 프로파일러 기록
 
 ```cpp
-const int32_t prev = _state.fetch_add(RWSpinLockBits::READER_ONE, std::memory_order_acquire);
+const int32 prev = _state.fetch_add(RWSpinLockBits::READER_ONE, std::memory_order_acquire);
 if ((prev & (RWSpinLockBits::WRITER_WAITING_MASK | RWSpinLockBits::WRITE_LOCKED)) == 0)
 {
     ...
@@ -297,6 +299,40 @@ if (((prev + RWSpinLockBits::READER_ONE) & RWSpinLockBits::READER_COUNT_MASK) ==
 reader 카운트(15비트, 최대 32767)나 writer 대기 카운트(16비트, 최대 65535)가 인접 필드를 침범하기 직전이 되면, 방금 반영한 카운트 변경을 롤백한 뒤 `SPINLOCK_FATAL`로 그 자리에서 프로세스를 중단시킨다. "조용히 잘못된 상태로 계속 실행되도록 두는 것"보다 "확실하게, 그리고 즉시 죽이는 것"이 디버깅 용이성과 안전성 양쪽에서 더 낫다는 fail-fast 철학이다.
 
 3만 개 이상의 스레드가 동시에 같은 락에서 read를 대기하는 상황은 정상적인 서버 부하로 보기 어렵고, 대개는 락을 과도하게 세분화하지 못했거나 특정 락으로 접근이 과도하게 쏠리는 설계 결함의 징후다. 이 어서션이 실제로 걸린다면 카운트를 늘리는 방향이 아니라, 해당 락 사용 패턴 자체(샤딩 부족, 락 스코프 과다 등)를 재검토해야 한다.
+
+### 5.7 RWSpinLockPreset — 프리셋 곡선과 타입 별칭
+
+```cpp
+struct RWSpinLockPreset
+{
+    struct ReadHeavy        { static constexpr uint32 MaxPauseBackoff = 512;  static constexpr uint32 MaxYieldCount = 32;  };
+    struct Default           { static constexpr uint32 MaxPauseBackoff = 1024; static constexpr uint32 MaxYieldCount = 64;  };
+    struct WriteContention   { static constexpr uint32 MaxPauseBackoff = 2048; static constexpr uint32 MaxYieldCount = 128; };
+};
+```
+
+`SpinLock`의 §4.4와 동일한 적응형 백오프(§4) 메커니즘을 그대로 재사용하되, `RWSpinLock`의 워크로드 특성에 맞춘 세 가지 프리셋을 제공한다.
+
+| 프리셋 | MaxPauseBackoff | MaxYieldCount | 의도 |
+|---|---|---|---|
+| `ReadHeavy` | 512 | 32 | reader가 압도적으로 많은 워크로드(예: 조회 위주의 캐시)에서, reader끼리는 서로 막지 않으므로 백오프를 다소 짧게 잡아 재시도를 빠르게 |
+| `Default` | 1024 | 64 | 범용 |
+| `WriteContention` | 2048 | 128 | writer 경합이 잦은 자원(예: 자주 갱신되는 세션 목록)에서 §5.3의 2단계 진입 동안 불필요한 CAS 재시도를 줄이기 위해 백오프를 길게 유지 |
+
+`SpinLock`과 마찬가지로 각 프리셋 조합에 대해 `using` 별칭이 준비되어 있어, 매번 `SpinLock<SpinLockPreset::HeavyContention>`처럼 템플릿 인자를 풀어 쓸 필요 없이 짧은 이름으로 선언할 수 있다.
+
+```cpp
+using SpinLockDefault        = SpinLock<SpinLockPreset::Default>;
+using SpinLockLight          = SpinLock<SpinLockPreset::LightWeight>;
+using SpinLockHeavy          = SpinLock<SpinLockPreset::HeavyContention>;
+using SpinLockOverSubscribed = SpinLock<SpinLockPreset::OverSubscribed>;
+
+using RWSpinLockDefault          = RWSpinLock<RWSpinLockPreset::Default>;
+using RWSpinLockReadHeavy        = RWSpinLock<RWSpinLockPreset::ReadHeavy>;
+using RWSpinLockWriteContention  = RWSpinLock<RWSpinLockPreset::WriteContention>;
+```
+
+다만 `SPIN_USE_LOCK`/`RWSPIN_USE_LOCK` 매크로(§7)는 각각 `SpinLockPreset::LightWeight`와 `RWSpinLockPreset::Default`로 프리셋이 고정되어 있어, 이 별칭들을 실제로 활용하려면 매크로 대신 해당 타입으로 멤버를 직접 선언해야 한다(예: `mutable RWSpinLockReadHeavy _lock;`).
 
 ---
 
@@ -341,7 +377,25 @@ reader 카운트(15비트, 최대 32767)나 writer 대기 카운트(16비트, �
 
 `__func__`(C++11 표준 예약 식별자, `static const char[]`)가 자동으로 프로파일러 이름 인자로 전달된다는 점도 설계 의도가 있다. MSVC 전용 확장인 `__FUNCTION__` 대신 표준 식별자를 쓴 덕분에 컴파일러 간 이식성이 확보되며, `USE_GPDEADLOCKPROFILER && _DEBUG`가 정의된 빌드에서는 어느 함수가 어떤 락을 얼마나 오래 쥐고 있는지 데드락 프로파일러(`gpDeadLockProfiler`)로 추적할 수 있다. 릴리스 빌드에서는 이 매크로 조건이 거짓이므로 `PushLock`/`PopLock` 호출 자체가 통째로 컴파일되지 않아 런타임 오버헤드가 전혀 없다.
 
-`SpinLock::Lock()`/`Unlock()`도 `RWSpinLock`과 동일하게 `name` 매개변수(기본값 `nullptr`)를 받는다. `SpinLockGuard`가 생성 시점에 `_name`을 보관해 두었다가 `Lock`/`Unlock` 호출 양쪽에 그대로 전달하므로, `SPIN_LOCK` 매크로를 쓰기만 하면 별도 코드 변경 없이 상호 배제 락도 데드락 프로파일러 추적 대상에 자동으로 포함된다. `TryLock()`은 실패할 수 있는 비블로킹 API라 프로파일러 등록 대상에서 제외되어 있다 — 이는 `TryReadLock`/`TryWriteLock`이 성공 시에만 `PushLock`을 호출하는 것(§5.5)과 같은 원칙으로, 실제 획득 여부가 불확실한 시도까지 프로파일러 스택에 남기면 소유 상태가 어긋난다.
+`SpinLock::Lock()`/`Unlock()`도 `RWSpinLock`과 동일하게 `name` 매개변수(기본값 `nullptr`)를 받는다. `SpinLockGuard`가 생성 시점에 `_name`을 보관해 두었다가 `Lock`/`Unlock` 호출 양쪽에 그대로 전달하므로, `SPIN_LOCK` 매크로를 쓰기만 하면 별도 코드 변경 없이 상호 배제 락도 데드락 프로파일러 추적 대상에 자동으로 포함된다.
+
+`TryLock(const char* name = nullptr)`도 이제 `RWSpinLock`의 `TryReadLock`/`TryWriteLock`과 완전히 대칭인 구조다 — CAS로 실제 락 획득에 **성공했을 때만** `PushLock(name)`을 호출한다(§5.5와 동일한 원칙). 이전에는 `TryLock()`이 `name` 매개변수 자체를 받지 않아, `Unlock(name)`과 이름을 맞춰 짝지어 쓰면 `PushLock` 없이 `PopLock`만 호출되어 `CDeadLockProfiler`가 `MULTIPLE_UNLOCK`/`INVALID_UNLOCK`으로 크래시하는 함정이 있었다. `name`을 추가하고 `Unlock(name)`과 항상 짝을 맞추도록 고친 뒤로는 이 비대칭이 사라졌다. `Lock()` 내부에서 재시도용으로 호출하는 `TryLock()`(인자 없이 호출 → 기본값 `nullptr`)은 여전히 프로파일러에 기록되지 않아, `Lock()`이 진입 시점에 이미 호출한 `PushLock`과 중복 기록되지 않는다.
+
+이 API 대칭성 덕분에 `SpinLock`에도 비블로킹 시도용 RAII 가드 `TrySpinLockGuard`가 새로 추가됐다(참고로 이 저장소의 또 다른 락인 `CSRWLock`은 이미 `TryExclusiveLockGuard`/`TrySharedLockGuard`라는 동일한 패턴의 가드를 갖고 있다 — 별도의 RWLock 설계 문서 참고). 생성자에서 `lock.TryLock(name)`을 시도해 결과를 `_acquired`에 저장하고, 소멸자는 `_acquired`가 `true`일 때만 `lock.Unlock(name)`을 호출한다.
+
+```cpp
+bool TryIncrement()
+{
+    TrySpinLockGuard guard(_lock, __func__);
+    if (!guard.IsAcquired())
+        return false;   // 다른 스레드가 쥐는 중 → 대기 없이 즉시 포기
+
+    ++_hitCount;
+    return true;
+}
+```
+
+`SpinLockGuard`와 마찬가지로 전용 매크로(`SPIN_TRY_LOCK` 같은)는 별도로 제공되지 않으며, 필요한 지점에서 `TrySpinLockGuard<Preset>`을 직접 선언해 쓴다.
 
 `CustomLockGuard`가 `LockType` 열거값으로 읽기/쓰기를 런타임에 선택하는 구조인 이유는, `RWSPIN_WRITE_LOCK`/`RWSPIN_READ_LOCK` 매크로가 컴파일 타임에 결정된 리터럴을 넘기더라도 내부적으로는 `if (_type == LockType::Write) ... else ...`라는 단일 코드 경로로 두 가드 타입을 통합해, 별도의 `WriteLockGuard`/`ReadLockGuard` 클래스와 중복 없이 프로파일러 연동 로직을 한 곳에서 관리하기 위함이다. 실제로 `WriteLockGuard`/`ReadLockGuard`는 각각 단일 락 타입 전용 RAII 가드로 별도 존재하며, `CustomLockGuard`는 매크로 계층에서 사용하는 범용 버전이다.
 
@@ -492,4 +546,5 @@ struct alignas(kCacheLineSize) CachePaddedAtomic
 - `RWSpinLock`은 writer의 "선등록 후 대기" 2단계 진입으로 reader에 의한 writer 기아를 방지하지만, writer 간의 순서 자체는 보장하지 않으며 `TryWriteLock()`은 이를 추월할 수 있다는 점이 명시적 설계 경계다.
 - `TryWriteLock()`에서 카운터 필드(`WRITER_ONE`)와 플래그 필드(`WRITE_LOCKED`)를 산술 덧셈으로 구분해 합성하는 것, 오버플로우 가드에서 롤백 후 `SPINLOCK_FATAL`을 호출하는 순서는 모두 `WriteUnlock()`과의 상태 대칭성을 지키기 위한 핵심 불변조건이다.
 - 캐시라인 정렬(`alignas`)과 명시적 패딩을 함께 사용해 객체의 시작 주소와 크기를 모두 캐시라인에 고정함으로써, 배열로 사용할 때도 인접 원소 간 false sharing이 발생하지 않는다.
+- `SpinLock::TryLock()`은 이제 `name` 매개변수를 받아 `RWSpinLock`의 `TryReadLock`/`TryWriteLock`과 동일하게 "성공했을 때만 `PushLock`" 원칙을 따르며, 이를 감싸는 `TrySpinLockGuard`가 `SpinLockGuard`와 나란히 제공된다.
 - 현재 설계는 unfair 스핀락을 전제로 저지연에 최적화되어 있으며, 더 강한 공정성이 필요한 특정 자원에는 티켓락/MCS락을 별도로 조합하는 것을 권장한다.

@@ -14,10 +14,10 @@
 CServerConfig::CServerConfig(void)
 	: _nServerPort(0), _nMaxUser(0), _nKeepAliveSec(0)
 {
-	memset(_tszServerName, 0x00, sizeof(_tszServerName));
-	memset(_tszIP, 0x00, sizeof(_tszIP));
-	memset(_tszServiceName, 0x00, sizeof(_tszServiceName));
-	memset(_tszDisplayName, 0x00, sizeof(_tszDisplayName));
+	memset(_tszServerName, 0, sizeof(_tszServerName));
+	memset(_tszIP, 0, sizeof(_tszIP));
+	memset(_tszServiceName, 0, sizeof(_tszServiceName));
+	memset(_tszDisplayName, 0, sizeof(_tszDisplayName));
 
 	Clear();
 }

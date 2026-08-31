@@ -48,8 +48,7 @@ public:
     void Lock(const char* name = nullptr) noexcept
     {
 #if PLATFORM_LOCK_WINDOWS
-        (void)name;
-        _srwLock.ExclusiveLock();
+        _srwLock.ExclusiveLock(name);
 #else
         _spinLock.Lock(name);
 #endif
@@ -63,11 +62,9 @@ public:
     [[nodiscard]] bool TryLock(const char* name = nullptr) noexcept
     {
 #if PLATFORM_LOCK_WINDOWS
-        (void)name;
-        return _srwLock.TryExclusiveLock();
+        return _srwLock.TryExclusiveLock(name);
 #else
-        (void)name;
-        return _spinLock.TryLock();
+        return _spinLock.TryLock(name);
 #endif
     }
 
@@ -78,8 +75,7 @@ public:
     void Unlock(const char* name = nullptr) noexcept
     {
 #if PLATFORM_LOCK_WINDOWS
-        (void)name;
-        _srwLock.ExclusiveUnLock();
+        _srwLock.ExclusiveUnLock(name);
 #else
         _spinLock.Unlock(name);
 #endif
@@ -128,8 +124,7 @@ public:
     void ReadLock(const char* name = nullptr) noexcept
     {
 #if PLATFORM_LOCK_WINDOWS
-        (void)name;
-        _srwLock.SharedLock();
+        _srwLock.SharedLock(name);
 #else
         _rwSpinLock.ReadLock(name);
 #endif
@@ -143,8 +138,7 @@ public:
     [[nodiscard]] bool TryReadLock(const char* name = nullptr) noexcept
     {
 #if PLATFORM_LOCK_WINDOWS
-        (void)name;
-        return _srwLock.TrySharedLock();
+        return _srwLock.TrySharedLock(name);
 #else
         return _rwSpinLock.TryReadLock(name);
 #endif
@@ -157,8 +151,7 @@ public:
     void ReadUnlock(const char* name = nullptr) noexcept
     {
 #if PLATFORM_LOCK_WINDOWS
-        (void)name;
-        _srwLock.SharedUnLock();
+        _srwLock.SharedUnLock(name);
 #else
         _rwSpinLock.ReadUnlock(name);
 #endif
@@ -173,8 +166,7 @@ public:
     void WriteLock(const char* name = nullptr) noexcept
     {
 #if PLATFORM_LOCK_WINDOWS
-        (void)name;
-        _srwLock.ExclusiveLock();
+        _srwLock.ExclusiveLock(name);
 #else
         _rwSpinLock.WriteLock(name);
 #endif
@@ -188,8 +180,7 @@ public:
     [[nodiscard]] bool TryWriteLock(const char* name = nullptr) noexcept
     {
 #if PLATFORM_LOCK_WINDOWS
-        (void)name;
-        return _srwLock.TryExclusiveLock();
+        return _srwLock.TryExclusiveLock(name);
 #else
         return _rwSpinLock.TryWriteLock(name);
 #endif
@@ -202,8 +193,7 @@ public:
     void WriteUnlock(const char* name = nullptr) noexcept
     {
 #if PLATFORM_LOCK_WINDOWS
-        (void)name;
-        _srwLock.ExclusiveUnLock();
+        _srwLock.ExclusiveUnLock(name);
 #else
         _rwSpinLock.WriteUnlock(name);
 #endif

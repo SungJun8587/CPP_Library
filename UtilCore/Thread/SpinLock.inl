@@ -77,13 +77,21 @@ void SpinLock<Preset>::Lock(const char* name) noexcept
 
 //***************************************************************************
 // @brief 락 획득을 비블로킹 방식으로 시도합니다.
+// @param name 프로파일링 추적용 락 이름
 // @return 락 획득 성공 시 true, 실패 시 false
 //***************************************************************************
 template <typename Preset>
-bool SpinLock<Preset>::TryLock() noexcept
+bool SpinLock<Preset>::TryLock(const char* name) noexcept
 {
     bool expected = false;
-    return _locked.compare_exchange_strong(expected, true, std::memory_order_acquire, std::memory_order_relaxed);
+    if( !_locked.compare_exchange_strong(expected, true, std::memory_order_acquire, std::memory_order_relaxed) )
+        return false;
+
+#if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
+    // 락 획득 성공 시에만 프로파일러에 이력을 기록한다.
+    if( name ) gpDeadLockProfiler->PushLock(name);
+#endif
+    return true;
 }
 
 //***************************************************************************

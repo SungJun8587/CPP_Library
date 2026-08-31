@@ -22,14 +22,14 @@
 	extern class CJobTimer*		gpJobTimer;
 #endif
 
-#ifdef UC_THREADMANAGER_H	
-	class CThreadManager;
-	extern class CThreadManager*	gpThreadManager;
-#endif
-
 #if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
 	class CDeadLockProfiler;
 	extern class CDeadLockProfiler* gpDeadLockProfiler;
+#endif
+
+#ifdef UC_THREADMANAGER_H	
+	class CThreadManager;
+	extern class CThreadManager* gpThreadManager;
 #endif
 
 namespace BaseGlobal

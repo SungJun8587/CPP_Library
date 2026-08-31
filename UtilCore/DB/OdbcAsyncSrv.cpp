@@ -1,11 +1,11 @@
-﻿//***************************************************************************
+﻿
+//***************************************************************************
 // OdbcAsyncSrv.cpp : implementation of the COdbcAsyncSrv class.
 //
 //***************************************************************************
 
 #include "pch.h"
 #include "OdbcAsyncSrv.h"
-#include <algorithm>
 
 extern CThreadManager* gpThreadManager;
 
@@ -51,15 +51,12 @@ COdbcAsyncSrv::~COdbcAsyncSrv()
 //***************************************************************************
 void COdbcAsyncSrv::Clear()
 {
-	// CSwapQueue를 비우기 위해 전체 크기만큼 넉넉하게 척크 스왑하거나 통째로 비움
+	// [2/3번 수정] 크기를 먼저 읽고 그 값만큼 SwapChunk하는 대신,
+	// 큐 전체를 한 번에(O(1), 대상이 비어있는 경우) 넘겨받는 전용 Swap()을 사용한다.
+	// - GetSize() 이후 Push()가 끼어들 경우 방금 들어온 항목이 이번 드레인에서
+	//   누락될 수 있는 TOCTOU 여지를 원천적으로 제거한다.
 	CQueue<std::unique_ptr<st_DBAsyncRq>> tempQueue;
-
-	// 안전하게 현재 남은 전체 사이즈만큼 척크 스왑을 수행하여 tempQueue로 이동
-	int64 totalSize = _queueDBAsyncRq.GetSize();
-	if( totalSize > 0 )
-	{
-		_queueDBAsyncRq.SwapChunk(tempQueue, static_cast<size_t>(totalSize));
-	}
+	_queueDBAsyncRq.Swap(tempQueue);
 
 	// tempQueue가 비워질 때 unique_ptr이 알아서 메모리를 해제하므로 별도의 SAFE_DELETE가 불필요합니다.
 	while( !tempQueue.empty() )
@@ -80,13 +77,9 @@ void COdbcAsyncSrv::FlushRemainingTasks()
 	_cva.notify_all();
 	_cvProducer.notify_all();
 
-	// 큐에 남아있는 작업들을 안전하게 모두 가져옴
+	// [2/3번 수정] Clear()와 동일하게 GetSize()+SwapChunk 대신 Swap()으로 한 번에 이관한다.
 	CQueue<std::unique_ptr<st_DBAsyncRq>> tempQueue;
-	int64 totalSize = _queueDBAsyncRq.GetSize();
-	if( totalSize > 0 )
-	{
-		_queueDBAsyncRq.SwapChunk(tempQueue, static_cast<size_t>(totalSize));
-	}
+	_queueDBAsyncRq.Swap(tempQueue);
 
 	int32 remainingCount = static_cast<int32>(tempQueue.size());
 	if( remainingCount > 0 )
@@ -245,7 +238,9 @@ bool COdbcAsyncSrv::RunningThread()
 //***************************************************************************
 bool COdbcAsyncSrv::Action()
 {
-	static uint64 cumulateCallCnt = 0;
+	// [MySQL판 대조로 발견/수정] 여러 워커 스레드가 동시에 Action()을 돌며 이 값을 증가시키므로
+	// 비atomic static 변수 + 후위증가는 동기화 없는 공유 상태 변경으로 데이터 레이스(UB)다.
+	static std::atomic<uint64> cumulateCallCnt{ 0 };
 	CQueue<std::unique_ptr<st_DBAsyncRq>> localQueue; // 소비자별 로컬 처리용 큐 (더블 버퍼링 스왑 대상)
 
 	while( !_bStopThread.load() )
@@ -276,7 +271,7 @@ bool COdbcAsyncSrv::Action()
 			{
 				uint64 endTick = _GetTickCount();
 				if( 300 <= endTick - startTick )
-					LOG_WARNING(_T("Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"), endTick - startTick, cumulateCallCnt++, static_cast<int>(Ret), pAsyncRq->callIdent);
+					LOG_WARNING(_T("Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"), endTick - startTick, cumulateCallCnt.fetch_add(1, std::memory_order_relaxed), static_cast<int>(Ret), pAsyncRq->callIdent);
 
 				uint16 logIdent = pAsyncRq->callIdent;
 				pAsyncRq->bReTry = true;
@@ -296,11 +291,11 @@ bool COdbcAsyncSrv::Action()
 #if defined(_DEBUG)
 		uint64 endTick = _GetTickCount();
 		if( 300 <= endTick - startTick )
-			LOG_WARNING(_T("Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"), endTick - startTick, cumulateCallCnt++, static_cast<int>(Ret), pAsyncRq->callIdent);
+			LOG_WARNING(_T("Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"), endTick - startTick, cumulateCallCnt.fetch_add(1, std::memory_order_relaxed), static_cast<int>(Ret), pAsyncRq->callIdent);
 #else
 		uint64 endTick = _GetTickCount();
 		if( 1000 <= endTick - startTick )
-			LOG_WARNING(_T("Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"), endTick - startTick, cumulateCallCnt++, static_cast<int>(Ret), pAsyncRq->callIdent);
+			LOG_WARNING(_T("Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"), endTick - startTick, cumulateCallCnt.fetch_add(1, std::memory_order_relaxed), static_cast<int>(Ret), pAsyncRq->callIdent);
 #endif
 
 		SubOutstandingRequest();
@@ -318,10 +313,20 @@ int COdbcAsyncSrv::Push(std::unique_ptr<st_DBAsyncRq> pAsyncRq)
 {
 	if( _bStopThread.load() ) return 0;
 
-	// [1번 수정] 락 안에서 푸시와 사이즈 조회를 원자적으로 처리하므로 이중 delete 위험 소멸
-	int queueSize = static_cast<int>(_queueDBAsyncRq.PushAndGetSize(std::move(pAsyncRq)));
-
-	_cva.notify_one();
+	// [1번 수정] PushAndGetSize()가 잡는 큐 내부 락(PLock)과 별개로,
+	// Pop()이 대기하는 조건(_cva)을 보호하는 COdbcAsyncSrv::_mutex를 여기서도 잡은 뒤
+	// notify_one()까지 같은 임계구역 안에서 수행한다.
+	// - 기존에는 이 구간이 _mutex 밖에서 실행되어, 컨슈머가 "predicate 검사 후 실제
+	//   wait() 진입 전" 사이의 틈에 push+notify가 끼어들면 notify가 유실될 수 있었다
+	//   (lost wakeup). 그 경우 해당 요청은 다음 push가 들어오기 전까지 방치될 수 있었다.
+	// - Pop()이 SwapChunk()를 호출할 때도 이미 같은 _mutex를 먼저 잡은 뒤이므로,
+	//   잠금 순서는 항상 (_mutex → 큐 내부 PLock)으로 일관되어 데드락 위험이 없다.
+	int queueSize = 0;
+	{
+		std::lock_guard<std::mutex> lockGuard(_mutex);
+		queueSize = static_cast<int>(_queueDBAsyncRq.PushAndGetSize(std::move(pAsyncRq)));
+		_cva.notify_one();
+	}
 
 	return queueSize;
 }

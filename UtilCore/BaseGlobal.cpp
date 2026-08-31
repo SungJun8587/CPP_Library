@@ -19,12 +19,12 @@ CGlobalQueue* gpGlobalQueue = nullptr;
 CJobTimer* gpJobTimer = nullptr;
 #endif
 
-#ifdef UC_THREADMANAGER_H
-CThreadManager* gpThreadManager = nullptr;
-#endif
-
 #if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
 CDeadLockProfiler* gpDeadLockProfiler = nullptr;
+#endif
+
+#ifdef UC_THREADMANAGER_H
+CThreadManager* gpThreadManager = nullptr;
 #endif
 
 //***************************************************************************
@@ -77,12 +77,12 @@ namespace BaseGlobal
 		gpJobTimer = new CJobTimer();
 #endif
 
-#ifdef UC_THREADMANAGER_H
-		gpThreadManager = new CThreadManager();
-#endif	
-
 #if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
 		gpDeadLockProfiler = new CDeadLockProfiler();
+#endif	
+
+#ifdef UC_THREADMANAGER_H
+		gpThreadManager = new CThreadManager();
 #endif	
 	}
 
@@ -97,19 +97,35 @@ namespace BaseGlobal
 		//    그 과정에서 워커 스레드들의 CMemory TLS 캐시가 이미
 		//    gpMemory의 전역 풀로 반납 완료된다.
 #ifdef UC_THREADMANAGER_H
-		if( gpThreadManager != nullptr ) delete gpThreadManager;
+		if( gpThreadManager != nullptr )
+		{
+			delete gpThreadManager;
+			gpThreadManager = nullptr;
+		}
 #endif	
 
 #if defined(USE_GPDEADLOCKPROFILER) && defined(_DEBUG)
-		if( gpDeadLockProfiler != nullptr ) delete gpDeadLockProfiler;
+		if( gpDeadLockProfiler != nullptr )
+		{
+			delete gpDeadLockProfiler;
+			gpDeadLockProfiler = nullptr;
+		}
 #endif	
 
 #ifdef UC_JOBTIMER_H
-		if( gpJobTimer != nullptr ) delete gpJobTimer;
+		if( gpJobTimer != nullptr )
+		{
+			delete gpJobTimer;
+			gpJobTimer = nullptr;
+		}
 #endif
 
 #ifdef UC_GLOBALQUEUE_H
-		if( gpGlobalQueue != nullptr ) delete gpGlobalQueue;
+		if( gpGlobalQueue != nullptr )
+		{
+			delete gpGlobalQueue;
+			gpGlobalQueue = nullptr;
+		}
 #endif
 
 		// 2) 메인 스레드 자신의 TLS 캐시를 수동으로 비운다.
@@ -119,7 +135,11 @@ namespace BaseGlobal
 		//    반드시 가장 마지막에 파괴한다.
 #ifdef UC_MEMORY_H
 		CMemory::FlushCurrentThreadCache();
-		if( gpMemory != nullptr ) delete gpMemory;
+		if( gpMemory != nullptr )
+		{
+			delete gpMemory;
+			gpMemory = nullptr;
+		}
 #endif	
 	}
 }

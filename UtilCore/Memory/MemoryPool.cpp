@@ -79,8 +79,7 @@ MemoryHeader* CMemoryPool::Pop()
 	// 풀이 비어있으면 새로 raw 할당
 	if( memory == nullptr )
 	{
-		memory = reinterpret_cast<MemoryHeader*>(
-			RawAllocator::AllocAligned(_allocSize, SLIST_ALIGNMENT));
+		memory = reinterpret_cast<MemoryHeader*>(RawAllocator::AllocAligned(_allocSize, SLIST_ALIGNMENT));
 
 		// 할당 실패(OOM) 방어 체크 - nullptr 상태로 이후 로직이 진행되는 것을 차단
 		ASSERT_CRASH(memory != nullptr);

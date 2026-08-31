@@ -26,6 +26,28 @@ Windows `SRWLOCK` API를 래핑한 C++ 읽기/쓰기 락 클래스.
 `SRWLOCK` 핸들을 내부에 보유하며 읽기/쓰기 락 획득·해제 API를 제공하는 핵심 클래스.  
 복사·이동 불가. 스택 또는 클래스 멤버로 선언하여 사용.
 
+### 멤버 변수
+
+| 변수 | 타입 | 설명 |
+|---|---|---|
+| `_srwLock` | `SRWLOCK` | Windows 네이티브 SRWLock 핸들(포인터 크기, 8바이트) |
+
+### 멤버 함수
+
+| 함수 | 파라미터 | 반환값 | 설명 |
+|---|---|---|---|
+| `CSRWLock` | 없음 | - | 생성자. `InitializeSRWLock`으로 내부 핸들 초기화(동적 할당 불필요) |
+| `~CSRWLock` | 없음 | - | 소멸자. `_DEBUG`에서만 잠금 상태 검사 후 `assert`, probe-then-release(위 참고) |
+| `ExclusiveLock` | `const char* name = nullptr` | `void` | 쓰기 락 블로킹 획득. 실제 획득 전에 `PushLock` |
+| `TryExclusiveLock` | `const char* name = nullptr` | `[[nodiscard]] bool` | 쓰기 락 비블로킹 시도. 성공 시에만 `PushLock` |
+| `ExclusiveUnLock` | `const char* name = nullptr` | `void` | 쓰기 락 해제 후 `PopLock` |
+| `SharedLock` | `const char* name = nullptr` | `void` | 읽기 락 블로킹 획득. 실제 획득 전에 `PushLock` |
+| `TrySharedLock` | `const char* name = nullptr` | `[[nodiscard]] bool` | 읽기 락 비블로킹 시도. 성공 시에만 `PushLock` |
+| `SharedUnLock` | `const char* name = nullptr` | `void` | 읽기 락 해제 후 `PopLock` |
+| `NativeHandle` | 없음 | `SRWLOCK*` | 내부 핸들 포인터 반환(`CONDITION_VARIABLE` 연동용) |
+
+복사 생성자·복사 대입 연산자·이동 생성자·이동 대입 연산자는 모두 `= delete`로 금지되어 있습니다(락 객체는 고정된 주소를 가져야 함).
+
 ### 생성자 / 소멸자
 
 #### `CSRWLock()`
@@ -33,39 +55,44 @@ Windows `SRWLOCK` API를 래핑한 C++ 읽기/쓰기 락 클래스.
 동적 할당 없이 스택/멤버 변수로 선언 가능.
 
 #### `~CSRWLock()`
-`_DEBUG` 빌드에서만 `TryExclusiveLock`으로 잠금 상태를 검사.  
-잠긴 채 소멸되면 `assert` 발동. `SRWLOCK`은 별도 Destroy API 없음.
+`_DEBUG` 빌드에서만, 인자 없이(`name = nullptr`) `TryExclusiveLock()`을 호출해 잠금 상태를 검사.  
+성공(=아무도 잠그지 않은 상태)이면 그 즉시 `ExclusiveUnLock()`으로 되돌려 원래 상태를 복원하고, `assert`는 통과.  
+실패(=누군가 잠근 상태)라면 `assert("RWLock destroyed while locked")`가 발동하며, 이 경우 락을 획득하지 못했으므로 `ExclusiveUnLock()`은 호출하지 않음.  
+`SRWLOCK`은 별도 Destroy API 없음. 검사에 쓰인 `TryExclusiveLock()`은 인자를 생략해 호출하므로 이 검사 자체는 데드락 프로파일러에 기록되지 않음.
 
 ### 메서드
 
 #### `void ExclusiveLock(const char* name = nullptr)`
 쓰기 락(Exclusive) 획득. 블로킹.  
 모든 읽기·쓰기 스레드가 락을 해제할 때까지 대기.  
-`USE_GPDEADLOCKPROFILER && _DEBUG` 빌드에서 `name`이 지정되면 데드락 프로파일러에 획득 순서를 기록.
+`USE_GPDEADLOCKPROFILER && _DEBUG` 빌드에서 `name`이 지정되면, **실제 `AcquireSRWLockExclusive` 호출보다 먼저** 데드락 프로파일러에 획득 순서를 기록(`PushLock`). 블로킹 획득이 시작되기 전에 의존성 그래프를 갱신해 두는 순서이므로, 이 호출이 순환 의존을 완성시키는 경우 `PushLock` 내부의 `CheckCycle()`이 실제로 블로킹되어 멈추기 전에 즉시 `CRASH("DEADLOCK_DETECTED")`로 잡아낸다.
 
 #### `[[nodiscard]] bool TryExclusiveLock(const char* name = nullptr)`
 쓰기 락 비블로킹 획득 시도.  
 즉시 획득 가능하면 `true`, 불가능하면 `false` 반환.  
 반환값 무시 시 컴파일러 경고 발생.  
-획득 성공 시에만 프로파일러에 기록(실패한 시도는 기록하지 않음).
+`TryAcquireSRWLockExclusive`로 **실제 락을 먼저 획득한 뒤에만** 프로파일러에 기록(`PushLock`)한다 — `ExclusiveLock`과 반대 순서. 비블로킹 호출은 애초에 멈춰 있을 위험이 없으므로, 획득에 실패한 시도는 기록하지 않는다.
 
 #### `void ExclusiveUnLock(const char* name = nullptr)`
 쓰기 락 해제.  
 `ExclusiveLock` 또는 `TryExclusiveLock` 성공 후 반드시 호출.  
-프로파일러 연동 빌드에서 `name`으로 해제 기록.
+`ReleaseSRWLockExclusive`로 **실제 락을 먼저 해제한 뒤** 프로파일러에서 `PopLock`으로 기록을 지운다.
 
 #### `void SharedLock(const char* name = nullptr)`
 읽기 락(Shared) 획득. 블로킹.  
-다른 읽기 스레드와 동시 획득 가능. 쓰기 스레드 존재 시 대기.
+다른 읽기 스레드와 동시 획득 가능. 쓰기 스레드 존재 시 대기.  
+`ExclusiveLock`과 동일하게, `name`이 지정되면 **실제 `AcquireSRWLockShared` 호출보다 먼저** `PushLock`을 호출한다.
 
 #### `[[nodiscard]] bool TrySharedLock(const char* name = nullptr)`
 읽기 락 비블로킹 획득 시도.  
 즉시 획득 가능하면 `true`, 불가능하면 `false` 반환.  
-반환값 무시 시 컴파일러 경고 발생.
+반환값 무시 시 컴파일러 경고 발생.  
+`TryAcquireSRWLockShared`로 **실제 락을 먼저 획득한 뒤에만** `PushLock`을 호출한다(`TryExclusiveLock`과 동일한 순서).
 
 #### `void SharedUnLock(const char* name = nullptr)`
 읽기 락 해제.  
-`SharedLock` 또는 `TrySharedLock` 성공 후 반드시 호출.
+`SharedLock` 또는 `TrySharedLock` 성공 후 반드시 호출.  
+`ReleaseSRWLockShared`로 **실제 락을 먼저 해제한 뒤** `PopLock`으로 기록을 지운다.
 
 #### `SRWLOCK* NativeHandle()`
 내부 `SRWLOCK` 핸들 포인터 반환.  
@@ -74,6 +101,10 @@ Windows `SRWLOCK` API를 래핑한 C++ 읽기/쓰기 락 클래스.
 ### 데드락 프로파일러 연동
 
 `USE_GPDEADLOCKPROFILER`와 `_DEBUG`가 모두 정의된 빌드에서, 각 Lock/Unlock 계열 메서드에 전달한 `name` 인자가 전역 `gpDeadLockProfiler`(`CDeadLockProfiler`)로 전달되어 락 획득 순서를 추적한다. `name`을 생략하면(`nullptr`) 해당 호출은 프로파일링 대상에서 제외된다. 릴리즈 빌드나 프로파일러 미사용 빌드에서는 `name` 인자가 완전히 무시되며 순수 SRWLock 호출만 수행되어 오버헤드가 없다.
+
+**`PushLock` 호출 시점은 블로킹 여부에 따라 다르다.** `ExclusiveLock`/`SharedLock`(블로킹)은 실제 OS 락 획득 함수를 부르기 **전**에 `PushLock`을 호출하는 반면, `TryExclusiveLock`/`TrySharedLock`(비블로킹)은 실제 획득에 **성공한 뒤**에만 호출한다. 블로킹 계열이 먼저 기록하는 이유는, `PushLock`이 내부적으로 실행하는 `CheckCycle()`이 이 호출로 인해 순환 의존이 생기는지를 락을 실제로 기다리기 전에 미리 검사하기 때문이다 — 순환이 발견되면 스레드가 실제로 멈추기 전에 `CRASH("DEADLOCK_DETECTED")`로 즉시 알 수 있다. `Unlock` 계열은 반대로 실제 OS 락 해제가 먼저이고 `PopLock` 기록이 그 뒤를 따른다.
+
+`SRWLock.cpp`는 `BaseGlobal.h`를 포함하지 않고 `extern CDeadLockProfiler* gpDeadLockProfiler;`를 자체적으로 선언해 이 전역을 참조한다. 두 선언은 같은 전역 심볼을 가리키므로 링크 시 하나로 합쳐지며, 덕분에 `SRWLock` 모듈은 `BaseGlobal`을 직접 포함하지 않고도 독립적으로 컴파일된다.
 
 ---
 
@@ -84,6 +115,22 @@ Windows `SRWLOCK` API를 래핑한 C++ 읽기/쓰기 락 클래스.
 쓰기 락 블로킹 획득용 RAII 가드.  
 생성 시 `ExclusiveLock` 획득, 소멸 시 `ExclusiveUnLock` 자동 호출.  
 예외 발생 시에도 락 해제 보장.
+
+### 멤버 변수
+
+| 변수 | 타입 | 설명 |
+|---|---|---|
+| `_lock` | `CSRWLock&` | 대상 `CSRWLock` 객체 참조 |
+| `_name` | `const char*` | 데드락 프로파일러에 전달할 락 이름 |
+
+### 멤버 함수
+
+| 함수 | 파라미터 | 반환값 | 설명 |
+|---|---|---|---|
+| `ExclusiveLockGuard` | `CSRWLock& lock, const char* name = nullptr` | - | `explicit` 생성자(`noexcept`). `lock.ExclusiveLock(name)` 호출 |
+| `~ExclusiveLockGuard` | 없음 | - | 소멸자(`noexcept`). `lock.ExclusiveUnLock(name)` 호출 |
+
+복사 생성자·복사 대입 연산자는 `= delete`로 금지되어 있습니다.
 
 ### 생성자 / 소멸자
 
@@ -112,6 +159,22 @@ Windows `SRWLOCK` API를 래핑한 C++ 읽기/쓰기 락 클래스.
 생성 시 `SharedLock` 획득, 소멸 시 `SharedUnLock` 자동 호출.  
 예외 발생 시에도 락 해제 보장.
 
+### 멤버 변수
+
+| 변수 | 타입 | 설명 |
+|---|---|---|
+| `_lock` | `CSRWLock&` | 대상 `CSRWLock` 객체 참조 |
+| `_name` | `const char*` | 데드락 프로파일러에 전달할 락 이름 |
+
+### 멤버 함수
+
+| 함수 | 파라미터 | 반환값 | 설명 |
+|---|---|---|---|
+| `SharedLockGuard` | `CSRWLock& lock, const char* name = nullptr` | - | `explicit` 생성자(`noexcept`). `lock.SharedLock(name)` 호출 |
+| `~SharedLockGuard` | 없음 | - | 소멸자(`noexcept`). `lock.SharedUnLock(name)` 호출 |
+
+복사 생성자·복사 대입 연산자는 `= delete`로 금지되어 있습니다.
+
 ### 생성자 / 소멸자
 
 #### `explicit SharedLockGuard(CSRWLock& lock, const char* name = nullptr)`
@@ -138,6 +201,24 @@ Windows `SRWLOCK` API를 래핑한 C++ 읽기/쓰기 락 클래스.
 쓰기 락 비블로킹 획득용 RAII 가드.  
 생성 시 `TryExclusiveLock` 시도, 획득 성공 시 소멸자에서 `ExclusiveUnLock` 자동 호출.  
 `IsAcquired()`로 획득 여부 확인 후 임계 구역 진입.
+
+### 멤버 변수
+
+| 변수 | 타입 | 설명 |
+|---|---|---|
+| `_lock` | `CSRWLock&` | 대상 `CSRWLock` 객체 참조 |
+| `_name` | `const char*` | 데드락 프로파일러에 전달할 락 이름 |
+| `_acquired` | `bool` | 락 획득 성공 여부 플래그 |
+
+### 멤버 함수
+
+| 함수 | 파라미터 | 반환값 | 설명 |
+|---|---|---|---|
+| `TryExclusiveLockGuard` | `CSRWLock& lock, const char* name = nullptr` | - | `explicit` 생성자(`noexcept`). `lock.TryExclusiveLock(name)` 호출 결과를 `_acquired`에 저장 |
+| `~TryExclusiveLockGuard` | 없음 | - | 소멸자(`noexcept`). `_acquired`가 `true`일 때만 `lock.ExclusiveUnLock(name)` 호출 |
+| `IsAcquired` | 없음 | `[[nodiscard]] bool` | 락 획득 성공 여부 반환 |
+
+복사 생성자·복사 대입 연산자는 `= delete`로 금지되어 있습니다.
 
 ### 생성자 / 소멸자
 
@@ -172,6 +253,24 @@ if (guard.IsAcquired())
 읽기 락 비블로킹 획득용 RAII 가드.  
 생성 시 `TrySharedLock` 시도, 획득 성공 시 소멸자에서 `SharedUnLock` 자동 호출.  
 `IsAcquired()`로 획득 여부 확인 후 임계 구역 진입.
+
+### 멤버 변수
+
+| 변수 | 타입 | 설명 |
+|---|---|---|
+| `_lock` | `CSRWLock&` | 대상 `CSRWLock` 객체 참조 |
+| `_name` | `const char*` | 데드락 프로파일러에 전달할 락 이름 |
+| `_acquired` | `bool` | 락 획득 성공 여부 플래그 |
+
+### 멤버 함수
+
+| 함수 | 파라미터 | 반환값 | 설명 |
+|---|---|---|---|
+| `TrySharedLockGuard` | `CSRWLock& lock, const char* name = nullptr` | - | `explicit` 생성자(`noexcept`). `lock.TrySharedLock(name)` 호출 결과를 `_acquired`에 저장 |
+| `~TrySharedLockGuard` | 없음 | - | 소멸자(`noexcept`). `_acquired`가 `true`일 때만 `lock.SharedUnLock(name)` 호출 |
+| `IsAcquired` | 없음 | `[[nodiscard]] bool` | 락 획득 성공 여부 반환 |
+
+복사 생성자·복사 대입 연산자는 `= delete`로 금지되어 있습니다.
 
 ### 생성자 / 소멸자
 
@@ -211,6 +310,21 @@ return -1;  // 락 획득 실패 시 fallback
 | `SRW_USE_LOCK` | `mutable CSRWLock _lock;` 멤버 선언 |
 | `SRW_WRITE_LOCK` | 함수 스코프에 쓰기 락 가드 생성 (`__func__`을 프로파일러 이름으로 자동 전달) |
 | `SRW_READ_LOCK` | 함수 스코프에 읽기 락 가드 생성 (`__func__`을 프로파일러 이름으로 자동 전달) |
+
+### 멤버 변수
+
+| 변수 | 타입 | 설명 |
+|---|---|---|
+| `_lock` | `LockObj&` | 대상 락 객체 참조 |
+| `_type` | `SRWLockType` | 락 타입(`Read` 또는 `Write`) |
+| `_name` | `const char*` | 데드락 프로파일러에 전달할 락 이름 |
+
+### 멤버 함수
+
+| 함수 | 파라미터 | 반환값 | 설명 |
+|---|---|---|---|
+| `CSRWCustomLockGuard` | `LockObj& lock, SRWLockType type, const char* name` | - | 생성자(`noexcept`). `type == Write`면 `lock.ExclusiveLock(name)`, 아니면 `lock.SharedLock(name)` 호출 |
+| `~CSRWCustomLockGuard` | 없음 | - | 소멸자(`noexcept`). `_type`에 대응하는 `ExclusiveUnLock`/`SharedUnLock` 호출 |
 
 ### 사용 예시
 

@@ -271,7 +271,11 @@ inline _tstring tstring_format_arg_list(const TCHAR* ptszFmt, va_list args)
 
 	while( result == -1 )
 	{
-		if( ptszBuffer ) delete[] ptszBuffer;
+		if( ptszBuffer != nullptr )
+		{
+			delete[] ptszBuffer;
+			ptszBuffer = nullptr;
+		}
 		ptszBuffer = new TCHAR[length + 1];
 		memset(ptszBuffer, 0, (length + 1) * sizeof(TCHAR));
 
@@ -312,7 +316,11 @@ inline _tstring tstring_cformat(const char* pszFmt, Args ... args)
 
 	while( result == -1 )
 	{
-		if( ptszBuffer ) delete[] ptszBuffer;
+		if( ptszBuffer != nullptr )
+		{
+			delete[] ptszBuffer;
+			ptszBuffer = nullptr;
+		}
 		ptszBuffer = new TCHAR[length + 1];
 		memset(ptszBuffer, 0, (length + 1) * sizeof(TCHAR));
 

@@ -66,9 +66,10 @@ typedef unsigned long	ulong;
 typedef uint64_t		uint64, time64;
 
 //***************************************************************************
-// 유니코드(UNICODE) 설정에 따른 동적 문자열 및 스트림 타입 정의 (_t 시리즈)
-//************************************************---------------------------
+// @brief 빌드 환경(_UNICODE)에 따라 문자열 및 메모리 제어 매크로를 분기 정의합니다. (_t 시리즈)
+//***************************************************************************
 #ifdef UNICODE
+	#define __TFUNCTION__				__FUNCTIONW__
 	#define _tcout						std::wcout
 	#define _tcerr						std::wcerr
 	typedef std::wstring				_tstring;
@@ -80,6 +81,7 @@ typedef uint64_t		uint64, time64;
 	typedef std::wcmatch				_tcmatch;
 	typedef std::wsregex_token_iterator _tsregex_token_iterator;
 #else
+	#define __TFUNCTION__				__FUNCTION__
 	#define _tcout						std::cout
 	#define _tcerr						std::cerr
 	typedef std::string					_tstring;
