@@ -26,9 +26,17 @@
 //
 // 주요 처리 및 특징:
 //  - 락 프리(Lock-free) 기반 MPMC(Multi-Producer, Multi-Consumer) 슬롯 관리
+//    (단, wait-free는 아니며 경쟁이 심한 경우 특정 스레드의 CAS 재시도가 길어질 수 있습니다.)
 //  - 버전 카운터를 통한 32-bit version counter 기반 ABA 재출현 방어
 //  - 사전 할당된 벡터를 통한 메모리 단편화 및 할당 부하 제거
 //  - RIO(Registered I/O) 버퍼 풀 등의 자원 관리 최적화
+//
+// @note ownership contract (매우 중요)
+// Pop()으로 획득한 슬롯 인덱스는 사용이 끝난 뒤 반드시 정확히 한 번만 Push()로
+// 반환해야 합니다. 동일한 인덱스를 중복으로 Push()하거나, Pop()으로 획득하지 않은
+// 인덱스를 Push()하면 내부 free-list가 순환/오염되어 동작이 정의되지 않습니다
+// (undefined behavior). 이 클래스는 성능을 위해 별도의 상태 검증을 하지 않으므로,
+// 소유권 규칙은 호출 측(caller)이 책임져야 합니다.
 //***************************************************************************
 class CLockFreeSlotStack
 {
@@ -41,6 +49,9 @@ public:
         : _capacity(capacity)
         , _nextFree(capacity)
     {
+        static_assert(std::atomic<uint64>::is_always_lock_free,
+            "CLockFreeSlotStack requires lock-free 64-bit atomics on this platform.");
+
         if( capacity == 0 )
         {
             _head.store(MakeNode(0, kNullIndex), std::memory_order_relaxed);
@@ -80,7 +91,10 @@ public:
             const uint32 version = GetVersion(oldHead);
             const uint64 newHead = MakeNode(version + 1, nextIndex);
 
-            if( _head.compare_exchange_weak(oldHead, newHead, std::memory_order_acq_rel, std::memory_order_acquire) )
+            // Pop은 이전 Push가 release한 상태를 관찰(acquire)하기만 하면 되고,
+            // 새로운 데이터를 다른 스레드에 publish하지 않으므로 success order는
+            // acquire로 충분합니다 (release는 불필요).
+            if( _head.compare_exchange_weak(oldHead, newHead, std::memory_order_acquire, std::memory_order_acquire) )
             {
                 outIndex = index;
                 return true;
@@ -90,11 +104,21 @@ public:
 
     //***************************************************************************
     // @brief 사용을 마친 슬롯 인덱스를 스택에 반환합니다.
-    // @param index 반환할 슬롯 인덱스
+    // @param index 반환할 슬롯 인덱스. 반드시 Pop()으로 획득했고 아직 반환하지
+    //              않은 인덱스여야 합니다 (자세한 내용은 클래스 주석의 ownership
+    //              contract 참고).
+    // @return true: 정상적으로 반환됨, false: index가 capacity 범위를 벗어나
+    //         (예: capacity == 0인 인스턴스) 반환이 무시됨
     //***************************************************************************
-    void Push(uint32 index)
+    bool Push(uint32 index)
     {
         assert(index < _capacity);
+
+        if( index >= _capacity )
+        {
+            // capacity == 0 등 계약 위반 상황에서 Release 빌드의 OOB 접근을 방지합니다.
+            return false;
+        }
 
         uint64 oldHead = _head.load(std::memory_order_acquire);
 
@@ -109,7 +133,7 @@ public:
 
             if( _head.compare_exchange_weak(oldHead, newHead, std::memory_order_release, std::memory_order_acquire) )
             {
-                return;
+                return true;
             }
         }
     }

@@ -89,8 +89,10 @@ CSpinLockQueue<int> jobQueue;
 jobQueue.Push(42);
 jobQueue.Push(100);
 
-int job = jobQueue.Pop();
-std::cout << "처리된 작업: " << job << std::endl;
+int job;
+if (jobQueue.TryPop(job)) {
+    std::cout << "처리된 작업: " << job << std::endl;
+}
 
 CVector<int> jobs;
 jobQueue.PopAll(jobs);
@@ -163,7 +165,7 @@ for (int i = 0; i < 100; ++i) {
     packetQueue.Push(i);
 }
 
-std::queue<int> outQueue;
+CQueue<int> outQueue;
 packetQueue.SwapChunk(outQueue, 10);
 
 while (!outQueue.empty()) {
@@ -204,8 +206,8 @@ std::thread producer([&packetQueue]() {
 });
 
 std::thread consumer([&packetQueue]() {
-    std::queue<int> outQueue;
-    while (packetQueue.SwapChunkBlocking(outQueue, 10)) {
+    CQueue<int> outQueue;
+    while (packetQueue.PopChunk(outQueue, 10)) {
         while (!outQueue.empty()) {
             std::cout << "처리된 패킷: " << outQueue.front() << std::endl;
             outQueue.pop();
@@ -225,7 +227,7 @@ consumer.join();
 
 | 특징 | **CDelayedTaskQueue** | **CDoubleBufferQueue** | **CSpinLockQueue** | **CBlockingTaskQueue** | **CChunkedSwapQueue** | **CChunkedBlockingQueue** |
 |------|--------------------------|--------------------------|--------------------------|--------------------------|--------------------------|--------------------------|
-| **패턴** | SPMC | MPSC | MPMC | MPMC | SPMC | SPMC |
+| **패턴** | MPMC | MPSC | MPMC | MPMC | MPMC | SPMC |
 | **목적** | 특정 시점 이후 작업 실행 | 초고속 배치 처리 | 범용 작업 큐 | 블로킹 대기 지원 | 부하 제어 및 청킹 처리 | 청킹 + 블로킹 대기 |
 | **구현 방식** | priority_queue + condition_variable | 더블 버퍼링, 원자적 스왑 | 스핀락 + 아토믹 카운터 | mutex + condition_variable | 청킹 스왑 + 아토믹 카운터 | mutex + condition_variable + 청킹 |
 | **중점** | 시간 기반 실행 | 배치 처리 성능 | 직관적 범용 큐 | 안전한 블로킹 대기 | 부하 제어 및 분산 | 안정적 청킹 + 블로킹 |

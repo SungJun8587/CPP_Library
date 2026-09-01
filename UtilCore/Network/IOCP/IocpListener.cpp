@@ -197,8 +197,8 @@ void CIocpListener::RegisterAccept(AcceptEvent* acceptEvent)
         sessionSocket,
         acceptEvent->acceptBuffer,
         0,
-        sizeof(SOCKADDR_IN) + 16,
-        sizeof(SOCKADDR_IN) + 16,
+        CSocketUtils::kAcceptExAddrLen,
+        CSocketUtils::kAcceptExAddrLen,
         OUT & bytesReceived,
         static_cast<LPOVERLAPPED>(acceptEvent)
     );

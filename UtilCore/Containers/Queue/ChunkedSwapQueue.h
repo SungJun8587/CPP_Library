@@ -12,6 +12,8 @@
 #include <Memory/Containers.h>
 #include <Thread/PlatformLock.h>
 
+#include <type_traits>
+
 //***************************************************************************
 // @class CChunkedSwapQueue
 // @brief 단일 큐와 청킹(Chunking) 기능을 지원하는 스레드 세이프 스왑 큐.
@@ -30,6 +32,12 @@
 //  - 내부 큐 접근은 단일 락으로 직렬화
 //  - SwapChunk()를 통해 consumer별 처리량을 제한할 수 있음
 //
+// outQueue 소유권 / 스레드 안전성 계약:
+//  - Swap()/SwapChunk()의 outQueue 파라미터는 이 클래스가 보호하는 대상이 아닙니다.
+//    호출자가 소유하는 로컬 출력 큐이며, 동일한 outQueue 인스턴스를 여러 스레드가
+//    동시에 넘기는 경우 호출자가 별도의 동기화를 제공해야 합니다.
+//    권장 사용법은 스레드별로 서로 다른 local outQueue를 사용하는 것입니다.
+//
 // 정지(Stop) 관련 계약:
 //  - Stop()은 내부 락(_lock) 안에서 플래그를 세팅하므로, Stop()이 반환한 "이후" 시작되는
 //    모든 Push 계열 호출은 반드시 드롭된다(happens-before 보장). Stop()과 동시에 진행
@@ -37,10 +45,28 @@
 //  - Push 계열 함수는 모두 "삽입 성공 여부"를 반환값으로 명시적으로 알려준다. 정지 상태에서
 //    호출되어 드롭된 경우와 정상 성공을 반환값만으로 구분할 수 있다.
 //  - Start()로 정지 상태를 해제하고 재사용할 수 있다.
+//
+// 예외 안전성 전제:
+//  - PushBatch()는 루프 도중 실패 시 _size/items 상태를 롤백하지 않는다. 이는
+//    내부 컨테이너(CQueue<T> = std::queue<T, CDeque<T>>)의 원소 삽입이 예외를
+//    던지지 않는다는 전제 위에서 의도적으로 생략한 것이다. 이 전제는 다음 두 조건이
+//    모두 성립할 때만 유효하다:
+//      1) StlAllocator<T>::allocate()가 PoolAllocator::Alloc/AllocAligned를 거쳐
+//         gpMemory(CMemory)로 위임되는 USE_GPMEMORY 빌드일 것 (이 경로는 할당
+//         실패 시 ASSERT_CRASH로 종료하며 예외를 던지지 않음을 확인함).
+//      2) T의 이동 생성자가 noexcept일 것 (아래 static_assert로 강제).
+//    USE_GPMEMORY가 정의되지 않은 폴백 빌드(StlAllocator가 ::operator new로
+//    직접 위임하는 경우)에서는 allocate()가 std::bad_alloc을 던질 수 있으므로
+//    이 전제가 깨진다. 그런 빌드에서 이 큐를 사용할 계획이라면 PushBatch()의
+//    예외 안전성을 재검토해야 한다.
 //***************************************************************************
 template<typename T>
 class CChunkedSwapQueue
 {
+    static_assert(
+        std::is_nothrow_move_constructible_v<T>,
+        "CChunkedSwapQueue<T> requires nothrow move constructible T.");
+
 public:
     CChunkedSwapQueue() = default;
     ~CChunkedSwapQueue() = default;
@@ -84,6 +110,7 @@ public:
     // @brief 여러 아이템을 벡터 단위로 일괄 삽입합니다.
     // @param items 삽입할 데이터 항목들이 담긴 벡터 (성공 시에만 내부가 비워짐)
     // @return 정상적으로 일괄 삽입되었으면 true. 정지 상태라 드롭되었으면 false(items는 그대로 유지)
+    // @note 예외 안전성은 클래스 상단 "예외 안전성 전제" 주석을 참고할 것.
     //***************************************************************************
     bool PushBatch(CVector<T>& items)
     {
@@ -106,7 +133,7 @@ public:
 
     //***************************************************************************
     // @brief 입력 큐의 모든 요소를 출력 큐로 통째로 스왑(이동)합니다.
-    // @param outQueue 데이터를 전달받을 대상 큐
+    // @param outQueue 데이터를 전달받을 대상 큐 (호출자 소유, 클래스 상단 계약 참고)
     //***************************************************************************
     void Swap(CQueue<T>& outQueue)
     {
@@ -136,7 +163,7 @@ public:
     //***************************************************************************
     // @brief 입력 큐에서 지정한 최대 개수(maxCount)만큼만 떼어와 출력 큐로 이동합니다. (청킹 스왑)
     // @note 멀티 스레드 환경에서 하나의 스레드가 백로그 전체를 독점하는 현상을 방지합니다.
-    // @param outQueue 데이터를 전달받을 대상 큐
+    // @param outQueue 데이터를 전달받을 대상 큐 (호출자 소유, 클래스 상단 계약 참고)
     // @param maxCount 한 번에 가져올 최대 아이템 개수
     //***************************************************************************
     void SwapChunk(CQueue<T>& outQueue, size_t maxCount)

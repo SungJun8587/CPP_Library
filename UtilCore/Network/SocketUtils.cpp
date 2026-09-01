@@ -1,4 +1,5 @@
-﻿//***************************************************************************
+﻿
+//***************************************************************************
 // SocketUtils.cpp: implementation of the CSocketUtils class.
 //
 //***************************************************************************
@@ -117,10 +118,10 @@ const WINSOCK_ERRORCODE_INFO CSocketUtils::_errTableKr[] =
 };
 
 // 정적 확장 함수 포인터 초기화
-LPFN_ACCEPTEX               CSocketUtils::_acceptEx = nullptr;
-LPFN_GETACCEPTEXSOCKADDRS    CSocketUtils::_getAcceptExSockAddrs = nullptr;
-LPFN_CONNECTEX               CSocketUtils::_connectEx = nullptr;
-LPFN_DISCONNECTEX            CSocketUtils::_disconnectEx = nullptr;
+LPFN_ACCEPTEX					CSocketUtils::_acceptEx = nullptr;
+LPFN_GETACCEPTEXSOCKADDRS		CSocketUtils::_getAcceptExSockAddrs = nullptr;
+LPFN_CONNECTEX					CSocketUtils::_connectEx = nullptr;
+LPFN_DISCONNECTEX				CSocketUtils::_disconnectEx = nullptr;
 
 //***************************************************************************
 // @brief Winsock 라이브러리(WSAStartup) 및 IOCP 확장 함수 포인터를 초기화합니다.
@@ -161,13 +162,35 @@ void CSocketUtils::Clear()
 // @brief shutdown 후 closesocket을 수행하여 소켓을 정상 종료합니다.
 // @param socket 대상 소켓 핸들
 // @param how shutdown 방식 (SD_RECEIVE / SD_SEND / SD_BOTH)
+// @return shutdown/closesocket 둘 다 성공(또는 이미 연결이 끊겨 ENOTCONN인
+//         경우)이면 true, 그 외 에러가 발생하면 false. 실패 시
+//         ReportError()로 로그를 남깁니다. socket==INVALID_SOCKET이면
+//         아무 작업도 하지 않고 true를 반환합니다(멱등 처리).
 //***************************************************************************
-void CSocketUtils::CloseGraceful(SOCKET socket, int how)
+bool CSocketUtils::CloseGraceful(SOCKET socket, int how)
 {
-	if( socket == INVALID_SOCKET ) return;
+	if( socket == INVALID_SOCKET ) return true;
 
-	(void)::shutdown(socket, how);
-	(void)::closesocket(socket);
+	bool success = true;
+
+	if( ::shutdown(socket, how) == SOCKET_ERROR )
+	{
+		const int32 error = ::WSAGetLastError();
+		// 이미 연결이 끊겨 있던 경우(WSAENOTCONN)는 정상적인 상황이므로 실패로 취급하지 않음
+		if( error != WSAENOTCONN )
+		{
+			ReportError(_T("CSocketUtils::CloseGraceful(shutdown)"), error);
+			success = false;
+		}
+	}
+
+	if( ::closesocket(socket) == SOCKET_ERROR )
+	{
+		ReportError(_T("CSocketUtils::CloseGraceful(closesocket)"), ::WSAGetLastError());
+		success = false;
+	}
+
+	return success;
 }
 
 //***************************************************************************
@@ -298,6 +321,41 @@ bool CSocketUtils::SetSendBufferSize(SOCKET socket, int32 size)
 {
 	return ::setsockopt(socket, SOL_SOCKET, SO_SNDBUF,
 		reinterpret_cast<char*>(&size), sizeof(size)) != SOCKET_ERROR;
+}
+
+//***************************************************************************
+// @brief TCP Keep-Alive 옵션을 설정합니다.
+// @param socket 대상 소켓 핸들
+// @param enable Keep-Alive 활성화 여부
+// @param idleMs 첫 프로브를 보내기 전까지의 유휴 시간(밀리초). 0이면 OS 기본값 사용
+//        (SIO_KEEPALIVE_VALS를 호출하지 않고 SO_KEEPALIVE만 켬).
+// @param intervalMs 프로브 재전송 간격(밀리초). idleMs가 0이면 무시됨.
+// @return 성공 시 true, 실패 시 false. enable==false인 경우 idleMs/intervalMs는 무시됩니다.
+// @details idleMs/intervalMs를 지정하면 WSAIoctl(SIO_KEEPALIVE_VALS)로
+//          per-socket 세부 튜닝을 적용합니다(전역 레지스트리 설정과 무관).
+//***************************************************************************
+bool CSocketUtils::SetKeepAlive(SOCKET socket, bool enable, DWORD idleMs, DWORD intervalMs)
+{
+	int32 value = enable ? 1 : 0;
+	if( ::setsockopt(socket, SOL_SOCKET, SO_KEEPALIVE,
+		reinterpret_cast<char*>(&value), sizeof(value)) == SOCKET_ERROR )
+	{
+		return false;
+	}
+
+	if( !enable || idleMs == 0 )
+		return true;
+
+	tcp_keepalive keepAlive{};
+	keepAlive.onoff = 1;
+	keepAlive.keepalivetime = idleMs;
+	keepAlive.keepaliveinterval = intervalMs;
+
+	DWORD bytesReturned = 0;
+	return ::WSAIoctl(socket, SIO_KEEPALIVE_VALS,
+		&keepAlive, sizeof(keepAlive),
+		nullptr, 0,
+		&bytesReturned, nullptr, nullptr) != SOCKET_ERROR;
 }
 
 //***************************************************************************
@@ -638,6 +696,36 @@ bool CSocketUtils::GetSockAddrIn(const TCHAR* hostName, const int port, std::lis
 	{
 		addrinfo addrInfo;
 		::memcpy(&addrInfo, pAddrInfo, sizeof(addrinfo));
+
+		// [수정] 얕은 복사(memcpy)만 하면 ai_addr/ai_canonname이 freeaddrinfo()로
+		// 해제될 pResult 내부 메모리를 계속 가리키는 댕글링 포인터가 된다.
+		// ai_addr이 가리키는 sockaddr 내용을 별도 힙 버퍼로 deep-copy해서
+		// 리스트 원소가 자체 소유 메모리를 갖도록 한다. 이 버퍼는 프로세스/리스트
+		// 수명과 함께 가는 일회성 DNS 조회 결과이므로 의도적으로 해제하지 않는다
+		// (호출 빈도가 낮고 개수가 addrinfo 결과 수로 제한되어 있어 누수 영향 미미).
+		if( pAddrInfo->ai_addr != nullptr && pAddrInfo->ai_addrlen > 0 )
+		{
+			sockaddr* pAddrCopy = static_cast<sockaddr*>(::malloc(pAddrInfo->ai_addrlen));
+			if( pAddrCopy != nullptr )
+			{
+				::memcpy(pAddrCopy, pAddrInfo->ai_addr, pAddrInfo->ai_addrlen);
+				addrInfo.ai_addr = pAddrCopy;
+			}
+			else
+			{
+				addrInfo.ai_addr = nullptr;
+				addrInfo.ai_addrlen = 0;
+			}
+		}
+
+		// ai_canonname도 같은 이유로 댕글링 대상 — deep-copy하지 않고 안전하게 무효화.
+		// (호출부에서 canonical name이 필요하면 별도 API로 조회할 것)
+		addrInfo.ai_canonname = nullptr;
+
+		// pResult 체인은 여기서 끊고, 각 노드는 sockAddrList 자체의 순회로 대체한다
+		// (ai_next를 그대로 두면 이미 해제된 다음 노드를 가리키는 댕글링 포인터가 됨).
+		addrInfo.ai_next = nullptr;
+
 		sockAddrList.push_back(addrInfo);
 	}
 
@@ -655,6 +743,20 @@ bool CSocketUtils::GetPeerAddress(SOCKET socket, sockaddr_in& outAddress)
 {
 	int addrLen = sizeof(outAddress);
 	return ::getpeername(socket, reinterpret_cast<SOCKADDR*>(&outAddress), &addrLen) == 0;
+}
+
+//***************************************************************************
+// @brief getsockname()을 래핑하여 소켓에 바인딩된 로컬 주소를 조회합니다.
+// @param socket 대상 소켓 핸들
+// @param outAddress 조회된 로컬 주소가 채워질 구조체
+// @return 성공 시 true, 실패 시 false
+// @details ConnectEx로 연결한 클라이언트 소켓처럼 로컬 포트를 커널이 임의
+//          배정하는 경우, 실제 배정된 포트를 확인할 때 사용합니다.
+//***************************************************************************
+bool CSocketUtils::GetLocalAddress(SOCKET socket, sockaddr_in& outAddress)
+{
+	int addrLen = sizeof(outAddress);
+	return ::getsockname(socket, reinterpret_cast<SOCKADDR*>(&outAddress), &addrLen) == 0;
 }
 
 // ---------- 에러 메시지 ----------

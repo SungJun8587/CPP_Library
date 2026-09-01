@@ -41,10 +41,12 @@ void CGlobalQueue::Push(CJobQueueRef jobQueue)
 
 //***************************************************************************
 // @brief 전역 큐에서 작업 큐를 꺼냅니다.
-// @detail 스레드 안전한 스핀락 큐로부터 대기 중인 작업 큐를 인출하여 반환합니다.
-// @return 인출된 작업 큐 레퍼런스
+// @detail 스레드 안전한 큐로부터 대기 중인 작업 큐를 인출하여 반환합니다.
+// @return 인출된 작업 큐 레퍼런스. 큐가 비어있으면 기본 생성된(빈) 레퍼런스 반환.
 //***************************************************************************
 CJobQueueRef CGlobalQueue::Pop()
 {
-	return _jobQueues.Pop();
+    CJobQueueRef ret;
+    bool flag = _jobQueues.TryPop(ret);
+    return ret;
 }

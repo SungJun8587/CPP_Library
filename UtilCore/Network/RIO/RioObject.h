@@ -58,7 +58,7 @@ public:
     CRioObject& operator=(CRioObject&&) = delete;
 
     bool IncrementIoCount() noexcept;
-    void DecrementIoCount() noexcept;
+    bool DecrementIoCount() noexcept;
     uint32 GetIoCount() const noexcept;
     bool HasOutstandingIo() const noexcept;
 

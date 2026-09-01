@@ -439,7 +439,11 @@ for( int32 i = 0; i < nDBCount; ++i )
   `max(4, nMaxThreadCnt / 4)`로 산정해 전달함으로써, 재연결 워커 수가 풀 크기(= DB 비동기
   워커 스레드 수)에 비례하도록 한다.
 - `Action()`의 지연 쿼리 경고는 빌드 구성에 따라 임계값이 다르다 — 디버그 빌드는 300ms,
-  릴리즈 빌드는 1000ms 이상 걸린 쿼리에 대해 경고 로그를 남긴다.
+  릴리즈 빌드는 1000ms 이상 걸린 쿼리에 대해 경고 로그를 남긴다. 누적 호출 수를 세는
+  `cumulateCallCnt`는 `static std::atomic<uint64>`이고 `fetch_add(memory_order_relaxed)`로
+  증가시킨다 — `_nMaxThreadCnt`개의 워커 스레드가 모두 같은 `Action()`을 동시에 실행하며 이
+  static 변수를 공유하므로, 원자적이지 않은 단순 증가(`++`)는 데이터 레이스(정의되지 않은
+  동작)가 된다(MySQL판과의 대조로 발견해 수정함).
 - `Clear()`는 DB 요청 큐를 비우는 역할만 담당한다. `GetSize()`로 크기를 먼저 읽어
   `SwapChunk(tempQueue, size)`로 그만큼만 옮기는 대신, 전용 `_queueDBAsyncRq.Swap(tempQueue)`로
   그 시점의 큐 전체를 한 번의 락 구간 안에서 통째로 이관한다 — 대상 큐가 비어 있으므로 내부적으로

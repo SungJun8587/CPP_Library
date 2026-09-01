@@ -11,6 +11,8 @@
 #include <Containers/Queue/QueueCommon.h>
 #include <Memory/Containers.h>
 #include <Thread/PlatformLock.h>
+#include <utility>
+#include <atomic>
 
 //***************************************************************************
 // @class CDoubleBufferQueue
@@ -56,7 +58,7 @@ public:
 
     //***************************************************************************
     // @brief 큐에 새로운 데이터를 추가합니다 (R-value 이동).
-    // @param item 추가할 데이터 객체 (이동语义)
+    // @param item 추가할 데이터 객체 (이동 의미론, move semantics)
     //***************************************************************************
     void Push(T&& item)
     {
@@ -75,7 +77,7 @@ public:
     {
         if( m_stopped.load(std::memory_order_relaxed) )
             return;
-        PushInternal(T(std::forward<Args>(args)...));
+        EmplaceInternal(std::forward<Args>(args)...);
     }
 
     //***************************************************************************
@@ -124,6 +126,9 @@ public:
     //***************************************************************************
     // @brief 양쪽 버퍼에 쌓인 데이터 총 개수의 근사치(Approximate Size)를 반환합니다.
     // @return 두 버퍼에 있는 데이터 수의 합
+    // @note Consumer 스레드 단독 환경 또는 데이터 경합이 없는 디버깅용으로만 호출해야 합니다.
+    //       Producer가 동시에 push_back() 중이거나 Consumer가 swap() 중인 멀티스레드 상황에서
+    //       호출 시 std::vector 내부 데이터 경합(Data Race, UB)이 발생할 수 있습니다.
     //***************************************************************************
     size_t ApproxSize() const
     {
@@ -154,12 +159,12 @@ private:
         explicit InFlightGuard(std::atomic<int>& inFlight) noexcept
             : m_inFlight(inFlight)
         {
-            m_inFlight.fetch_add(1, std::memory_order_acq_rel);
+            m_inFlight.fetch_add(1, std::memory_order_relaxed);
         }
 
         ~InFlightGuard() noexcept
         {
-            m_inFlight.fetch_sub(1, std::memory_order_acq_rel);
+            m_inFlight.fetch_sub(1, std::memory_order_release);
         }
 
         InFlightGuard(const InFlightGuard&) = delete;
@@ -209,7 +214,19 @@ private:
     template <typename U>
     void PushInternal(U&& item)
     {
+        EmplaceInternal(std::forward<U>(item));
+    }
+
+    //***************************************************************************
+    // @brief 내부 Emplace 구현 함수. Producer가 인자들을 통해 데이터를 버퍼에 직접 제자리 생성합니다.
+    // @tparam Args 생성자에 전달할 인자 타입들
+    // @param args 생성자에 전달할 인자들
+    //***************************************************************************
+    template <typename... Args>
+    void EmplaceInternal(Args&&... args)
+    {
         int idx;
+
         for( ;;)
         {
             if( m_stopped.load(std::memory_order_relaxed) )
@@ -217,17 +234,18 @@ private:
 
             idx = m_writeIdx.load(std::memory_order_acquire);
 
-            // RAII 가드를 통해 예외 발생 시에도 카운터가 안전하게 복구됨
             InFlightGuard guard(m_inFlight[idx]);
 
-            if( m_writeIdx.load(std::memory_order_acquire) == idx )
+            if( m_writeIdx.load(std::memory_order_acquire) != idx )
+                continue;
+
             {
-                {
-                    SpinLockGuard<Preset> lockGuard(m_bufferLock[idx], "CDoubleBufferQueue::Push");
-                    m_buffer[idx].push_back(std::forward<U>(item));
-                }
-                break;
+                SpinLockGuard<Preset> lockGuard(m_bufferLock[idx], __FUNCTION__);
+
+                m_buffer[idx].emplace_back(std::forward<Args>(args)...);
             }
+
+            break;
         }
     }
 

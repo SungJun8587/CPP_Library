@@ -10,6 +10,8 @@
 #include <BaseRedefineDataType.h>
 #include <Network/NetAddress.h>
 
+#include <mstcpip.h>
+
 class CNetAddress;
 
 //***************************************************************************
@@ -49,9 +51,15 @@ typedef struct _WINSOCK_ERRORCODE_INFO
 class CSocketUtils
 {
 public:
+	// AcceptEx의 outputBuffer 중 로컬/원격 주소 저장용으로 각각 필요한 크기.
+	// MS 문서 규정: sockaddr_in 크기 + 16바이트 여유. 호출부(AcceptEx 인자,
+	// outputBuffer 총 크기 산정)에서 매직넘버 대신 이 상수를 참조할 것.
+	static constexpr DWORD kAcceptExAddrLen = sizeof(sockaddr_in) + 16;
+
+public:
 	static bool     Init();
 	static void     Clear();
-	static void     CloseGraceful(SOCKET socket, int how = SD_BOTH);
+	static bool     CloseGraceful(SOCKET socket, int how = SD_BOTH);
 
 public:
 	// ---------- 소켓 생성 ----------
@@ -66,6 +74,7 @@ public:
 	static bool     SetNoDelay(SOCKET socket, bool flag);
 	static bool     SetRecvBufferSize(SOCKET socket, int32 size);
 	static bool     SetSendBufferSize(SOCKET socket, int32 size);
+	static bool     SetKeepAlive(SOCKET socket, bool enable, DWORD idleMs = 0, DWORD intervalMs = 0);
 	static bool     SetUpdateAcceptContext(SOCKET clientSocket, SOCKET listenSocket);
 	static bool     SetUpdateConnectContext(SOCKET socket);
 	static bool     GetSocketError(SOCKET socket, int32& outError);
@@ -103,6 +112,7 @@ public:
 	static void     IPv4ToIPv6(const struct in_addr ipv4, struct in6_addr& ipv6);
 	static bool     GetSockAddrIn(const TCHAR* hostName, const int port, std::list<addrinfo>& sockAddrList);
 	static bool     GetPeerAddress(SOCKET socket, sockaddr_in& outAddress);
+	static bool     GetLocalAddress(SOCKET socket, sockaddr_in& outAddress);
 
 	// ---------- 에러 메시지 ----------
 	static const TCHAR* GetErrMsgToWinsockErrCodeEn(const int errorCode);

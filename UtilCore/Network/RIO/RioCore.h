@@ -549,10 +549,25 @@ private:
 
         //***************************************************************************
         // @brief 스코프 탈출 시 object->DecrementIoCount()를 안전하게 호출합니다.
+        // @details DecrementIoCount()는 CAS 루프 기반 bool 반환(성공 시 true,
+        //          이미 0인 상태에서 감소를 시도한 underflow면 false)입니다.
+        //          이 가드가 도달했다는 것 자체가 TakeOwner()로 소유권을 넘겨받은
+        //          completion 하나에 대응하는 정상적인 1회 감소여야 하므로,
+        //          false가 나오면 카운트 관리 로직 어딘가(중복 감소 등)에 결함이
+        //          있다는 뜻입니다. noexcept라 예외는 못 던지고, 반환값을 그냥
+        //          버리면 이런 결함이 조용히 묻히므로 assert로 표면화합니다
+        //          (CRioObject::DecrementIoCount() 내부에서도 동일하게 assert하므로
+        //          이중 assert가 되지만, 호출부에서도 명시적으로 검증한다는
+        //          계약을 코드로 남겨두는 의미가 있습니다).
         //***************************************************************************
         ~ObjectIoCountGuard() noexcept
         {
-            if( object != nullptr ) object->DecrementIoCount();
+            if( object != nullptr )
+            {
+                const bool decremented = object->DecrementIoCount();
+                assert(decremented && "ObjectIoCountGuard: DecrementIoCount() underflow - duplicate decrement suspected");
+                (void)decremented; // release 빌드(NDEBUG)에서 미사용 변수 경고 방지
+            }
         }
     };
 

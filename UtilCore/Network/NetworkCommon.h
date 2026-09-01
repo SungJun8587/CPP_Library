@@ -11,6 +11,7 @@
 #include <mswsock.h>
 #include <ws2tcpip.h>
 #include <winternl.h>
+#include <mstcpip.h>
 
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "mswsock.lib")

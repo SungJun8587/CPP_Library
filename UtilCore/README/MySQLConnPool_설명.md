@@ -31,7 +31,7 @@
 | 격리(Quarantine) 큐 | 교체된 낡은 커넥션에 참조가 남아있으면 즉시 삭제하지 않고 격리 후 안전할 때 삭제 |
 | 격리 큐 요약 경보 | 갇힌 항목이 있어도 개별 로그 대신 5분(`LOG_ALERT_INTERVAL_MS`) 주기로 개수와 최장 체류 시간을 한 줄로 요약 로깅해 로그 폭주 방지 |
 | Safe Leak | 프로세스 종료 시점까지 참조가 남은 커넥션은 삭제를 포기(누수)하여 UAF 크래시를 방지 |
-| False sharing 방지 | 슬롯별 원자 배열(`_pMySQLConns`, `_pRefCount`, `_pReconnecting`, `_pRetryFailCount`)을 `CachePaddedAtomic<T>[]`로, `_slotLocks`를 캐시라인 정렬된 `SpinLockDefault[]`로 구성해 슬롯 간 캐시라인 공유를 차단 |
+| False sharing 방지 | 슬롯별 원자 배열(`_pMySQLConns`, `_pRefCount`, `_pReconnecting`, `_pRetryFailCount`)을 `CachePaddedAtomic<T>[]`로, `_slotLocks`를 슬롯별 단독 락인 `PLock[]`로 구성해 슬롯 간 캐시라인 공유를 차단 |
 | char/wchar_t 이중 접속정보 입력 | `Init()`이 `char*`/`wchar_t*` 두 오버로드를 제공하며, wchar_t 버전은 `WideCharToMultiByte` 변환 후 공통 로직(`FinishInit`)에 합류 |
 | 할당자 분리 | `CMySQLConnPool` 자신은 `BaseAllocator` 상속으로 RawAllocator 경로를, 내부 `CBaseMySQL` 커넥션은 `xnew`/`xdelete`(PoolAllocator)로 별도 관리 (§10 참고) |
 
@@ -60,7 +60,7 @@
 |---|---|
 | `_pMySQLConns` | 슬롯별 실제 커넥션 포인터 (`CachePaddedAtomic<CBaseMySQL*>[]`) |
 | `_pRefCount` | 슬롯별 참조 카운트 (`CachePaddedAtomic<int32>[]`, 가장 핫한 배열) |
-| `_slotLocks` | 슬롯별 교체(swap) 보호용 스핀락 배열 (`SpinLockDefault[]`) |
+| `_slotLocks` | 슬롯별 교체(swap) 보호용 스핀락 배열 (`PLock[]`) |
 | `_pReconnecting` | 슬롯별 "재연결 워커가 처리 중" 플래그 (`CachePaddedAtomic<bool>[]`, 중복 디스패치 방지) |
 | `_pRetryFailCount` | 슬롯별 연속 재연결 실패 횟수 (`CachePaddedAtomic<int32>[]`). 지수 백오프 shift 계산에 쓰이는 동시에, 0보다 크면 "이미 `_delayedTaskQueue`에 재시도가 예약된 상태"임을 나타내는 상태 플래그 역할도 겸함(§5.2) |
 
@@ -434,20 +434,30 @@ for( int32 i = 0; i < nDBCount; ++i )
 - `Instance()`는 C++11 Meyers' Singleton(함수 내 static 지역 변수, magic statics)으로
   스레드 안전하게 생성되는 `std::make_shared` 기반 진짜 싱글턴이다 — `T::operator new`를
   거치지 않으므로 `BaseAllocator` 상속은 이 클래스에는 적용하지 않는다(§10.3).
-- 큐 동기화는 `std::mutex` + `std::condition_variable`로 이루어진다. Push/Pop이 매 DB
-  요청마다 항상 배타적으로(unique_lock) 잠그는 핫패스이고, 공유 잠금이 필요한 경로
-  (`GetQueryQueueSize`/`IsEmpty`)는 모니터링용으로 드물게만 쓰이므로 `shared_mutex` 대신
-  표준 `mutex`/`condition_variable`을 사용한다(`shared_mutex`의 배타 잠금 자체가 더 무겁고
-  `condition_variable_any`도 락 타입 소거 오버헤드가 있기 때문). `Push()`는 큐 조작을
-  마치고 락을 해제한 뒤 `notify_one()`을 호출해, 깨어난 워커가 곧바로 락을 잡을 수 있게 한다.
-  `Pop()`은 소비자이므로 `notify_all()`을 호출하지 않는다(다른 소비자를 깨울 필요가 없음).
+- 요청 큐 `_queueDBAsyncRq`는 `CChunkedSwapQueue<std::unique_ptr<st_DBAsyncRq>>`다. 요청은
+  원시 포인터가 아니라 `std::unique_ptr`로 소유되며, 큐를 떠난 요청 객체는 `SAFE_DELETE` 같은
+  수동 해제 없이 `unique_ptr`가 스코프를 벗어나는 시점에 RAII로 자동 해제된다.
+- 큐 동기화는 두 겹이다 — `CChunkedSwapQueue` 자신의 내부 락이 큐 데이터(`_inQueue`/`_size`)를
+  보호하고, `CMySQLAsyncSrv`의 `std::mutex`(`_mutex`) + `std::condition_variable`(`_cva`)는
+  그 위에서 `Pop()`의 블로킹 대기/기상을 담당한다. `Push()`는 `_mutex`를 잡은 채로
+  `_queueDBAsyncRq.PushAndGetSize()`와 `_cva.notify_one()`을 같은 임계구역 안에서 수행한다 —
+  `Pop()`이 `_cva.wait()`의 predicate(`!IsEmpty()`)를 검사하는 구간과 `Push()`의 push+notify
+  구간이 동일한 `_mutex`로 직렬화되어, "predicate 검사 직후·`wait()` 진입 직전"의 틈에 notify가
+  끼어들어 유실되는 lost-wakeup을 원천 차단한다. `Pop()`도 `SwapChunk()` 호출 전에 이미 같은
+  `_mutex`를 먼저 잡으므로, 잠금 순서는 항상 (`_mutex` → 큐 내부 락)으로 일관되어 데드락 위험은
+  없다. `Pop()`은 소비자이므로 `notify_all()`을 호출하지 않는다(다른 소비자를 깨울 필요가 없음).
+  `_mutex`가 매 요청마다 잠기는 핫패스이고, `GetQueryQueueSize`/`IsEmpty` 같은 공유 잠금 경로는
+  모니터링용으로 드물게만 쓰이므로 `shared_mutex` 대신 표준 `mutex`/`condition_variable`을
+  사용한다(`shared_mutex`의 배타 잠금 자체가 더 무겁고 `condition_variable_any`도 락 타입 소거
+  오버헤드가 있기 때문).
 - `st_DBAsyncRq`는 `callIdent`별로 실제 쿼리 데이터를 담은 파생 구조체의 베이스 타입이다.
   타임아웃 재시도 시, 베이스 타입으로 복사(`new st_DBAsyncRq{ *pAsyncRq }`)하면 파생
   클래스의 실제 쿼리 파라미터가 잘려나가는 오브젝트 슬라이싱 버그가 발생하므로, 복사본을
-  새로 만들지 않고 **원본 객체를 그대로 재사용**해 `bReTry` 플래그만 세팅한 뒤 재큐잉한다.
-  슬라이싱 버그가 사라지는 것은 물론, 이미 DB가 지연되고 있는 상황에서 불필요한 heap
-  할당/해제 한 쌍도 없어진다. 재큐잉이 실패하면(`Push()`가 0을 반환 — 서비스 종료 시점과
-  겹친 경우) 해당 객체는 직접 해제된다(누수 방지).
+  새로 만들지 않고 **원본 `unique_ptr`를 그대로 `std::move`로 재사용**해 `bReTry` 플래그만
+  세팅한 뒤 재큐잉한다. 슬라이싱 버그가 사라지는 것은 물론, 이미 DB가 지연되고 있는 상황에서
+  불필요한 heap 할당/해제 한 쌍도 없어진다. 재큐잉이 실패하면(`Push()`가 0을 반환 — 서비스
+  종료 시점과 겹친 경우) 해당 `unique_ptr`는 `Push()` 내부에서 버려지는 즉시 소멸자에 의해
+  자동 해제된다 — 별도의 명시적 delete 호출이 없다.
 - `InitMySQL`은 호출 시작 시 `_bStopThread`를 `false`로 재설정해, `StopThread()`
   이후 서비스를 다시 시작하는 재시작 시나리오에서도 워커 스레드들이 정상적으로 큐를
   처리한다(기존에는 이 초기화가 없어 재시작 시 워커가 즉시 종료 조건으로 빠지는 문제가 있었음).
@@ -465,10 +475,41 @@ for( int32 i = 0; i < nDBCount; ++i )
   모두 캡처/바인딩되는 것은 동일한 raw `this` 포인터라서, 댕글링 포인터에 대한 안전성
   자체는 동일하다(`std::bind`가 더 안전한 것은 아님).
 - `Action()`의 지연 쿼리 경고는 빌드 구성에 따라 임계값이 다르다 — 디버그 빌드는 300ms,
-  릴리즈 빌드는 1000ms 이상 걸린 쿼리에 대해 경고 로그를 남긴다.
-- `Clear()`는 DB 요청 큐(`_queueDBAsyncRq`)를 비우는 역할만 담당한다. 등록된 핸들러
-  (`_mapCommand`)는 `Clear()`의 영향을 받지 않으므로, 초기화가 중간에 실패해 `Clear()`가
-  호출되어도 `Regist()`로 등록해둔 핸들러는 그대로 유지된다.
+  릴리즈 빌드는 1000ms 이상 걸린 쿼리에 대해 경고 로그를 남긴다. 누적 호출 수를 세는
+  `cumulateCallCnt`는 `static std::atomic<uint64>`이고 `fetch_add(memory_order_relaxed)`로
+  증가시킨다 — `_nMaxThreadCnt`개의 워커 스레드가 모두 같은 `Action()`을 동시에 실행하며 이
+  static 변수를 공유하므로, 원자적이지 않은 단순 증가(`++`)는 데이터 레이스(정의되지 않은
+  동작)가 된다.
+- `Clear()`는 DB 요청 큐(`_queueDBAsyncRq`)를 비우는 역할만 담당한다. `GetSize()`로 크기를
+  먼저 읽어 `SwapChunk`로 그만큼만 옮기는 대신, 전용 `_queueDBAsyncRq.Swap(tempQueue)`로 그
+  시점의 큐 전체를 한 번의 락 구간 안에서 통째로 이관한다 — 대상 큐가 비어 있으므로 내부적으로
+  컨테이너 자체를 O(1)로 스왑하며, 크기 조회 이후 들어온 새 항목이 이번 드레인에서 누락되는
+  TOCTOU 여지도 없앤다. 등록된 핸들러(`_mapCommand`)는 `Clear()`의 영향을 받지 않으므로,
+  초기화가 중간에 실패해 `Clear()`가 호출되어도 `Regist()`로 등록해둔 핸들러는 그대로 유지된다.
+
+
+### 11.1a `Pop()`의 배치 인출과 큐 크기 경고
+
+`Pop()`은 워커(소비자)별 로컬 큐(`localQueue`)를 두고, 비어 있을 때만 `_mutex`를 잡아
+`_cva.wait()`로 대기한 뒤 `_queueDBAsyncRq.SwapChunk(localQueue, 64)`로 한 번에 최대 64개만
+떼어온다 — 워커 하나가 백로그 전체를 독점하지 못하게 막고, 락을 잡는 빈도를 항목 1개당
+1회에서 최대 64개당 1회로 줄인다.
+
+락을 쥔 상태에서 큐 크기 경고도 함께 수행하며, 두 단계 모두 문턱 교차 감지 + 쿨다운
+방식으로 설계되어 있다:
+
+- **`LOG_ERROR` (심각 수준)**: `currentSize >= MAX_WARNING_QUERY_QUEUE_SIZE`(`100000`)를
+  처음 넘어서는 순간 1회만 발령한다(`_bMaxWarningActive` 플래그로 무장). 좁은 구간을
+  표본으로 삼지 않고 `>=` 비교 하나로만 판정하므로, 표본 사이에 크기가 크게 튀어도 경고가
+  누락되지 않는다. 이후 `currentSize`가 히스테리시스 하한인
+  `MAX_WARNING_RESET_QUEUE_SIZE`(`90000`) 아래로 실제로 내려와야 재무장되어, 문턱 근처에서
+  값이 오르내려도 매번 재알림하지 않는다.
+- **`LOG_WARNING` (증가 추세 알림)**: "마지막으로 경고한 값(`_nLastWarnedQueueSize`, 초기값
+  `INITIAL_WARN_QUEUE_SIZE`=`1000`)보다 커질 때"를 후보 조건으로 삼되, 실제 로그 출력은
+  `QUEUE_SIZE_WARN_COOLDOWN_MS`(`5000ms`) 쿨다운을 통과했을 때만 허용한다 — 큐가 계속 자라
+  매 `Pop()` 재획득마다 새 최댓값을 경신하는 상황(=시스템이 이미 과부하인 바로 그 타이밍)에도
+  로그가 최대 5초에 한 번으로 제한된다. 초기 기준치도 `2`에서 `1000`으로 올려, 기동 직후
+  워밍업 단계의 사소한 큐 증가만으로 경고가 찍히지 않게 했다.
 
 ### 11.2 스레드 생성
 
@@ -487,20 +528,26 @@ for( int32 i = 0; i < nDBCount; ++i )
 유실되거나(요청이 처리되지 못한 채 `Clear()`로 그냥 비워짐) 이미 해제된 풀을 참조하는
 일이 없게 한다.
 
-1. `_bStopThread`를 `true`로 설정하고 `_cva.notify_all()`을 호출해, 이후 새 `Push()`를 막고
-   대기 중이던 워커들이 종료 조건을 확인하도록 깨운다.
-2. `_mutex`를 짧게 잡은 상태에서 `_queueDBAsyncRq` 전체를 지역 임시 큐(`tempQueue`)로
-   `std::move`한다 — 잠금 구간을 큐 이관 한 번으로 최소화해, 그 사이 워커 스레드가 오래
-   블로킹되지 않게 한다.
-3. 잠금을 푼 뒤, 임시 큐에 옮겨 담은 요청들을 하나씩 꺼내 `_mapCommand`에서 핸들러를 찾아
+1. `_bStopThread`를 `true`로 설정하고 `_cva.notify_all()` / `_cvProducer.notify_all()`을
+   호출해, 이후 새 `Push()`를 막고 대기 중이던 워커/생산자들이 종료 조건을 확인하도록 깨운다.
+2. `_queueDBAsyncRq.Swap(tempQueue)`로 남은 전체 요청을 지역 임시 큐(`tempQueue`)로 한
+   번에 옮긴다 — `GetSize()`로 크기를 먼저 재는 절차 없이 그 시점의 큐를 통째로 이관하므로
+   잠금 구간이 짧고, 크기 조회와 실제 이관 사이에 새 요청이 끼어들 여지도 없다.
+   `CMySQLAsyncSrv::_mutex`는 이 구간에서 쓰이지 않으며, 보호는 `CChunkedSwapQueue` 자신의
+   내부 락이 `Swap()` 호출 한 번 동안만 담당한다.
+3. 임시 큐에 옮겨 담은 요청들을 하나씩 `std::move`로 꺼내 `_mapCommand`에서 핸들러를 찾아
    `ProcessAsyncCall()`을 호출부 스레드에서 직접 실행한다. `Action()`의 워커 루프와 동일하게
-   핸들러를 찾지 못하거나 처리 결과가 `EDBReturnType::OK`가 아니면 에러를 로그로 남기고,
-   각 요청은 처리 후 `SAFE_DELETE`로 해제한다.
+   핸들러를 찾지 못하거나 처리 결과가 `EDBReturnType::OK`가 아니면 에러를 로그로 남긴다. 각
+   요청은 `unique_ptr`이므로 별도의 해제 호출 없이, 루프를 도는 동안 지역 변수가 재대입/소멸될
+   때 자동으로 메모리가 해제된다. `SubOutstandingRequest()`는 핸들러를 찾았는지 여부와
+   무관하게(`pAsyncRq == nullptr`로 건너뛴 경우만 제외) 루프 맨 끝에서 항상 호출된다 —
+   원래는 핸들러를 찾은 분기 안에만 있어 미등록 `callIdent`를 만나면 카운터가 감소하지 않는
+   버그가 있었는데, if/else 바깥으로 옮겨 두 경로 모두 항상 호출되도록 바로잡았다(§11.5 참고).
 4. 큐가 빌 때까지 반복한 뒤 완료 로그를 남기고 반환한다.
 
 * `Action()`의 워커 루프에 있던 타임아웃 재시도 로직(§11.1의 `bReTry` 재큐잉)은 여기에는
   없다 — 종료 처리 경로이므로 실패한 요청을 다시 큐에 넣지 않고 에러 로그만 남기고 넘어간다.
-* 큐를 옮겨받은 뒤(2단계) 처리하는 동안(3단계)은 `_mutex`를 잡지 않으므로,
+* 2단계(`Swap()`)와 3단계(순차 처리) 모두 `CMySQLAsyncSrv::_mutex`를 잡지 않으므로,
   `FlushRemainingTasks()` 실행 중에도 다른 스레드가 `GetQueryQueueSize()`/`IsEmpty()` 같은
   조회 함수를 호출하는 것 자체는 안전하다 (다만 이미 `_bStopThread`가 켜진 뒤라 `Push()`는
   더 이상 큐에 쌓이지 않는다).
@@ -570,25 +617,28 @@ for( int32 i = 0; i < nDBCount; ++i )
 충분하다 — 다른 메모리 접근과의 순서를 보장할 필요 없이 카운트 값 자체만 정확하면 되기
 때문이다.
 
-**감소 시점 — 두 경로 모두에서 "최종적으로 끝날 때"만 호출**
+**감소 시점 — "요청이 끝났다고 간주되는" 모든 경로에서 항상 호출**
 
-- `Action()`: 워커 루프에서 요청을 완전히 처리(성공이든, 타임아웃 재시도가 아닌 최종 실패든)한
-  뒤, `SAFE_DELETE(pAsyncRq)` 직전에 `SubOutstandingRequest()`를 호출한다. 싱글턴 인스턴스
-  자신의 메서드 안에서 호출되는 것이므로 `CMySQLAsyncSrv::Instance()->`를 다시 거치지 않고
-  암묵적 `this`로 바로 호출한다.
+- `Action()`: 워커 루프에서 요청이 완전히 처리되든(성공/최종 실패), 애초에 핸들러를 찾지
+  못해 처리를 포기하든, 두 경로 모두 `SubOutstandingRequest()`를 호출한다. 핸들러 미등록
+  경로도 호출하도록 되어 있는데, 이 요청은 어차피 다시 처리되지 않고 버려지는 것이므로
+  "요청이 끝났다"고 봐야 카운터 정합성이 맞기 때문이다. 싱글턴 인스턴스 자신의 메서드
+  안에서 호출되는 것이므로 `CMySQLAsyncSrv::Instance()->`를 다시 거치지 않고 암묵적 `this`로
+  바로 호출한다.
 - `FlushRemainingTasks()`: 종료 시점에 메인 스레드가 남은 요청을 동기 처리하는 루프에서도,
-  핸들러를 찾아 `ProcessAsyncCall()`을 실행한 경우(성공/실패 불문) `SubOutstandingRequest()`를
-  호출한 뒤 `SAFE_DELETE`한다. `Action()`과 동일한 기준으로 카운터를 관리해, 정상 종료 경로든
-  강제 flush 경로든 요청이 "처리를 시도해 끝난" 시점에 항상 카운터가 감소한다.
+  핸들러를 찾아 `ProcessAsyncCall()`을 실행했는지(성공/실패 불문) 또는 핸들러를 찾지
+  못했는지와 무관하게, `pAsyncRq`가 유효한 모든 반복에서 루프 맨 끝에 `SubOutstandingRequest()`를
+  호출한다. `Action()`과 동일한 기준으로 카운터를 관리해, 정상 종료 경로든 강제 flush
+  경로든 요청이 "처리를 시도해 끝난" 시점에 항상 카운터가 감소한다.
+
+> 이전 버전에서는 `FlushRemainingTasks()`의 이 호출이 `if( it != _mapCommand.end() )` 블록
+> **안쪽에만** 있어서, 핸들러를 찾지 못한 요청은 루프를 그냥 지나쳤다 — `Action()`의 동일
+> 분기는 호출하는데 `FlushRemainingTasks()`만 빠져 있던 비대칭이었다. if/else 바깥으로
+> 옮겨 두 함수의 동작을 통일했다.
 
 **카운터를 건드리지 않는 유일한 경로**
 
-- `Action()`의 `_mapCommand.end() == it`(핸들러를 찾지 못한 경우)와, `FlushRemainingTasks()`의
-  동일한 분기(`else` — 핸들러 없음) 양쪽 모두 `SubOutstandingRequest()`를 호출하지 않는다.
-  이 경로는 `callIdent`에 대응하는 핸들러가 애초에 등록되어 있지 않은, 설정 누락에 가까운
-  예외적 상황이다. 카운터가 안 맞는 상태로 남을 수 있음을 인지한 채로, 정상적인 운영에서는
-  거의 발생하지 않는 경로이므로 의도적으로 그대로 두었다.
 - 타임아웃으로 재큐잉되는 경로(`Ret == TIMEOUT && bReTry == false` → `Push()`로 재투입)는
   "최종적으로 끝난" 것이 아니라 다시 큐로 돌아가는 것이므로 이 시점에는 감소시키지 않는다 —
-  재큐잉된 요청이 이후 다시 `Action()`을 통과할 때(성공하든 최종 실패하든) 그때 비로소
-  `SubOutstandingRequest()`가 호출된다.
+  재큐잉된 요청이 이후 다시 `Action()`을 통과할 때(성공하든 최종 실패하든, 또는 재큐잉
+  자체가 서비스 종료와 겹쳐 실패하든) 그때 비로소 `SubOutstandingRequest()`가 호출된다.

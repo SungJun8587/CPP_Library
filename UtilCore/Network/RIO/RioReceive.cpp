@@ -43,21 +43,28 @@ bool CRioReceive::Receive(
             return core.TrySubmit(
                 [&]() noexcept -> bool
                 {
+                    /*
                     const BOOL result = core.GetRioTable().RIOReceive(
                         requestQueue,
                         const_cast<PRIO_BUF>(&buffer),
                         1,
                         flags,
                         reinterpret_cast<PVOID>(rioEvent)) != FALSE;
-
                     if( result == FALSE )
                     {
                         DWORD err = WSAGetLastError();
                         std::cout << "[Error] RIOReceive failed with WSA Error Code: " << err << "\n";
                         return false;
                     }
-
                     return true;
+                    */
+
+                    return core.GetRioTable().RIOReceive(
+                        requestQueue,
+                        const_cast<PRIO_BUF>(&buffer),
+                        1,
+                        flags,
+                        reinterpret_cast<PVOID>(rioEvent)) != FALSE;
                 });
         });
 }
