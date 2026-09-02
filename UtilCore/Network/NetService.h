@@ -11,6 +11,7 @@
 
 #include <functional>
 #include <set>
+#include <unordered_map>
 #include <mutex>
 
 //***************************************************************************
@@ -80,7 +81,19 @@ protected:
 
 	std::mutex				_lock;               // 세션 컨테이너 동기화용 뮤텍스
 	int32					_maxSessionCount = 0;// 최대 허용 세션 수
-	CVector<CSessionRef>	_sessions;           // 현재 관리 중인 활성 세션 컨테이너
+	CVector<CSessionRef>	_sessions;           // 현재 관리 중인 활성 세션 컨테이너 (GetSession(index)의 O(1) 인덱스 접근 계약 유지용)
+
+	// [수정] AddSession()/ReleaseSession()이 매번 std::find()로 _sessions를
+	// 선형탐색하던 것을 O(1) 평균으로 개선하기 위한 raw pointer→_sessions
+	// 인덱스 맵. CSession*를 키로 쓰는 이유: shared_ptr 자체를 키로 쓰면
+	// 해시/비교마다 컨트롤 블록 접근 비용이 붙고, 세션 소유권은 이미
+	// _sessions(CVector<CSessionRef>)가 갖고 있어 여기선 식별자만 있으면
+	// 충분하다 — _sessions에 없는 raw pointer가 이 맵에 남는 dangling 우려는
+	// 없다(둘은 항상 AddSession/ReleaseSession 안에서 같은 락 하에 함께
+	// 갱신됨). ReleaseSession()은 swap-and-pop으로 제거하므로 삭제 시 맨
+	// 뒤 원소와 자리를 바꾼 세션의 인덱스도 함께 갱신해야 한다.
+	std::unordered_map<CSession*, size_t> _sessionIndex;
+
 	std::condition_variable _sessionsEmptyCv;
 };
 

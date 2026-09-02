@@ -339,6 +339,13 @@ private:
 			}
 		}
 
+		if( m_hasContentLength && m_contentLength > kMaxBodyLen )
+		{
+			// 비정상적으로 큰 Content-Length — 메모리 고갈 방지를 위해 즉시 에러 처리.
+			m_state = HTTP::EParseState::Error;
+			return;
+		}
+
 		if( !m_hasContentLength || m_contentLength == 0 )
 		{
 			// Content-Length가 없거나 0 — 요청은 스펙상 이 경우 body가 없는 게
@@ -346,6 +353,7 @@ private:
 			m_state = HTTP::EParseState::Complete;
 			return;
 		}
+		m_body.reserve(m_contentLength); // 크기를 미리 알고(상한 이내) 있으므로 재할당 방지
 		m_state = HTTP::EParseState::Body;
 	}
 
@@ -412,12 +420,22 @@ private:
 	// @param data 입력 바이트 포인터
 	// @param len data의 길이
 	// @return size_t 실제로 소비한 바이트 수 (m_chunkRemaining 남은 만큼만)
+	// @details chunked는 Content-Length처럼 총량을 미리 알 수 없어 OnHeadersComplete()의
+	//          사전 체크가 적용되지 않는다 — 그래서 여기서 누적 크기를 직접
+	//          kMaxBodyLen과 비교해 상한을 넘으면 Error로 전환한다(메모리 고갈 방지).
 	//***************************************************************************
 	size_t ConsumeChunkData(const char* data, size_t len)
 	{
 		size_t take = (std::min)(len, m_chunkRemaining);
 		m_body.append(data, take);
 		m_chunkRemaining -= take;
+
+		if( m_body.size() > kMaxBodyLen )
+		{
+			m_state = HTTP::EParseState::Error;
+			return take;
+		}
+
 		if( m_chunkRemaining == 0 )
 			m_state = HTTP::EParseState::ChunkedCRLF;
 		return take;
@@ -446,6 +464,7 @@ private:
 
 private:
 	static constexpr size_t kMaxLineLen = 8192; // 헤더 한 줄 상한 (비정상 요청/공격 방어)
+	static constexpr size_t kMaxBodyLen = 64 * 1024 * 1024; // body 누적 크기 상한(64MB) — Content-Length/chunked 둘 다 이 상한을 넘으면 Error(메모리 고갈 방지)
 
 	HTTP::EParseState m_state = HTTP::EParseState::StartLine; // 파싱 진행 상태
 	std::string m_lineBuffer;                                             // 개행을 못 찾은 부분 라인의 누적 버퍼 (char 기준)

@@ -87,23 +87,29 @@ public:
     ~CDelayedTaskQueue() = default;
 
     //***************************************************************************
-    // @brief 일정 시간(밀리초) 뒤에 실행될 작업을 예약합니다.
+    // @brief 일정 시간 뒤에 실행될 작업을 예약합니다.
     // @tparam F 람다식 또는 함수 객체 타입
-    // @param milliseconds 현재 시점부터 경과해야 할 시간 (밀리초 단위)
+    // @param delay 현재 시점부터 경과해야 할 시간
     // @param task 시간이 되었을 때 실행할 작업 함수
+    // @return true: 예약 성공, false: Stop() 이후라 거부됨
+    // @note DelayedTask(std::function 포함) 구성은 락 밖에서 수행합니다. std::function이
+    //       캡처 크기에 따라 힙 할당을 일으킬 수 있는데, 이를 _mutex 보유 구간 밖으로
+    //       빼내어 락 보유 시간을 최소화합니다. 락 안에서는 완성된 DelayedTask를
+    //       move만 합니다(nothrow 보장은 위 static_assert 참고).
     //***************************************************************************
     template<typename F>
-    void Reserve(int milliseconds, F&& task)
+    bool Reserve(std::chrono::milliseconds delay, F&& task)
     {
-        auto executeTime = std::chrono::steady_clock::now() + std::chrono::milliseconds(milliseconds);
+        DelayedTask newTask{ std::chrono::steady_clock::now() + delay, std::forward<F>(task) };
 
         {
             std::lock_guard<std::mutex> lock(_mutex);
             if( _stopped )
-                return;
-            _queue.push(DelayedTask{ executeTime, std::forward<F>(task) });
+                return false;
+            _queue.push(std::move(newTask));
         }
         _cv.notify_one(); // 대기 중인 스레드 깨우기
+        return true;
     }
 
     //***************************************************************************

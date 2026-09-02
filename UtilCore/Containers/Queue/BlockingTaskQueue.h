@@ -13,6 +13,7 @@
 
 #include <condition_variable>
 #include <mutex>
+#include <type_traits>
 #include <utility>
 
 //***************************************************************************
@@ -33,10 +34,20 @@
 // 패턴 최적화:
 //  - **MPMC(Multi Producer, Multi Consumer)** 환경에 최적화
 //    → 여러 프로듀서가 데이터를 넣고, 여러 컨슈머가 안전하게 Pop 수행
+//
+// 예외 안전성:
+//  - PushBatch()는 Stop()/SetProducerDone() 이후 거부되는 경우 temp에 옮겨둔 원소를
+//    items로 되돌리는 롤백 경로를 가집니다. 이 롤백이 안전하려면 T의 이동 생성이
+//    예외를 던지지 않아야 하므로, T는 nothrow move constructible이어야 합니다
+//    (아래 static_assert로 강제).
 //***************************************************************************
 template<typename T>
 class CBlockingTaskQueue
 {
+    static_assert(std::is_nothrow_move_constructible_v<T>,
+        "CBlockingTaskQueue<T>: T must be nothrow move constructible "
+        "for exception-safe batch insertion.");
+
 public:
     //***************************************************************************
     // @brief 큐의 내부에 데이터를 삽입합니다.
@@ -56,49 +67,56 @@ public:
     }
 
     //***************************************************************************
-    // @brief 여러 데이터를 묶어서 한 번에 넣고 알림을 보냅니다.
+    // @brief 여러 데이터를 묶어서 한 번에 큐에 넣고 대기 중인 소비자에게 알립니다.
     // @param items 삽입할 데이터 항목들의 참조 벡터 (성공 시 내부 비워짐)
-    // @return true: 삽입 성공, false: Stop() 또는 SetProducerDone() 이후라 거부됨(items는 최대한 복원됨)
-    // @note temp.push()/items.push_back() 등 락 밖 이동 과정에서 예외가 발생하면
-    //       일부 원소만 옮겨진 상태로 함수가 종료될 수 있습니다. _queue 자체의 컨테이너
-    //       invariant는 깨지지 않지만, "예외 발생 시 items가 호출 전 상태로 완전히
-    //       보존된다"는 보장은 아닙니다. T의 이동 연산이 예외를 던지지 않는 타입에서
-    //       사용을 권장합니다.
-    //***************************************************************************
+    // @return true: 삽입 성공
+    //         false: Stop() 또는 SetProducerDone() 이후라 삽입이 거부됨
+    // @note
+    //       모든 원소의 큐 삽입은 동일한 mutex 구간에서 수행됩니다.
+    //       따라서 배치 삽입과 Stop()/SetProducerDone() 사이의 상태 경쟁을
+    //       방지하고, 배치 전체를 하나의 논리적 삽입 작업으로 처리합니다.
+    //
+    //       별도의 임시 CQueue<T>를 사용하지 않습니다.
+    //       CQueue<T>가 deque 기반이므로 temp를 사용하는 경우 추가적인
+    //       컨테이너 메모리 할당/해제와 원소 이동이 발생합니다.
+    //
+    //       T는 nothrow move constructible이어야 하며,
+    //       PushBatch()에서 원소를 내부 큐로 이동하는 과정에서
+    //       T의 이동 생성으로 인한 예외를 방지합니다.
+    //
+    //       단, _queue의 내부 메모리 할당은 실패할 수 있으므로,
+    //       메모리 할당 예외 발생 시 items가 호출 전 상태로
+    //       완전히 보존된다는 강한 예외 보장은 제공하지 않습니다.
+    //***************************************************************************    
     bool PushBatch(CVector<T>& items)
     {
         if( items.empty() )
             return true;
 
-        // 할당이 발생할 수 있는 각 원소의 큐 삽입을 락 밖에서 먼저 임시 큐에 수행합니다.
-        // 이렇게 하면 락을 잡지 않은 채로 처리되므로 락 보유 시간이 줄어듭니다.
-        CQueue<T> temp;
-        for( auto& item : items )
-            temp.push(std::move(item));
+        size_t count = 0;
 
         {
             std::lock_guard<std::mutex> lock(_mutex);
-            if( _stopped || _producerDone )
-            {
-                // 이미 정지/종료된 상태라면 큐에 넣지 않고, temp로 옮겨둔 원소를
-                // items로 최대한 되돌립니다(위 @note 참고: 완전한 예외 안전성은 아님).
-                items.clear();
-                while( !temp.empty() )
-                {
-                    items.push_back(std::move(temp.front()));
-                    temp.pop();
-                }
-                return false;
-            }
 
-            while( !temp.empty() )
-            {
-                _queue.push(std::move(temp.front()));
-                temp.pop();
-            }
+            if( _stopped || _producerDone )
+                return false;
+
+            count = items.size();
+
+            for( auto& item : items )
+                _queue.push(std::move(item));
         }
-        _cv.notify_all();
+
         items.clear();
+
+        // 배치 삽입이므로 대기 중인 소비자를 깨웁니다.
+        // 단일 항목은 notify_one()으로 충분하지만,
+        // 여러 항목은 여러 소비자가 동시에 처리할 수 있도록 notify_all()을 사용합니다.
+        if( count == 1 )
+            _cv.notify_one();
+        else
+            _cv.notify_all();
+
         return true;
     }
 

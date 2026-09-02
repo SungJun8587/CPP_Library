@@ -7,6 +7,8 @@
 #include "pch.h"
 #include "NetService.h"
 
+#include <vector>
+
 //***************************************************************************
 // @brief CNetService 생성자 구현
 // @param type 서비스 타입
@@ -29,25 +31,46 @@ CNetService::~CNetService()
 
 //***************************************************************************
 // @brief 서비스에 등록된 모든 세션을 종료합니다.
-// @note _sessions 목록을 순회하며 Disconnect를 호출합니다.
+// @note
+// [수정] 기존에는 _lock을 쥔 채로 각 session->Disconnect()를 호출했다. 이는
+// Disconnect()가 항상 순수 비동기(게시만 하고 즉시 반환)라는 가정 위에서만
+// 안전했는데, CIocpSession::Disconnect(Iocp::CloseReason)의 "아직 연결 완료
+// 전(Accept/ConnectEx 진행 중)" 경로는 그 자리에서 동기적으로
+// OnDisconnected()→CSession::OnDisconnected()→(DisconnectHandler)→
+// CNetService::ReleaseSession()까지 호출하며 같은 _lock(non-recursive
+// std::mutex)을 다시 잡으려 한다 — 같은 스레드의 재진입이라 그 즉시
+// 데드락이었다.
+//
+// CIocpSessionManager::Broadcast()/BeginCloseAllSessions()가 이미 쓰고 있는
+// 패턴과 동일하게, 락 안에서는 세션 목록의 스냅샷만 수집하고 실제
+// Disconnect() 호출은 락 밖에서 수행하도록 바꿔 이 재진입 데드락을 근본적으로
+// 제거한다(Disconnect()가 동기/비동기 어느 쪽이든 안전).
 //***************************************************************************
 void CNetService::Close()
 {
-	// 1. _sessions를 순회하며 각 세션에 Disconnect()를 게시한다. Disconnect()는
-	//    비동기라(실제 소켓 종료/완료 통지 처리는 워커 스레드가 나중에 처리)
-	//    이 루프 자체는 즉시 끝난다 — "게시"일 뿐 "완료 대기"가 아니다.
-	std::unique_lock<std::mutex> guard(_lock);
-	for( const CSessionRef& session : _sessions )
+	// 1. 락 안에서는 세션 목록 스냅샷만 수집한다(shared_ptr 복사이므로 이
+	//    시점 이후 다른 스레드가 원본 세션을 정리해도 여기 보관된 참조는
+	//    안전하게 유효하다).
+	std::vector<CSessionRef> sessionsToClose;
+	{
+		std::lock_guard<std::mutex> guard(_lock);
+		sessionsToClose.reserve(_sessions.size());
+		for( const CSessionRef& session : _sessions )
+			sessionsToClose.push_back(session);
+	}
+
+	// 2. 락 밖에서 Disconnect()를 호출한다. Disconnect()가 동기적으로
+	//    ReleaseSession()(같은 _lock)을 재진입하더라도, 이 스레드는 더 이상
+	//    _lock을 쥐고 있지 않으므로 안전하다.
+	for( const CSessionRef& session : sessionsToClose )
 		session->Disconnect(L"NetService Close");
 
-	// 2. 각 세션의 disconnect가 실제로 완료되면(OnDisconnected() 훅 이후)
+	// 3. 각 세션의 disconnect가 실제로 완료되면(OnDisconnected() 훅 이후)
 	//    ReleaseSession()이 호출되어 _sessions에서 제거되고 _sessionsEmptyCv가
 	//    notify된다 — 그 순간이 올 때까지, 즉 _sessions가 실제로 빌 때까지
-	//    여기서 블로킹 대기한다.
-	// 2-1. wait()가 대기하는 동안엔 guard(락)를 자동으로 풀어주므로, 그 사이에
-	//      워커 스레드가 ReleaseSession()에서 같은 락을 잡고 세션을 제거할 수
-	//      있다 — 여기서 락을 계속 쥐고 있으면 ReleaseSession()이 락을 못 잡아
-	//      데드락에 빠진다는 점에서 unique_lock(lock_guard 아님)이 필수적이다.
+	//    여기서 블로킹 대기한다. wait()는 대기 중 guard(락)를 자동으로
+	//    풀어주므로 그 사이 ReleaseSession()이 락을 잡을 수 있다.
+	std::unique_lock<std::mutex> guard(_lock);
 	_sessionsEmptyCv.wait(guard, [this] { return _sessions.empty(); });
 }
 
@@ -96,10 +119,13 @@ void CNetService::AddSession(CSessionRef session)
 
 	std::lock_guard<std::mutex> guard(_lock);
 
-	if( std::find(_sessions.begin(), _sessions.end(), session) == _sessions.end() )
-	{
-		_sessions.push_back(session);
-	}
+	// [수정] std::find() O(n) 선형탐색 대신 _sessionIndex(unordered_map)로
+	// O(1) 평균 중복 체크.
+	if( _sessionIndex.find(session.get()) != _sessionIndex.end() )
+		return;
+
+	_sessionIndex.emplace(session.get(), _sessions.size());
+	_sessions.push_back(session);
 }
 
 //***************************************************************************
@@ -113,12 +139,27 @@ void CNetService::ReleaseSession(CSessionRef session)
 
 	std::lock_guard<std::mutex> guard(_lock);
 
-	auto it = std::find(_sessions.begin(), _sessions.end(), session);
-	if( it != _sessions.end() )
+	// [수정] std::find() O(n) 선형탐색 + erase()의 O(n) 원소 시프트 대신,
+	// _sessionIndex로 대상 위치를 O(1) 평균으로 찾고 맨 뒤 원소와 자리를
+	// 바꾼 뒤(swap-and-pop) 맨 뒤를 제거 — 순서 보장이 필요 없는 컨테이너라
+	// 안전하다. 자리를 옮긴 세션의 인덱스도 함께 갱신해야 한다.
+	auto it = _sessionIndex.find(session.get());
+	if( it == _sessionIndex.end() )
+		return;
+
+	size_t removeIdx = it->second;
+	size_t lastIdx = _sessions.size() - 1;
+
+	if( removeIdx != lastIdx )
 	{
-		_sessions.erase(it);
-		_sessionsEmptyCv.notify_all();
+		_sessions[removeIdx] = _sessions[lastIdx];
+		_sessionIndex[_sessions[removeIdx].get()] = removeIdx;
 	}
+
+	_sessions.erase(_sessions.begin() + lastIdx); // 맨 뒤 원소 제거 — 시프트 없음
+	_sessionIndex.erase(it);
+
+	_sessionsEmptyCv.notify_all();
 }
 
 //***************************************************************************

@@ -111,7 +111,27 @@ bool CIocpServerService::Start()
 		return false;
 	}
 
+	// 3. 세션 reap 스레드 시작 — Running 중 자연 종료된 세션의 _sessionManager
+	//    엔트리를 kSessionReapInterval마다 정리한다(예전에는 Close() 시점에만
+	//    정리돼 서버가 오래 떠 있을수록 map이 무한정 커질 수 있었음). Listener/
+	//    워커가 이미 정상 구동 중인 이 시점 이후에 시작해야, reap 스레드가
+	//    도는 동안 세션이 실제로 늘어나는 정상 상태와 겹쳐도 안전하다.
+	_sessionReapThread = std::thread([this]() { _sessionReapQueue.ProcessExpiredTasks(); });
+	ScheduleSessionReap();
+
 	return true;
+}
+
+//***************************************************************************
+// @brief _sessionManager에 다음 reap tick을 예약합니다(self-rescheduling).
+//***************************************************************************
+void CIocpServerService::ScheduleSessionReap()
+{
+	_sessionReapQueue.Reserve(kSessionReapInterval, [this]()
+		{
+			_sessionManager.RemoveClosedSessions();
+			ScheduleSessionReap(); // 다음 tick 재예약. Close() 이후엔 Reserve()가 false를 반환하며 조용히 멈춤.
+		});
 }
 
 //***************************************************************************
@@ -124,6 +144,15 @@ bool CIocpServerService::Start()
 //***************************************************************************
 void CIocpServerService::Close()
 {
+	// 0. reap 스레드부터 정지 — 아래에서 _sessionManager를 직접 조작하는
+	//    (BeginCloseAllSessions/RemoveClosedSessions) 동안 reap 스레드가
+	//    동시에 같은 맵을 건드리지 않도록 가장 먼저 멈춘다. Stop()은 신호만
+	//    보내고 반환하므로 반드시 join까지 해야 한다(CDelayedTaskQueue의
+	//    Lifetime 계약).
+	_sessionReapQueue.Stop();
+	if( _sessionReapThread.joinable() )
+		_sessionReapThread.join();
+
 	// 1. 신규 연결 차단을 가장 먼저 (RIO 쪽과 동일한 이유 — 세션 정리 도중에도
 	//    계속 새 세션이 들어와 BeginCloseAllSessions()의 스냅샷에서 누락되는
 	//    상황을 막기 위함)
@@ -147,6 +176,12 @@ void CIocpServerService::Close()
 	_sessionManager.RemoveClosedSessions();
 
 	// 4. 세션 정리가 다 끝난 뒤에야 워커 스레드 정지
+	//    [수정] RequestShutdown()으로 종료 플래그를 먼저 세팅한 뒤 PQCS를
+	//    게시한다 — 순서가 바뀌면(PQCS 먼저) 깨어난 워커가 IsShuttingDown()을
+	//    아직 false로 관측해 DispatchBatch(10)을 한 번 더 돈 뒤에야(최대 10ms)
+	//    종료를 인지하는 지연이 생긴다. JoinThreads() 자신도 내부에서 플래그를
+	//    세팅하므로 기능적 hang은 없지만, 여기서 먼저 세팅해두면 그 지연이 없다.
+	_threadManager.RequestShutdown();
 	if( _iocpCore && _iocpCore->GetHandle() != INVALID_HANDLE_VALUE )
 	{
 		size_t threadCount = _threadManager.GetThreadCount();
@@ -298,6 +333,10 @@ void CIocpClientService::Close()
 	CNetService::Close();	// 세션이 실제로 0개 될 때까지 블로킹 대기
 
 	// 2. 세션 정리가 다 끝났으니, 이제 워커 스레드들에게 종료 신호를 보낸다.
+	//    [수정] RequestShutdown()을 PQCS 게시보다 먼저 호출 — 이유는
+	//    CIocpServerService::Close()와 동일(깨어난 워커가 곧바로 종료를
+	//    인지하도록, 최대 10ms 지연 제거).
+	_threadManager.RequestShutdown();
 	if( _iocpCore && _iocpCore->GetHandle() != INVALID_HANDLE_VALUE )
 	{
 		// 2-1. 워커 스레드 개수만큼 wake-up(빈 overlapped) 패킷을 게시한다.

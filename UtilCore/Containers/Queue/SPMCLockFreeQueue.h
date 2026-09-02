@@ -35,7 +35,7 @@
 //  - producer 경로 단순화 → 성능 향상
 //  - consumer는 CAS 필요
 //  - blocking 정책은 MPMC와 동일
-//  - Stop()을 통한 종료 지원
+//  - Close()를 통한 종료 지원
 //  - T 생성/이동 대입 예외 발생 시 queue 구조를 최대한 보존
 //
 // 주의:
@@ -109,7 +109,7 @@ public:
             0,
             std::memory_order_relaxed);
 
-        m_Stopped.store(
+        m_Closed.store(
             false,
             std::memory_order_relaxed);
     }
@@ -156,7 +156,7 @@ public:
     //***************************************************************************
     // @brief 큐에 데이터를 논블로킹 방식으로 삽입합니다. (Lvalue)
     // @param value 삽입할 값
-    // @return true: 삽입 성공, false: 큐가 가득 참 또는 Stop 상태
+    // @return true: 삽입 성공, false: 큐가 가득 참 또는 Close 상태
     //***************************************************************************
     bool TryPush(const T& value)
     {
@@ -166,7 +166,7 @@ public:
     //***************************************************************************
     // @brief 큐에 데이터를 논블로킹 방식으로 삽입합니다. (Rvalue)
     // @param value 삽입할 값
-    // @return true: 삽입 성공, false: 큐가 가득 참 또는 Stop 상태
+    // @return true: 삽입 성공, false: 큐가 가득 참 또는 Close 상태
     //***************************************************************************
     bool TryPush(T&& value)
     {
@@ -176,29 +176,29 @@ public:
     //***************************************************************************
     // @brief 큐에 데이터를 블로킹 방식으로 삽입합니다. (Lvalue)
     // @param value 삽입할 값
+    // @return true: 삽입 성공, false: Close 상태로 인해 삽입되지 않음
     //
     // @details
-    // Stop()이 호출되면 더 이상 삽입하지 않고 반환합니다.
-    // 기존 void API를 유지하기 때문에 호출자는 Stop 이후 Push가 실제로
-    // 수행되었는지 직접 확인할 수 없습니다. 삽입 성공 여부가 필요하면
-    // TryPush()를 사용하십시오.
+    // Close()가 호출되면 더 이상 삽입하지 않고 false를 반환합니다.
+    // 반환값을 통해 호출자는 Close 이후 Push가 실제로 수행되었는지
+    // 확인할 수 있습니다.
     //***************************************************************************
-    void Push(const T& value)
+    bool Push(const T& value)
     {
-        BlockingEmplacePush(value);
+        return BlockingEmplacePush(value);
     }
 
     //***************************************************************************
     // @brief 큐에 데이터를 블로킹 방식으로 삽입합니다. (Rvalue)
     // @param value 삽입할 값
+    // @return true: 삽입 성공, false: Close 상태로 인해 삽입되지 않음
     //
     // @details
-    // Stop()이 호출되면 더 이상 삽입하지 않고 반환합니다.
-    // 기존 void API를 유지하기 위한 동작입니다.
+    // Close()가 호출되면 더 이상 삽입하지 않고 false를 반환합니다.
     //***************************************************************************
-    void Push(T&& value)
+    bool Push(T&& value)
     {
-        BlockingEmplacePush(std::move(value));
+        return BlockingEmplacePush(std::move(value));
     }
 
     //***************************************************************************
@@ -295,22 +295,28 @@ public:
     //***************************************************************************
     // @brief 큐에서 데이터를 블로킹 방식으로 꺼냅니다.
     // @param outValue 꺼낸 데이터가 저장될 참조 변수
+    // @return true: 데이터 추출 성공, false: Close 상태이며 큐가 비어있어
+    //         더 이상 꺼낼 데이터가 없음
     //
     // @details
-    // Stop()이 호출되고 queue가 비어 있으면 반환합니다.
+    // Close()가 호출되고 queue가 비어 있으면 false를 반환합니다.
     //
-    // Stop() 시점에 이미 queue에 남아있는 데이터는 먼저 drain할 수
+    // Close() 시점에 이미 queue에 남아있는 데이터는 먼저 drain할 수
     // 있도록 구현되어 있습니다.
+    //
+    // 반환값을 통해 호출자는 while (queue.Pop(item)) { ... } 와 같은
+    // 표준적인 소비 루프를 작성할 수 있습니다. outValue는 반환값이
+    // true인 경우에만 유효합니다.
     //***************************************************************************
-    void Pop(T& outValue)
+    bool Pop(T& outValue)
     {
         for( int i = 0; i < kSpinBeforeSleepCount; ++i )
         {
             if( TryPop(outValue) )
-                return;
+                return true;
 
-            if( IsStopped() && EmptyApprox() )
-                return;
+            if( IsClosed() && IsEmptyApprox() )
+                return false;
 
             LFQ_CPU_PAUSE();
         }
@@ -327,7 +333,7 @@ public:
                 lock,
                 [this]()
                 {
-                    return IsStopped() || !EmptyApprox();
+                    return IsClosed() || !IsEmptyApprox();
                 });
 
             m_WaitingPoppers.fetch_sub(
@@ -337,11 +343,11 @@ public:
             lock.unlock();
 
             if( TryPop(outValue) )
-                return;
+                return true;
 
-            // Stop 상태이고 queue가 완전히 drain되었다면 종료합니다.
-            if( IsStopped() && EmptyApprox() )
-                return;
+            // Close 상태이고 queue가 완전히 drain되었다면 종료합니다.
+            if( IsClosed() && IsEmptyApprox() )
+                return false;
         }
     }
 
@@ -349,16 +355,16 @@ public:
     // @brief 큐를 종료 상태로 전환합니다.
     //
     // @details
-    // Stop 이후 새로운 Push는 거부됩니다.
+    // Close 이후 새로운 Push는 거부됩니다.
     //
     // 이미 queue에 들어간 데이터는 Pop을 통해 drain할 수 있습니다.
     // queue가 비어있는 상태에서 대기 중인 Pop은 즉시 깨워집니다.
     //
-    // Stop()은 여러 번 호출해도 안전합니다.
+    // Close()는 여러 번 호출해도 안전합니다.
     //***************************************************************************
-    void Stop() noexcept
+    void Close() noexcept
     {
-        m_Stopped.store(
+        m_Closed.store(
             true,
             std::memory_order_release);
 
@@ -366,7 +372,7 @@ public:
         // predicate 평가 직후 아직 wait()에 등록되기 전인 구간에서
         // notify가 유실되지 않도록 각 mutex를 잡은 뒤 통보합니다.
         //
-        // Stop은 lifecycle 이벤트이므로 빈번한 hot path가 아니며,
+        // Close는 lifecycle 이벤트이므로 빈번한 hot path가 아니며,
         // mutex를 잡는 비용은 무시할 수 있습니다.
         {
             std::lock_guard<std::mutex> lock(m_NotEmptyMutex);
@@ -380,22 +386,22 @@ public:
 
     //***************************************************************************
     // @brief 큐가 종료 상태인지 확인합니다.
-    // @return true: Stop 상태, false: 실행 상태
+    // @return true: Close 상태, false: 실행 상태
     //***************************************************************************
-    bool IsStopped() const noexcept
+    bool IsClosed() const noexcept
     {
-        return m_Stopped.load(
+        return m_Closed.load(
             std::memory_order_acquire);
     }
 
     //***************************************************************************
-    // @brief Stop 상태를 해제하고 다시 사용할 수 있도록 합니다.
+    // @brief Close 상태를 해제하고 다시 사용할 수 있도록 합니다.
     //
     // @details
     // Reset()은 queue를 사용하는 다른 producer/consumer가 없는 상태에서
     // 호출해야 합니다.
     //
-    // 일반적인 생산/소비 lifecycle에서는 Stop 후 새로운 queue 객체를
+    // 일반적인 생산/소비 lifecycle에서는 Close 후 새로운 queue 객체를
     // 생성하는 방식이 더 안전합니다.
     //
     // Reset()은 position이나 Cell을 초기화하지 않습니다.
@@ -403,7 +409,7 @@ public:
     //***************************************************************************
     void Reset() noexcept
     {
-        m_Stopped.store(
+        m_Closed.store(
             false,
             std::memory_order_release);
     }
@@ -433,7 +439,7 @@ public:
     // @brief 큐가 비어있는지 대략적으로 확인합니다.
     // @return true: 비어있음, false: 데이터 존재
     //***************************************************************************
-    bool EmptyApprox() const noexcept
+    bool IsEmptyApprox() const noexcept
     {
         return SizeApprox() == 0;
     }
@@ -442,7 +448,7 @@ public:
     // @brief 큐가 가득 찼는지 대략적으로 확인합니다.
     // @return true: 가득 참, false: 빈 공간 존재
     //***************************************************************************
-    bool FullApprox() const noexcept
+    bool IsFullApprox() const noexcept
     {
         return SizeApprox() >= Capacity;
     }
@@ -503,17 +509,18 @@ private:
     //***************************************************************************
     // @brief 블로킹 방식으로 데이터를 임플레이스 삽입합니다.
     // @param value 삽입할 값 (포워딩 참조)
+    // @return true: 삽입 성공, false: Close 상태로 인해 삽입되지 않음
     //***************************************************************************
     template <typename U>
-    void BlockingEmplacePush(U&& value)
+    bool BlockingEmplacePush(U&& value)
     {
         for( int i = 0; i < kSpinBeforeSleepCount; ++i )
         {
             if( EmplacePush(std::forward<U>(value)) )
-                return;
+                return true;
 
-            if( IsStopped() )
-                return;
+            if( IsClosed() )
+                return false;
 
             LFQ_CPU_PAUSE();
         }
@@ -530,7 +537,7 @@ private:
                 lock,
                 [this]()
                 {
-                    return IsStopped() || !FullApprox();
+                    return IsClosed() || !IsFullApprox();
                 });
 
             m_WaitingPushers.fetch_sub(
@@ -539,18 +546,18 @@ private:
 
             lock.unlock();
 
-            if( IsStopped() )
-                return;
+            if( IsClosed() )
+                return false;
 
             if( EmplacePush(std::forward<U>(value)) )
-                return;
+                return true;
         }
     }
 
     //***************************************************************************
     // @brief 논블로킹 방식으로 데이터를 임플레이스 삽입합니다.
     // @param value 삽입할 값 (포워딩 참조)
-    // @return true: 삽입 성공, false: 큐가 가득 참 또는 Stop 상태
+    // @return true: 삽입 성공, false: 큐가 가득 참 또는 Close 상태
     //
     // @details
     // 단일 producer 전용: CAS 없이 relaxed 원자적 load/store만 사용합니다.
@@ -563,8 +570,8 @@ private:
     template <typename U>
     bool EmplacePush(U&& value)
     {
-        // Stop 이후 새로운 데이터를 추가하지 않습니다.
-        if( m_Stopped.load(
+        // Close 이후 새로운 데이터를 추가하지 않습니다.
+        if( m_Closed.load(
             std::memory_order_acquire) )
         {
             return false;
@@ -660,10 +667,10 @@ private:
     // @brief queue 종료 상태
     //
     // @details
-    // Stop() 호출 이후 새로운 Push를 차단하고 blocking thread를 깨웁니다.
+    // Close() 호출 이후 새로운 Push를 차단하고 blocking thread를 깨웁니다.
     //***************************************************************************
     alignas(LFQ_CACHE_LINE_SIZE)
-        std::atomic<bool> m_Stopped{ false };
+        std::atomic<bool> m_Closed{ false };
 
     //***************************************************************************
     // @brief 큐가 비어있거나 가득 찼을 때 블로킹을 위한 뮤텍스

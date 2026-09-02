@@ -46,6 +46,18 @@
 //
 //      즉 CRioCore가 CRioBuffer보다 먼저 파괴되면 안 됩니다.
 //
+//      [주의 — 객체 파괴 순서만으로는 불충분함] 위 규칙은 "객체 소멸 순서"만
+//      말하지만, 실제 위험은 그보다 이릅니다. CRioCore::Shutdown()은 정상
+//      호출(소멸자 경유가 아니어도) 시 Phase 6에서 _rioTable 전체를
+//      ZeroMemory로 지웁니다 — 이 시점 이후 CRioCore 객체 자체는 아직
+//      살아있어도(소멸 전) _rioTable.RIODeregisterBuffer는 이미 null입니다.
+//      따라서 CRioCore::Shutdown()이 이 CRioBuffer::Shutdown()보다 먼저
+//      호출되면, CRioCore 객체 자체는 아직 파괴되지 않았더라도
+//      UnregisterBuffer()가 null 함수 포인터를 만나 등록 해제를 조용히
+//      건너뛰는 silent leak이 발생합니다(로컬 메모리는 정상 해제되지만
+//      OS/드라이버 쪽 RIO 등록은 남음). 호출부는 반드시 이 CRioBuffer의
+//      Shutdown()을, 소유 CRioCore의 Shutdown()보다 먼저 호출해야 합니다.
+//
 //***************************************************************************
 //
 // [Concurrency Contract]
@@ -91,7 +103,9 @@
 //      유지되는 동안 호출되어야 합니다.
 //
 //      또한 _rioTable은 CRioCore가 소유하므로 CRioBuffer보다 CRioCore가
-//      먼저 파괴되어서는 안 됩니다.
+//      먼저 파괴되어서는 안 됩니다. 위 [RIO Function Table Ownership]에서
+//      설명한 대로, 이 규칙은 "파괴 순서"뿐 아니라 "Shutdown() 호출 순서"에도
+//      동일하게 적용됩니다.
 //
 //***************************************************************************
 //
@@ -248,11 +262,11 @@ private:
     uint32 _slotSize{ 0 };   // 개별 슬롯 1개의 크기 (Bytes)
     size_t _totalSize{ 0 };    // 전체 메모리 할당 크기 (Bytes)
     size_t _alignment{ 0 };    // 메모리 바이트 정렬 단위 (예: 64 Bytes)
-    
+
     std::unique_ptr<std::atomic<uint8>[]> _slotState; // 각 슬롯의 현재 할당 상태(Free / Allocated)를 CAS로 추적하여 Double-Free를 검출하는 원자적 상태 배열
     std::unique_ptr<CLockFreeSlotStack> _freeStack;     // 사용 가능한 슬롯 인덱스(0 ~ _slotCount - 1)를 Pop/Push 방식으로 관리하는 Lock-Free 스택
     std::atomic<uint32> _allocatedCount{ 0 };         // 현재 외부에서 할당하여 사용 중인 슬롯의 총 개수 (원자적 카운터)
-    
+
     bool _initialized{ false };     // 버퍼 정상 초기화 완료 여부 플래그 (_lifecycleMutex 보호 하에 접근)
 };
 

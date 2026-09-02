@@ -559,14 +559,27 @@ private:
         //          (CRioObject::DecrementIoCount() 내부에서도 동일하게 assert하므로
         //          이중 assert가 되지만, 호출부에서도 명시적으로 검증한다는
         //          계약을 코드로 남겨두는 의미가 있습니다).
+        //
+        //          [수정] 이 감소가 카운트를 정확히 0으로 만들었으면(레이스 없이
+        //          유일하게 판별 가능 — DecrementIoCount() 설명 참고)
+        //          object->OnIoCountReachedZero()를 호출합니다. 이 훅을 통해
+        //          CRioSession 같은 구현체가 "Closing 중이었는데 방금 그
+        //          completion이 마지막 outstanding이었던 경우"를 감지해
+        //          FinalizeClose()를 대신 진행할 수 있습니다(기본 구현은 no-op이라
+        //          이 훅을 안 쓰는 CRioObject 구현체에는 아무 영향 없음).
         //***************************************************************************
         ~ObjectIoCountGuard() noexcept
         {
             if( object != nullptr )
             {
-                const bool decremented = object->DecrementIoCount();
+                bool reachedZero = false;
+                const bool decremented = object->DecrementIoCount(&reachedZero);
                 assert(decremented && "ObjectIoCountGuard: DecrementIoCount() underflow - duplicate decrement suspected");
-                (void)decremented; // release 빌드(NDEBUG)에서 미사용 변수 경고 방지
+
+                if( decremented && reachedZero )
+                {
+                    object->OnIoCountReachedZero();
+                }
             }
         }
     };

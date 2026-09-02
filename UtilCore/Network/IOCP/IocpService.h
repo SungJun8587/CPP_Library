@@ -12,6 +12,9 @@
 #include <Network/IOCP/IocpListener.h>
 #include <Network/IOCP/IocpSessionManager.h>
 #include <Thread/ThreadManager.h>
+#include <Containers/Queue/DelayedTaskQueue.h>
+
+#include <thread>
 
 //***************************************************************************
 // @class CIocpServerService
@@ -64,10 +67,31 @@ public:
 	CIocpSessionManager& GetSessionManager() { return _sessionManager; }
 
 private:
+	//***************************************************************************
+	// @brief _sessionManager에 다음 reap tick을 예약합니다(self-rescheduling).
+	// @details CRioServerService::ScheduleSessionReap()과 동일한 설계 —
+	//          Running 중 자연 종료된(원격 종료/에러 등) 세션의 _sessionManager
+	//          엔트리를 예전에는 Close() 시점에만 정리했는데, 서버가 오래
+	//          떠 있을수록 map이 무한정 커질 수 있었다. CDelayedTaskQueue::
+	//          Reserve()가 일회성이라 이 함수가 실행될 때마다 자기 자신을 다시
+	//          예약하는 self-rescheduling 패턴을 쓴다. Close()가
+	//          _sessionReapQueue.Stop()을 호출하면 그 이후의 재예약 시도는
+	//          Reserve()가 false를 반환하며 조용히 무시되어 재귀가 자연스럽게
+	//          끊긴다. CIocpClientService는 CIocpSessionManager를 아예 소유하지
+	//          않으므로(ConnectOneMoreSession()이 CNetService::_sessions만 씀)
+	//          이 reap이 필요 없다 — 서버 전용.
+	//***************************************************************************
+	void ScheduleSessionReap();
+
+	static constexpr std::chrono::seconds kSessionReapInterval{ 30 }; // 임의로 잡은 기본값 — 세션 처리량/서버 규모에 맞춰 조정 가능
+	CDelayedTaskQueue	_sessionReapQueue;						// reap tick 예약 큐 (스스로 워커 스레드를 안 가짐)
+	std::thread			_sessionReapThread;						// _sessionReapQueue.ProcessExpiredTasks()를 실행하는 전용 스레드
+
+private:
 	CIocpCoreRef			_iocpCore = nullptr;    // 연동된 IOCP 코어 객체 참조
 	CIocpListenerRef		_listener = nullptr;    // 클라이언트 접속 수락 리스너
 	CIocpSessionManager		_sessionManager;        // 서버 서비스가 직접 소유하는 세션 매니저
-	uint32				_workerThreadCount = 0; // 구동할 IOCP 워커 스레드 개수 (0=자동)
+	uint32					_workerThreadCount = 0; // 구동할 IOCP 워커 스레드 개수 (0=자동)
 	CThreadManager			_threadManager;         // 워커 스레드 수명 주기 및 TLS 관리자
 };
 
@@ -153,7 +177,7 @@ public:
 
 private:
 	CIocpCoreRef			_iocpCore = nullptr;    // 연동된 IOCP 코어 객체 참조
-	uint32				_workerThreadCount = 0; // 구동할 IOCP 워커 스레드 개수 (0=자동)
+	uint32					_workerThreadCount = 0; // 구동할 IOCP 워커 스레드 개수 (0=자동)
 	CThreadManager			_threadManager;         // 워커 스레드 수명 주기 및 TLS 관리자
 };
 

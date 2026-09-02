@@ -13,6 +13,7 @@
 #include <string>
 #include <vector>
 #include <mutex>
+#include <atomic>
 #include <cstdint>
 #include <algorithm>
 
@@ -367,7 +368,8 @@ private:
 	TlsHandshakeCompleteHandler _onHandshakeDone;  // 핸드셰이크 완료/실패 통지 콜백
 
 	std::mutex _lock;                  // SSL/BIO 조작 보호 (콜백 호출 중에는 놓음 — 클래스 설명 참고)
-	bool _handshakeComplete = false;   // 핸드셰이크 완료 여부
+	std::atomic<bool> _handshakeComplete{ false }; // 핸드셰이크 완료 여부. IsHandshakeComplete()가
+	// 락 없이(다른 스레드에서) 읽을 수 있어 atomic — 쓰기는 여전히 _lock 보유 중(ProcessSslLocked)에만 일어남.
 };
 
 #endif // ndef UC_TLSFILTER_H

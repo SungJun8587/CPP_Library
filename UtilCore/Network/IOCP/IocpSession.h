@@ -161,6 +161,36 @@ private:
 	//***************************************************************************
 	void			FailConnect(Iocp::CloseReason reason);
 
+	//***************************************************************************
+	// @brief [수정 — outstanding recv/send 완료를 기다린 뒤에만 OnDisconnected() 통지]
+	// @details 예전에는 ProcessDisconnect()(DisconnectEx 자신의 completion)가
+	//          도착하는 즉시 OnDisconnected()를 통지했다. 그런데 그 시점에
+	//          이미 게시돼 있던 WSARecv/WSASend가 다른 워커 스레드에서 "취소되지
+	//          않고 실제 데이터와 함께" 완료될 수 있는 좁은 레이스가 있어서,
+	//          "연결 끊김" 통지가 이미 나간 뒤에 OnRecv()가 뒤늦게 호출되는
+	//          순서 역전이 가능했다(크래시는 아님 — CIocpEvent의 owner shared_ptr이
+	//          객체 lifetime은 보장하므로 — 하지만 상위 프로토콜 레이어 입장에서는
+	//          이미 죽었다고 통지받은 세션에서 데이터가 더 오는 논리적 모순).
+	//
+	//          이제 _pendingIoCount(outstanding recv+send 수)가 0이고
+	//          _disconnectCompleted도 true일 때만(둘 다 만족해야 함 — 어느 쪽이
+	//          나중에 만족되든 그쪽이 실제로 통지를 트리거함) OnDisconnected()를
+	//          호출한다. _disconnectNotified로 이중 통지를 막는다.
+	//
+	//          [알려진 잔여 레이스 — 의도적으로 미해결] RegisterRecv()/RegisterSend()의
+	//          "IsConnected() 체크 후 post" 사이의 극히 좁은 틈에 Disconnect()가
+	//          끼어들면, 그 체크 통과 이후 실제 post(및 _pendingIoCount 증가)가
+	//          ProcessDisconnect()의 "카운트 0 확인"보다 늦게 반영될 이론적
+	//          가능성이 남아있다(개별 원자 변수들은 전부 seq_cst이지만, 서로
+	//          다른 두 원자 변수에 걸친 이 특정 인과관계까지 강제하려면
+	//          RegisterRecv/RegisterSend의 hot path에 락을 추가해야 해서 비용
+	//          대비 실익이 낮다고 판단해 보류함). 이 경우도 그 post는 곧
+	//          DisconnectEx에 의해 취소되어 aborted(0바이트)로 안전하게 완료되는
+	//          게 거의 항상이라(위 연구에서 확인한 IOCP의 표준 동작), 실질적
+	//          발생 확률은 극히 낮다.
+	//***************************************************************************
+	void			TryFinalizeDisconnect() noexcept;
+
 private:
 	uint64				_sessionId{ 0 };					// 고유 세션 ID
 	SOCKET					_socket = INVALID_SOCKET;			// 통신에 사용되는 WinSock 소켓 핸들
@@ -168,6 +198,16 @@ private:
 
 	std::atomic<bool>				_connected = false;							// 원자적(Atomic) 연산을 보장하는 세션 연결/해제 상태 플래그
 	std::atomic<Iocp::CloseReason>	_closeReason{ Iocp::CloseReason::None };	// 세션 종료 사유 변수
+
+	// [수정] TryFinalizeDisconnect() 관련 — OnDisconnected() 통지를 outstanding
+	// recv/send 완료까지 지연시키기 위한 상태. 셋 다 seq_cst로만 접근한다
+	// (TryFinalizeDisconnect()의 주석 참고 — 서로 다른 두 원자 변수에 걸친
+	// "어느 쪽이 나중에 0/true가 되든 그쪽이 통지를 트리거한다"는 인과관계를
+	// 보장하려면 개별 acquire/release 페어링보다 전역 순차 일관성이 더
+	// 단순하고 안전함).
+	std::atomic<int32> _pendingIoCount{ 0 };        // 현재 outstanding 상태인 WSARecv+WSASend 완료 대기 수
+	std::atomic<bool> _disconnectCompleted{ false }; // DisconnectEx 자신의 completion이 이미 처리됐는지
+	std::atomic<bool> _disconnectNotified{ false };  // OnDisconnected() 중복 통지 방지 1회성 CAS 가드
 
 	std::mutex				_lock;                          // 송신 큐(_sendQueue) 스레드 동기화를 위한 뮤텍스
 	CRingBuffer				_recvBuffer;                    // 제로카피 비동기 수신(WSARecv)을 관리하는 수신 링버퍼

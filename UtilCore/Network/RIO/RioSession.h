@@ -101,6 +101,20 @@ public:
 	// CRioObject 인터페이스 구현
 	virtual void Dispatch(CRioEvent* rioEvent, ULONG bytesTransferred, LONG status) override;
 
+private:
+	//***************************************************************************
+	// @brief CRioObject::OnIoCountReachedZero() 오버라이드. 이 세션의 outstanding
+	//        I/O 카운트가 0이 될 때마다(정상 동작 중이든 종료 중이든) 호출됩니다.
+	// @details Closing 상태일 때만 의미가 있습니다 — 그 경우 FinalizeClose()를
+	//          대신 호출합니다. Active 상태에서 우연히 카운트가 0을 지나가는
+	//          경우(예: 마지막 receive completion 처리 후 다음 PostReceiveInternal()
+	//          이 아직 다시 카운트를 올리기 전인 찰나)는 아무 의미가 없으므로
+	//          무시합니다. Close()의 "outstanding이 있으면 여기서 마무리해줄
+	//          것을 기대하고 아무것도 안 함" 경로와 정확히 짝을 이룹니다 —
+	//          자세한 설계 배경은 Close()의 주석 참고.
+	//***************************************************************************
+	virtual void OnIoCountReachedZero() noexcept override;
+
 public:
 	// CSession 공통 인터페이스 오버라이드
 	virtual void	Disconnect(const TCHAR* cause) override;

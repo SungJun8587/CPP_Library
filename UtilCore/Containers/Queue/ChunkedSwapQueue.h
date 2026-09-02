@@ -47,18 +47,16 @@
 //  - Start()로 정지 상태를 해제하고 재사용할 수 있다.
 //
 // 예외 안전성 전제:
-//  - PushBatch()는 루프 도중 실패 시 _size/items 상태를 롤백하지 않는다. 이는
-//    내부 컨테이너(CQueue<T> = std::queue<T, CDeque<T>>)의 원소 삽입이 예외를
-//    던지지 않는다는 전제 위에서 의도적으로 생략한 것이다. 이 전제는 다음 두 조건이
-//    모두 성립할 때만 유효하다:
-//      1) StlAllocator<T>::allocate()가 PoolAllocator::Alloc/AllocAligned를 거쳐
-//         gpMemory(CMemory)로 위임되는 USE_GPMEMORY 빌드일 것 (이 경로는 할당
-//         실패 시 ASSERT_CRASH로 종료하며 예외를 던지지 않음을 확인함).
-//      2) T의 이동 생성자가 noexcept일 것 (아래 static_assert로 강제).
-//    USE_GPMEMORY가 정의되지 않은 폴백 빌드(StlAllocator가 ::operator new로
-//    직접 위임하는 경우)에서는 allocate()가 std::bad_alloc을 던질 수 있으므로
-//    이 전제가 깨진다. 그런 빌드에서 이 큐를 사용할 계획이라면 PushBatch()의
-//    예외 안전성을 재검토해야 한다.
+//  - T는 nothrow move constructible이어야 합니다.
+//  - PushBatch()/Swap()/SwapChunk()는 내부 또는 출력 큐의 원소 삽입 과정에서
+//    예외가 발생하지 않는다는 전제를 사용합니다.
+//  - USE_GPMEMORY 빌드에서는 StlAllocator가 gpMemory(CMemory)로 위임되며,
+//    할당 실패 시 ASSERT_CRASH로 종료하여 std::bad_alloc을 발생시키지 않습니다.
+//  - USE_GPMEMORY가 정의되지 않은 폴백 빌드에서는 ::operator new 기반 할당이
+//    std::bad_alloc을 던질 수 있으므로 PushBatch()/Swap()/SwapChunk()의
+//    부분 이동 후 상태 롤백은 보장하지 않습니다.
+//  - 따라서 이 클래스에서 예외가 발생할 수 있는 allocator 환경을 사용하려면
+//    별도의 예외 안전성 설계가 필요합니다.
 //***************************************************************************
 template<typename T>
 class CChunkedSwapQueue
@@ -91,7 +89,7 @@ public:
     }
 
     //***************************************************************************
-    // @brief 락 안에서 푸시와 크기 증가를 원자적으로 처리하여 갱신된 전체 크기를 반환합니다.
+    // @brief 락 안에서 푸시와 크기 증가를 처리하고, 해당 삽입 직후의 큐 크기를 반환합니다.
     // @param item 삽입할 데이터 항목
     // @return 푸시 후의 전체 큐 크기(성공 시 항상 1 이상). 정지 상태라 드롭된 경우 -1을 반환한다.
     //***************************************************************************
@@ -114,6 +112,20 @@ public:
     //***************************************************************************
     bool PushBatch(CVector<T>& items)
     {
+        // 클래스 상단 "예외 안전성 전제" 참고: 이 함수의 무롤백(no-rollback) 루프는
+        // StlAllocator 할당 실패가 예외를 던지지 않는다는 전제(USE_GPMEMORY 빌드)에서만
+        // 안전하다. 이 전제를 런타임에 검증할 수 없으므로, USE_GPMEMORY가 정의되지 않은
+        // 빌드에서 PushBatch()가 실제로 인스턴스화되는 즉시 컴파일 에러로 막는다.
+        // (sizeof(T) == 0은 항상 false이지만, 템플릿 인자 T에 의존하는 식이라야
+        //  이 static_assert가 클래스 인스턴스화 시점이 아닌 PushBatch() 인스턴스화
+        //  시점까지 평가가 지연된다 — PushBatch()를 호출하지 않는 한 걸리지 않는다.)
+#ifndef USE_GPMEMORY
+        static_assert(sizeof(T) == 0,
+            "CChunkedSwapQueue<T>::PushBatch() assumes StlAllocator allocation failures "
+            "never throw, which is only guaranteed under a USE_GPMEMORY build. Define "
+            "USE_GPMEMORY, or review PushBatch()'s exception-safety before using it in "
+            "this build.");
+#endif
         if( items.empty() )
             return true;
 
@@ -161,10 +173,11 @@ public:
     }
 
     //***************************************************************************
-    // @brief 입력 큐에서 지정한 최대 개수(maxCount)만큼만 떼어와 출력 큐로 이동합니다. (청킹 스왑)
-    // @note 멀티 스레드 환경에서 하나의 스레드가 백로그 전체를 독점하는 현상을 방지합니다.
+    // @brief 입력 큐에서 지정한 최대 개수(maxCount)만큼 데이터를 청크 단위로 가져와 출력 큐로 이동합니다.
     // @param outQueue 데이터를 전달받을 대상 큐 (호출자 소유, 클래스 상단 계약 참고)
     // @param maxCount 한 번에 가져올 최대 아이템 개수
+    // @note maxCount가 클수록 한 번의 호출에서 더 많은 작업을 처리할 수 있지만,
+    //       내부 락 점유 시간이 증가할 수 있습니다.
     //***************************************************************************
     void SwapChunk(CQueue<T>& outQueue, size_t maxCount)
     {

@@ -331,30 +331,42 @@ private:
 
 	//***************************************************************************
 	// @brief 어떤 풀이든 활성 세션 수가 바뀔 때마다 호출됩니다(InstallCountChangedHook() 참고).
-	// @param rawPool 세션 수가 바뀐 풀 (식별용 — _closingPools에서 찾을 때만 사용)
+	// @param rawPool 세션 수가 바뀐 풀 (식별 + 이전 카운트 조회용)
 	// @param newCount 그 풀의 새 활성 세션 수
 	// @details (1) 정리 중이던 풀이 방금 0이 됐으면 이제서야 _closingPools에서
-	//          내보내 진짜로 파괴될 수 있게 하고, (2) 활성+정리 중 풀 전체를
-	//          다시 합산해 캐시를 갱신한 뒤, (3) condition_variable을 깨우고
-	//          필요하면 SetAllSessionsClosedHandler()의 콜백을 부른다.
+	//          내보내 진짜로 파괴될 수 있게 하고, (2) 이 풀의 "이전에 캐싱해둔
+	//          카운트"와 newCount의 차이(델타)만 전체 합계에 반영한 뒤, (3)
+	//          condition_variable을 깨우고 필요하면 SetAllSessionsClosedHandler()의
+	//          콜백을 부른다.
+	//
+	//          [전체 재합산 대신 델타 반영] 예전에는 이벤트가 올 때마다
+	//          _pools+_closingPools를 통째로 순회하며 GetActiveSessionCount()를
+	//          다시 합산했다(O(호스트 수), 그것도 _lock을 쥔 채로) — 호스트가
+	//          많고 연결 교체가 잦으면 이 재계산이 병목이 되고, 그 동안
+	//          GetOrCreatePool()/CloseAll()도 같은 _lock을 기다리게 됐다. 지금은
+	//          풀마다 마지막으로 반영한 카운트를 _lastKnownCounts에 캐싱해두고,
+	//          이번 통지와의 차이만 _cachedTotalActiveCount에 더해 O(1)로 갱신한다.
 	//***************************************************************************
 	void OnPoolSessionCountChanged(IHttpConnPool* rawPool, size_t newCount)
 	{
-		size_t total = 0;
+		int64 delta = 0;
 		{
 			std::lock_guard<std::mutex> guard(_lock);
 
+			auto it = _lastKnownCounts.find(rawPool);
+			size_t previousCount = (it != _lastKnownCounts.end()) ? it->second : 0;
+			delta = static_cast<int64>(newCount) - static_cast<int64>(previousCount);
+			_lastKnownCounts[rawPool] = newCount;
+
 			if( newCount == 0 )
 			{
-				auto it = _closingPools.find(rawPool);
-				if( it != _closingPools.end() )
-					_closingPools.erase(it); // 여기서 마지막 강한 참조가 풀려 풀 객체가 파괴될 수 있음
+				auto closingIt = _closingPools.find(rawPool);
+				if( closingIt != _closingPools.end() )
+					_closingPools.erase(closingIt); // 여기서 마지막 강한 참조가 풀려 풀 객체가 파괴될 수 있음
+				// 풀 객체 자체가 사라지므로, 다음 신규 풀이 같은 주소를 재사용할 때
+				// 옛 카운트가 잘못 델타 계산에 섞이지 않도록 캐시도 함께 지운다.
+				_lastKnownCounts.erase(rawPool);
 			}
-
-			for( auto& [key, pool] : _pools )
-				if( pool ) total += pool->GetActiveSessionCount();
-			for( auto& [key, pool] : _closingPools )
-				if( pool ) total += pool->GetActiveSessionCount();
 		}
 
 		bool justReachedZero = false;
@@ -362,8 +374,8 @@ private:
 		{
 			std::lock_guard<std::mutex> countGuard(_countLock);
 			bool wasNonZero = (_cachedTotalActiveCount != 0);
-			_cachedTotalActiveCount = total;
-			if( wasNonZero && total == 0 )
+			_cachedTotalActiveCount = static_cast<size_t>(static_cast<int64>(_cachedTotalActiveCount) + delta);
+			if( wasNonZero && _cachedTotalActiveCount == 0 )
 			{
 				justReachedZero = true;
 				handlerCopy = _allSessionsClosedHandler;
@@ -379,9 +391,10 @@ private:
 	HttpConnPoolCreator _creator;   // host 하나에 대한 풀을 만드는 콜백
 	HttpDnsResolveFn _resolver;     // hostname -> CNetAddress DNS resolve 콜백
 
-	mutable std::mutex _lock;                                          // _pools/_closingPools 보호
+	mutable std::mutex _lock;                                          // _pools/_closingPools/_lastKnownCounts 보호
 	std::unordered_map<std::string, IHttpConnPoolRef> _pools;          // "hostname:port" -> 요청을 받을 수 있는 활성 풀
 	std::unordered_map<IHttpConnPool*, IHttpConnPoolRef> _closingPools; // 닫혔지만 세션이 아직 안 빠진 풀 (0 될 때까지 강한 참조로 유지)
+	std::unordered_map<IHttpConnPool*, size_t> _lastKnownCounts;        // 풀별로 마지막 반영한 세션 수 (OnPoolSessionCountChanged()의 델타 계산용)
 
 	mutable std::mutex _countLock;                  // 아래 캐시/콜백/condition_variable 보호
 	std::condition_variable _countChangedCv;        // WaitUntilAllSessionsClosed()가 대기하는 조건 변수

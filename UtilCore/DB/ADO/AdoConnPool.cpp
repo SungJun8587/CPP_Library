@@ -338,7 +338,7 @@ void CAdoConnPool::ScheduleRetry(int32 nType)
 		nType, nFailCount, static_cast<long long>(nDelayMs));
 
 	// 지연 작업 큐에 재시도 작업 등록
-	_delayedTaskQueue.Reserve(static_cast<int>(nDelayMs), [this, nType]() {
+	_delayedTaskQueue.Reserve(std::chrono::milliseconds(nDelayMs), [this, nType]() {
 		CAdoDB* pCur = _pAdoConns[nType].value.load(std::memory_order_acquire);
 		if( _pRefCount[nType].value.load(std::memory_order_acquire) == 0 &&
 			(pCur == nullptr || !pCur->GetDBCon()) )

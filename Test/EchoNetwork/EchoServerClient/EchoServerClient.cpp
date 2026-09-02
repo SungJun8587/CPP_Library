@@ -176,7 +176,7 @@ int IocpRioTest()
 	CRioCoreRef rioCore = nullptr;
 
 	std::cout << "========================================\n";
-	std::cout << " Network Engine: " << (kTestEngineType == ENetworkEngineType::RIO ? "RIO (Registered I/O)" : "IOCP") << "\n";
+	std::cout << " Network Engine: " << (kTestEngineType == ENetworkEngineType::RIO ? "RIO (Registered I/O)" : "IOCP (I/O Completion Port)") << "\n";
 	std::cout << "========================================\n";
 
 	// 서버 워커 스레드 개수 설정 (0 입력 시 하드웨어 코어 수 기반 자동 산정)
@@ -196,16 +196,16 @@ int IocpRioTest()
 
 		// 서버 서비스 생성 (인자 순서: 엔진타입, 주소, 팩토리, 최대세션수, 워커스레드수, 코어참조)
 		serverService = CNetworkFactory::CreateServerService(
-			ENetworkEngineType::IOCP, serverAddress,
+			iocpCore, serverAddress,
 			[]() { return std::make_shared<CIocpEchoServerSession>(); },
-			10, serverThreadWorkerCount, &iocpCore
+			10, serverThreadWorkerCount
 		);
 
 		// 클라이언트 서비스 생성
 		clientService = CNetworkFactory::CreateClientService(
-			ENetworkEngineType::IOCP, serverAddress,
+			iocpCore, serverAddress,
 			[]() { return std::make_shared<CIocpEchoClientSession>(); },
-			1, clientThreadWorkerCount, &iocpCore
+			1, clientThreadWorkerCount
 		);
 	}
 	else if( kTestEngineType == ENetworkEngineType::RIO )
@@ -214,16 +214,16 @@ int IocpRioTest()
 
 		// 서버 서비스 생성 (RIO)
 		serverService = CNetworkFactory::CreateServerService(
-			ENetworkEngineType::RIO, serverAddress,
+			rioCore, serverAddress,
 			[]() { return std::make_shared<CRioEchoServerSession>(); },
-			10, serverThreadWorkerCount, &rioCore
+			10, serverThreadWorkerCount
 		);
 
 		// 클라이언트 서비스 생성 (RIO)
 		clientService = CNetworkFactory::CreateClientService(
-			ENetworkEngineType::RIO, serverAddress,
+			rioCore, serverAddress,
 			[]() { return std::make_shared<CRioEchoClientSession>(); },
-			1, clientThreadWorkerCount, &rioCore
+			1, clientThreadWorkerCount
 		);
 	}
 

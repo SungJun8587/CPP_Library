@@ -12,6 +12,7 @@
 
 #include <deque>
 #include <vector>
+#include <unordered_set>
 #include <mutex>
 #include <string>
 #include <memory>
@@ -255,6 +256,19 @@ public:
 	//          connected==false면 ScheduleReconnect()로 기준선(_minIdle) 유지를
 	//          시도하고, true면 백오프 카운터를 리셋한 뒤 DispatchOrIdle()로 넘긴다.
 	//
+	//          [_notifiedSessionCount와 연결 실패 세션 — 중요]
+	//          CIocpSession/CRioSession의 FailConnect()(연결 시도 자체가 실패하는
+	//          경로)는 OnConnected()를 절대 호출하지 않고 OnDisconnected()만
+	//          호출한다 — 즉 이 세션에 대해 connected==true 통지는 한 번도 안 오고
+	//          connected==false만 온다. "OnConnected/OnDisconnected가 세션당
+	//          1:1"이라는 가정은 실제로는 성립하지 않는다. 그래서 단순히
+	//          fetch_add/fetch_sub만 하면, 연결 실패가 쌓일 때마다 카운터가
+	//          매칭되는 increment 없이 감소해 영구적으로 실제보다 낮게 드리프트한다.
+	//          이를 막기 위해 _connectedSessions(세션 포인터 집합, _lock으로 보호)에
+	//          "실제로 connected==true를 받은 세션"만 기록해두고, connected==false가
+	//          왔을 때 그 집합에 있던 세션에 대해서만 감소시킨다 — 한 번도
+	//          연결되지 않았던 세션의 실패 통지는 카운터에 아예 반영하지 않는다.
+	//
 	//          [_sessionCountChangedHandler에 _notifiedSessionCount를 쓰는 이유]
 	//          처음에는 여기서 GetActiveSessionCount()(=_clientService->
 	//          GetCurrentSessionCount(), 즉 하위 CNetService::_sessions.size()를
@@ -266,10 +280,7 @@ public:
 	//          있었다. CNetService::_sessions를 우리가 직접 건드릴 수 없으니,
 	//          _sessions.size()에 의존하는 대신 "연결 성공/해제 통지를 우리가
 	//          직접 받은 횟수"만으로 순수하게 세는 별도 카운터
-	//          (_notifiedSessionCount)를 둬서 이 레이스 자체를 회피한다 —
-	//          OnConnected()/OnDisconnected() 쌍은 이 프로젝트 전반에서 세션당
-	//          정확히 1:1로 호출되는 게 기존 불변식이므로, 이 카운터는 하위
-	//          컨테이너의 정리 타이밍과 무관하게 항상 정확하다.
+	//          (_notifiedSessionCount)를 둬서 이 레이스 자체를 회피한다.
 	//***************************************************************************
 	void OnSessionConnStateChanged(CSessionRef sessionBase, bool connected)
 	{
@@ -278,11 +289,27 @@ public:
 		int64 notifiedCount;
 		if( !connected )
 		{
-			notifiedCount = _notifiedSessionCount.fetch_sub(1, std::memory_order_acq_rel) - 1;
+			bool wasConnected = false;
+			{
+				std::lock_guard<std::mutex> guard(_lock);
+				wasConnected = (_connectedSessions.erase(sessionBase.get()) != 0);
+			}
+
+			// 한 번도 연결된 적 없던 세션(FailConnect() 경로)의 실패 통지는
+			// 카운터에 반영하지 않는다 — 매칭되는 increment가 없었으므로.
+			notifiedCount = wasConnected
+				? (_notifiedSessionCount.fetch_sub(1, std::memory_order_acq_rel) - 1)
+				: _notifiedSessionCount.load(std::memory_order_acquire);
+
 			ScheduleReconnect();
 		}
 		else
 		{
+			{
+				std::lock_guard<std::mutex> guard(_lock);
+				_connectedSessions.insert(sessionBase.get());
+			}
+
 			notifiedCount = _notifiedSessionCount.fetch_add(1, std::memory_order_acq_rel) + 1;
 			_consecutiveFailCount.store(0, std::memory_order_relaxed); // 연결 성공 -> 백오프 리셋
 			DispatchOrIdle(session);
@@ -463,6 +490,16 @@ private:
 	//          ConnectAsync() 게시 이전에 먼저 호출됨 — IocpService/RioService의
 	//          ConnectOneMoreSession() 설계 참고)인 세션도 포함하므로, 짧은
 	//          시간에 여러 번 불려도 자연스럽게 과다 재연결을 막아준다.
+	//
+	//          [실행 시점 재검증] 이 함수의 _minIdle 체크는 "예약하는 시점"의
+	//          스냅샷일 뿐이다 — 세션 여러 개가 짧은 시간에 한꺼번에 끊기면
+	//          ScheduleReconnect()가 그만큼 여러 번 예약되고, 그 사이 다른
+	//          재연결이 먼저 성공해 기준선이 이미 회복돼도 예약된 작업들은
+	//          그대로 실행돼버려 _minIdle은 물론(예약 시 캡을 아예 확인하지
+	//          않는) _maxConnections까지 넘어설 수 있었다. 그래서 지연 실행되는
+	//          콜백 안에서도 실행 "그 순간"의 카운트로 _minIdle/_maxConnections
+	//          둘 다 다시 확인한다 — 어느 한쪽이라도 이미 채워져 있으면 실행을
+	//          건너뛴다.
 	//***************************************************************************
 	void ScheduleReconnect()
 	{
@@ -475,10 +512,14 @@ private:
 		uint32 failCount = _consecutiveFailCount.fetch_add(1, std::memory_order_relaxed);
 		int32 delayMs = ComputeBackoffDelay(failCount);
 
-		_delayedTaskQueue.Reserve(delayMs, [this]()
+		_delayedTaskQueue.Reserve(std::chrono::milliseconds(delayMs), [this]()
 			{
-				if( _clientService )
-					_clientService->ConnectOneMoreSession();
+				if( !_clientService )
+					return;
+				int32 currentCount = _clientService->GetCurrentSessionCount();
+				if( currentCount >= _minIdle || currentCount >= _maxConnections )
+					return;
+				_clientService->ConnectOneMoreSession();
 			});
 	}
 
@@ -509,9 +550,10 @@ private:
 	int32 _minIdle;             // host당 항상 유지할 기준 커넥션 수 (ScheduleReconnect()가 지킴)
 	int32 _maxConnections;      // host당 허용할 최대 커넥션 수 (TryGrow()의 상한)
 
-	std::mutex _lock;                            // _idleSessions/_pendingRequests 보호
+	std::mutex _lock;                            // _idleSessions/_pendingRequests/_connectedSessions 보호
 	std::vector<TSessionRef> _idleSessions;      // 요청을 받을 수 있는 유휴 세션 목록
 	std::deque<PendingRequest> _pendingRequests; // 유휴 세션이 없을 때 대기 중인 요청 큐
+	std::unordered_set<CSession*> _connectedSessions; // 실제로 connected==true 통지를 받은 세션 집합 (_notifiedSessionCount 드리프트 방지용, OnSessionConnStateChanged 참고)
 
 	std::atomic<uint32> _consecutiveFailCount{ 0 }; // 지수 백오프용 연속 연결 실패 횟수
 	CDelayedTaskQueue _delayedTaskQueue;              // 재연결 작업 예약 큐

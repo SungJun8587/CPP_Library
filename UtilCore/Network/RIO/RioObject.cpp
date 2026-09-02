@@ -71,18 +71,23 @@ bool CRioObject::IncrementIoCount() noexcept
 
 //***************************************************************************
 // @brief Outstanding I/O reference를 하나 감소시킵니다.
+// @param outReachedZero [out, 선택] 이 감소로 카운트가 정확히 0이 됐는지.
+//        CAS 성공 시점의 current-1 값을 그대로 쓰므로 별도 재조회 없이
+//        정확하다 — 원자적 CAS는 선형화 가능하므로 1->0 전이는 오직 한
+//        스레드만 관측하며, 그 스레드가 바로 이 함수를 호출한 스레드다.
 // @return bool 정상적으로 1 감소했으면 true, 이미 0인 상태에서 감소를
 //         시도한 underflow(중복 감소 등 카운트 관리 결함 의심)면 false.
 // @note
 //      CRioCore::ProcessRioResult()의 ObjectIoCountGuard는
 //      Dispatch()가 정상적으로 반환된 이후 이 함수를 호출하고, 반환값을
-//      검증해 결함을 조용히 묻지 않고 assert로 표면화합니다.
+//      검증해 결함을 조용히 묻지 않고 assert로 표면화합니다. outReachedZero가
+//      true로 나오면 OnIoCountReachedZero() 훅을 호출합니다.
 // @details
 //      CAS 루프 성공 시 std::memory_order_release 오더링을 적용합니다.
 //      이로써 Dispatch() 로직 및 I/O 처리 과정에서 발생한 모든 메모리 변경 사항이
 //      이 카운터를 관찰하는 다른 스레드(acquire 로드)에 가시성(Visibility)을 가집니다.
 //***************************************************************************
-bool CRioObject::DecrementIoCount() noexcept
+bool CRioObject::DecrementIoCount(bool* outReachedZero) noexcept
 {
     // 루프 진입 전 최초 1회 읽는 값이므로 acquire가 필요 없다.
     // CAS가 실패할 경우 재시도용 값은 compare_exchange_weak의
@@ -104,6 +109,9 @@ bool CRioObject::DecrementIoCount() noexcept
             std::memory_order_release,
             std::memory_order_relaxed) )
         {
+            if( outReachedZero != nullptr )
+                *outReachedZero = (current - 1 == 0);
+
             return true;
         }
     }

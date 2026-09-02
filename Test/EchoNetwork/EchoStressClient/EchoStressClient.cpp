@@ -32,7 +32,7 @@ int main()
     CVector<CNetServiceRef> clientServices;
 
     std::cout << "========================================\n";
-    std::cout << " Network Engine: " << (kTestEngineType == ENetworkEngineType::RIO ? "RIO (Registered I/O)" : "IOCP") << "\n";
+    std::cout << " Network Engine: " << (kTestEngineType == ENetworkEngineType::RIO ? "RIO (Registered I/O)" : "IOCP (I/O Completion Port)") << "\n";
     std::cout << "========================================\n";
 
     // 2. 네트워크 엔진 코어 객체 생성
@@ -61,18 +61,18 @@ int main()
         {
             // 3-1. IOCP 클라이언트 서비스 생성 (인자 순서: 엔진타입, 주소, 팩토리, 최대세션수, 워커스레드수, 코어참조)
             clientService = CNetworkFactory::CreateClientService(
-                ENetworkEngineType::IOCP, serverAddress,
+                iocpCore, serverAddress,
                 []() { return std::make_shared<CIocpEchoClientSession>(); },
-                1, stressWorkerCount, &iocpCore
+                1, stressWorkerCount
             );
         }
         else if( kTestEngineType == ENetworkEngineType::RIO )
         {
             // 3-2. RIO 클라이언트 서비스 생성
             clientService = CNetworkFactory::CreateClientService(
-                ENetworkEngineType::RIO, serverAddress,
+                rioCore, serverAddress,
                 []() { return std::make_shared<CRioEchoClientSession>(); },
-                1, stressWorkerCount, &rioCore
+                1, stressWorkerCount
             );
         }
 

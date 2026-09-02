@@ -363,7 +363,7 @@ void CMySQLConnPool::ScheduleRetry(int32 nType)
 	LOG_DEBUG(_T("ScheduleRetry: slot(%d) failCount(%d), retrying in %lldms"),
 		nType, nFailCount, static_cast<long long>(nDelayMs));
 
-	_delayedTaskQueue.Reserve(static_cast<int>(nDelayMs), [this, nType]() {
+	_delayedTaskQueue.Reserve(std::chrono::milliseconds(nDelayMs), [this, nType]() {
 		CBaseMySQL* pCur = _pMySQLConns[nType].value.load(std::memory_order_acquire);
 		if( _pRefCount[nType].value.load(std::memory_order_acquire) == 0 &&
 			(pCur == nullptr || !pCur->IsConnected()) )

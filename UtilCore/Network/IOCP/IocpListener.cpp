@@ -164,9 +164,22 @@ void CIocpListener::RegisterAccept(AcceptEvent* acceptEvent)
         return;
 
     // 1. 세션 생성 팩터리 호출
+    // [수정] 팩토리가 nullptr을 반환하는 경우(예: 세션 풀 순간 고갈)도 이
+    // 함수가 공유하는 4가지 실패 경로 중 하나로 취급해야 한다. 기존에는
+    // retryCount 증가/ScheduleRetry() 없이 그냥 반환해, 이 AcceptEvent
+    // 슬롯이 재등록되지 않고 영구히 죽었다 — 여러 슬롯에서 누적되면 Accept
+    // Pool이 조용히 줄어들다 결국 신규 연결을 못 받는 상태로 갈 수 있었다.
     CIocpObjectRef session = _sessionFactory();
     if( session == nullptr )
+    {
+        if( ++acceptEvent->retryCount > kMaxAcceptRetry )
+        {
+            // TODO: 로그 - 세션 팩토리 반복 실패, Accept 재등록 포기
+            return;
+        }
+        ScheduleRetry(acceptEvent);
         return;
+    }
 
     // 2. CIocpObject::GetHandle()로 소켓 핸들 추출 (CSession 의존성 없음)
     SOCKET sessionSocket = static_cast<SOCKET>(reinterpret_cast<ULONG_PTR>(session->GetHandle()));
@@ -329,7 +342,12 @@ void CIocpListener::ProcessAccept(AcceptEvent* acceptEvent)
             // TODO: 로그 - SetUpdateAcceptContext 반복 실패, Accept 재등록 포기
             return;
         }
-        RegisterAccept(acceptEvent);
+        // [수정] RegisterAccept() 즉시 재귀 대신 ScheduleRetry()로 지연 오프로딩.
+        // 이 실패가 지속되면(리소스 고갈 등) 워커 스레드가 세션 생성까지 포함한
+        // 무거운 재시도를 백오프 없이 그 자리에서 kMaxAcceptRetry회 반복하며
+        // 다른 완료 이벤트 처리를 지연시킬 수 있다 — RegisterAccept() 자신의
+        // 실패 경로와 동일한 정책으로 통일한다.
+        ScheduleRetry(acceptEvent);
         return;
     }
 
@@ -350,7 +368,8 @@ void CIocpListener::ProcessAccept(AcceptEvent* acceptEvent)
             // TODO: 로그 - IOCP Register 반복 실패, Accept 재등록 포기
             return;
         }
-        RegisterAccept(acceptEvent);
+        // [수정] 위와 동일한 이유로 ScheduleRetry()로 통일.
+        ScheduleRetry(acceptEvent);
         return;
     }
 

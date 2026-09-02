@@ -178,7 +178,27 @@ bool CRioServerService::Start()
 		return false;
 	}
 
+	// 7. 세션 reap 스레드 시작 — Running 중 자연 종료된 세션의 _sessionManager
+	//    엔트리를 kSessionReapInterval마다 정리한다(예전에는 Close() 시점에만
+	//    정리돼 서버가 오래 떠 있을수록 map이 무한정 커질 수 있었음).
+	//    Listener/워커가 이미 정상 구동 중인 이 시점 이후에 시작해야, reap
+	//    스레드가 도는 동안 세션이 실제로 늘어나는 정상 상태와 겹쳐도 안전하다.
+	_sessionReapThread = std::thread([this]() { _sessionReapQueue.ProcessExpiredTasks(); });
+	ScheduleSessionReap();
+
 	return true;
+}
+
+//***************************************************************************
+// @brief _sessionManager에 다음 reap tick을 예약합니다(self-rescheduling).
+//***************************************************************************
+void CRioServerService::ScheduleSessionReap()
+{
+	_sessionReapQueue.Reserve(kSessionReapInterval, [this]()
+		{
+			_sessionManager.RemoveClosedSessions();
+			ScheduleSessionReap(); // 다음 tick 재예약. Close() 이후엔 Reserve()가 false를 반환하며 조용히 멈춤.
+		});
 }
 
 //***************************************************************************
@@ -197,6 +217,14 @@ bool CRioServerService::Start()
 //***************************************************************************
 void CRioServerService::Close()
 {
+	// 0. reap 스레드부터 정지 — 아래에서 _sessionManager를 직접 조작하는(
+	//    BeginCloseAllSessions/RemoveClosedSessions) 동안 reap 스레드가 동시에
+	//    같은 맵을 건드리지 않도록 가장 먼저 멈춘다. Stop()은 신호만 보내고
+	//    반환하므로 반드시 join까지 해야 한다(CDelayedTaskQueue의 Lifetime 계약).
+	_sessionReapQueue.Stop();
+	if( _sessionReapThread.joinable() )
+		_sessionReapThread.join();
+
 	if( _listener )
 	{
 		_listener->Stop();
@@ -285,8 +313,7 @@ CRioSessionRef CRioClientService::ConnectOneMoreSession()
 	// "연결 시도 중" 세션이 목록에 남는 leak은 없습니다.
 	AddSession(rioSession);
 
-	uint64 sessionId = _sessionManager.GenerateSessionId();
-	_sessionManager.AddSession(sessionId, rioSession);
+	uint64 sessionId = GenerateSessionId();
 
 	// ConnectAsync()의 반환값은 "게시 시도" 성공 여부일 뿐입니다 — false든 true든
 	// 최종 연결 결과는 세션의 OnConnected()/OnDisconnected(reason)으로 비동기
@@ -394,6 +421,7 @@ bool CRioClientService::Start()
 	return true;
 }
 
+
 //***************************************************************************
 // @brief 클라이언트 서비스 종료 처리
 // @note [수정] _connectDispatcher/_rioCore 정지 이후 _eventPool도 명시적으로
@@ -402,15 +430,16 @@ bool CRioClientService::Start()
 //***************************************************************************
 void CRioClientService::Close()
 {
+	// 0. reap 스레드부터 정지 (서버 쪽과 동일한 이유 — CRioServerService::Close() 참고)
 	// 1. 세션 정리를 게시하고, 실제로 세션이 0개가 될 때까지 블로킹 대기한다.
 	//    이 시점엔 아직 _rioCore/_connectDispatcher가 살아있어서 disconnect
 	//    완료 통지(및 진행 중이던 ConnectEx 완료 통지)를 계속 처리해줄 수
 	//    있다 — 그래서 여기서 먼저 기다려야 한다. 2번(디스패처/코어 정지)을
 	//    먼저 해버리면, 게시된 세션 정리들이 완료 통지를 처리해줄 워커가
 	//    없어져서 영원히 안 끝나는 문제가 생긴다(CIocpClientService::Close()와
-	//    동일한 이유 — RIO 클라이언트는 IOCP 클라이언트와 마찬가지로
-	//    CRioSessionManager 없이 CNetService::_sessions를 직접 쓰므로 같은
-	//    패턴이 그대로 적용됨).
+	//    동일한 이유 — RIO 클라이언트도 IOCP 클라이언트와 마찬가지로
+	//    세션 매니저 없이 CNetService::_sessions만 쓰므로 같은 패턴이 그대로
+	//    적용됨).
 	CNetService::Close(); // 세션이 실제로 0개 될 때까지 블로킹 대기(_connectDispatcher/_rioCore를 멈추기 전에 _sessions가 실제로 비워질 때까지 기다려야 함)
 
 	// 2. 세션 정리가 다 끝났으니, ConnectEx 게시/완료 통지 처리를 담당하던

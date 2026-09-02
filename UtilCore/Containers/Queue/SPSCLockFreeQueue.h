@@ -35,6 +35,14 @@
 //  - CAS 불필요 → 성능 최고
 //  - 구조 단순, 구현 간결
 //  - blocking 정책은 동일하게 제공
+//  - Close()를 통한 종료 지원
+//
+// 종료:
+//  - Close() 호출 후 새로운 Push는 실패합니다.
+//  - Close() 이전에 삽입된 데이터는 계속 Pop할 수 있습니다.
+//  - Close() 이후 큐가 비어 있으면 Pop은 false를 반환합니다.
+//  - Close()는 대기 중인 producer/consumer를 모두 깨웁니다.
+//  - Close()는 여러 번 호출해도 안전합니다(idempotent).
 //***************************************************************************
 template <typename T, std::size_t Capacity>
 class SPSCLockFreeQueue
@@ -110,6 +118,7 @@ public:
     {
         m_EnqueuePos.Value.store(0, std::memory_order_relaxed);
         m_DequeuePos.Value.store(0, std::memory_order_relaxed);
+        m_Closed.store(false, std::memory_order_relaxed);
     }
 
     //***************************************************************************
@@ -148,7 +157,7 @@ public:
     //***************************************************************************
     // @brief 큐에 데이터를 논블로킹 방식으로 삽입합니다. (Lvalue)
     // @param value 삽입할 값
-    // @return true: 삽입 성공, false: 큐가 가득 참
+    // @return true: 삽입 성공, false: 큐가 가득 참 또는 Close 상태
     //***************************************************************************
     bool TryPush(const T& value)
     {
@@ -158,7 +167,7 @@ public:
     //***************************************************************************
     // @brief 큐에 데이터를 논블로킹 방식으로 삽입합니다. (Rvalue)
     // @param value 삽입할 값
-    // @return true: 삽입 성공, false: 큐가 가득 참
+    // @return true: 삽입 성공, false: 큐가 가득 참 또는 Close 상태
     //***************************************************************************
     bool TryPush(T&& value)
     {
@@ -168,19 +177,21 @@ public:
     //***************************************************************************
     // @brief 큐에 데이터를 블로킹 방식으로 삽입합니다. (Lvalue)
     // @param value 삽입할 값
+    // @return true: 삽입 성공, false: Close 상태로 인해 삽입되지 않음
     //***************************************************************************
-    void Push(const T& value)
+    bool Push(const T& value)
     {
-        BlockingEmplacePush(value);
+        return BlockingEmplacePush(value);
     }
 
     //***************************************************************************
     // @brief 큐에 데이터를 블로킹 방식으로 삽입합니다. (Rvalue)
     // @param value 삽입할 값
+    // @return true: 삽입 성공, false: Close 상태로 인해 삽입되지 않음
     //***************************************************************************
-    void Push(T&& value)
+    bool Push(T&& value)
     {
-        BlockingEmplacePush(std::move(value));
+        return BlockingEmplacePush(std::move(value));
     }
 
     //***************************************************************************
@@ -239,14 +250,23 @@ public:
     //***************************************************************************
     // @brief 큐에서 데이터를 블로킹 방식으로 꺼냅니다.
     // @param outValue 꺼낸 데이터가 저장될 참조 변수
+    // @return true: 데이터 추출 성공, false: Close 상태이며 큐가 비어있어
+    //         더 이상 꺼낼 데이터가 없음
+    //
+    // @details
+    // Close() 호출 후 큐에 남아있는 데이터는 먼저 drain할 수 있도록
+    // 구현되어 있습니다. drain이 끝난 이후에는 false를 반환합니다.
     //***************************************************************************
-    void Pop(T& outValue)
+    bool Pop(T& outValue)
     {
         // 짧은 대기는 context switch보다 spin이 유리할 수 있습니다.
         for( int i = 0; i < kSpinBeforeSleepCount; ++i )
         {
             if( TryPop(outValue) )
-                return;
+                return true;
+
+            if( IsClosed() && !HasData() )
+                return false;
 
             LFQ_CPU_PAUSE();
         }
@@ -259,6 +279,9 @@ public:
             //
             // producer는 waiter가 존재할 경우 같은 mutex를 잡은 뒤 notify하기
             // 때문에 notify와 wait 사이의 lost wakeup을 방지할 수 있습니다.
+            //
+            // Close()도 동일한 mutex를 잡은 뒤 notify하므로 predicate 평가
+            // 직후, wait() 등록 직전 구간에서의 lost wakeup을 방지합니다.
             m_WaitingPoppers.fetch_add(
                 1,
                 std::memory_order_relaxed);
@@ -267,7 +290,7 @@ public:
                 lock,
                 [this]() noexcept
                 {
-                    return HasData();
+                    return IsClosed() || HasData();
                 });
 
             m_WaitingPoppers.fetch_sub(
@@ -277,15 +300,25 @@ public:
             lock.unlock();
 
             // SPSC이므로 predicate가 true가 된 이후 다른 consumer가 데이터를
-            // 가져갈 수 없습니다. 따라서 정상적으로 성공해야 합니다.
+            // 가져갈 수 없습니다. 따라서 데이터가 있었다면 정상적으로
+            // 성공해야 합니다.
             if( TryPop(outValue) )
-                return;
+                return true;
+
+            // Close 상태이고 큐가 완전히 drain되었다면 종료합니다.
+            if( IsClosed() && !HasData() )
+                return false;
         }
     }
 
     //***************************************************************************
     // @brief 대략적인 현재 큐 크기를 반환합니다.
     // @return std::size_t 대략적인 요소 개수
+    //
+    // @details
+    // 정상 동작 중에는 dequeuePos <= enqueuePos가 항상 성립하지만,
+    // 다른 lock-free 큐 구현체들과의 일관성 및 향후 변경에 대한 방어적
+    // 안전장치로 클램프를 유지합니다.
     //***************************************************************************
     std::size_t SizeApprox() const noexcept
     {
@@ -295,7 +328,9 @@ public:
         const std::size_t dequeuePos =
             m_DequeuePos.Value.load(std::memory_order_relaxed);
 
-        return enqueuePos - dequeuePos;
+        return (enqueuePos >= dequeuePos)
+            ? (enqueuePos - dequeuePos)
+            : 0;
     }
 
     //***************************************************************************
@@ -305,6 +340,50 @@ public:
     constexpr std::size_t GetCapacity() const noexcept
     {
         return Capacity;
+    }
+
+    //***************************************************************************
+    // @brief 큐를 종료 상태로 전환합니다.
+    //
+    // @details
+    // Close() 이후 새로운 Push는 실패합니다.
+    // 이미 큐에 저장된 데이터는 계속 Pop할 수 있으며,
+    // 모든 데이터가 소비된 이후 Pop()은 false를 반환합니다.
+    //
+    // 대기 중인 producer/consumer는 모두 깨워 종료 상태를 확인할 수 있습니다.
+    //
+    // Close()는 여러 번 호출해도 안전합니다.
+    //***************************************************************************
+    void Close() noexcept
+    {
+        const bool wasClosed =
+            m_Closed.exchange(true, std::memory_order_acq_rel);
+
+        if( wasClosed )
+            return;
+
+        // waiter가 predicate 평가 직후, 아직 wait()에 등록되기 전인
+        // 구간에서 notify가 유실되지 않도록 각 mutex를 잡은 뒤 통보합니다.
+        //
+        // Close는 lifecycle 이벤트이므로 빈번한 hot path가 아니며,
+        // mutex를 잡는 비용은 무시할 수 있습니다.
+        {
+            std::lock_guard<std::mutex> lock(m_NotEmptyMutex);
+            m_NotEmptyCv.notify_all();
+        }
+        {
+            std::lock_guard<std::mutex> lock(m_NotFullMutex);
+            m_NotFullCv.notify_all();
+        }
+    }
+
+    //***************************************************************************
+    // @brief 큐가 종료 상태인지 확인합니다.
+    // @return true: 종료됨, false: 동작 중
+    //***************************************************************************
+    bool IsClosed() const noexcept
+    {
+        return m_Closed.load(std::memory_order_acquire);
     }
 
 private:
@@ -381,15 +460,19 @@ private:
     //***************************************************************************
     // @brief 블로킹 방식으로 데이터를 임플레이스 삽입합니다.
     // @param value 삽입할 값 (포워딩 참조)
+    // @return true: 삽입 성공, false: Close 상태로 인해 삽입되지 않음
     //***************************************************************************
     template <typename U>
-    void BlockingEmplacePush(U&& value)
+    bool BlockingEmplacePush(U&& value)
     {
         // 짧은 대기는 context switch보다 spin이 유리할 수 있습니다.
         for( int i = 0; i < kSpinBeforeSleepCount; ++i )
         {
             if( EmplacePush(std::forward<U>(value)) )
-                return;
+                return true;
+
+            if( IsClosed() )
+                return false;
 
             LFQ_CPU_PAUSE();
         }
@@ -399,6 +482,9 @@ private:
             std::unique_lock<std::mutex> lock(m_NotFullMutex);
 
             // waiter 등록과 predicate 확인을 같은 mutex 영역에서 수행합니다.
+            //
+            // Close()도 동일한 mutex를 잡은 뒤 notify하므로 lost wakeup을
+            // 방지합니다.
             m_WaitingPushers.fetch_add(
                 1,
                 std::memory_order_relaxed);
@@ -407,7 +493,7 @@ private:
                 lock,
                 [this]() noexcept
                 {
-                    return HasFreeSlot();
+                    return IsClosed() || HasFreeSlot();
                 });
 
             m_WaitingPushers.fetch_sub(
@@ -416,21 +502,31 @@ private:
 
             lock.unlock();
 
+            if( IsClosed() )
+                return false;
+
             // SPSC이므로 predicate가 true가 된 이후 다른 producer가
             // 해당 slot을 선점할 수 없습니다.
             if( EmplacePush(std::forward<U>(value)) )
-                return;
+                return true;
         }
     }
 
     //***************************************************************************
     // @brief 논블로킹 방식으로 데이터를 임플레이스 삽입합니다.
     // @param value 삽입할 값 (포워딩 참조)
-    // @return true: 삽입 성공, false: 큐가 가득 참
+    // @return true: 삽입 성공, false: 큐가 가득 참 또는 Close 상태
     //***************************************************************************
     template <typename U>
     bool EmplacePush(U&& value)
     {
+        // Close 이후 새로운 데이터를 추가하지 않습니다.
+        //
+        // producer가 하나뿐이므로 이 검사와 실제 슬롯 예약 사이에
+        // 다른 producer가 끼어들 여지가 없어 별도의 재확인이 필요 없습니다.
+        if( m_Closed.load(std::memory_order_acquire) )
+            return false;
+
         // producer만 m_EnqueuePos를 수정하므로 relaxed load로 충분합니다.
         const std::size_t pos =
             m_EnqueuePos.Value.load(std::memory_order_relaxed);
@@ -528,6 +624,17 @@ private:
     //***************************************************************************
     alignas(LFQ_CACHE_LINE_SIZE) std::atomic<int> m_WaitingPoppers{ 0 };
     alignas(LFQ_CACHE_LINE_SIZE) std::atomic<int> m_WaitingPushers{ 0 };
+
+    //***************************************************************************
+    // 큐 종료 여부입니다.
+    //
+    // false -> 정상 동작
+    // true  -> 새로운 Push 금지, 기존 데이터 drain 허용
+    //
+    // producer/consumer 모두가 읽으므로 별도의 cache line에 배치하여
+    // false sharing을 줄입니다.
+    //***************************************************************************
+    alignas(LFQ_CACHE_LINE_SIZE) std::atomic<bool> m_Closed{ false };
 };
 
 #endif // UC_SPSCLOCKFREEQUEUE_H

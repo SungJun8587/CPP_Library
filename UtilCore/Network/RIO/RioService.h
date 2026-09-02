@@ -12,6 +12,10 @@
 #include <Network/RIO/RioListener.h>
 #include <Network/RIO/RioConnectDispatcher.h>
 #include <Network/RIO/RioSessionManager.h>
+#include <Containers/Queue/DelayedTaskQueue.h>
+
+#include <thread>
+#include <atomic>
 
 class CRioBuffer;
 
@@ -99,12 +103,32 @@ public:
 	CRioSessionManager& GetSessionManager() { return _sessionManager; }
 
 private:
-	CRioCoreRef		_rioCore = nullptr;					// 연동된 RIO 코어 참조 (생성자에서 주입받음)
-	CRioListenerRef _listener = nullptr;				// RIO 접속 수락 리스너
-	CRioSessionManager _sessionManager;					// 서버 서비스가 소유하는 RIO 세션 매니저
-	CRioEventPool	_eventPool;							// 이 서비스 소속 세션들이 공유하는 RIO 이벤트 풀
-	CRioBufferRef	_globalRecvBuffer;					// 클라이언트 비동기 수신(RIOReceive)용 글로벌 CRioBuffer 객체
-	uint32		_workerThreadCount = 0;				// StartWorkers()에 넘길 워커 스레드 개수 (0=자동)
+	//***************************************************************************
+	// @brief _sessionManager에 다음 reap tick을 예약합니다(self-rescheduling).
+	// @details 최초 호출은 Start()에서, 이후로는 이 함수 자신이 실행될 때마다
+	//          다음 tick을 다시 예약합니다 — CDelayedTaskQueue::Reserve()가
+	//          일회성이라 주기적 동작을 만들려면 이 패턴이 필요합니다. Close()가
+	//          _sessionReapQueue.Stop()을 호출하면 그 이후의 재예약 시도는
+	//          Reserve()가 false를 반환하며 조용히 무시되어 재귀가 자연스럽게
+	//          끊깁니다.
+	//***************************************************************************
+	void ScheduleSessionReap();
+
+	// Running 중 자연 종료된(원격 종료/에러 등) 세션의 _sessionManager 엔트리를
+	// 방치하면 서버가 오래 떠 있을수록 map이 무한정 커진다 — 예전에는
+	// RemoveClosedSessions()가 Close()(종료 시점)에서만 호출됐다. 이제
+	// ScheduleSessionReap()이 kSessionReapInterval마다 주기적으로 호출한다.
+	static constexpr std::chrono::seconds kSessionReapInterval{ 30 }; // 임의로 잡은 기본값 — 세션 처리량/서버 규모에 맞춰 조정 가능
+	CDelayedTaskQueue	_sessionReapQueue;						// reap tick 예약 큐 (스스로 워커 스레드를 안 가짐)
+	std::thread			_sessionReapThread;						// _sessionReapQueue.ProcessExpiredTasks()를 실행하는 전용 스레드
+
+private:
+	CRioCoreRef			_rioCore = nullptr;					// 연동된 RIO 코어 참조 (생성자에서 주입받음)
+	CRioListenerRef		_listener = nullptr;				// RIO 접속 수락 리스너
+	CRioSessionManager	_sessionManager;					// 서버 서비스가 소유하는 RIO 세션 매니저
+	CRioEventPool		_eventPool;							// 이 서비스 소속 세션들이 공유하는 RIO 이벤트 풀
+	CRioBufferRef		_globalRecvBuffer;					// 클라이언트 비동기 수신(RIOReceive)용 글로벌 CRioBuffer 객체
+	uint32				_workerThreadCount = 0;				// StartWorkers()에 넘길 워커 스레드 개수 (0=자동)
 };
 
 //***************************************************************************
@@ -172,12 +196,6 @@ public:
 	CRioBuffer* GetGlobalRecvBuffer() { return _globalRecvBuffer.get(); }
 
 	//***************************************************************************
-	// @brief 소속된 RIO 세션 매니저 참조를 반환합니다.
-	// @return CRioSessionManager& 세션 매니저 참조
-	//***************************************************************************
-	CRioSessionManager& GetSessionManager() { return _sessionManager; }
-
-	//***************************************************************************
 	// @brief 이미 구동 중인 서비스에 세션 하나를 추가로 연결 "게시"합니다.
 	// @details 세션 생성 → 서비스에 즉시 등록 → CRioSession::ConnectAsync()로
 	//          ConnectEx 비동기 게시, 순서로 동작합니다(RIOCreateRequestQueue/
@@ -208,12 +226,30 @@ public:
 	CRioSessionRef	ConnectOneMoreSession();
 
 private:
-	CRioCoreRef			_rioCore = nullptr;						// 연동된 RIO 코어 참조 (생성자에서 주입받음)
-	CRioSessionManager	_sessionManager;						// 클라이언트 서비스가 소유하는 RIO 세션 매니저
-	CRioEventPool		_eventPool;								// 이 서비스 소속 세션들이 공유하는 RIO 이벤트 풀
-	CRioBufferRef		_globalRecvBuffer;						// 클라이언트 비동기 수신(RIOReceive)용 글로벌 CRioBuffer 객체
-	CRioConnectDispatcher _connectDispatcher;					// ConnectEx 완료 통지 전용 디스패처 (CRioCore와 무관, 이 서비스가 소유)
-	uint32			_workerThreadCount = 0;					// StartWorkers()에 넘길 워커 스레드 개수 (0=자동)
+	//***************************************************************************
+	// @brief 새 세션에 부여할 고유 SessionId를 원자적으로 발급합니다.
+	// @details [수정 — CRioSessionManager 멤버 자체를 제거] 이전에는 이
+	//          클래스가 CRioSessionManager(클러스터 해시맵 전체)를 멤버로 갖고
+	//          있었는데, 실제로 쓰는 기능은 GenerateSessionId()/AddSession()
+	//          뿐이었다. SessionId로 세션을 조회하거나(FindSession) 전체에
+	//          브로드캐스트해야(Broadcast) 하는 건 "외부에서 특정 세션을 ID로
+	//          찾아야 하는" 서버 역할에 필요한 기능이지, 커넥션 풀처럼 스스로
+	//          연결을 만들고 관리하는 클라이언트 역할에는 필요 없다 —
+	//          CIocpClientService가 애초에 CIocpSessionManager를 아예 안 갖고
+	//          CNetService::_sessions만 쓰는 것과 동일한 이유. 무거운 클러스터
+	//          맵 전체 대신 원자적 카운터 하나로 충분하다(이 카운터 자체가
+	//          reap이 필요한 상태를 아예 안 만드므로, 이전에 추가했던 이
+	//          클래스의 세션 reap 스레드/큐도 함께 제거함).
+	//***************************************************************************
+	uint64 GenerateSessionId() noexcept { return _nextSessionId.fetch_add(1, std::memory_order_relaxed); }
+
+private:
+	CRioCoreRef				_rioCore = nullptr;						// 연동된 RIO 코어 참조 (생성자에서 주입받음)
+	std::atomic<uint64>		_nextSessionId{ 0 };					// GenerateSessionId() 전용 카운터 (CRioSessionManager 대체)
+	CRioEventPool			_eventPool;								// 이 서비스 소속 세션들이 공유하는 RIO 이벤트 풀
+	CRioBufferRef			_globalRecvBuffer;						// 클라이언트 비동기 수신(RIOReceive)용 글로벌 CRioBuffer 객체
+	CRioConnectDispatcher	_connectDispatcher;						// ConnectEx 완료 통지 전용 디스패처 (CRioCore와 무관, 이 서비스가 소유)
+	uint32					_workerThreadCount = 0;					// StartWorkers()에 넘길 워커 스레드 개수 (0=자동)
 };
 
 #endif // ndef UC_RIOSERVICE_H

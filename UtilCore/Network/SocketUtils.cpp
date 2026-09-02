@@ -629,7 +629,7 @@ bool CSocketUtils::AddrToIP(const int af, const void* src, TCHAR* hostAddress, s
 		dwSockAddrLen = sizeof(sockaddr_in); // [수정] IPv4 정확한 구조체 크기 지정
 		break;
 	case AF_INET6:
-		reinterpret_cast<sockaddr_in6*>(&ss)->sin6_addr = *reinterpret_cast<const struct in_addr6*>(src);
+		reinterpret_cast<sockaddr_in6*>(&ss)->sin6_addr = *reinterpret_cast<const struct in6_addr*>(src);
 		dwSockAddrLen = sizeof(sockaddr_in6); // [수정] IPv6 정확한 구조체 크기 지정
 		break;
 	default:
@@ -803,9 +803,9 @@ void CSocketUtils::ReportError(const TCHAR* operationDesc, const int errorCode)
 	bool isAllocatedBySystem = false;
 
 #ifdef _DEBUG_KR
-	ptszMsgBuffer = GetErrMsgToWinsockErrCodeEn(errorCode);
-#elif _DEBUG_EN
 	ptszMsgBuffer = GetErrMsgToWinsockErrCodeKr(errorCode);
+#elif _DEBUG_EN
+	ptszMsgBuffer = GetErrMsgToWinsockErrCodeEn(errorCode);
 #else
 	DWORD flags = FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
 	if( ::FormatMessage(flags, NULL, errorCode, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),

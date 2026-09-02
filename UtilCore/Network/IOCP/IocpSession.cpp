@@ -75,6 +75,31 @@ void CIocpSession::ProcessConnect()
 	// 세션 재사용(AcceptEx) 시 이전 연결의 잔여 데이터 오염 방지
 	_recvBuffer.Clear();
 
+	// [수정] 세션 객체가 재사용되는 경로(위 주석 참고)에서, 이전 연결 사이클의
+	// TryFinalizeDisconnect() 관련 상태가 남아있으면 안 된다 — 특히
+	// _disconnectNotified가 true로 남아있으면 이번 연결이 끊길 때
+	// OnDisconnected()가 "이미 통지함" 가드에 막혀 영원히 호출되지 않는다.
+	// 새 연결 사이클은 항상 이 셋이 초기 상태(0/false)여야 한다.
+	_pendingIoCount.store(0, std::memory_order_seq_cst);
+	_disconnectCompleted.store(false, std::memory_order_seq_cst);
+	_disconnectNotified.store(false, std::memory_order_seq_cst);
+
+	// [수정] 송신 상태도 동일한 이유로 리셋 필요. ProcessSend()의
+	// numOfBytes==0(WSASend 취소/실패 완료) 분기는 Disconnect()만 호출하고
+	// _sendRegistered/_sendQueue를 정리하지 않은 채 반환하므로, 이전 연결이
+	// Send 대기 중(또는 in-flight) 상태로 끊긴 뒤 이 세션 객체가 재사용되면
+	// (1) _sendRegistered가 true로 남아 Send()가 영원히 RegisterSend()를
+	//     트리거하지 못해(exchange(true)==false를 통과 못함) 송신이 마비되고,
+	// (2) _sendQueue에 남아있던 이전 연결의 미전송 버퍼가 이후 어떤 경로로든
+	//     RegisterSend()가 걸릴 때 새 클라이언트에게 그대로 전송되는
+	//     세션 간 데이터 혼선이 발생한다. RegisterSend()의 즉시 실패 분기가
+	//     동일하게 정리하는 것과 대칭되도록 여기서도 락 하에 정리한다.
+	{
+		std::lock_guard<std::mutex> guard(_lock);
+		_sendQueue.clear();
+		_sendRegistered.store(false);
+	}
+
 	// 상위 레이어 이벤트 호출
 	OnConnected();
 
@@ -161,11 +186,16 @@ void CIocpSession::RegisterRecv()
 	DWORD numOfBytes = 0;
 	DWORD flags = 0;
 
+	// [수정] 실제 게시 직전에 증가시키고, 게시 자체가 즉시 실패하면(completion이
+	// 절대 안 옴) 바로 롤백한다 — TryFinalizeDisconnect()의 설명 참고.
+	_pendingIoCount.fetch_add(1, std::memory_order_seq_cst);
+
 	if( ::WSARecv(_socket, wsaBufs, static_cast<DWORD>(bufferCount), OUT & numOfBytes, &flags, static_cast<LPOVERLAPPED>(&_recvEvent), nullptr) == SOCKET_ERROR )
 	{
 		int32 errorCode = ::WSAGetLastError();
 		if( errorCode != WSA_IO_PENDING )
 		{
+			_pendingIoCount.fetch_sub(1, std::memory_order_seq_cst); // 게시 실패 롤백 — completion이 안 옴
 			_recvEvent.owner = nullptr;
 			Disconnect(Iocp::CloseReason::SocketError);
 		}
@@ -181,6 +211,14 @@ void CIocpSession::RegisterRecv()
 //***************************************************************************
 void CIocpSession::ProcessRecv(int32 numOfBytes)
 {
+	// [수정] 이 completion 하나에 대응하는 outstanding 카운트를 함수 최상단에서
+	// 즉시 감소시킨다 — 아래 여러 갈래의 early-return 경로 전부에서 정확히
+	// 1회씩만 실행되도록 보장하는 가장 단순한 위치. TryFinalizeDisconnect()는
+	// _disconnectCompleted/카운트 조건을 스스로 재확인하므로, 매 completion마다
+	// 무조건 호출해도 안전하다(조건 미충족이면 즉시 반환).
+	_pendingIoCount.fetch_sub(1, std::memory_order_seq_cst);
+	TryFinalizeDisconnect();
+
 	if( numOfBytes == 0 )
 	{
 		_recvEvent.owner = nullptr;
@@ -269,11 +307,18 @@ void CIocpSession::RegisterSend()
 	}
 
 	DWORD numOfBytes = 0;
+
+	// [수정] 실제 게시 직전에 증가시키고, 게시 자체가 즉시 실패하면(completion이
+	// 절대 안 옴) 바로 롤백한다 — TryFinalizeDisconnect()의 설명 참고.
+	_pendingIoCount.fetch_add(1, std::memory_order_seq_cst);
+
 	if( ::WSASend(_socket, wsaBufs.data(), static_cast<DWORD>(wsaBufs.size()), OUT & numOfBytes, 0, static_cast<LPOVERLAPPED>(&_sendEvent), nullptr) == SOCKET_ERROR )
 	{
 		int32 errorCode = ::WSAGetLastError();
 		if( errorCode != WSA_IO_PENDING )
 		{
+			_pendingIoCount.fetch_sub(1, std::memory_order_seq_cst); // 게시 실패 롤백 — completion이 안 옴
+
 			// [수정] Disconnect()를 가장 먼저 호출해 _connected를 즉시 false로
 			// 전환한다. 이렇게 해야 이 지점과 아래 정리 코드 사이의 시간 창에서
 			// 다른 스레드가 Send()를 호출해 IsConnected()==true를 관측하고
@@ -318,6 +363,10 @@ void CIocpSession::RegisterDisconnect()
 //***************************************************************************
 void CIocpSession::ProcessSend(int32 numOfBytes)
 {
+	// [수정] ProcessRecv()와 동일한 이유로 함수 최상단에서 즉시 감소시킨다.
+	_pendingIoCount.fetch_sub(1, std::memory_order_seq_cst);
+	TryFinalizeDisconnect();
+
 	_sendEvent.owner = nullptr; // Ref -1
 	_sendEvent.sendBuffers.clear(); // 전송 끝난 SendBuffer 수명 해제
 
@@ -351,10 +400,39 @@ void CIocpSession::ProcessSend(int32 numOfBytes)
 
 //***************************************************************************
 // @brief DisconnectEx 완료 처리
+// @details [수정] 예전에는 여기서 곧바로 OnDisconnected()를 통지했다. 이제는
+//          _disconnectCompleted만 세팅해두고 TryFinalizeDisconnect()에
+//          위임한다 — 그 시점에 이미 게시돼 있던 WSARecv/WSASend가 아직
+//          outstanding이면(다른 워커 스레드가 처리 중) 그 마지막 완료가
+//          알아서 마저 통지해준다. 자세한 배경은 헤더의 TryFinalizeDisconnect()
+//          선언부 주석 참고.
 //***************************************************************************
 void CIocpSession::ProcessDisconnect()
 {
 	_disconnectEvent.owner = nullptr; // Ref -1
+
+	_disconnectCompleted.store(true, std::memory_order_seq_cst);
+	TryFinalizeDisconnect();
+}
+
+//***************************************************************************
+// @brief outstanding recv/send가 전부 끝났고 DisconnectEx 자신의 completion도
+//        도착했을 때만 OnDisconnected()를 1회 통지합니다.
+// @details 어느 쪽 조건이 나중에 만족되든(마지막 recv/send completion, 또는
+//          DisconnectEx completion 그 자체) 그쪽 호출부가 이 함수를 통해
+//          통지를 트리거합니다 — 자세한 설계 배경/알려진 잔여 레이스는
+//          헤더의 이 함수 선언부 주석 참고.
+//***************************************************************************
+void CIocpSession::TryFinalizeDisconnect() noexcept
+{
+	if( !_disconnectCompleted.load(std::memory_order_seq_cst) )
+		return;
+
+	if( _pendingIoCount.load(std::memory_order_seq_cst) != 0 )
+		return;
+
+	if( _disconnectNotified.exchange(true, std::memory_order_seq_cst) )
+		return; // 이미 다른 스레드가 통지 완료
 
 	OnDisconnected();
 	CSession::OnDisconnected();
@@ -363,11 +441,40 @@ void CIocpSession::ProcessDisconnect()
 //***************************************************************************
 // @brief 지정된 사유로 세션 종료 요청
 // @param reason 세션 종료 사유
+// @details
+// [수정] 기존에는 `_connected.exchange(false) == false`면(즉 한 번도 연결
+// 완료 전이던 상태 — Accept/ConnectEx가 아직 진행 중인 세션) 완전히 no-op으로
+// 반환했다. 그런데 CNetService::Close()는 세션 생성 직후(연결 완료 전)부터
+// AddSession()으로 _sessions에 등록된 세션에 대해서도 이 Disconnect()를
+// 호출하므로, 그 세션이 실제로 연결 완료/실패해 스스로 OnDisconnected()를
+// 통지하기 전까지 _sessionsEmptyCv가 영원히 깨어나지 않아 Close() 호출
+// 스레드가 무한 대기(hang)하는 문제가 있었다.
+//
+// 이제는 미연결 상태에서도 FailConnect()와 동일하게 소켓을 직접 닫아
+// pending AcceptEx/ConnectEx를 취소시키고, 즉시 OnDisconnected() 통지까지
+// 완료한다. _disconnectNotified CAS로 최초 1회만 통지되도록 가드하며,
+// FailConnect()도 동일한 가드를 거치도록 통일해(아래 참고) — 취소된 I/O의
+// 완료 통지가 나중에 도착해 FailConnect()를 다시 태워도 중복 통지되지 않는다.
 //***************************************************************************
 void CIocpSession::Disconnect(Iocp::CloseReason reason)
 {
 	if( _connected.exchange(false) == false )
+	{
+		// 아직 연결 완료 전(Accept/ConnectEx 진행 중) — FailConnect()와 동일한
+		// 강제 정리 경로. _disconnectNotified가 이미 true면(FailConnect()가
+		// 먼저 통지를 마쳤거나 이 경로가 이미 실행됨) 아무 것도 하지 않는다.
+		if( _disconnectNotified.exchange(true, std::memory_order_seq_cst) )
+			return;
+
+		_closeReason.store(reason, std::memory_order_release);
+
+		CSocketUtils::Close(_socket); // pending AcceptEx/ConnectEx 취소 유도
+		_socket = INVALID_SOCKET;
+
+		OnDisconnected();
+		CSession::OnDisconnected();
 		return;
+	}
 
 	_closeReason.store(reason, std::memory_order_release);
 
@@ -402,6 +509,17 @@ void CIocpSession::Disconnect(const TCHAR* cause)
 //***************************************************************************
 bool CIocpSession::ConnectAsync(const CNetAddress& remoteAddr)
 {
+	// [수정] 새 연결 시도 사이클 시작 — 이전 시도(재사용된 세션 객체의 과거
+	// 실패한 connect 등)에서 _disconnectNotified가 true로 남아있으면 이번
+	// 시도의 FailConnect()/Disconnect() 강제종료 경로가 가드에 막혀 아예
+	// 통지되지 않는다(ProcessConnect()는 "성공"한 연결에서만 리셋하므로 실패로
+	// 끝난 이전 시도 뒤에는 이 리셋을 거치지 못함). ConnectOneMoreSession()이
+	// AddSession()을 이 함수 호출보다 먼저 수행하므로, 그 좁은 창에서 Close()가
+	// 끼어들면 여전히 스테일 가드를 볼 수 있는 잔여 레이스가 있으나(클라이언트
+	// 세션 객체가 실패 직후 재사용되는 경우에 한정), ProcessConnect() 리셋과
+	// 대칭을 맞추는 것으로 실질적인 케이스는 대부분 닫힌다.
+	_disconnectNotified.store(false, std::memory_order_seq_cst);
+
 	if( _socket == INVALID_SOCKET )
 	{
 		FailConnect(Iocp::CloseReason::SocketError);
@@ -478,9 +596,18 @@ void CIocpSession::ProcessConnectEx()
 //***************************************************************************
 // @brief connect 실패 시 정리 전용 경로.
 // @param reason 실패 사유
+// @details [수정] Disconnect(Iocp::CloseReason)의 "미연결 상태 강제 종료" 경로와
+//          동일한 _disconnectNotified CAS 가드를 공유한다. CNetService::Close()가
+//          연결 완료 전인 이 세션에 대해 먼저 Disconnect()를 호출해 소켓을 이미
+//          닫고 통지까지 마친 뒤, 취소된 ConnectEx의 완료가 뒤늦게 도착해
+//          ProcessConnectEx()가 이 함수를 호출하는 경우 — 가드가 없으면
+//          OnDisconnected()가 두 번 호출된다.
 //***************************************************************************
 void CIocpSession::FailConnect(Iocp::CloseReason reason)
 {
+	if( _disconnectNotified.exchange(true, std::memory_order_seq_cst) )
+		return; // Disconnect()의 강제 종료 경로가 이미 통지를 마침
+
 	_closeReason.store(reason, std::memory_order_release);
 
 	CSocketUtils::Close(_socket);

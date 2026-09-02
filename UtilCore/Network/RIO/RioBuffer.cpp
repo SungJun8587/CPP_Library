@@ -214,6 +214,15 @@ bool CRioBuffer::RegisterBuffer() noexcept
 
 //***************************************************************************
 // @brief RIO Registered Buffer 등록 해제
+// @details [수정] _rioTable이 null이거나 RIODeregisterBuffer 함수 포인터가
+//          null이면(CRioBuffer.h의 [RIO Function Table Ownership] 계약 위반 —
+//          가장 흔한 원인은 소유 CRioCore::Shutdown()이 이 CRioBuffer::Shutdown()
+//          보다 먼저 호출되어 _rioTable을 이미 ZeroMemory로 지운 경우) 예전에는
+//          그냥 조용히 등록 해제를 건너뛰었다. 그러면 로컬 메모리(_buffer)는
+//          정상 해제되지만 OS/드라이버 쪽에 등록된 RIO buffer는 그대로 남는
+//          실질적인 leak인데도 아무 신호가 없었다. 이제 이 경로를 assert로
+//          표면화한다(_bufferId는 원래대로 계속 무효화 — 이후 재사용 시
+//          이중 해제로 오인되지 않도록).
 //***************************************************************************
 void CRioBuffer::UnregisterBuffer() noexcept
 {
@@ -224,6 +233,11 @@ void CRioBuffer::UnregisterBuffer() noexcept
         _rioTable->RIODeregisterBuffer != nullptr )
     {
         _rioTable->RIODeregisterBuffer(_bufferId);
+    }
+    else
+    {
+        assert(false && "CRioBuffer::UnregisterBuffer: RIODeregisterBuffer unavailable "
+            "(owning CRioCore must not Shutdown() before this CRioBuffer does) - RIO buffer registration leaked");
     }
 
     _bufferId = RIO_INVALID_BUFFERID;

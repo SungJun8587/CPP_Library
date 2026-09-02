@@ -7,6 +7,8 @@
 #include "pch.h"
 #include "SendBuffer.h"
 
+thread_local CSendBufferChunkRef	LSendBufferChunk;
+
 //***************************************************************************
 // @brief CSendBuffer 객체를 생성합니다.
 // @param owner 이 버퍼를 소유하는 SendBufferChunk 참조

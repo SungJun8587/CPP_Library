@@ -7,6 +7,8 @@
 #include "pch.h"
 #include "JobQueue.h"
 
+thread_local CJobQueue* LCurrentJobQueue = nullptr;
+
 //***************************************************************************
 // Construction/Destruction 
 //***************************************************************************

@@ -308,20 +308,34 @@ void CRioSession::Disconnect(const TCHAR* cause)
 }
 
 //***************************************************************************
-// @brief 지정된 사유로 세션 종료를 요청합니다 (락 내부에서 상태 전이 후 락 밖에서 실행).
+// @brief 지정된 사유로 세션 종료를 요청합니다 (락 내부에서 상태 전이 후 필요시 락 밖에서 실행).
 // @param reason 세션 종료 사유
-// @note [알려진 트레이드오프] 여기서는 outstanding I/O(진행 중인 RIO 요청)를 기다리지
-//       않고 즉시 FinalizeClose()로 넘어가 소켓을 닫습니다. 진행 중인 receive/send가
-//       남아 있는 상태에서 closesocket()이 호출될 수 있다는 뜻입니다. 서버 전체
-//       종료 시퀀스(CRioServer::Stop())는 그와 별개로 CRioCore::Shutdown() 자체의
-//       outstanding I/O drain을 거친 뒤에만 전역 버퍼풀/이벤트풀을 해제하므로
-//       UAF로는 이어지지 않는다는 것은 확인했으나, RIO가 이런 식으로 도중에 닫힌
-//       RQ의 미완료 요청에 대해 항상 에러 completion을 정상적으로 돌려주는지는
-//       별도로 확인이 필요합니다(확인 전까지는 낮은 확률로 이벤트/버퍼 슬롯이
-//       완료 통지 없이 방치될 수 있음).
+// @note [수정 — outstanding I/O drain 후 소켓을 닫도록 변경]
+//       예전 버전은 진행 중인 RIO 요청(outstanding I/O)을 기다리지 않고 즉시
+//       FinalizeClose()로 넘어가 소켓을 닫았다. RIO 공식 문서(RIOCloseCompletionQueue,
+//       LPFN_RIOCREATEREQUESTQUEUE)와 실제 사례(MS Q&A에 보고된, 이미 진행 중이던
+//       요청의 RQ가 담긴 소켓이 다른 스레드에서 closesocket()될 때 mswsock.dll이
+//       크래시하는 사례)를 확인한 결과 — "이미 게시되어 진행 중이던 요청이 소켓
+//       close 이후에도 CQ로 에러 completion을 정상 반환한다"는 보장은 문서 어디에도
+//       없었다. CRioCore::Shutdown() 자체는 이미 "outstanding이 0이 될 때까지
+//       CQ/IOCP를 안 닫는" 훨씬 보수적인 패턴을 쓰는데, 개별 세션 레벨(Close())만
+//       그 원칙을 안 지키고 있던 것 — 이제 동일한 원칙을 세션 단위로도 적용한다.
+//
+//       [비블로킹 구현] outstanding I/O가 없으면(가장 흔한 경로 — 유휴 세션 종료)
+//       즉시 FinalizeClose()로 넘어간다. outstanding이 있으면 여기서는 소켓
+//       shutdown()만 해두고 아무것도 기다리지 않은 채 반환한다 — 남은 completion들이
+//       도착할 때마다 CRioCore::ProcessRioResult()의 ObjectIoCountGuard가
+//       DecrementIoCount() 이후 OnIoCountReachedZero()를 호출해주고, 그 훅이
+//       Closing 상태를 보고 대신 FinalizeClose()를 호출한다(아래 OnIoCountReachedZero()
+//       참고). 이 방식이면 RIO 워커 스레드가 다른 세션의 completion 처리를
+//       기다리며 블로킹되는 일이 없다 — CRioCore::Shutdown()처럼 poll 루프를
+//       세션 레벨에 두면 그 폴링을 처리할 워커 자신이 다른 completion을 기다리며
+//       멈춰버리는 데드락 위험이 있어 그 방식은 채택하지 않았다.
 //***************************************************************************
 void CRioSession::Close(Rio::CloseReason reason) noexcept
 {
+    bool shouldFinalizeNow = false;
+
     {
         PLockGuard guard(_ioSubmitLock, __FUNCTION__);
 
@@ -334,12 +348,42 @@ void CRioSession::Close(Rio::CloseReason reason) noexcept
 
         _closeReason.store(reason, std::memory_order_release);
 
-        // 소켓 셧다운 먼저 수행
+        // 소켓 셧다운 먼저 수행 (신규 데이터 송수신 차단, 이미 게시된 요청은
+        // 그대로 진행 중 — closesocket()은 여기서 하지 않는다)
         ShutdownSocketInternal();
+
+        // outstanding I/O가 이미 없으면(가장 흔함) 곧바로 최종 정리해도 안전하다.
+        // 있으면 여기서 아무것도 하지 않는다 — PostReceiveInternal()/
+        // FlushSendInternal()도 이 함수와 동일하게 _ioSubmitLock을 잡고 나서야
+        // 신규 제출 전 상태를 확인하므로(위 CAS로 이미 Closing이 된 이후에는
+        // 그쪽에서 새로 IncrementIoCount()가 절대 끼어들 수 없다 — 락으로
+        // 직렬화됨), 지금 관측한 이 카운트가 앞으로 남은 completion 수의
+        // 정확한 상한이다.
+        shouldFinalizeNow = !HasOutstandingIo();
     }
 
-    // 즉시 최종 정리 진행
-    FinalizeClose();
+    if( shouldFinalizeNow )
+    {
+        FinalizeClose();
+    }
+    // else: 마지막 남은 completion의 OnIoCountReachedZero() 훅이 대신 정리한다.
+}
+
+//***************************************************************************
+// @brief CRioObject::OnIoCountReachedZero() 오버라이드.
+// @details Close()가 outstanding I/O를 남겨둔 채 반환했을 경우, 그 마지막
+//          completion의 처리 결과로 이 함수가 호출된다(호출부: CRioCore::
+//          ProcessRioResult()의 ObjectIoCountGuard, 이미 RIO 워커 스레드
+//          위에서 실행 중 — 여기서 블로킹 대기 절대 금지). Closing 상태가
+//          아니면(Active 상태에서 카운트가 우연히 0을 지나가는 경우 등)
+//          아무 의미가 없으므로 무시한다.
+//***************************************************************************
+void CRioSession::OnIoCountReachedZero() noexcept
+{
+    if( _state.load(std::memory_order_acquire) == Rio::SessionState::Closing )
+    {
+        FinalizeClose();
+    }
 }
 
 //***************************************************************************
@@ -525,15 +569,27 @@ void CRioSession::Dispatch(CRioEvent* rioEvent, ULONG bytesTransferred, LONG sta
         return;
     }
 
-    // BufferBinding이 있으면 Receive(슬롯 풀에서 받아온 버퍼 바인딩이 존재),
-    // 없으면 Send(사전 등록된 _sendBuffer를 그대로 참조하므로 별도 바인딩이 없음)로 간주합니다.
-    if( !rioEvent->GetBufferBindings().empty() )
+    // [수정] rioEvent->GetBufferBindings().empty()로 Send/Receive를 구분하던
+    // 방식은, CRioSend::Send()(단일 버퍼 버전)가 BindBufferSlot()을 호출해
+    // Send 이벤트에도 바인딩이 생길 수 있는 경로가 열려 있어 그 경로가 실제로
+    // 쓰이면 Send를 Receive로 오분류하는 잠재 버그였다. CRioEvent가 Initialize()
+    // 시점에 Rio::EventType(Send/Receive)을 명시적으로 기록해두므로, 그 값을
+    // 직접 조회하는 GetEventType()으로 교체해 바인딩 유무와 무관하게 항상
+    // 정확히 구분한다.
+    switch( rioEvent->GetEventType() )
     {
+    case Rio::EventType::Receive:
         OnReceiveCompleted(rioEvent, bytesTransferred);
-    }
-    else
-    {
+        break;
+
+    case Rio::EventType::Send:
         OnSendCompleted(rioEvent, bytesTransferred);
+        break;
+
+    default:
+        assert(false && "CRioSession::Dispatch: unknown Rio::EventType on completed rioEvent");
+        Close(Rio::CloseReason::InternalError);
+        break;
     }
 }
 

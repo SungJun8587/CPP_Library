@@ -145,11 +145,17 @@ public:
 private:
 	//***************************************************************************
 	// @brief 무작위 16바이트를 hex로 인코딩해 경계 문자열을 생성합니다.
+	// @details PRNG 엔진(std::mt19937)은 스레드마다 처음 호출될 때 한 번만
+	//          std::random_device로 시드를 얻어 초기화하고, 그 뒤로는 계속
+	//          재사용한다 — CMultipartFormBuilder를 요청마다 새로 만들거나
+	//          Reset()을 자주 호출하는 핫패스에서, random_device 호출(대개
+	//          OS 엔트로피 소스에 대한 시스템 콜)과 엔진 재시드 비용이 매번
+	//          반복되는 걸 피하기 위함이다. thread_local이라 스레드 간 공유/락이
+	//          필요 없다.
 	//***************************************************************************
 	static std::string GenerateBoundary()
 	{
-		std::random_device rd;
-		std::mt19937 gen(rd());
+		thread_local std::mt19937 gen{ std::random_device{}() };
 		std::uniform_int_distribution<int> dist(0, 255);
 
 		std::string boundary = "----CppFormBoundary";

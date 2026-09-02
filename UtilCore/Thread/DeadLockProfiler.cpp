@@ -7,6 +7,8 @@
 #include "pch.h"
 #include "DeadLockProfiler.h"
 
+thread_local std::stack<int32>		LLockStack;
+
 //***************************************************************************
 // @brief 락을 획득할 때 호출하여 락 계층 구조와 의존성을 기록합니다.
 // @param name 획득한 락의 고유 이름
