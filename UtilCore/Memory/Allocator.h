@@ -400,6 +400,11 @@ public:
 	//***************************************************************************  
 	T* allocate(size_t count)
 	{
+		// 0-size 요청은 PoolAllocator::Alloc의 ASSERT_CRASH(size > 0)에 걸리므로
+		// 여기서 조기에 처리합니다. deallocate()는 이미 nullptr을 무시하므로 짝이 맞습니다.
+		if( count == 0 )
+			return nullptr;
+
 		if( count > (std::numeric_limits<size_t>::max)() / sizeof(T) )
 			throw std::bad_array_new_length();
 

@@ -93,15 +93,15 @@ public:
 	// @return std::shared_ptr<CHttpClient> 생성된 클라이언트
 	//***************************************************************************
 	template<typename SessionType = CHttpSessionIocp>
-	static std::shared_ptr<CHttpClient> CreateIocp(CIocpCoreRef iocpCore, SSL_CTX* sslCtx = nullptr,
+	static CHttpClientRef CreateIocp(CIocpCoreRef iocpCore, SSL_CTX* sslCtx = nullptr,
 		int32 minIdlePerHost = 2, int32 maxConnectionsPerHost = 8, uint32 workerThreadCountPerHost = 1)
 	{
 		auto httpManager = CreateHttpConnPoolManagerIocp<SessionType>(iocpCore, minIdlePerHost, maxConnectionsPerHost, workerThreadCountPerHost);
-		std::shared_ptr<CHttpConnPoolManager> httpsManager;
+		CHttpConnPoolManagerRef httpsManager;
 		if( sslCtx != nullptr )
 			httpsManager = CreateHttpsConnPoolManagerIocp<SessionType>(sslCtx, iocpCore, minIdlePerHost, maxConnectionsPerHost, workerThreadCountPerHost);
 
-		return std::shared_ptr<CHttpClient>(new CHttpClient(std::move(httpManager), std::move(httpsManager)));
+		return CHttpClientRef(new CHttpClient(std::move(httpManager), std::move(httpsManager)));
 	}
 
 	//***************************************************************************
@@ -109,15 +109,15 @@ public:
 	// @tparam SessionType 사용할 세션 클래스 (기본값 CHttpSessionRio)
 	//***************************************************************************
 	template<typename SessionType = CHttpSessionRio>
-	static std::shared_ptr<CHttpClient> CreateRio(CRioCoreRef rioCore, SSL_CTX* sslCtx = nullptr,
+	static CHttpClientRef CreateRio(CRioCoreRef rioCore, SSL_CTX* sslCtx = nullptr,
 		int32 minIdlePerHost = 2, int32 maxConnectionsPerHost = 8, uint32 workerThreadCountPerHost = 1)
 	{
 		auto httpManager = CreateHttpConnPoolManagerRio<SessionType>(rioCore, minIdlePerHost, maxConnectionsPerHost, workerThreadCountPerHost);
-		std::shared_ptr<CHttpConnPoolManager> httpsManager;
+		CHttpConnPoolManagerRef httpsManager;
 		if( sslCtx != nullptr )
 			httpsManager = CreateHttpsConnPoolManagerRio<SessionType>(sslCtx, rioCore, minIdlePerHost, maxConnectionsPerHost, workerThreadCountPerHost);
 
-		return std::shared_ptr<CHttpClient>(new CHttpClient(std::move(httpManager), std::move(httpsManager)));
+		return CHttpClientRef(new CHttpClient(std::move(httpManager), std::move(httpsManager)));
 	}
 
 	//***************************************************************************
@@ -143,7 +143,7 @@ public:
 			return;
 		}
 
-		std::shared_ptr<CHttpConnPoolManager> manager = parsedUrl.isHttps ? _httpsManager : _httpManager;
+		CHttpConnPoolManagerRef manager = parsedUrl.isHttps ? _httpsManager : _httpManager;
 		if( !manager )
 		{
 			// HTTPS 요청인데 SSL_CTX 없이 클라이언트를 만든 경우 등.
@@ -328,14 +328,14 @@ public:
 	}
 
 private:
-	CHttpClient(std::shared_ptr<CHttpConnPoolManager> httpManager, std::shared_ptr<CHttpConnPoolManager> httpsManager)
+	CHttpClient(CHttpConnPoolManagerRef httpManager, CHttpConnPoolManagerRef httpsManager)
 		: _httpManager(std::move(httpManager)), _httpsManager(std::move(httpsManager))
 	{
 	}
 
 private:
-	std::shared_ptr<CHttpConnPoolManager> _httpManager;		// http:// 요청용 (항상 유효)
-	std::shared_ptr<CHttpConnPoolManager> _httpsManager;	// https:// 요청용 (sslCtx 없이 생성했으면 nullptr)
+	CHttpConnPoolManagerRef _httpManager;		// http:// 요청용 (항상 유효)
+	CHttpConnPoolManagerRef _httpsManager;	// https:// 요청용 (sslCtx 없이 생성했으면 nullptr)
 };
 
 #endif // ndef UC_HTTPCLIENT_H

@@ -391,9 +391,6 @@
     <ClInclude Include="Network\IOCP\IocpService.h">
       <Filter>Network\IOCP</Filter>
     </ClInclude>
-    <ClInclude Include="Network\NetworkRedefineDataType.h">
-      <Filter>Network</Filter>
-    </ClInclude>
     <ClInclude Include="Network\RIO\RioSubmissionHelper.h">
       <Filter>Network\RIO</Filter>
     </ClInclude>
@@ -552,6 +549,24 @@
     </ClInclude>
     <ClInclude Include="Containers\Map\ClusterSpinUnorderedMap.h">
       <Filter>Containers\Map</Filter>
+    </ClInclude>
+    <ClInclude Include="Redis\RedisServerHeartbeat.h">
+      <Filter>Redis</Filter>
+    </ClInclude>
+    <ClInclude Include="Job\JobCommon.h">
+      <Filter>Job</Filter>
+    </ClInclude>
+    <ClInclude Include="Job\JobRedefineDataType.h">
+      <Filter>Job</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\NetworkRedefineDataType.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="DB\DBRedefineDataType.h">
+      <Filter>DB</Filter>
+    </ClInclude>
+    <ClInclude Include="Redis\RedisCommon.h">
+      <Filter>Redis</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -822,6 +837,9 @@
       <Filter>Redis</Filter>
     </ClCompile>
     <ClCompile Include="Redis\RedisResultSet.cpp">
+      <Filter>Redis</Filter>
+    </ClCompile>
+    <ClCompile Include="Redis\RedisServerHeartbeat.cpp">
       <Filter>Redis</Filter>
     </ClCompile>
   </ItemGroup>

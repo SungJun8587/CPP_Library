@@ -272,7 +272,7 @@ void CIocpListener::ScheduleRetry(AcceptEvent* acceptEvent)
 
                     if( !_closing.load(std::memory_order_acquire) )
                     {
-                        if( std::shared_ptr<CIocpListener> self = weakSelf.lock() )
+                        if( CIocpListenerRef self = weakSelf.lock() )
                         {
                             self->RegisterAccept(acceptEvent);
                         }

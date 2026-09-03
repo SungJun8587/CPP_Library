@@ -12,7 +12,9 @@
 #include <Memory/Containers.h>
 #include <Thread/PlatformLock.h>
 
+#include <atomic>
 #include <type_traits>
+#include <utility>
 
 //***************************************************************************
 // @class CChunkedSwapQueue
@@ -54,7 +56,9 @@
 //    할당 실패 시 ASSERT_CRASH로 종료하여 std::bad_alloc을 발생시키지 않습니다.
 //  - USE_GPMEMORY가 정의되지 않은 폴백 빌드에서는 ::operator new 기반 할당이
 //    std::bad_alloc을 던질 수 있으므로 PushBatch()/Swap()/SwapChunk()의
-//    부분 이동 후 상태 롤백은 보장하지 않습니다.
+//    부분 이동 후 상태 롤백은 보장하지 않습니다. 이 셋 모두 동일한 전제에
+//    의존하므로, 이 전제가 깨지는 빌드에서는 셋 다 인스턴스화 시점에 컴파일
+//    에러로 막습니다(아래 각 함수의 static_assert 참고).
 //  - 따라서 이 클래스에서 예외가 발생할 수 있는 allocator 환경을 사용하려면
 //    별도의 예외 안전성 설계가 필요합니다.
 //***************************************************************************
@@ -146,9 +150,22 @@ public:
     //***************************************************************************
     // @brief 입력 큐의 모든 요소를 출력 큐로 통째로 스왑(이동)합니다.
     // @param outQueue 데이터를 전달받을 대상 큐 (호출자 소유, 클래스 상단 계약 참고)
+    // @note 예외 안전성은 클래스 상단 "예외 안전성 전제" 주석을 참고할 것.
     //***************************************************************************
     void Swap(CQueue<T>& outQueue)
     {
+        // PushBatch()와 동일한 전제(예외 없는 allocator)에 의존한다. outQueue가 비어있지
+        // 않아 개별 이동 경로를 타는 경우, 폴백 빌드에서는 outQueue.push()의 할당 실패가
+        // 예외를 던질 수 있어 부분 이동 후 _size가 실제 _inQueue.size()와 어긋날 수 있다.
+        // 이 전제를 런타임에 검증할 수 없으므로, USE_GPMEMORY가 정의되지 않은 빌드에서
+        // Swap()이 실제로 인스턴스화되는 즉시 컴파일 에러로 막는다.
+#ifndef USE_GPMEMORY
+        static_assert(sizeof(T) == 0,
+            "CChunkedSwapQueue<T>::Swap() assumes StlAllocator allocation failures "
+            "never throw, which is only guaranteed under a USE_GPMEMORY build. Define "
+            "USE_GPMEMORY, or review Swap()'s exception-safety before using it in "
+            "this build.");
+#endif
         PLockGuard lock(_lock, __FUNCTION__);
 
         if( _inQueue.empty() )
@@ -178,9 +195,22 @@ public:
     // @param maxCount 한 번에 가져올 최대 아이템 개수
     // @note maxCount가 클수록 한 번의 호출에서 더 많은 작업을 처리할 수 있지만,
     //       내부 락 점유 시간이 증가할 수 있습니다.
+    // @note 예외 안전성은 클래스 상단 "예외 안전성 전제" 주석을 참고할 것.
     //***************************************************************************
     void SwapChunk(CQueue<T>& outQueue, size_t maxCount)
     {
+        // PushBatch()/Swap()과 동일한 전제(예외 없는 allocator)에 의존한다. 개별 이동
+        // 루프 도중 outQueue.push()가 예외를 던지면 _size가 실제 _inQueue.size()와
+        // 어긋날 수 있다. 이 전제를 런타임에 검증할 수 없으므로, USE_GPMEMORY가
+        // 정의되지 않은 빌드에서 SwapChunk()가 실제로 인스턴스화되는 즉시 컴파일
+        // 에러로 막는다.
+#ifndef USE_GPMEMORY
+        static_assert(sizeof(T) == 0,
+            "CChunkedSwapQueue<T>::SwapChunk() assumes StlAllocator allocation failures "
+            "never throw, which is only guaranteed under a USE_GPMEMORY build. Define "
+            "USE_GPMEMORY, or review SwapChunk()'s exception-safety before using it in "
+            "this build.");
+#endif
         if( maxCount == 0 )
             return;
 
@@ -204,6 +234,8 @@ public:
 
     //***************************************************************************
     // @brief 큐가 비어있는지 여부를 반환합니다.
+    // @note lock-free 관측값입니다. 동기화 지점이 아니며, 다소 오래된(stale) 값을
+    //       관측할 수 있습니다.
     //***************************************************************************
     bool IsEmpty() const
     {
@@ -212,6 +244,8 @@ public:
 
     //***************************************************************************
     // @brief 현재 큐에 대기 중인 전체 아이템 개수를 반환합니다.
+    // @note lock-free 관측값입니다. 동기화 지점이 아니며, 다소 오래된(stale) 값을
+    //       관측할 수 있습니다.
     //***************************************************************************
     int64 GetSize() const
     {

@@ -12,9 +12,6 @@
 #include <Network/HTTP/HttpConnPoolCommon.h>
 #include <Network/HTTP/TlsFilter.h>
 
-class CHttpSessionIocp;
-using CHttpSessionIocpRef = std::shared_ptr<CHttpSessionIocp>;
-
 //***************************************************************************
 // @class CHttpSessionIocp
 // @brief CIocpSession + CHttpClientCore(합성) — IOCP 엔진에서 HTTP/HTTPS 요청/

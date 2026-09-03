@@ -7,7 +7,7 @@
 #ifndef UC_JOBTIMER_H
 #define UC_JOBTIMER_H
 
-#include <BaseRedefineDataType.h> 
+#include <Job/JobCommon.h>
 #include <Memory/Containers.h> 
 #include <Thread/PlatformLock.h>
 

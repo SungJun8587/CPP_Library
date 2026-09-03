@@ -14,9 +14,6 @@
 #include <atomic>
 #include <mutex>
 
-class CIocpSession;
-using CIocpSessionRef = std::shared_ptr<CIocpSession>;
-
 //***************************************************************************
 // @class CIocpSession
 // @brief CSession을 상속받는 IOCP 네트워크 통신의 핵심인 연결 세션 추상 기반 클래스.

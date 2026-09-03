@@ -86,9 +86,19 @@
 #endif
 
 //***************************************************************************
-// @brief 스톰프 할당자(Stomp Allocator) 사용 여부를 제어하는 플래그 매크로입니다.
+// @brief 디버그 빌드 환경에서 메모리 오버런/언더런 검출용 스톰프 할당자(Stomp Allocator)를 자동 활성화합니다.
+// @note
+// [작동 방식]
+// - _DEBUG 플래그가 정의되어 있고, _STOMP 매크로가 사전 정의되지 않은 경우에만 
+//   _STOMP를 자동으로 정의하여 디버그 할당자로 전환합니다.
+// - 메모리 경계 침범(오버런/언더런) 및 Use-After-Free 버그를 디버그 단계에서 
+//	 즉시 검출하기 위해 사용됩니다.
+// - 릴리즈(Release) 빌드에서는 무시되므로 성능 하락 없이 디버그 환경에서만
+//   메모리 오염 및 Out-of-Bounds 에러를 빠르게 추적할 수 있습니다.
 //***************************************************************************
+#if defined(_DEBUG) && !defined(_STOMP)
 #define _STOMP
+#endif
 
 //***************************************************************************
 // @brief 빌드 타겟(x86/x64) 및 빌드 모드(Debug/Release)에 맞는 라이브러리 파일명을 생성합니다.
@@ -108,5 +118,27 @@
 #		define LIB_NAME(LIB) LIB##"32.lib"
 #	endif
 #endif
+
+//***************************************************************************
+// @brief 클래스 전방 선언(Forward Declaration)과 함께 스마트 포인터 타입 별칭을 자동 생성하는 매크로
+// 
+// [작동 방식]
+// - 'class name' 형태로 전방 선언을 동시에 수행하므로, 별도의 헤더 파일 include 없이도
+//   스마트 포인터 타입 별칭(예: CJob -> CJobRef)을 안전하게 사용할 수 있습니다.
+// - 템플릿 인스턴스화 시 불투명 타입(Incomplete Type) 상태를 활용하여 컴파일 타임 
+//   헤더 의존성 및 순환 참조(Circular Dependency)를 최소화합니다.
+// 
+// [사용 예시]
+// - USING_SHARED_PTR(CJob); -> using CJobRef = std::shared_ptr<class CJob>;
+//***************************************************************************
+#define USING_SHARED_PTR(name)	using name##Ref = std::shared_ptr<class name>;
+
+//***************************************************************************
+// 배열 크기 및 바이트 크기 계산용 유틸리티 매크로
+//***************************************************************************
+#define size16(val)		static_cast<int16>(sizeof(val))
+#define size32(val)		static_cast<int32>(sizeof(val))
+#define len16(arr)		static_cast<int16>(sizeof(arr)/sizeof(arr[0]))
+#define len32(arr)		static_cast<int32>(sizeof(arr)/sizeof(arr[0]))
 
 #endif // ndef UC_BASEMACRO_H

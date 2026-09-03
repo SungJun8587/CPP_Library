@@ -96,9 +96,6 @@
     <ClCompile Include="..\..\..\UtilCore\Network\RingBuffer.cpp">
       <Filter>UtilCore\Network</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\UtilCore\Network\IOCP\RecvBuffer.cpp">
-      <Filter>UtilCore\Network\IOCP</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\UtilCore\Network\IOCP\SendBuffer.cpp">
       <Filter>UtilCore\Network\IOCP</Filter>
     </ClCompile>
@@ -250,9 +247,6 @@
     <ClInclude Include="..\..\..\UtilCore\Util\Log.h">
       <Filter>UtilCore\Util</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\UtilCore\Containers\Map\ClusterSpinMap.h">
-      <Filter>UtilCore\Containers\Map</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\UtilCore\Memory\Containers.h">
       <Filter>UtilCore\Memory</Filter>
     </ClInclude>
@@ -283,9 +277,6 @@
     <ClInclude Include="..\..\..\UtilCore\Thread\PlatformLock.h">
       <Filter>UtilCore\Thread</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\RecvBuffer.h">
-      <Filter>UtilCore\Network\IOCP</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\UtilCore\Network\IOCP\SendBuffer.h">
       <Filter>UtilCore\Network\IOCP</Filter>
     </ClInclude>
@@ -303,13 +294,16 @@
     <ClInclude Include="..\..\..\UtilCore\Network\RIO\RioConnectEvent.h">
       <Filter>UtilCore\Network\RIO</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\UtilCore\Containers\Map\ClusterSpinUnorderedMap.h">
+      <Filter>UtilCore\Containers\Map</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\UtilCore\Containers\Map\ClusterSpinMap.inl">
-      <Filter>UtilCore\Containers\Map</Filter>
-    </None>
     <None Include="..\..\..\UtilCore\Thread\SpinLock.inl">
       <Filter>UtilCore\Thread</Filter>
+    </None>
+    <None Include="..\..\..\UtilCore\Containers\Map\ClusterSpinUnorderedMap.inl">
+      <Filter>UtilCore\Containers\Map</Filter>
     </None>
   </ItemGroup>
 </Project>

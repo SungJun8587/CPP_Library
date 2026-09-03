@@ -10,7 +10,14 @@
 #include <BaseRedefineDataType.h>
 #include <Containers/Queue/QueueCommon.h>
 
+#include <atomic>
+#include <condition_variable>
+#include <cstddef>
+#include <cstdint>
+#include <mutex>
+#include <new>
 #include <type_traits>
+#include <utility>
 
 //***************************************************************************
 // @class MPMCLockFreeQueue
@@ -36,6 +43,13 @@
 //  - Close() 이후에도 큐에 남아있는 데이터는 정상적으로 소비할 수 있습니다.
 //  - 큐가 닫히고 남은 데이터가 없으면 blocking Pop()은 false를 반환합니다.
 //  - Close()는 대기 중인 모든 producer/consumer를 깨웁니다.
+//  - Close()가 이미 IsClosed()==false를 확인하고 reservation 절차에
+//    들어간 producer와 동시에 호출되면, 그 producer의 아이템은 정상
+//    publish되어 Pop 가능합니다. 다만 이는 best-effort이며, Close()를
+//    "모든 producer가 push를 끝낸 뒤"에 호출하는 것이 유일하게 보장되는
+//    사용 방식입니다. 그렇지 않으면 극히 드문 스케줄링 하에서 Close()와
+//    거의 동시에 시작된 push가 이미 종료를 관찰한 Pop()에 보이지 않을
+//    수 있습니다.
 //
 // 주의:
 //  - 객체의 소멸은 모든 producer/consumer가 종료된 이후에 수행해야 합니다.
@@ -59,6 +73,15 @@ private:
         T* GetDataPtr() noexcept
         {
             return reinterpret_cast<T*>(Storage);
+        }
+
+        //***************************************************************************
+        // @brief 셀 내부에 저장된 데이터의 const 포인터를 반환합니다.
+        // @return const T* 데이터 포인터
+        //***************************************************************************
+        const T* GetDataPtr() const noexcept
+        {
+            return reinterpret_cast<const T*>(Storage);
         }
     };
 
@@ -95,7 +118,7 @@ public:
     // @param value 삽입할 값
     // @return true: 삽입 성공, false: 큐가 가득 차거나 종료됨
     //***************************************************************************
-    bool TryPush(const T& value)
+    [[nodiscard]] bool TryPush(const T& value)
     {
         static_assert(
             std::is_nothrow_copy_constructible_v<T>,
@@ -109,7 +132,7 @@ public:
     // @param value 삽입할 값
     // @return true: 삽입 성공, false: 큐가 가득 차거나 종료됨
     //***************************************************************************
-    bool TryPush(T&& value)
+    [[nodiscard]] bool TryPush(T&& value)
     {
         static_assert(
             std::is_nothrow_move_constructible_v<T>,
@@ -123,7 +146,7 @@ public:
     // @param value 삽입할 값
     // @return true: 삽입 성공, false: 종료됨
     //***************************************************************************
-    bool Push(const T& value)
+    [[nodiscard]] bool Push(const T& value)
     {
         static_assert(
             std::is_nothrow_copy_constructible_v<T>,
@@ -137,7 +160,7 @@ public:
     // @param value 삽입할 값
     // @return true: 삽입 성공, false: 종료됨
     //***************************************************************************
-    bool Push(T&& value)
+    [[nodiscard]] bool Push(T&& value)
     {
         static_assert(
             std::is_nothrow_move_constructible_v<T>,
@@ -151,7 +174,7 @@ public:
     // @param outValue 꺼낸 데이터가 저장될 참조 변수
     // @return true: 데이터 추출 성공, false: 큐가 비어있음 또는 종료 후 비어있음
     //***************************************************************************
-    bool TryPop(T& outValue)
+    [[nodiscard]] bool TryPop(T& outValue)
     {
         static_assert(
             std::is_nothrow_move_assignable_v<T>,
@@ -209,7 +232,7 @@ public:
     // @brief 큐에서 데이터를 블로킹 방식으로 꺼냅니다.
     // @param outValue 꺼낸 데이터가 저장될 참조 변수
     //***************************************************************************
-    bool Pop(T& outValue)
+    [[nodiscard]] bool Pop(T& outValue)
     {
         static_assert(
             std::is_nothrow_move_assignable_v<T>,
@@ -220,7 +243,7 @@ public:
             if( TryPop(outValue) )
                 return true;
 
-            if( IsClosed() )
+            if( IsClosed() && IsEmptyApprox() )
                 return false;
 
             LFQ_CPU_PAUSE();
@@ -231,7 +254,7 @@ public:
             {
                 std::unique_lock<std::mutex> lock(m_NotEmptyMutex);
 
-                if( IsClosed() && SizeApprox() == 0 )
+                if( IsClosed() && IsEmptyApprox() )
                     return false;
 
                 m_WaitingPoppers.fetch_add(
@@ -253,7 +276,12 @@ public:
             if( TryPop(outValue) )
                 return true;
 
-            if( IsClosed() )
+            // Close 상태이고 큐가 완전히 drain되었다면 종료합니다.
+            //
+            // TryPop() 실패 시점의 스냅샷이 아니라 이 시점에서 다시
+            // IsEmptyApprox()를 평가하여, TryPop() 확인과 Close() 확인
+            // 사이에 끼어든 push를 놓치지 않도록 합니다.
+            if( IsClosed() && IsEmptyApprox() )
                 return false;
         }
     }
@@ -296,16 +324,34 @@ public:
     // @brief 큐가 종료 상태인지 확인합니다.
     // @return true: 종료됨, false: 동작 중
     //***************************************************************************
-    bool IsClosed() const noexcept
+    [[nodiscard]] bool IsClosed() const noexcept
     {
         return m_Closed.load(std::memory_order_acquire);
+    }
+
+    //***************************************************************************
+    // @brief Close 상태를 해제하고 다시 사용할 수 있도록 합니다.
+    //
+    // @details
+    // Reset()은 큐를 사용하는 다른 producer/consumer가 없는 상태에서
+    // 호출해야 합니다.
+    //
+    // 일반적인 생산/소비 lifecycle에서는 Close 후 새로운 queue 객체를
+    // 생성하는 방식이 더 안전합니다.
+    //
+    // Reset()은 position이나 Cell을 초기화하지 않습니다.
+    // 따라서 기존 queue가 완전히 drain된 상태에서만 사용해야 합니다.
+    //***************************************************************************
+    void Reset() noexcept
+    {
+        m_Closed.store(false, std::memory_order_release);
     }
 
     //***************************************************************************
     // @brief 대략적인 현재 큐 크기를 반환합니다.
     // @return std::size_t 대략적인 요소 개수
     //***************************************************************************
-    std::size_t SizeApprox() const noexcept
+    [[nodiscard]] std::size_t SizeApprox() const noexcept
     {
         const std::size_t enq =
             m_EnqueuePos.load(std::memory_order_relaxed);
@@ -320,7 +366,7 @@ public:
     // @brief 큐의 최대 용량을 반환합니다.
     // @return constexpr std::size_t 큐 용량
     //***************************************************************************
-    constexpr std::size_t GetCapacity() const noexcept
+    [[nodiscard]] constexpr std::size_t GetCapacity() const noexcept
     {
         return Capacity;
     }
@@ -331,7 +377,7 @@ private:
     //***************************************************************************
     // @brief 대략적인 큐가 비어있는지 확인합니다.
     //***************************************************************************
-    bool IsEmptyApprox() const noexcept
+    [[nodiscard]] bool IsEmptyApprox() const noexcept
     {
         return SizeApprox() == 0;
     }
@@ -516,7 +562,7 @@ private:
     //***************************************************************************
     // @brief 대략적인 큐가 가득 찼는지 확인합니다.
     //***************************************************************************
-    bool IsFullApprox() const noexcept
+    [[nodiscard]] bool IsFullApprox() const noexcept
     {
         return SizeApprox() >= Capacity;
     }

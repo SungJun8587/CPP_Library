@@ -94,10 +94,7 @@ using namespace std;
 
 #include <Containers/Stack/LockFreeSlotStack.h>
 
-#include <Job/Job.h>
-#include <Job/JobTimer.h>
-#include <Job/JobQueue.h>
-#include <Job/GlobalQueue.h>
+#include <Job/JobCommon.h>
 
 #include <Network/NetworkCommon.h>
 
@@ -186,13 +183,7 @@ using namespace std;
 #include <DB/MySQL/MySQLAsyncSrv.h>
 
 #include <Redis/HiRedisConn.h>
-#include <Redis/RedisProtocol.h>
-#include <Redis/RedisParser.h>
-#include <Redis/RedisCommandBuilder.h>
-#include <Redis/RedisClient.h>
-#include <Redis/RedisConnectionPool.h>
-#include <Redis/RedisService.h>
-#include <Redis/RedisResultSet.h>
+#include <Redis/RedisCommon.h>
 
 #include <WindowsServiceBase.h>
 

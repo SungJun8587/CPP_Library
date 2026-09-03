@@ -55,7 +55,7 @@ void CRioSessionManager::RemoveSession(uint64 sessionId)
 	if( sessionId == 0 )
 		return;
 
-	_sessions.EraseObject(sessionId);
+	(void)_sessions.EraseObject(sessionId);
 }
 
 //***************************************************************************

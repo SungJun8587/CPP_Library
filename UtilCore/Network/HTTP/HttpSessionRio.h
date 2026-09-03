@@ -12,9 +12,6 @@
 #include <Network/HTTP/HttpConnPoolCommon.h>
 #include <Network/HTTP/TlsFilter.h>
 
-class CHttpSessionRio;
-using CHttpSessionRioRef = std::shared_ptr<CHttpSessionRio>;
-
 //***************************************************************************
 // @class CHttpSessionRio
 // @brief CRioSession + CHttpClientCore(합성) — RIO 엔진에서 HTTP/HTTPS 요청/

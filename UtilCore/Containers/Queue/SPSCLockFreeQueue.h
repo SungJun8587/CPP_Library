@@ -43,6 +43,10 @@
 //  - Close() 이후 큐가 비어 있으면 Pop은 false를 반환합니다.
 //  - Close()는 대기 중인 producer/consumer를 모두 깨웁니다.
 //  - Close()는 여러 번 호출해도 안전합니다(idempotent).
+//  - Close()는 producer가 마지막 Push를 마친 뒤(가급적 producer 스레드
+//    자신이) 호출해야 합니다. Push 진행 중에 다른 스레드가 Close()를
+//    호출하면, 그 Push는 정상 publish될 수도 있지만 이미 종료를 관찰한
+//    Pop()에는 보이지 않을 수 있습니다.
 //***************************************************************************
 template <typename T, std::size_t Capacity>
 class SPSCLockFreeQueue
@@ -159,7 +163,7 @@ public:
     // @param value 삽입할 값
     // @return true: 삽입 성공, false: 큐가 가득 참 또는 Close 상태
     //***************************************************************************
-    bool TryPush(const T& value)
+    [[nodiscard]] bool TryPush(const T& value)
     {
         return EmplacePush(value);
     }
@@ -169,7 +173,7 @@ public:
     // @param value 삽입할 값
     // @return true: 삽입 성공, false: 큐가 가득 참 또는 Close 상태
     //***************************************************************************
-    bool TryPush(T&& value)
+    [[nodiscard]] bool TryPush(T&& value)
     {
         return EmplacePush(std::move(value));
     }
@@ -179,7 +183,7 @@ public:
     // @param value 삽입할 값
     // @return true: 삽입 성공, false: Close 상태로 인해 삽입되지 않음
     //***************************************************************************
-    bool Push(const T& value)
+    [[nodiscard]] bool Push(const T& value)
     {
         return BlockingEmplacePush(value);
     }
@@ -189,7 +193,7 @@ public:
     // @param value 삽입할 값
     // @return true: 삽입 성공, false: Close 상태로 인해 삽입되지 않음
     //***************************************************************************
-    bool Push(T&& value)
+    [[nodiscard]] bool Push(T&& value)
     {
         return BlockingEmplacePush(std::move(value));
     }
@@ -199,7 +203,7 @@ public:
     // @param outValue 꺼낸 데이터가 저장될 참조 변수
     // @return true: 데이터 추출 성공, false: 큐가 비어있음
     //***************************************************************************
-    bool TryPop(T& outValue)
+    [[nodiscard]] bool TryPop(T& outValue)
     {
         // consumer만 m_DequeuePos를 수정하므로 relaxed load로 충분합니다.
         const std::size_t pos =
@@ -257,7 +261,7 @@ public:
     // Close() 호출 후 큐에 남아있는 데이터는 먼저 drain할 수 있도록
     // 구현되어 있습니다. drain이 끝난 이후에는 false를 반환합니다.
     //***************************************************************************
-    bool Pop(T& outValue)
+    [[nodiscard]] bool Pop(T& outValue)
     {
         // 짧은 대기는 context switch보다 spin이 유리할 수 있습니다.
         for( int i = 0; i < kSpinBeforeSleepCount; ++i )
@@ -274,6 +278,9 @@ public:
         for( ;;)
         {
             std::unique_lock<std::mutex> lock(m_NotEmptyMutex);
+
+            if( IsClosed() && !HasData() )
+                return false;
 
             // waiter 등록과 predicate 확인을 같은 mutex 영역에서 수행합니다.
             //
@@ -320,7 +327,7 @@ public:
     // 다른 lock-free 큐 구현체들과의 일관성 및 향후 변경에 대한 방어적
     // 안전장치로 클램프를 유지합니다.
     //***************************************************************************
-    std::size_t SizeApprox() const noexcept
+    [[nodiscard]] std::size_t SizeApprox() const noexcept
     {
         const std::size_t enqueuePos =
             m_EnqueuePos.Value.load(std::memory_order_relaxed);
@@ -337,7 +344,7 @@ public:
     // @brief 큐의 최대 용량을 반환합니다.
     // @return constexpr std::size_t 큐 용량
     //***************************************************************************
-    constexpr std::size_t GetCapacity() const noexcept
+    [[nodiscard]] constexpr std::size_t GetCapacity() const noexcept
     {
         return Capacity;
     }
@@ -381,9 +388,27 @@ public:
     // @brief 큐가 종료 상태인지 확인합니다.
     // @return true: 종료됨, false: 동작 중
     //***************************************************************************
-    bool IsClosed() const noexcept
+    [[nodiscard]] bool IsClosed() const noexcept
     {
         return m_Closed.load(std::memory_order_acquire);
+    }
+
+    //***************************************************************************
+    // @brief Close 상태를 해제하고 다시 사용할 수 있도록 합니다.
+    //
+    // @details
+    // Reset()은 큐를 사용하는 다른 producer/consumer가 없는 상태에서
+    // 호출해야 합니다.
+    //
+    // 일반적인 생산/소비 lifecycle에서는 Close 후 새로운 queue 객체를
+    // 생성하는 방식이 더 안전합니다.
+    //
+    // Reset()은 position이나 Cell을 초기화하지 않습니다.
+    // 따라서 기존 queue가 완전히 drain된 상태에서만 사용해야 합니다.
+    //***************************************************************************
+    void Reset() noexcept
+    {
+        m_Closed.store(false, std::memory_order_release);
     }
 
 private:
@@ -393,7 +418,7 @@ private:
     // @brief 큐에 데이터가 존재하는지 확인합니다.
     // @return true: 데이터가 존재함, false: 큐가 비어있음
     //***************************************************************************
-    bool HasData() const noexcept
+    [[nodiscard]] bool HasData() const noexcept
     {
         const std::size_t dequeuePos =
             m_DequeuePos.Value.load(std::memory_order_relaxed);
@@ -408,7 +433,7 @@ private:
     // @brief 큐에 빈 공간이 존재하는지 확인합니다.
     // @return true: 빈 공간 존재, false: 큐가 가득 참
     //***************************************************************************
-    bool HasFreeSlot() const noexcept
+    [[nodiscard]] bool HasFreeSlot() const noexcept
     {
         const std::size_t enqueuePos =
             m_EnqueuePos.Value.load(std::memory_order_relaxed);
@@ -430,7 +455,7 @@ private:
     //***************************************************************************
     void NotifyNotEmpty()
     {
-        if( m_WaitingPoppers.load(std::memory_order_acquire) == 0 )
+        if( m_WaitingPoppers.load(std::memory_order_relaxed) == 0 )
             return;
 
         std::lock_guard<std::mutex> lock(m_NotEmptyMutex);
@@ -449,7 +474,7 @@ private:
     //***************************************************************************
     void NotifyNotFull()
     {
-        if( m_WaitingPushers.load(std::memory_order_acquire) == 0 )
+        if( m_WaitingPushers.load(std::memory_order_relaxed) == 0 )
             return;
 
         std::lock_guard<std::mutex> lock(m_NotFullMutex);
@@ -480,6 +505,9 @@ private:
         for( ;;)
         {
             std::unique_lock<std::mutex> lock(m_NotFullMutex);
+
+            if( IsClosed() )
+                return false;
 
             // waiter 등록과 predicate 확인을 같은 mutex 영역에서 수행합니다.
             //

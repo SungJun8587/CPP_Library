@@ -11,6 +11,7 @@
 #include <Containers/Queue/QueueCommon.h>
 #include <Memory/Containers.h>
 
+#include <atomic>
 #include <condition_variable>
 #include <mutex>
 #include <type_traits>
@@ -36,17 +37,31 @@
 //    → 여러 프로듀서가 데이터를 넣고, 여러 컨슈머가 안전하게 Pop 수행
 //
 // 예외 안전성:
-//  - PushBatch()는 Stop()/SetProducerDone() 이후 거부되는 경우 temp에 옮겨둔 원소를
-//    items로 되돌리는 롤백 경로를 가집니다. 이 롤백이 안전하려면 T의 이동 생성이
-//    예외를 던지지 않아야 하므로, T는 nothrow move constructible이어야 합니다
-//    (아래 static_assert로 강제).
+//  - PushBatch()는 Stop()/SetProducerDone() 이후 거부되는 경우, 원소 이동을 전혀
+//    시작하지 않고(락 안에서 상태 체크가 이동보다 먼저 수행됨) 즉시 false를 반환합니다.
+//    즉 거부 케이스는 애초에 롤백이 필요 없는 all-or-nothing입니다.
+//  - 다만 내부 CQueue<T>(deque)의 메모리 할당이 루프 도중 실패하면(폴백 빌드 등)
+//    이미 이동된 일부 원소는 items에서 빠진 채로 예외가 전파될 수 있어, 이 경우는
+//    강한 예외 보장을 제공하지 않습니다(PushBatch() 함수 주석 참고). T가 nothrow
+//    move constructible/assignable이어야 하는 이유는 이 부분 이동 시나리오에서 T의
+//    이동 자체가 추가로 예외를 던지지 않도록 하기 위함입니다 (아래 static_assert로 강제).
+//
+// Lifetime 계약:
+//  - 이 클래스는 컨슈머 스레드를 소유하지 않습니다. Pop()에서 블로킹 대기 중인
+//    스레드가 있다면, 호출자는 반드시 Stop() 호출 후 해당 스레드를 join()한 뒤에
+//    이 객체를 파괴해야 합니다. Stop()은 대기 중인 스레드를 깨우는 신호만 보낼 뿐
+//    스레드 종료를 기다리지 않으므로(Stop() != Join), Stop() 호출 직후 객체를
+//    파괴하면 막 깨어난 Pop()이 이미 소멸된 _mutex/_cv에 접근하는 미정의 동작(UB)이
+//    발생할 수 있습니다.
 //***************************************************************************
 template<typename T>
 class CBlockingTaskQueue
 {
-    static_assert(std::is_nothrow_move_constructible_v<T>,
+    static_assert(
+        std::is_nothrow_move_constructible_v<T>&&
+        std::is_nothrow_move_assignable_v<T>,
         "CBlockingTaskQueue<T>: T must be nothrow move constructible "
-        "for exception-safe batch insertion.");
+        "and nothrow move assignable.");
 
 public:
     //***************************************************************************
@@ -61,6 +76,12 @@ public:
             if( _stopped || _producerDone )
                 return false;
             _queue.push(std::move(item));
+            // fetch_sub()가 항상 락 안에서 실행되는 Pop()과 짝을 맞추기 위해,
+            // fetch_add()도 반드시 같은 락 구간 안에서 실행합니다. 락 밖에서
+            // 실행하면, 이 push가 unlock된 직후(아직 fetch_add 전) 다른 컨슈머가
+            // 먼저 락을 선점해 이 원소를 pop()하고 fetch_sub()를 실행할 수 있어
+            // _size가 일시적으로 음수로 언더플로(size_t 래핑)될 수 있습니다.
+            _size.fetch_add(1, std::memory_order_relaxed);
         }
         _cv.notify_one();
         return true;
@@ -105,6 +126,9 @@ public:
 
             for( auto& item : items )
                 _queue.push(std::move(item));
+
+            // Push()와 동일한 이유로 fetch_add()를 락 구간 안에서 실행합니다.
+            _size.fetch_add(count, std::memory_order_relaxed);
         }
 
         items.clear();
@@ -141,7 +165,31 @@ public:
 
         out = std::move(_queue.front());
         _queue.pop();
+        _size.fetch_sub(1, std::memory_order_relaxed);
         return true;
+    }
+
+    //***************************************************************************
+    // @brief 큐가 비어있는지 여부를 반환합니다.
+    // @return true: 비어있음, false: 데이터 있음
+    // @note 락 없이 아토믹 카운터로 조회하는 순간적인 관찰값입니다. 멀티스레드
+    //       환경에서는 반환 직후 상태가 변경될 수 있습니다. 동시성 제어가
+    //       필요한 경우 Pop()의 반환값을 사용해야 합니다.
+    //***************************************************************************
+    bool IsEmpty() const
+    {
+        return _size.load(std::memory_order_relaxed) == 0;
+    }
+
+    //***************************************************************************
+    // @brief 현재 큐에 대기 중인 전체 아이템 개수를 반환합니다.
+    // @return 큐 크기 (size_t)
+    // @note 락 없이 아토믹 카운터로 조회하는 순간적인 관찰값입니다. 멀티스레드
+    //       환경에서는 반환 직후 실제 큐 크기가 변경될 수 있습니다.
+    //***************************************************************************
+    size_t GetSize() const
+    {
+        return _size.load(std::memory_order_relaxed);
     }
 
     //***************************************************************************
@@ -178,6 +226,7 @@ private:
     CQueue<T>                   _queue;                 // 내부 큐 컨테이너
     std::mutex                  _mutex;                 // 동기화를 위한 뮤텍스
     std::condition_variable     _cv;                    // 소비자 대기 제어 조건 변수
+    std::atomic<size_t>         _size{ 0 };             // GetSize()/IsEmpty()를 락 없이 조회하기 위한 카운터
     bool                        _producerDone{ false }; // 프로듀서 종료 플래그 (항상 _mutex 보유 상태에서만 접근)
     bool                        _stopped{ false };      // 강제 종료 플래그 (항상 _mutex 보유 상태에서만 접근)
 };

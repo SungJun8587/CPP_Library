@@ -54,6 +54,7 @@
     <ClInclude Include="DB\DBMYSQLQuery.h" />
     <ClInclude Include="DB\DBORACLEQuery.h" />
     <ClInclude Include="DB\DBQueryProcess.h" />
+    <ClInclude Include="DB\DBRedefineDataType.h" />
     <ClInclude Include="DB\DBSchema.h" />
     <ClInclude Include="DB\DBSQLQuery.h" />
     <ClInclude Include="DB\DBSyncBind.h" />
@@ -69,7 +70,9 @@
     <ClInclude Include="GcpService\JsonFieldExtract.h" />
     <ClInclude Include="Job\GlobalQueue.h" />
     <ClInclude Include="Job\Job.h" />
+    <ClInclude Include="Job\JobCommon.h" />
     <ClInclude Include="Job\JobQueue.h" />
+    <ClInclude Include="Job\JobRedefineDataType.h" />
     <ClInclude Include="Job\JobTimer.h" />
     <ClInclude Include="JSON\RapidJSONUtil.h" />
     <ClInclude Include="Memory\Allocator.h" />
@@ -133,11 +136,13 @@
     <ClInclude Include="Redis\HiRedisConn.h" />
     <ClInclude Include="Redis\RedisClient.h" />
     <ClInclude Include="Redis\RedisCommandBuilder.h" />
+    <ClInclude Include="Redis\RedisCommon.h" />
     <ClInclude Include="Redis\RedisConnectionPool.h" />
     <ClInclude Include="Redis\RedisParser.h" />
     <ClInclude Include="Redis\RedisProtocol.h" />
     <ClInclude Include="Redis\RedisRedefineDataType.h" />
     <ClInclude Include="Redis\RedisResultSet.h" />
+    <ClInclude Include="Redis\RedisServerHeartbeat.h" />
     <ClInclude Include="Redis\RedisService.h" />
     <ClInclude Include="ServerConfig.h" />
     <ClInclude Include="ServerConnectInfo.h" />
@@ -244,6 +249,7 @@
     <ClCompile Include="Redis\RedisConnectionPool.cpp" />
     <ClCompile Include="Redis\RedisParser.cpp" />
     <ClCompile Include="Redis\RedisResultSet.cpp" />
+    <ClCompile Include="Redis\RedisServerHeartbeat.cpp" />
     <ClCompile Include="Redis\RedisService.cpp" />
     <ClCompile Include="ServerConfig.cpp" />
     <ClCompile Include="pch.cpp">

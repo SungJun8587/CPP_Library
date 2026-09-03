@@ -52,11 +52,11 @@ typedef char TCHAR;
 //***************************************************************************
 // 고정 크기 정수형 타입 재정의 (크로스플랫폼 표준 준수)
 // MSVC 전용인 __int64나 _W64 대신 <cstdint>의 표준 타입을 사용합니다.
-//************************************************---------------------------
+//***************************************************************************
 typedef int8_t			int8;
 typedef int16_t			int16;
 typedef int32_t			int32;
-typedef long			time32;
+typedef int32_t			time32;
 typedef int64_t			int64;
 
 typedef uint8_t			uint8, uchar;
@@ -96,25 +96,12 @@ typedef uint64_t		uint64, time64;
 
 //***************************************************************************
 // 편의 템플릿 및 스마트 포인터 단축 매크로
-//************************************************---------------------------
+//***************************************************************************
 template<typename T>
 using Atomic = std::atomic<T>;
-
-// 클래스 이름을 받아 스마트 포인터 타입(예: CJobRef)을 자동 선언해 주는 매크로
-#define USING_SHARED_PTR(name)	using name##Ref = std::shared_ptr<class name>;
-
-//***************************************************************************
-// 프로젝트 내 주요 클래스 스마트 포인터 정의
-//***************************************************************************
-USING_SHARED_PTR(CJob);
-USING_SHARED_PTR(CJobQueue);
-
-//***************************************************************************
-// 배열 크기 및 바이트 크기 계산용 유틸리티 매크로
-//************************************************---------------------------
-#define size16(val)		static_cast<int16>(sizeof(val))
-#define size32(val)		static_cast<int32>(sizeof(val))
-#define len16(arr)		static_cast<int16>(sizeof(arr)/sizeof(arr[0]))
-#define len32(arr)		static_cast<int32>(sizeof(arr)/sizeof(arr[0]))
+using Mutex = std::mutex;
+using CondVar = std::condition_variable;
+using UniqueLock = std::unique_lock<std::mutex>;
+using LockGuard = std::lock_guard<std::mutex>;
 
 #endif // ndef UC_BASEREDEFINEDATATYPE_H

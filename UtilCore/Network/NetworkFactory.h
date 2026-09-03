@@ -7,8 +7,8 @@
 #ifndef UC_NETWORKFACTORY_H
 #define UC_NETWORKFACTORY_H
 
-#include <Network/Session.h>						// SessionFactory 정의 (CSessionRef를 쓰는 std::function 별칭)
-#include <Network/NetworkRedefineDataType.h>		// CNetServiceRef/CIocpCoreRef/CRioCoreRef 등 네트워크 계층 전체가 공유하는 shared_ptr 별칭 레지스트리
+#include <Network/NetworkRedefineDataType.h>		
+#include <Network/Session.h>						
 
 #include <memory>
 #include <functional>

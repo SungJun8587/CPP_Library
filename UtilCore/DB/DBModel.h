@@ -7,25 +7,11 @@
 #ifndef UC_DBMODEL_H
 #define UC_DBMODEL_H
 
+#include <DB/DBCommon.h>
+
 #include <regex>
 
 NAMESPACE_BEGIN(DBModel)
-
-USING_SHARED_PTR(Column);
-USING_SHARED_PTR(Constraint);
-USING_SHARED_PTR(IdentityColumn);
-USING_SHARED_PTR(IndexColumn);
-USING_SHARED_PTR(Index);
-USING_SHARED_PTR(IndexOption);
-USING_SHARED_PTR(ForeignKey);
-USING_SHARED_PTR(DefaultConstraint);
-USING_SHARED_PTR(CheckConstraint);
-USING_SHARED_PTR(Table);
-USING_SHARED_PTR(Trigger);
-USING_SHARED_PTR(ProcParam);
-USING_SHARED_PTR(Procedure);
-USING_SHARED_PTR(FuncParam);
-USING_SHARED_PTR(Function);
 
 //***************************************************************************
 // @brief 데이터베이스 컬럼 모델 클래스

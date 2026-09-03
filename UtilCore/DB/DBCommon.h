@@ -7,6 +7,10 @@
 #ifndef UC_DBCOMMON_H
 #define UC_DBCOMMON_H
 
+#include <BaseRedefineDataType.h>
+#include <BaseMacro.h>
+
+#include <DB/DBRedefineDataType.h>
 #include <DB/DBEnum.h>
 #include <DB/DBMSSQLQuery.h>
 #include <DB/DBMYSQLQuery.h>

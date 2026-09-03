@@ -11,7 +11,10 @@
 #include <Containers/Queue/QueueCommon.h>
 
 #include <atomic>
+#include <condition_variable>
+#include <cstddef>
 #include <cstdint>
+#include <mutex>
 #include <new>
 #include <type_traits>
 #include <utility>
@@ -34,19 +37,23 @@
 //  - producer는 CAS 필요
 //  - consumer는 단순 인덱스 증가
 //  - 단일 소비자 환경에서 효율적
-//  - C++20 atomic wait/notify를 사용하여 blocking 대기 가능
+//  - blocking 경로는 짧은 스핀 후 condition_variable로 대기
 //
 // 종료:
 //  - Close() 호출 후 새로운 Push는 실패합니다.
 //  - Close() 이전에 삽입된 데이터는 계속 Pop할 수 있습니다.
 //  - Close() 이후 큐가 비어 있으면 Pop은 false를 반환합니다.
+//  - Close()가 이미 IsClosed()==false를 확인하고 reservation 절차에
+//    들어간 producer와 동시에 호출되면, 그 producer의 아이템은 정상
+//    publish되어 Pop 가능합니다. 다만 이는 best-effort이며, Close()를
+//    "모든 producer가 push를 끝낸 뒤"에 호출하는 것이 유일하게 보장되는
+//    사용 방식입니다.
 //
 // 주의:
 //  - T의 생성자는 noexcept여야 합니다.
 //  - T의 move assignment는 noexcept여야 합니다.
 //  - T의 destructor는 noexcept여야 합니다.
 //  - 객체가 소멸되는 동안 다른 producer/consumer가 큐에 접근해서는 안 됩니다.
-//  - C++20 std::atomic::wait/notify 기능을 사용합니다.
 //***************************************************************************
 template <typename T, std::size_t Capacity>
 class MPSCLockFreeQueue
@@ -133,7 +140,7 @@ public:
     // @param value 삽입할 값
     // @return true: 삽입 성공, false: 큐가 가득 찼거나 종료됨
     //***************************************************************************
-    bool TryPush(const T& value)
+    [[nodiscard]] bool TryPush(const T& value)
     {
         return EmplacePush(value);
     }
@@ -143,7 +150,7 @@ public:
     // @param value 삽입할 값
     // @return true: 삽입 성공, false: 큐가 가득 찼거나 종료됨
     //***************************************************************************
-    bool TryPush(T&& value)
+    [[nodiscard]] bool TryPush(T&& value)
     {
         return EmplacePush(std::move(value));
     }
@@ -153,7 +160,7 @@ public:
     // @param value 삽입할 값
     // @return true: 삽입 성공, false: 큐가 종료됨
     //***************************************************************************
-    bool Push(const T& value)
+    [[nodiscard]] bool Push(const T& value)
     {
         return BlockingEmplacePush(value);
     }
@@ -163,7 +170,7 @@ public:
     // @param value 삽입할 값
     // @return true: 삽입 성공, false: 큐가 종료됨
     //***************************************************************************
-    bool Push(T&& value)
+    [[nodiscard]] bool Push(T&& value)
     {
         return BlockingEmplacePush(std::move(value));
     }
@@ -171,9 +178,9 @@ public:
     //***************************************************************************
     // @brief 큐에서 데이터를 논블로킹 방식으로 꺼냅니다.
     // @param outValue 꺼낸 데이터가 저장될 참조 변수
-    // @return true: 데이터 추출 성공, false: 큐가 비어있음 또는 종료 후 비어있음
+    // @return true: 데이터 추출 성공, false: 큐가 비어있음
     //***************************************************************************
-    bool TryPop(T& outValue)
+    [[nodiscard]] bool TryPop(T& outValue)
     {
         static_assert(
             std::is_nothrow_move_assignable_v<T>,
@@ -210,7 +217,7 @@ public:
             std::memory_order_release);
 
         // Full 상태에서 대기 중인 producer를 깨웁니다.
-        m_DequeuePos.notify_one();
+        NotifyNotFull();
 
         return true;
     }
@@ -220,7 +227,7 @@ public:
     // @param outValue 꺼낸 데이터가 저장될 참조 변수
     // @return true: 데이터 추출 성공, false: 종료되어 더 이상 데이터가 없음
     //***************************************************************************
-    bool Pop(T& outValue)
+    [[nodiscard]] bool Pop(T& outValue)
     {
         static_assert(
             std::is_nothrow_move_assignable_v<T>,
@@ -231,7 +238,7 @@ public:
             if( TryPop(outValue) )
                 return true;
 
-            if( IsClosedAndEmpty() )
+            if( IsClosed() && IsEmptyApprox() )
                 return false;
 
             LFQ_CPU_PAUSE();
@@ -239,30 +246,45 @@ public:
 
         for( ;;)
         {
-            if( TryPop(outValue) )
-                return true;
+            std::unique_lock<std::mutex> lock(m_NotEmptyMutex);
 
-            if( IsClosedAndEmpty() )
+            if( IsClosed() && IsEmptyApprox() )
                 return false;
 
-            // 현재 enqueue position을 관찰합니다.
+            // waiter 등록과 predicate 확인을 같은 mutex 영역에서 수행합니다.
             //
-            // producer가 데이터를 publish하거나 Close()가 호출되면
-            // 해당 atomic 값에 notify가 발생합니다.
-            const std::size_t observed =
-                m_EnqueuePos.load(std::memory_order_acquire);
+            // producer는 waiter가 존재할 경우 같은 mutex를 잡은 뒤 notify하기
+            // 때문에 notify와 wait 사이의 lost wakeup을 방지할 수 있습니다.
+            //
+            // Close()도 동일한 mutex를 잡은 뒤 notify하므로 predicate 평가
+            // 직후, wait() 등록 직전 구간에서의 lost wakeup을 방지합니다.
+            m_WaitingPoppers.fetch_add(
+                1,
+                std::memory_order_relaxed);
 
-            // wait 직전에 상태를 다시 확인합니다.
-            // 값이 이미 변경되었다면 wait하지 않고 다시 loop합니다.
+            m_NotEmptyCv.wait(
+                lock,
+                [this]()
+                {
+                    return IsClosed() || !IsEmptyApprox();
+                });
+
+            m_WaitingPoppers.fetch_sub(
+                1,
+                std::memory_order_relaxed);
+
+            lock.unlock();
+
             if( TryPop(outValue) )
                 return true;
 
-            if( IsClosedAndEmpty() )
+            // Close 상태이고 큐가 완전히 drain되었다면 종료합니다.
+            //
+            // TryPop() 실패 시점의 스냅샷이 아니라 이 시점에서 다시
+            // IsEmptyApprox()를 평가하여, TryPop() 확인과 Close() 확인
+            // 사이에 끼어든 push를 놓치지 않도록 합니다.
+            if( IsClosed() && IsEmptyApprox() )
                 return false;
-
-            m_EnqueuePos.wait(
-                observed,
-                std::memory_order_acquire);
         }
     }
 
@@ -284,45 +306,53 @@ public:
         if( wasClosed )
             return;
 
-        // 대기 중인 consumer를 깨웁니다.
-        m_EnqueuePos.notify_all();
-
-        // 대기 중인 producer를 깨웁니다.
-        m_DequeuePos.notify_all();
+        // waiter가 predicate 평가 직후, 아직 wait()에 등록되기 전인
+        // 구간에서 notify가 유실되지 않도록 각 mutex를 잡은 뒤 통보합니다.
+        //
+        // Close는 lifecycle 이벤트이므로 빈번한 hot path가 아니며,
+        // mutex를 잡는 비용은 무시할 수 있습니다.
+        {
+            std::lock_guard<std::mutex> lock(m_NotEmptyMutex);
+            m_NotEmptyCv.notify_all();
+        }
+        {
+            std::lock_guard<std::mutex> lock(m_NotFullMutex);
+            m_NotFullCv.notify_all();
+        }
     }
 
     //***************************************************************************
     // @brief 큐가 종료되었는지 확인합니다.
     // @return true: 종료됨, false: 동작 중
     //***************************************************************************
-    bool IsClosed() const noexcept
+    [[nodiscard]] bool IsClosed() const noexcept
     {
         return m_Closed.load(std::memory_order_acquire);
     }
 
     //***************************************************************************
-    // @brief 큐가 종료되었고 비어 있는지 확인합니다.
-    // @return true: 종료되었으며 데이터가 없음
+    // @brief Close 상태를 해제하고 다시 사용할 수 있도록 합니다.
+    //
+    // @details
+    // Reset()은 큐를 사용하는 다른 producer/consumer가 없는 상태에서
+    // 호출해야 합니다.
+    //
+    // 일반적인 생산/소비 lifecycle에서는 Close 후 새로운 queue 객체를
+    // 생성하는 방식이 더 안전합니다.
+    //
+    // Reset()은 position이나 Cell을 초기화하지 않습니다.
+    // 따라서 기존 queue가 완전히 drain된 상태에서만 사용해야 합니다.
     //***************************************************************************
-    bool IsClosedAndEmpty() const noexcept
+    void Reset() noexcept
     {
-        if( !m_Closed.load(std::memory_order_acquire) )
-            return false;
-
-        const std::size_t enq =
-            m_EnqueuePos.load(std::memory_order_acquire);
-
-        const std::size_t deq =
-            m_DequeuePos.load(std::memory_order_acquire);
-
-        return enq == deq;
+        m_Closed.store(false, std::memory_order_release);
     }
 
     //***************************************************************************
     // @brief 대략적인 현재 큐 크기를 반환합니다.
     // @return std::size_t 대략적인 요소 개수
     //***************************************************************************
-    std::size_t SizeApprox() const noexcept
+    [[nodiscard]] std::size_t SizeApprox() const noexcept
     {
         const std::size_t enq =
             m_EnqueuePos.load(std::memory_order_relaxed);
@@ -334,16 +364,66 @@ public:
     }
 
     //***************************************************************************
+    // @brief 큐가 비어있는지 대략적으로 확인합니다.
+    // @return true: 비어있음, false: 데이터 존재
+    //***************************************************************************
+    [[nodiscard]] bool IsEmptyApprox() const noexcept
+    {
+        return SizeApprox() == 0;
+    }
+
+    //***************************************************************************
+    // @brief 큐가 가득 찼는지 대략적으로 확인합니다.
+    // @return true: 가득 참, false: 빈 공간 존재
+    //***************************************************************************
+    [[nodiscard]] bool IsFullApprox() const noexcept
+    {
+        return SizeApprox() >= Capacity;
+    }
+
+    //***************************************************************************
     // @brief 큐의 최대 용량을 반환합니다.
     // @return constexpr std::size_t 큐 용량
     //***************************************************************************
-    constexpr std::size_t GetCapacity() const noexcept
+    [[nodiscard]] constexpr std::size_t GetCapacity() const noexcept
     {
         return Capacity;
     }
 
 private:
     static constexpr int kSpinBeforeSleepCount = 1000;
+
+    //***************************************************************************
+    // @brief 대기 중인 소비자(popper)에게 데이터가 있음을 알립니다.
+    //
+    // @details
+    // waiter가 없는 일반적인 hot path에서는 mutex를 잡지 않습니다.
+    //***************************************************************************
+    void NotifyNotEmpty() noexcept
+    {
+        if( m_WaitingPoppers.load(std::memory_order_relaxed) == 0 )
+            return;
+
+        std::lock_guard<std::mutex> lock(m_NotEmptyMutex);
+
+        m_NotEmptyCv.notify_one();
+    }
+
+    //***************************************************************************
+    // @brief 대기 중인 생산자(pusher)에게 빈 공간이 생겼음을 알립니다.
+    //
+    // @details
+    // waiter가 없는 일반적인 hot path에서는 mutex를 잡지 않습니다.
+    //***************************************************************************
+    void NotifyNotFull() noexcept
+    {
+        if( m_WaitingPushers.load(std::memory_order_relaxed) == 0 )
+            return;
+
+        std::lock_guard<std::mutex> lock(m_NotFullMutex);
+
+        m_NotFullCv.notify_one();
+    }
 
     //***************************************************************************
     // @brief 블로킹 방식으로 데이터를 임플레이스 삽입합니다.
@@ -370,29 +450,33 @@ private:
 
         for( ;;)
         {
-            if( EmplacePush(std::forward<U>(value)) )
-                return true;
+            std::unique_lock<std::mutex> lock(m_NotFullMutex);
 
             if( IsClosed() )
                 return false;
 
-            // 현재 dequeue position을 관찰합니다.
-            //
-            // consumer가 Cell을 반환하면 dequeue position이 변경되고
-            // notify_one()이 호출됩니다.
-            const std::size_t observed =
-                m_DequeuePos.load(std::memory_order_acquire);
+            m_WaitingPushers.fetch_add(
+                1,
+                std::memory_order_relaxed);
 
-            // wait 직전에 다시 시도하여 race를 제거합니다.
-            if( EmplacePush(std::forward<U>(value)) )
-                return true;
+            m_NotFullCv.wait(
+                lock,
+                [this]()
+                {
+                    return IsClosed() || !IsFullApprox();
+                });
+
+            m_WaitingPushers.fetch_sub(
+                1,
+                std::memory_order_relaxed);
+
+            lock.unlock();
 
             if( IsClosed() )
                 return false;
 
-            m_DequeuePos.wait(
-                observed,
-                std::memory_order_acquire);
+            if( EmplacePush(std::forward<U>(value)) )
+                return true;
         }
     }
 
@@ -469,12 +553,7 @@ private:
             std::memory_order_release);
 
         // 대기 중인 consumer를 깨웁니다.
-        //
-        // m_EnqueuePos 자체도 reservation 단계에서 이미 변경되었기
-        // 때문에 wait 중인 consumer는 값 변화만으로도 깨어날 수 있지만,
-        // 실제 데이터 publish 시점에 명시적으로 notify하여 불필요한
-        // 지연을 줄입니다.
-        m_EnqueuePos.notify_one();
+        NotifyNotEmpty();
 
         return true;
     }
@@ -488,15 +567,11 @@ private:
 
     // 데이터가 삽입될 다음 위치입니다.
     // 멀티 프로듀서가 CAS로 경쟁하므로 별도의 캐시 라인에 배치합니다.
-    //
-    // C++20 atomic wait/notify의 consumer notification source로도 사용합니다.
     alignas(LFQ_CACHE_LINE_SIZE)
         std::atomic<std::size_t> m_EnqueuePos;
 
     // 데이터가 추출될 다음 위치입니다.
     // 단일 컨슈머 전용이므로 CAS가 필요하지 않습니다.
-    //
-    // C++20 atomic wait/notify의 producer notification source로도 사용합니다.
     alignas(LFQ_CACHE_LINE_SIZE)
         std::atomic<std::size_t> m_DequeuePos;
 
@@ -506,6 +581,36 @@ private:
     // true  -> 새로운 Push 금지, 기존 데이터 drain 허용
     alignas(LFQ_CACHE_LINE_SIZE)
         std::atomic<bool> m_Closed;
+
+    //***************************************************************************
+    // @brief 큐가 비어있거나 가득 찼을 때 블로킹을 위한 뮤텍스
+    //
+    // @details
+    // Hot path가 아니라 blocking path에서만 사용됩니다.
+    //***************************************************************************
+    std::mutex m_NotEmptyMutex;
+    std::mutex m_NotFullMutex;
+
+    //***************************************************************************
+    // @brief 큐 상태 변화(비어있지 않음 / 가득 차지 않음)를 통보하는 조건 변수
+    //***************************************************************************
+    std::condition_variable m_NotEmptyCv;
+    std::condition_variable m_NotFullCv;
+
+    //***************************************************************************
+    // @brief 현재 대기 중인 소비자/생산자 스레드 수
+    //
+    // @details
+    // Notify 함수에서는 mutex를 획득하기 전에 이 값을 확인하여
+    // waiter가 없는 hot path에서는 불필요한 mutex lock을 피합니다.
+    //
+    // 별도의 cache line에 배치하여 false sharing을 줄입니다.
+    //***************************************************************************
+    alignas(LFQ_CACHE_LINE_SIZE)
+        std::atomic<int> m_WaitingPoppers{ 0 };
+
+    alignas(LFQ_CACHE_LINE_SIZE)
+        std::atomic<int> m_WaitingPushers{ 0 };
 };
 
 #endif // UC_MPSCLOCKFREEQUEUE_H

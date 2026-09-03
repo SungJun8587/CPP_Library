@@ -50,7 +50,7 @@ using namespace std;
 
 #include <BaseGlobal.h>
 
-#include <Containers/Map/ClusterSpinMap.h>
+#include <Containers/Map/ClusterSpinUnorderedMap.h>
 
 #include <Containers/Stack/LockFreeSlotStack.h>
 

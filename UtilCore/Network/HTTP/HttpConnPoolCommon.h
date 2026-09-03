@@ -72,6 +72,5 @@ public:
 	//***************************************************************************
 	virtual void SetSessionCountChangedHandler(std::function<void(size_t)> handler) = 0;
 };
-using IHttpConnPoolRef = std::shared_ptr<IHttpConnPool>;
 
 #endif // ndef UC_HTTPCONNPOOLCOMMON_H

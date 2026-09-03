@@ -13,9 +13,6 @@
 #include <Network/RIO/RioCommon.h>
 #include <Network/RIO/RioSession.h>
 
-class CRioSession;
-using CRioSessionRef = std::shared_ptr<CRioSession>;
-
 //***************************************************************************
 // @class RioConnectEvent
 // @brief CRioConnectDispatcher 전용 OVERLAPPED 파생 이벤트 (ConnectEx 완료 통지용)

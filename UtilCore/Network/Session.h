@@ -11,8 +11,6 @@
 #include <memory>
 #include <WinSock2.h>
 
-class CSession;
-using CSessionRef = std::shared_ptr<CSession>;
 using SessionFactory = std::function<CSessionRef()>;
 using DisconnectHandler = std::function<void(CSessionRef)>;
 

@@ -7,13 +7,9 @@
 #ifndef UC_JOBQUEUE_H
 #define UC_JOBQUEUE_H
 
-#include <BaseRedefineDataType.h>
-#include <BaseTLS.h>
+#include <Job/JobCommon.h>
 #include <Memory/ObjectPool.h>
-#include <Job/Job.h>
 #include <Containers/Queue/SpinLockQueue.h>
-#include <Job/JobTimer.h>
-#include <Job/GlobalQueue.h>
 
 //***************************************************************************
 // @brief 전역 타이머 관리 클래스 전방 선언

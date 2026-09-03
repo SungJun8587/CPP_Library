@@ -79,6 +79,11 @@ static_assert(std::is_nothrow_move_constructible_v<DelayedTask>,
 //    합니다. Stop()은 루프 종료 신호만 보낼 뿐 스레드 종료를 기다리지 않으므로(Stop() != Join),
 //    Stop() 호출 직후 객체를 파괴하면 실행 중이던 ProcessExpiredTasks()가 이미 소멸된 멤버에
 //    접근하는 미정의 동작(UB)이 발생할 수 있습니다.
+//
+// Stop() 정책:
+//  - Stop()은 pending task(만료 여부 무관)를 전부 폐기합니다. graceful drain이
+//    아닙니다. 종료 시 예약된 task를 반드시 실행해야 하는 용도라면 이 클래스를
+//    그대로 쓰지 말고 별도 drain 로직을 추가하십시오.
 //***************************************************************************
 class CDelayedTaskQueue
 {
@@ -173,6 +178,13 @@ public:
             // const_cast 후 move하는 것 자체는 UB가 아닙니다. 다만 DelayedTask가
             // nothrow move 가능함을 static_assert로 보장하고 있으므로(위 참고),
             // 이 move는 예외를 던지지 않고 안전하게 완료됩니다.
+            //
+            // 뒤이어 호출되는 pop()은 내부적으로 pop_heap() + pop_back()으로 구성되며,
+            // pop_heap()은 front(=이미 move-out된 슬롯)를 back과 swap한 뒤
+            // [first, last-1) 범위, 즉 방금 move-out된 슬롯을 제외한 범위에서만
+            // comparator(operator>)를 호출해 재정렬합니다. 따라서 moved-from 상태의
+            // DelayedTask가 heap 비교 대상이 되는 일은 없으며, ExecuteTime 자체도
+            // move 후 그대로 유지되는 값이므로 이 패턴은 안전합니다.
             DelayedTask task = std::move(const_cast<DelayedTask&>(_queue.top()));
             _queue.pop();
 
@@ -201,6 +213,13 @@ public:
     //       ProcessExpiredTasks()는 이후 새로운 대기/작업 처리를 시작하지 않고 루프를
     //       종료합니다. 이미 실행 중인 워커 스레드의 종료를 기다리려면(join) 호출자가
     //       별도로 처리해야 합니다.
+    // @warning Stop() 호출 시점에 큐에 남아 있던 task(이미 만료되었으나 아직 꺼내지
+    //          못한 것 포함, 아직 만료되지 않은 예약도 포함)는 실행되지 않고 그대로
+    //          버려집니다. Stop()은 "남은 예약을 마저 처리하고 종료"하는 graceful
+    //          drain이 아니라 즉시 중단(discard)입니다. 종료 전 반드시 실행되어야
+    //          하는 task가 있다면, 호출자가 Stop() 전에 별도로 처리하거나 이 클래스를
+    //          graceful-drain이 필요 없는 용도(세션 timeout, 재시도 backoff 등)에만
+    //          사용하십시오.
     //***************************************************************************
     void Stop()
     {

@@ -103,7 +103,6 @@
     <ClCompile Include="..\..\..\UtilCore\Network\IOCP\IocpService.cpp" />
     <ClCompile Include="..\..\..\UtilCore\Network\IOCP\IocpSession.cpp" />
     <ClCompile Include="..\..\..\UtilCore\Network\IOCP\IocpSessionManager.cpp" />
-    <ClCompile Include="..\..\..\UtilCore\Network\IOCP\RecvBuffer.cpp" />
     <ClCompile Include="..\..\..\UtilCore\Network\IOCP\SendBuffer.cpp" />
     <ClCompile Include="..\..\..\UtilCore\Network\NetAddress.cpp" />
     <ClCompile Include="..\..\..\UtilCore\Network\NetService.cpp" />
@@ -141,7 +140,7 @@
     <ClInclude Include="..\..\..\UtilCore\BaseMacro.h" />
     <ClInclude Include="..\..\..\UtilCore\BaseRedefineDataType.h" />
     <ClInclude Include="..\..\..\UtilCore\BaseTLS.h" />
-    <ClInclude Include="..\..\..\UtilCore\Containers\Map\ClusterSpinMap.h" />
+    <ClInclude Include="..\..\..\UtilCore\Containers\Map\ClusterSpinUnorderedMap.h" />
     <ClInclude Include="..\..\..\UtilCore\Containers\Stack\LockFreeSlotStack.h" />
     <ClInclude Include="..\..\..\UtilCore\Memory\Allocator.h" />
     <ClInclude Include="..\..\..\UtilCore\Memory\Containers.h" />
@@ -156,7 +155,6 @@
     <ClInclude Include="..\..\..\UtilCore\Network\IOCP\IocpService.h" />
     <ClInclude Include="..\..\..\UtilCore\Network\IOCP\IocpSession.h" />
     <ClInclude Include="..\..\..\UtilCore\Network\IOCP\IocpSessionManager.h" />
-    <ClInclude Include="..\..\..\UtilCore\Network\IOCP\RecvBuffer.h" />
     <ClInclude Include="..\..\..\UtilCore\Network\IOCP\SendBuffer.h" />
     <ClInclude Include="..\..\..\UtilCore\Network\NetAddress.h" />
     <ClInclude Include="..\..\..\UtilCore\Network\NetService.h" />
@@ -193,7 +191,7 @@
     <ClInclude Include="RioEchoServerSession.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\UtilCore\Containers\Map\ClusterSpinMap.inl" />
+    <None Include="..\..\..\UtilCore\Containers\Map\ClusterSpinUnorderedMap.inl" />
     <None Include="..\..\..\UtilCore\Thread\SpinLock.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

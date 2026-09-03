@@ -11,6 +11,7 @@
 #include <Containers/Queue/QueueCommon.h>
 #include <Memory/Containers.h>
 
+#include <atomic>
 #include <condition_variable>
 #include <cstddef>
 #include <mutex>
@@ -44,6 +45,14 @@
 //  - PushBatch()는 T의 이동 과정에서 예외가 발생하지 않는 것을 전제로 합니다.
 //  - 단, 내부 deque의 메모리 할당 실패 등으로 예외가 발생할 경우
 //    배치 전체의 강한 예외 보장 및 items의 원상 복구는 보장하지 않습니다.
+//
+// Lifetime 계약:
+//  - 이 클래스는 컨슈머 스레드를 소유하지 않습니다. PopChunk()에서 블로킹 대기 중인
+//    스레드가 하나라도 있다면, 호출자는 반드시 Stop() 호출 후 해당 스레드들을
+//    모두 join()한 뒤에 이 객체를 파괴해야 합니다. Stop()은 대기 중인 스레드를
+//    깨우는 신호만 보낼 뿐 스레드 종료를 기다리지 않으므로(Stop() != Join),
+//    Stop() 호출 직후 객체를 파괴하면 막 깨어난 PopChunk()가 이미 소멸된
+//    _mutex/_cv에 접근하는 미정의 동작(UB)이 발생할 수 있습니다.
 //***************************************************************************
 template<typename T>
 class CChunkedBlockingQueue
@@ -81,6 +90,10 @@ public:
                 return false;
 
             _inQueue.push(std::move(item));
+            // fetch_sub()가 항상 락 안에서 실행되는 PopChunk()와 짝을 맞추기 위해,
+            // fetch_add()도 반드시 같은 락 구간 안에서 실행합니다(BlockingTaskQueue와
+            // 동일한 이유 — 락 밖에서 실행하면 _size가 일시적으로 언더플로될 수 있음).
+            _size.fetch_add(1, std::memory_order_relaxed);
         }
         _cv.notify_one();
         return true;
@@ -113,16 +126,13 @@ public:
             if( _maxQueueSize > 0 )
             {
                 _notFullCv.wait(lock, [this, &items]() {
-                    // 배치 전체가 큐에 들어갈 수 있는 충분한 공간이 있는지 확인합니다.
-                    // _maxQueueSize - _inQueue.size() 방식은 _inQueue.size()가
-                    // _maxQueueSize를 초과한 비정상 상태에서 size_t 언더플로우가
-                    // 발생할 수 있으므로 사용하지 않습니다.
-                    //
-                    // 정상적인 큐 invariant(_inQueue.size() <= _maxQueueSize)에서는
-                    // 아래 덧셈 비교가 배치 전체를 수용할 수 있는지를 정확하게 판단합니다.
+                    // _inQueue.size() <= _maxQueueSize가 항상 보장되므로
+                    // 가용 공간은 _maxQueueSize - _inQueue.size()로 계산합니다.
+                    // (items.size() + _inQueue.size()) 형태의 덧셈 비교는
+                    // size_t overflow 가능성이 있으므로 사용하지 않습니다.
                     return _stopped
                         || _producerDone
-                        || items.size() + _inQueue.size() <= _maxQueueSize;
+                        || items.size() <= (_maxQueueSize - _inQueue.size());
                     });
             }
 
@@ -131,6 +141,9 @@ public:
 
             for( auto& item : items )
                 _inQueue.push(std::move(item));
+
+            // Push()와 동일한 이유로 fetch_add()를 락 구간 안에서 실행합니다.
+            _size.fetch_add(items.size(), std::memory_order_relaxed);
         }
         _cv.notify_all();
         items.clear();
@@ -169,6 +182,8 @@ public:
                 _inQueue.pop();
                 ++movedCount;
             }
+
+            _size.fetch_sub(movedCount, std::memory_order_relaxed);
         }
 
         // 공간이 생겼음을 대기 중인 프로듀서에게 알림 (maxQueueSize 설정 시에만 의미 있음)
@@ -177,6 +192,29 @@ public:
             _notFullCv.notify_one();
 
         return true;
+    }
+
+    //***************************************************************************
+    // @brief 큐가 비어있는지 여부를 반환합니다.
+    // @return true: 비어있음, false: 데이터 있음
+    // @note 락 없이 아토믹 카운터로 조회하는 순간적인 관찰값입니다. 멀티스레드
+    //       환경에서는 반환 직후 상태가 변경될 수 있습니다. 동시성 제어가
+    //       필요한 경우 PopChunk()의 반환값을 사용해야 합니다.
+    //***************************************************************************
+    bool IsEmpty() const
+    {
+        return _size.load(std::memory_order_relaxed) == 0;
+    }
+
+    //***************************************************************************
+    // @brief 현재 입력 큐에 대기 중인 전체 아이템 개수를 반환합니다.
+    // @return 큐 크기 (size_t)
+    // @note 락 없이 아토믹 카운터로 조회하는 순간적인 관찰값입니다. 멀티스레드
+    //       환경에서는 반환 직후 실제 큐 크기가 변경될 수 있습니다.
+    //***************************************************************************
+    size_t GetSize() const
+    {
+        return _size.load(std::memory_order_relaxed);
     }
 
     //***************************************************************************
@@ -215,6 +253,7 @@ private:
     std::mutex                  _mutex;                     // 동기화를 위한 뮤텍스
     std::condition_variable     _cv;                        // 소비자 대기 및 통보용 조건 변수
     std::condition_variable     _notFullCv;                 // 생산자 백프레셔 대기용 조건 변수 (단일 프로듀서 전제)
+    std::atomic<size_t>         _size{ 0 };                 // GetSize()/IsEmpty()를 락 없이 조회하기 위한 카운터
     bool                        _producerDone{ false };     // 프로듀서 탐색 완료 플래그 (_mutex로 보호)
     bool                        _stopped{ false };          // 시스템 강제 정지 플래그 (_mutex로 보호)
     size_t                      _maxQueueSize{ 0 };         // 큐 최대 크기 (0 = 무제한)

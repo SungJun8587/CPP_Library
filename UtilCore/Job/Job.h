@@ -7,6 +7,8 @@
 #ifndef UC_JOB_H
 #define UC_JOB_H
 
+#include <Job/JobCommon.h>
+
 #include <functional>
 
 using CallbackType = std::function<void()>;

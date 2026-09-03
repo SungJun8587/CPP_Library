@@ -1,6 +1,6 @@
 ﻿
 //***************************************************************************
-// NetworkCommon.h: Common header file for network-related defines.
+// NetworkCommon.h : Common header file for network-related defines.
 //
 //***************************************************************************
 
@@ -16,6 +16,9 @@
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "mswsock.lib")
 
+#include <BaseRedefineDataType.h>
+#include <BaseTLS.h>
+
 #include <Network/NetworkRedefineDataType.h>
 #include <Network/NetAddress.h>
 #include <Network/SocketUtils.h>
@@ -26,7 +29,6 @@
 #if defined(USE_NETWORK_IOCP)
 #include <Network/IOCP/IocpCommon.h>
 #include <Network/IOCP/SendBuffer.h>
-#include <Network/IOCP/RecvBuffer.h>
 #include <Network/IOCP/IocpEvent.h>
 #include <Network/IOCP/IocpCore.h>
 #include <Network/IOCP/IocpListener.h>

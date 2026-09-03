@@ -7,6 +7,7 @@
 #ifndef UC_GLOBALQUEUE_H
 #define UC_GLOBALQUEUE_H
 
+#include <Job/JobCommon.h>
 #include <Containers/Queue/SpinLockQueue.h>
 
 //***************************************************************************

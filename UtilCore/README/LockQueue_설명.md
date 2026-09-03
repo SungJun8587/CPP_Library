@@ -116,14 +116,14 @@ logQueue.Stop(); // 종료 처리
   - 직관적 인터페이스  
   - MPMC 환경 지원
 - **성능**: Push/Pop 속도 빠름. 단순 구조로 직관적.  
-- **효율성**: 락 경합이 심한 경우 CPU 사용량 증가 가능. 하지만 Empty/Size 조회는 락 없이 가능해 상태 확인은 효율적.    
+- **효율성**: 락 경합이 심한 경우 CPU 사용량 증가 가능. 하지만 IsEmpty/GetSize 조회는 락 없이 가능해 상태 확인은 효율적.    
 - **멤버 변수**:
 
 | 변수명 | 타입 | 설명 |
 |--------|------|------|
 | `_lock` | `PLock` | 플랫폼 통합 단독 락 객체(Windows는 SRWLock, 그 외는 스핀락) |
 | `_items` | `CQueue<T>` | 커스텀 큐 기반 내부 저장소 |
-| `_size` | `std::atomic<int64>` | 락 없는 Empty/Size 조회용 카운터 |
+| `_size` | `std::atomic<int64>` | 락 없는 IsEmpty/GetSize 조회용 카운터 |
 | `_stopped` | `std::atomic<bool>` | 종료 플래그 |
 
 - **멤버 함수**:
@@ -134,8 +134,8 @@ logQueue.Stop(); // 종료 처리
 | `TryPop` | `[[nodiscard]] bool TryPop(T& outItem)` | 데이터 하나 꺼냄. 비어있으면 `false` |
 | `PopAll` | `void PopAll(CVector<T>& items)` | 전체 데이터를 한 번에 꺼내 `items`에 담음 |
 | `Clear` | `void Clear()` | 큐를 완전히 비움 |
-| `Empty` | `bool Empty() const` | 비어있는지 여부(락 없이 조회) |
-| `Size` | `size_t Size() const` | 현재 아이템 개수(락 없이 조회) |
+| `IsEmpty` | `bool IsEmpty() const` | 비어있는지 여부(락 없이 조회) |
+| `GetSize` | `size_t GetSize() const` | 현재 아이템 개수(락 없이 조회) |
 | `Stop` | `void Stop()` | 정지 상태로 전환, 이후 Push 차단 |
 
 - **사용 예시**:  
@@ -181,6 +181,7 @@ jobQueue.Stop(); // 종료 처리
 | `_queue` | `CQueue<T>` | 내부 큐 컨테이너 |
 | `_mutex` | `std::mutex` | 동기화용 뮤텍스 |
 | `_cv` | `std::condition_variable` | 소비자 대기 제어용 조건 변수 |
+| `_size` | `std::atomic<size_t>` | `GetSize()/IsEmpty()`를 락 없이 조회하기 위한 카운터. `Push`/`PushBatch`/`Pop`과 반드시 같은 락 구간 안에서 갱신(락 밖에서 갱신 시 언더플로 레이스 발생 가능) |
 | `_producerDone` | `bool` | 프로듀서 종료 플래그(`_mutex`로 보호) |
 | `_stopped` | `bool` | 강제 종료 플래그(`_mutex`로 보호) |
 
@@ -191,6 +192,8 @@ jobQueue.Stop(); // 종료 처리
 | `Push` | `bool Push(T item)` | 데이터 하나 삽입. `Stop()`/`SetProducerDone()` 이후면 `false` |
 | `PushBatch` | `bool PushBatch(CVector<T>& items)` | 여러 데이터 일괄 삽입(성공 시 `items` 비워짐) |
 | `Pop` | `bool Pop(T& out)` | 데이터 없으면 블로킹 대기 후 하나 꺼냄 |
+| `IsEmpty` | `bool IsEmpty() const` | 비어있는지 여부(락 없이 조회) |
+| `GetSize` | `size_t GetSize() const` | 현재 아이템 개수(락 없이 조회) |
 | `SetProducerDone` | `void SetProducerDone()` | 프로듀서 종료 신호(남은 데이터만 마저 처리) |
 | `Stop` | `void Stop()` | 강제 종료, 대기 중인 모든 스레드 깨움 |
 
@@ -200,7 +203,8 @@ jobQueue.Stop(); // 종료 처리
 - **게임 서버 적용**:  
   - 워커 스레드 파이프라인  
   - 종료 제어가 필요한 작업 처리  
-- **API 참고**: `T`는 nothrow move constructible이어야 합니다 — PushBatch()가 Stop()/SetProducerDone() 이후 거부될 때 옮겨둔 원소를 items로 되돌리는 롤백 경로가 이를 전제로 하며, 컴파일 타임 static_assert로 강제됩니다.  
+- **API 참고**: `T`는 nothrow move constructible/assignable이어야 합니다 — `PushBatch()`가 `Stop()`/`SetProducerDone()` 이후 거부되는 경우는 원소 이동을 전혀 시작하지 않는 all-or-nothing이라 별도 롤백이 필요 없지만, 내부 `CQueue<T>`(deque)의 메모리 할당이 루프 도중 실패하면 일부 원소만 이동된 채로 예외가 전파될 수 있어 이 부분 이동 시나리오에서 T의 이동 자체가 추가 예외를 던지지 않도록 하기 위함이며, 컴파일 타임 static_assert로 강제됩니다.  
+- **Lifetime 계약**: 이 클래스는 컨슈머 스레드를 소유하지 않습니다. `Pop()`에서 블로킹 대기 중인 스레드가 있다면, 호출자는 반드시 `Stop()` 호출 후 해당 스레드를 `join()`한 뒤에 객체를 파괴해야 합니다. `Stop()`은 대기 스레드를 깨우는 신호일 뿐 종료를 기다리지 않으므로(`Stop() != Join`), 직후 파괴하면 UB가 발생할 수 있습니다.  
 - **실전 예제**:
 ```cpp
 CBlockingTaskQueue<std::string> taskQueue;
@@ -302,6 +306,7 @@ packetQueue.Stop(); // 종료 처리
 | `_mutex` | `std::mutex` | 동기화용 뮤텍스 |
 | `_cv` | `std::condition_variable` | 소비자 대기/통보용 조건 변수 |
 | `_notFullCv` | `std::condition_variable` | 생산자 백프레셔 대기용 조건 변수(단일 프로듀서 전제) |
+| `_size` | `std::atomic<size_t>` | `GetSize()/IsEmpty()`를 락 없이 조회하기 위한 카운터. `Push`/`PushBatch`/`PopChunk`와 반드시 같은 락 구간 안에서 갱신 |
 | `_producerDone` | `bool` | 프로듀서 완료 플래그(`_mutex`로 보호) |
 | `_stopped` | `bool` | 강제 정지 플래그(`_mutex`로 보호) |
 | `_maxQueueSize` | `size_t` | 큐 최대 크기(0 = 무제한) |
@@ -314,6 +319,8 @@ packetQueue.Stop(); // 종료 처리
 | `Push` | `bool Push(T item)` | 단일 아이템 삽입. `maxQueueSize` 초과 시 공간이 생길 때까지 블로킹 |
 | `PushBatch` | `bool PushBatch(CVector<T>& items)` | 배치 단위 삽입(원자성 보장, 단일 프로듀서 전제) |
 | `PopChunk` | `bool PopChunk(CQueue<T>& outQueue, size_t maxCount)` | 최대 `maxCount`개를 꺼내 `outQueue`로 이동, 없으면 블로킹 대기 |
+| `IsEmpty` | `bool IsEmpty() const` | 비어있는지 여부(락 없이 조회) |
+| `GetSize` | `size_t GetSize() const` | 현재 입력 큐 아이템 개수(락 없이 조회) |
 | `SetProducerDone` | `void SetProducerDone()` | 프로듀서 완료 신호, 모든 소비자 스레드 깨움 |
 | `Stop` | `void Stop()` | 강제 정지, 모든 소비자/생산자 스레드 해제 |
 
@@ -325,6 +332,7 @@ packetQueue.Stop(); // 종료 처리
   - 대량 요청 처리 시 안정적 워커 스레드 운영  
   - 종료 제어가 필요한 네트워크 파이프라인  
 - **주의**: `PopChunk()`의 `_notFullCv.notify_one()`은 단일 프로듀서(SPMC) 가정 하에서만 안전합니다. 멀티 프로듀서로 확장할 계획이 있다면 `notify_all`로 전환을 검토해야 합니다.  
+- **Lifetime 계약**: 이 클래스는 컨슈머 스레드를 소유하지 않습니다. `PopChunk()`에서 블로킹 대기 중인 스레드가 하나라도 있다면, 호출자는 반드시 `Stop()` 호출 후 해당 스레드들을 모두 `join()`한 뒤에 객체를 파괴해야 합니다. `Stop()`은 대기 스레드를 깨우는 신호일 뿐 종료를 기다리지 않으므로(`Stop() != Join`), 직후 파괴하면 UB가 발생할 수 있습니다.  
 - **실전 예제**:
 ```cpp
 CChunkedBlockingQueue<int> packetQueue;
