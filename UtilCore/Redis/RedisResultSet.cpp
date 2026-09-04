@@ -63,12 +63,16 @@ bool CRedisResultSet::IsEmpty() const
 
 //***************************************************************************
 // @brief (Member-Score) 쌍으로 구성된 랭킹 결과의 항목 개수를 반환함
-// @return INT32 항목 개수
+// @details 정상적인 랭킹 응답(예: ZRANGE ... WITHSCORES)은 항상 짝수 개의
+//          요소로 구성되므로, 홀수인 경우는 서버 응답이 기대한 커맨드 형태와
+//          다르다는 신호로 보고 개발 빌드에서 즉시 드러나도록 assert한다.
 //***************************************************************************
 INT32 CRedisResultSet::GetRankInfoRetCount() const
 {
 	if( _vecResultSplit.empty() )
 		return 0;
+
+	ASSERT_CRASH((_vecResultSplit.size() % 2) == 0);
 
 	return static_cast<INT32>(_vecResultSplit.size()) / 2;
 }

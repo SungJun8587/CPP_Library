@@ -8,6 +8,7 @@
 #define UC_CRYPTOUTIL_H
 
 #include <BaseRedefineDataType.h>
+#include <BaseMacro.h>
 
 #include <openssl/evp.h>
 #include <openssl/rand.h>
@@ -21,8 +22,8 @@ namespace Crypto
 {
 	//***************************************************************************
 	// @brief 암호화, 복호화 및 해시 기능을 제공하는 유틸리티 클래스입니다.
-	// @detail OpenSSL 라이브러리를 기반으로 MD5 해시, AES 및 SEED 대칭 암호화,
-	//         그리고 AES-GCM 인증 암호화 기능을 수행합니다.
+	// @detail OpenSSL 라이브러리를 기반으로 MD5/SHA-256 해시, AES 및 SEED 대칭 암호화,
+	//         AES-GCM 인증 암호화, CSPRNG 난수 생성 기능을 수행합니다.
 	//***************************************************************************
 	class CCryptoUtil
 	{
@@ -66,7 +67,112 @@ namespace Crypto
 			return cipher != nullptr;
 		}
 
+		//***************************************************************************
+		// @brief [신규] 암호학적으로 안전한 난수 바이트를 생성합니다(OpenSSL RAND_bytes).
+		// @detail 세션 토큰, salt 등 보안 목적의 난수 생성 전용 — rand()/std::mt19937
+		//         등 일반 난수 생성기와 절대 혼용하지 말 것.
+		// @return 성공 시 true. RAND_bytes()가 실패(엔트로피 소스 문제 등)하면 false.
+		//***************************************************************************
+		static bool GenerateRandomBytes(unsigned char* out, size_t len)
+		{
+			return ::RAND_bytes(out, static_cast<int>(len)) == 1;
+		}
+
+		//***************************************************************************
+		// @brief [신규] SHA-256 해시를 계산합니다.
+		// @detail HashMD5()와 달리 static으로 뒀다 — SHA-256 자체는 대칭 키/IV가
+		//         필요 없는 순수 해시 연산이라, 이 하나를 쓰겠다고 키/IV로
+		//         인스턴스를 만드는 게 더 부자연스럽다고 판단했다(HashMD5와의
+		//         이런 비대칭은 의도적 — 필요하면 HashMD5도 static으로 통일하는
+		//         걸 검토해볼 수 있음).
+		// @return 16진수 소문자 문자열(64자)로 인코딩된 SHA-256 해시.
+		//***************************************************************************
+		static std::string HashSHA256(const std::string& data)
+		{
+			return hashWith(data, EVP_sha256());
+		}
+
+		//***************************************************************************
+		// @brief [신규] 바이너리 데이터를 16진수 문자열로 변환합니다(외부 공개용).
+		//***************************************************************************
+		static std::string ToHex(const unsigned char* data, size_t length)
+		{
+			return toHex(data, length);
+		}
+
+		//***************************************************************************
+		// @brief [신규] 16진수 문자열을 바이너리 데이터로 되돌립니다.
+		// @param outLen out에 쓸 바이트 수 — hex.size()가 outLen*2가 아니거나
+		//        16진수가 아닌 문자가 섞여 있으면 false(이 경우 out은 사용하지 말 것).
+		//***************************************************************************
+		static bool FromHex(const std::string& hex, unsigned char* out, size_t outLen)
+		{
+			if( hex.size() != outLen * 2 )
+				return false;
+
+			auto hexVal = [](char c) -> int
+				{
+					if( c >= '0' && c <= '9' ) return c - '0';
+					if( c >= 'a' && c <= 'f' ) return c - 'a' + 10;
+					if( c >= 'A' && c <= 'F' ) return c - 'A' + 10;
+					return -1;
+				};
+
+			for( size_t i = 0; i < outLen; ++i )
+			{
+				const int hi = hexVal(hex[i * 2]);
+				const int lo = hexVal(hex[i * 2 + 1]);
+				if( hi < 0 || lo < 0 )
+					return false;
+
+				out[i] = static_cast<unsigned char>((hi << 4) | lo);
+			}
+			return true;
+		}
+
+		//***************************************************************************
+		// @brief [신규] 타이밍 사이드채널을 피하기 위한 상수시간 바이트 비교.
+		// @detail 불일치를 찾는 즉시 반환하지 않고 항상 len바이트 전부를
+		//         XOR-누적한 뒤 마지막에 판정 — 토큰/해시 비교 등 보안이
+		//         중요한 값 비교에 사용할 것(문자열 비교 연산자 사용 금지).
+		//***************************************************************************
+		static bool ConstantTimeEquals(const unsigned char* a, const unsigned char* b, size_t len)
+		{
+			unsigned char diff = 0;
+			for( size_t i = 0; i < len; ++i )
+				diff |= static_cast<unsigned char>(a[i] ^ b[i]);
+			return diff == 0;
+		}
+
 	private:
+		//***************************************************************************
+		// @brief [신규] EVP_MD_CTX 기반 범용 해시 계산 — HashMD5()/HashSHA256()이
+		//        공유하는 내부 구현. 기존 HashMD5()의 인라인 구현을 그대로
+		//        옮겨온 것으로, HashMD5()의 동작/시그니처는 전혀 바뀌지 않는다.
+		//***************************************************************************
+		static std::string hashWith(const std::string& data, const EVP_MD* md)
+		{
+			EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+			if( !ctx )
+			{
+				throw std::runtime_error("Failed to create EVP_MD_CTX");
+			}
+
+			unsigned char hash[EVP_MAX_MD_SIZE];
+			unsigned int hash_len = 0;
+
+			if( EVP_DigestInit_ex(ctx, md, nullptr) != 1 ||
+				EVP_DigestUpdate(ctx, data.c_str(), data.size()) != 1 ||
+				EVP_DigestFinal_ex(ctx, hash, &hash_len) != 1 )
+			{
+				EVP_MD_CTX_free(ctx);
+				throw std::runtime_error("Failed to compute hash");
+			}
+
+			EVP_MD_CTX_free(ctx);
+			return toHex(hash, hash_len);
+		}
+
 		//***************************************************************************
 		// @brief EVP 인터페이스를 기반으로 데이터를 암호화합니다.
 		// @detail 제공된 대칭 키, IV 및 암호화 방식을 사용하여 평문을 암호문으로 변환합니다.

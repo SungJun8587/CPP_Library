@@ -119,21 +119,26 @@ bool CMySQLConnPool::Init(const wchar_t* pwszDBHost, const wchar_t* pwszDBUserId
 	StopReconnectWorkers();
 	Clear();
 
-	int nLength = WideCharToMultiByte(CP_ACP, 0, pwszDBHost, -1, NULL, 0, NULL, NULL);
-	if( nLength == 0 || DATABASE_SERVER_NAME_STRLEN < (size_t)nLength ) return false;
-	if( WideCharToMultiByte(CP_ACP, 0, pwszDBHost, -1, _szDBHost, nLength, NULL, NULL) == 0 ) return false;
+	if( pwszDBHost == nullptr || pwszDBUserId == nullptr || pwszDBPasswd == nullptr || pwszDBName == nullptr )
+	{
+		return false;
+	}
 
-	nLength = WideCharToMultiByte(CP_ACP, 0, pwszDBUserId, -1, NULL, 0, NULL, NULL);
-	if( nLength == 0 || DATABASE_DSN_USER_ID_STRLEN < (size_t)nLength ) return false;
-	if( WideCharToMultiByte(CP_ACP, 0, pwszDBUserId, -1, _szDBUserId, nLength, NULL, NULL) == 0 ) return false;
+	std::string strHost = UnicodeToAnsi(pwszDBHost);
+	if( strHost.empty() || strHost.length() >= DATABASE_SERVER_NAME_STRLEN ) return false;
+	strncpy_s(_szDBHost, sizeof(_szDBHost), strHost.c_str(), _TRUNCATE);
 
-	nLength = WideCharToMultiByte(CP_ACP, 0, pwszDBPasswd, -1, NULL, 0, NULL, NULL);
-	if( nLength == 0 || DATABASE_DSN_USER_PASSWORD_STRLEN < (size_t)nLength ) return false;
-	if( WideCharToMultiByte(CP_ACP, 0, pwszDBPasswd, -1, _szDBPasswd, nLength, NULL, NULL) == 0 ) return false;
+	std::string strUserId = UnicodeToAnsi(pwszDBUserId);
+	if( strUserId.empty() || strUserId.length() >= DATABASE_DSN_USER_ID_STRLEN ) return false;
+	strncpy_s(_szDBUserId, sizeof(_szDBUserId), strUserId.c_str(), _TRUNCATE);
 
-	nLength = WideCharToMultiByte(CP_ACP, 0, pwszDBName, -1, NULL, 0, NULL, NULL);
-	if( nLength == 0 || DATABASE_NAME_STRLEN < (size_t)nLength ) return false;
-	if( WideCharToMultiByte(CP_ACP, 0, pwszDBName, -1, _szDBName, nLength, NULL, NULL) == 0 ) return false;
+	std::string strPasswd = UnicodeToAnsi(pwszDBPasswd);
+	if( strPasswd.empty() || strPasswd.length() >= DATABASE_DSN_USER_PASSWORD_STRLEN ) return false;
+	strncpy_s(_szDBPasswd, sizeof(_szDBPasswd), strPasswd.c_str(), _TRUNCATE);
+
+	std::string strDBName = UnicodeToAnsi(pwszDBName);
+	if( strDBName.empty() || strDBName.length() >= DATABASE_NAME_STRLEN ) return false;
+	strncpy_s(_szDBName, sizeof(_szDBName), strDBName.c_str(), _TRUNCATE);
 
 	_uiPort = uiPort;
 

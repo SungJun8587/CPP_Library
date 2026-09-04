@@ -30,31 +30,15 @@ namespace Crypto
 
 	//***************************************************************************
 	// @brief 입력된 데이터에 대한 MD5 해시 값을 계산합니다.
-	// @detail OpenSSL의 EVP 인터페이스를 사용하여 MD5 해시를 생성하고, 결과를 16진수 문자열로 반환합니다.
+	// @detail [수정] 기존 EVP_MD_CTX 처리 로직을 private hashWith()로 옮기고
+	//         HashMD5()는 그걸 호출하도록 변경 — HashSHA256()과 구현을
+	//         공유하기 위함. 시그니처/동작(반환값)은 이전과 완전히 동일하다.
 	// @param data 해시를 생성할 원본 문자열 데이터
 	// @return 생성된 MD5 해시의 16진수 문자열
 	//***************************************************************************
 	std::string CCryptoUtil::HashMD5(const std::string& data) const
 	{
-		EVP_MD_CTX* ctx = EVP_MD_CTX_new();
-		if( !ctx )
-		{
-			throw std::runtime_error("Failed to create EVP_MD_CTX");
-		}
-
-		unsigned char hash[EVP_MAX_MD_SIZE];
-		unsigned int hash_len = 0;
-
-		if( EVP_DigestInit_ex(ctx, EVP_md5(), nullptr) != 1 ||
-			EVP_DigestUpdate(ctx, data.c_str(), data.size()) != 1 ||
-			EVP_DigestFinal_ex(ctx, hash, &hash_len) != 1 )
-		{
-			EVP_MD_CTX_free(ctx);
-			throw std::runtime_error("Failed to compute MD5 hash");
-		}
-
-		EVP_MD_CTX_free(ctx);
-		return toHex(hash, hash_len);
+		return hashWith(data, EVP_md5());
 	}
 
 	//***************************************************************************

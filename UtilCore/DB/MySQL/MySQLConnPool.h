@@ -14,6 +14,7 @@
 #include <Thread/ThreadManager.h>
 #include <DB/MySQL/BaseMySQL.h>
 #include <Containers/Queue/DelayedTaskQueue.h>
+#include <Util/EncodingConvert.h>
 
 //***************************************************************************
 // @brief MySQL 커넥션 풀 및 자동 재연결/헬스체크 관리 클래스
