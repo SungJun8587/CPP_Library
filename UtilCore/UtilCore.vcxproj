@@ -45,6 +45,8 @@
     <ClInclude Include="DB\ADO\AdoConnPool.h" />
     <ClInclude Include="DB\ADO\AdoDB.h" />
     <ClInclude Include="DB\BaseODBC.h" />
+    <ClInclude Include="DB\DBAsyncHandler.h" />
+    <ClInclude Include="DB\DBAsyncPushHelper.h" />
     <ClInclude Include="DB\DBAsyncSrv.h" />
     <ClInclude Include="DB\DBBind.h" />
     <ClInclude Include="DB\DBCommon.h" />

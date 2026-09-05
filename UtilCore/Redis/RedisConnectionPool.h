@@ -19,6 +19,7 @@
 #include <condition_variable>
 #include <unordered_map>
 #include <chrono>
+#include <random>
 
 //***************************************************************************
 // @brief 여러 개의 CRedisClient 연결 객체를 동시 분배/관리하는 커넥션 풀 클래스
@@ -54,6 +55,9 @@ public:
 	//***************************************************************************
 	// @brief 지정된 풀 크기만큼 CRedisClient를 생성 및 연결하고, 백그라운드
 	//        재연결 스레드를 시작함
+	// @details 이미 초기화된 풀에 다시 호출해도 안전하다(재진입 시 내부적으로
+	//          먼저 Clear()를 호출해 기존 재연결 스레드/커넥션을 완전히
+	//          정리한 뒤 처음부터 다시 채운다).
 	// @param strIP 서버 IP
 	// @param nPort 서버 포트
 	// @param nDbIndex 각 커넥션이 접속 직후 SELECT로 고정할 Redis 논리 DB

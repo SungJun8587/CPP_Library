@@ -7,8 +7,6 @@
 #include "pch.h"
 #include "RedisConnectionPool.h"
 
-#include <random>
-
 namespace
 {
 	// 클라이언트별 재연결 지수 백오프 기본값. COdbcConnPool::TReconnectConfig의
@@ -52,6 +50,14 @@ CRedisConnectionPool::~CRedisConnectionPool()
 //***************************************************************************
 bool CRedisConnectionPool::Init(const std::string& strIP, const uint16 nPort, const int32 nDbIndex, const int32 nPoolSize, const int32 nReconnectIntervalSec)
 {
+	// 이미 초기화된 풀에 Init()이 다시 호출되는 경우(재초기화)에 대비해
+	// 먼저 완전히 정리한다. 처음 호출되는 경우엔 재연결 스레드가 시작된
+	// 적이 없고 큐도 비어있어 사실상 아무 일도 하지 않는다. 이 선행 정리가
+	// 없으면, 이미 돌고 있는 _reconnectThread 위에 StartReconnectLoop()이
+	// 새 std::thread를 그대로 대입하려다 std::terminate()로 죽는다
+	// (joinable한 std::thread에 대한 이동 대입은 표준상 terminate 유발).
+	Clear();
+
 	// strIP/_nPort/_nDbIndex/_nReconnectIntervalSec 설정과 _vecAllClients/
 	// _queueFree에 대한 반영만 _lock으로 짧게 감싸고, 실제 블로킹 작업인
 	// Connect()(소켓 연결 + 필요 시 SELECT 응답 대기, 클라이언트당 최대

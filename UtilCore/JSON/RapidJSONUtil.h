@@ -1,5 +1,4 @@
-﻿
-//***************************************************************************
+﻿//***************************************************************************
 // RapidJSONUtil.h : interface and implementation for the CRapidJSONUtil class.
 //
 //***************************************************************************
@@ -228,32 +227,32 @@ public:
     template <typename T>
     inline T GetObject(const _tstring& key) const;
 
-    template <typename T>
-    inline void AddVector(const _tstring& key, const CVector<T>& vec);
+    template <typename Container, typename ValueType = typename Container::value_type>
+    inline void AddVector(const _tstring& key, const Container& vec);
 
-    template <typename T>
-    inline CVector<T> GetVector(const _tstring& key);
+    template <typename Container, typename ValueType = typename Container::value_type>
+    inline Container GetVector(const _tstring& key);
 
-    template <typename T>
-    inline void AddObjectVector(const _tstring& key, const CVector<T>& vec);
+    template <typename Container, typename ValueType = typename Container::value_type>
+    inline void AddObjectVector(const _tstring& key, const Container& vec);
 
-    template <typename T>
-    inline CVector<T> GetObjectVector(const _tstring& key);
+    template <typename Container, typename ValueType = typename Container::value_type>
+    inline Container GetObjectVector(const _tstring& key);
 
-    template <typename Key, typename Value>
-    inline void AddMap(const _tstring& key, const CMap<Key, Value>& map);
+    template <typename MapContainer>
+    inline void AddMap(const _tstring& key, const MapContainer& map);
 
-    template <typename Key, typename Value>
-    inline CMap<Key, Value> GetMap(const _tstring& key) const;
+    template <typename MapContainer>
+    inline MapContainer GetMap(const _tstring& key) const;
 
-    template <typename Key, typename T>
-    inline void AddObjectMap(const _tstring& key, const CMap<Key, T>& map);
+    template <typename MapContainer>
+    inline void AddObjectMap(const _tstring& key, const MapContainer& map);
 
-    template <typename Key, typename T>
-    inline CMap<Key, T> GetObjectMap(const _tstring& key) const;
+    template <typename MapContainer>
+    inline MapContainer GetObjectMap(const _tstring& key) const;
 
 private:
-    void	Print_DebugInfo(const TCHAR* ptszFormat, ...);
+    void Print_DebugInfo(const TCHAR* ptszFormat, ...);
 
     //***************************************************************************
     // @brief C++ 구조체 → JSON 변환(템플릿(T) 변수값을 _tValue 변수에 할당)
@@ -272,11 +271,21 @@ private:
     //***************************************************************************
     // @brief 벡터 타입 확인
     //***************************************************************************
+    // 1. 기본 템플릿 (기본값: false)
     template <typename T>
     struct is_vector : std::false_type {};
 
+    // 2. 커스텀 벡터 CVector 특수화 (true)
     template <typename T, typename Alloc>
     struct is_vector<CVector<T, Alloc>> : std::true_type {};
+
+    // 3. 표준 벡터 std::vector 특수화 (true)
+    template <typename T, typename Alloc>
+    struct is_vector<std::vector<T, Alloc>> : std::true_type {};
+
+    // 4. std::vector<bool> 특수화 제외 (비트 압축 객체로 인한 컴파일 에러 방지)
+    template <typename Alloc>
+    struct is_vector<std::vector<bool, Alloc>> : std::false_type {};
 
     //***************************************************************************
     // @brief 맵 타입 확인
@@ -286,6 +295,9 @@ private:
 
     template <typename K, typename V, typename Comp, typename Alloc>
     struct is_map<CMap<K, V, Comp, Alloc>> : std::true_type {};
+
+    template <typename K, typename V, typename Comp, typename Alloc>
+    struct is_map<std::map<K, V, Comp, Alloc>> : std::true_type {};
 
     //***************************************************************************
     // @brief T에 ToXML 멤버 함수가 있는지 확인하는 타입 트레이트

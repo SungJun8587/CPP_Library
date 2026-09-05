@@ -568,6 +568,12 @@
     <ClInclude Include="Redis\RedisCommon.h">
       <Filter>Redis</Filter>
     </ClInclude>
+    <ClInclude Include="DB\DBAsyncHandler.h">
+      <Filter>DB</Filter>
+    </ClInclude>
+    <ClInclude Include="DB\DBAsyncPushHelper.h">
+      <Filter>DB</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">

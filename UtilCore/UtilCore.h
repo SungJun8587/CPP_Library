@@ -164,13 +164,17 @@ using namespace std;
 #include <ServerConfig.h>
 
 #include <DB/DBCommon.h>
+
+#include <DB/DBAsyncSrv.h>
+#include <DB/DBAsyncHandler.h>
+#include <DB/DBAsyncPushHelper.h>
+
 #include <DB/BaseODBC.h>
 #include <DB/DBBind.h>
 #include <DB/DBModel.h>
 #include <DB/DBSyncBind.h>
 #include <DB/DBQueryProcess.h>
 #include <DB/DBSchema.h>
-#include <DB/DBAsyncSrv.h>
 #include <DB/OdbcConnPool.h>
 #include <DB/OdbcAsyncSrv.h>
 

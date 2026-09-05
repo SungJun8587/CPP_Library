@@ -1,5 +1,4 @@
-﻿
-//***************************************************************************
+﻿//***************************************************************************
 // RapidJSONUtil.inl : implementation of the CRapidJSONUtil class.
 //
 //***************************************************************************
@@ -15,23 +14,25 @@
 template <typename T>
 inline _tstring CRapidJSONUtil::Serialize(const _tstring& key, const T& obj, const bool pretty)
 {
-	if constexpr( is_vector<T>::value )
+	using CleanT = std::decay_t<T>;
+
+	if constexpr( is_vector<CleanT>::value )
 	{
-		using ValueType = typename T::value_type;
+		using ValueType = typename CleanT::value_type;
 		if constexpr( std::is_arithmetic_v<ValueType> || std::is_same_v<ValueType, _tstring> )
 		{
-			AddVector(key, obj);        // 기본 자료형 벡터
+			AddVector<CleanT, ValueType>(key, obj);        // 기본 자료형 벡터
 		}
 		else
 		{
-			AddObjectVector(key, obj);  // 사용자 정의 클래스 벡터
+			AddObjectVector<CleanT, ValueType>(key, obj);  // 사용자 정의 클래스 벡터
 		}
 	}
-	else if constexpr( is_map<T>::value )
+	else if constexpr( is_map<CleanT>::value )
 	{
 		// 맵 처리
-		using KeyType = typename T::key_type;
-		using ValueType = typename T::mapped_type;
+		using KeyType = typename CleanT::key_type;
+		using ValueType = typename CleanT::mapped_type;
 		if constexpr( std::is_same_v<KeyType, _tstring> )
 		{
 			// 키가 _tstring인 경우만 처리
@@ -45,19 +46,19 @@ inline _tstring CRapidJSONUtil::Serialize(const _tstring& key, const T& obj, con
 			}
 		}
 	}
-	else if constexpr( has_tojson_method<T>::value )
+	else if constexpr( has_tojson_method<CleanT>::value )
 	{
 		AddObject(key, obj);
 	}
-	else if constexpr( std::is_arithmetic<T>::value )
+	else if constexpr( std::is_arithmetic_v<CleanT> )
 	{
 		AddValue(key, obj);
 	}
-	else if constexpr( std::is_same_v<typename std::decay<T>::type, TCHAR*> || std::is_same_v<typename std::decay<T>::type, const TCHAR*> )
+	else if constexpr( std::is_same_v<CleanT, TCHAR*> || std::is_same_v<CleanT, const TCHAR*> )
 	{
 		AddValue(key, obj);
 	}
-	else if constexpr( std::is_same_v<T, _tstring> )
+	else if constexpr( std::is_same_v<CleanT, _tstring> )
 	{
 		AddValue(key, obj);
 	}
@@ -74,51 +75,53 @@ inline _tstring CRapidJSONUtil::Serialize(const _tstring& key, const T& obj, con
 template <typename T>
 inline T CRapidJSONUtil::Deserialize(const _tstring& key)
 {
-	if constexpr( is_vector<T>::value )
+	using CleanT = std::decay_t<T>;
+
+	if constexpr( is_vector<CleanT>::value )
 	{
-		using ValueType = typename T::value_type;
+		using ValueType = typename CleanT::value_type;
 		if constexpr( std::is_arithmetic_v<ValueType> || std::is_same_v<ValueType, _tstring> )
 		{
-			return GetVector<ValueType>(key);         // 기본 자료형 벡터
+			return GetVector<CleanT, ValueType>(key);         // 기본 자료형 벡터
 		}
 		else
 		{
-			return GetObjectVector<ValueType>(key);  // 사용자 정의 클래스 벡터
+			return GetObjectVector<CleanT, ValueType>(key);   // 사용자 정의 클래스 벡터
 		}
 	}
-	else if constexpr( is_map<T>::value )
+	else if constexpr( is_map<CleanT>::value )
 	{
 		// 맵 처리
-		using KeyType = typename T::key_type;
-		using ValueType = typename T::mapped_type;
+		using KeyType = typename CleanT::key_type;
+		using ValueType = typename CleanT::mapped_type;
 		if constexpr( std::is_same_v<KeyType, _tstring> )
 		{
 			// 키가 _tstring인 경우만 처리
 			if constexpr( std::is_arithmetic_v<ValueType> || std::is_same_v<ValueType, _tstring> )
 			{
-				return GetMap<KeyType, ValueType>(key);            // 기본 자료형 맵
+				return GetMap<CleanT>(key);            // 기본 자료형 맵
 			}
 			else
 			{
-				return GetObjectMap<KeyType, ValueType>(key);      // 사용자 정의 클래스 맵
+				return GetObjectMap<CleanT>(key);      // 사용자 정의 클래스 맵
 			}
 		}
 	}
-	else if constexpr( has_tojson_method<T>::value )
+	else if constexpr( has_tojson_method<CleanT>::value )
 	{
-		return GetObject<T>(key);
+		return GetObject<CleanT>(key);
 	}
-	else if constexpr( std::is_arithmetic<T>::value )
+	else if constexpr( std::is_arithmetic_v<CleanT> )
 	{
-		return GetValue<T>(key, 0);
+		return GetValue<CleanT>(key, 0);
 	}
-	else if constexpr( std::is_same_v<typename std::decay<T>::type, TCHAR*> || std::is_same_v<typename std::decay<T>::type, const TCHAR*> )
+	else if constexpr( std::is_same_v<CleanT, TCHAR*> || std::is_same_v<CleanT, const TCHAR*> )
 	{
-		return GetValue<T>(key, _T(""));
+		return GetValue<CleanT>(key, _T(""));
 	}
-	else if constexpr( std::is_same_v<T, _tstring> )
+	else if constexpr( std::is_same_v<CleanT, _tstring> )
 	{
-		return GetValue<T>(key, _T(""));
+		return GetValue<CleanT>(key, _T(""));
 	}
 
 	return T();
@@ -255,12 +258,12 @@ inline T CRapidJSONUtil::GetObject(const _tstring& key) const
 //***************************************************************************
 // @brief 기본 데이터 타입의 벡터를 JSON 배열로 직렬화하여 추가합니다.
 // @param key JSON 배열로 저장될 키 이름
-// @param vec 직렬화할 기본 자료형 벡터 (`CVector<T>`)
+// @param vec 직렬화할 기본 자료형 벡터 (`CVector<T>` 또는 `std::vector<T>`)
 // @return 없음
 // @detail 벡터의 각 요소를 순회하며 JSON 값으로 변환한 뒤, 하나의 JSON 배열에 추가하여 문서에 등록합니다.
 //***************************************************************************
-template <typename T>
-inline void CRapidJSONUtil::AddVector(const _tstring& key, const CVector<T>& vec)
+template <typename Container, typename ValueType>
+inline void CRapidJSONUtil::AddVector(const _tstring& key, const Container& vec)
 {
 	_tValue jsonArray(rapidjson::kArrayType);
 	for( const auto& item : vec )
@@ -274,13 +277,13 @@ inline void CRapidJSONUtil::AddVector(const _tstring& key, const CVector<T>& vec
 //***************************************************************************
 // @brief JSON 배열로부터 기본 데이터 타입 벡터를 역직렬화하여 가져옵니다.
 // @param key 가져올 JSON 배열의 키 이름
-// @return 복원된 기본 데이터 타입 벡터 (`CVector<T>`)
+// @return 복원된 기본 데이터 타입 벡터 (`CVector<T>` 또는 `std::vector<T>`)
 // @detail 지정한 키가 유효한 배열인지 검사한 후, 배열의 각 요소를 순회하며 지정된 타입으로 변환하여 결과 벡터에 담아 반환합니다.
 //***************************************************************************
-template <typename T>
-inline CVector<T> CRapidJSONUtil::GetVector(const _tstring& key)
+template <typename Container, typename ValueType>
+inline Container CRapidJSONUtil::GetVector(const _tstring& key)
 {
-	CVector<T> result;
+	Container result;
 	if( !_document.HasMember(key.c_str()) || !_document[key.c_str()].IsArray() )
 	{
 		return result;
@@ -288,7 +291,7 @@ inline CVector<T> CRapidJSONUtil::GetVector(const _tstring& key)
 	const auto& jsonArray = _document[key.c_str()];
 	for( rapidjson::SizeType i = 0; i < jsonArray.Size(); ++i )
 	{
-		result.push_back(ConvertFromJSONValue<T>(jsonArray[i]));
+		result.push_back(ConvertFromJSONValue<ValueType>(jsonArray[i]));
 	}
 	return result;
 }
@@ -296,12 +299,12 @@ inline CVector<T> CRapidJSONUtil::GetVector(const _tstring& key)
 //***************************************************************************
 // @brief 사용자 정의 객체 벡터를 JSON 배열로 직렬화하여 추가합니다.
 // @param key JSON 배열로 저장될 키 이름
-// @param vec 직렬화할 사용자 정의 객체 벡터 (`CVector<T>`)
+// @param vec 직렬화할 사용자 정의 객체 벡터 (`CVector<T>` 또는 `std::vector<T>`)
 // @return 없음
 // @detail 벡터 내 각 객체의 `ToJSON` 메서드를 호출해 JSON 객체로 변환하고, 이를 배열에 누적한 뒤 문서에 추가합니다.
 //***************************************************************************
-template <typename T>
-inline void CRapidJSONUtil::AddObjectVector(const _tstring& key, const CVector<T>& vec)
+template <typename Container, typename ValueType>
+inline void CRapidJSONUtil::AddObjectVector(const _tstring& key, const Container& vec)
 {
 	_tValue jsonArray(rapidjson::kArrayType);
 	for( const auto& item : vec )
@@ -318,13 +321,13 @@ inline void CRapidJSONUtil::AddObjectVector(const _tstring& key, const CVector<T
 //***************************************************************************
 // @brief JSON 배열로부터 사용자 정의 객체 벡터를 역직렬화하여 가져옵니다.
 // @param key 가져올 JSON 배열의 키 이름
-// @return 복원된 사용자 정의 객체 벡터 (`CVector<T>`)
+// @return 복원된 사용자 정의 객체 벡터 (`CVector<T>` 또는 `std::vector<T>`)
 // @detail 지정한 배열의 각 원소(JSON 객체)에 대해 객체를 생성하고 `FromJSON` 메서드를 호출하여 상태를 복원한 뒤 벡터에 추가합니다.
 //***************************************************************************
-template <typename T>
-inline CVector<T> CRapidJSONUtil::GetObjectVector(const _tstring& key)
+template <typename Container, typename ValueType>
+inline Container CRapidJSONUtil::GetObjectVector(const _tstring& key)
 {
-	CVector<T> result;
+	Container result;
 	if( !_document.HasMember(key.c_str()) || !_document[key.c_str()].IsArray() )
 	{
 		return result;
@@ -335,7 +338,7 @@ inline CVector<T> CRapidJSONUtil::GetObjectVector(const _tstring& key)
 	{
 		const _tValue& jsonObject = jsonArray[i];
 
-		T obj;
+		ValueType obj;
 		obj.FromJSON(jsonObject);	// 사용자 정의 객체의 FromJSON 호출
 		result.push_back(obj);
 	}
@@ -345,12 +348,12 @@ inline CVector<T> CRapidJSONUtil::GetObjectVector(const _tstring& key)
 //***************************************************************************
 // @brief 기본 데이터 타입 맵을 JSON 객체로 직렬화하여 추가합니다.
 // @param key JSON 객체로 저장될 키 이름
-// @param map 직렬화할 맵 데이터 (`CMap<Key, Value>`)
+// @param map 직렬화할 맵 데이터 (`CMap<Key, Value>` 또는 `std::map<Key, Value>`)
 // @return 없음
 // @detail 맵의 모든 키-값 쌍을 순회하며 각각 JSON 값으로 변환 후, 하나의 JSON 객체 멤버로 추가하여 문서에 등록합니다.
 //***************************************************************************
-template <typename Key, typename Value>
-inline void CRapidJSONUtil::AddMap(const _tstring& key, const CMap<Key, Value>& map)
+template <typename MapContainer>
+inline void CRapidJSONUtil::AddMap(const _tstring& key, const MapContainer& map)
 {
 	_tValue jsonObject(rapidjson::kObjectType);
 
@@ -368,13 +371,15 @@ inline void CRapidJSONUtil::AddMap(const _tstring& key, const CMap<Key, Value>& 
 //***************************************************************************
 // @brief JSON 객체로부터 기본 데이터 타입 맵을 역직렬화하여 가져옵니다.
 // @param key 가져올 JSON 객체의 키 이름
-// @return 복원된 기본 데이터 타입 맵 (`CMap<Key, Value>`)
+// @return 복원된 기본 데이터 타입 맵 (`CMap<Key, Value>` 또는 `std::map<Key, Value>`)
 // @detail 대상이 유효한 JSON 객체인지 확인한 후, 내부 멤버들을 순회하며 키와 값을 각각 매칭하여 맵 형태로 복원합니다.
 //***************************************************************************
-template <typename Key, typename Value>
-inline CMap<Key, Value> CRapidJSONUtil::GetMap(const _tstring& key) const
+template <typename MapContainer>
+inline MapContainer CRapidJSONUtil::GetMap(const _tstring& key) const
 {
-	CMap<Key, Value> result;
+	MapContainer result;
+	using KeyType = typename MapContainer::key_type;
+	using ValueType = typename MapContainer::mapped_type;
 
 	if( !_document.HasMember(key.c_str()) || !_document[key.c_str()].IsObject() )
 	{
@@ -384,8 +389,8 @@ inline CMap<Key, Value> CRapidJSONUtil::GetMap(const _tstring& key) const
 	const auto& obj = _document[key.c_str()];
 	for( auto it = obj.MemberBegin(); it != obj.MemberEnd(); ++it )
 	{
-		Key mapKey = ConvertFromJSONValue<Key>(it->name);
-		Value mapValue = ConvertFromJSONValue<Value>(it->value);
+		KeyType mapKey = ConvertFromJSONValue<KeyType>(it->name);
+		ValueType mapValue = ConvertFromJSONValue<ValueType>(it->value);
 		result[mapKey] = mapValue;
 	}
 
@@ -395,12 +400,12 @@ inline CMap<Key, Value> CRapidJSONUtil::GetMap(const _tstring& key) const
 //***************************************************************************
 // @brief 사용자 정의 객체 맵을 JSON 객체로 직렬화하여 추가합니다.
 // @param key JSON 객체로 저장될 키 이름
-// @param map 직렬화할 사용자 정의 객체 맵 (`CMap<Key, T>`)
+// @param map 직렬화할 사용자 정의 객체 맵 (`CMap<Key, T>` 또는 `std::map<Key, T>`)
 // @return 없음
 // @detail 맵의 각 항목에 대해 값을 JSON 객체로 변환하고 `ToJSON` 메서드를 호출하여 채운 뒤, 최종 JSON 객체에 추가합니다.
 //***************************************************************************
-template <typename Key, typename T>
-inline void CRapidJSONUtil::AddObjectMap(const _tstring& key, const CMap<Key, T>& map)
+template <typename MapContainer>
+inline void CRapidJSONUtil::AddObjectMap(const _tstring& key, const MapContainer& map)
 {
 	_tValue jsonObject(rapidjson::kObjectType);
 
@@ -420,13 +425,15 @@ inline void CRapidJSONUtil::AddObjectMap(const _tstring& key, const CMap<Key, T>
 //***************************************************************************
 // @brief JSON 객체로부터 사용자 정의 객체 맵을 역직렬화하여 가져옵니다.
 // @param key 가져올 JSON 객체의 키 이름
-// @return 복원된 사용자 정의 객체 맵 (`CMap<Key, T>`)
+// @return 복원된 사용자 정의 객체 맵 (`CMap<Key, T>` 또는 `std::map<Key, T>`)
 // @detail JSON 객체의 모든 멤버를 순회하며 키를 파싱하고, 값에 대해서는 `FromJSON` 메서드를 호출하여 객체를 복원한 뒤 맵에 삽입합니다.
 //***************************************************************************
-template <typename Key, typename T>
-inline CMap<Key, T> CRapidJSONUtil::GetObjectMap(const _tstring& key) const
+template <typename MapContainer>
+inline MapContainer CRapidJSONUtil::GetObjectMap(const _tstring& key) const
 {
-	CMap<Key, T> result;
+	MapContainer result;
+	using KeyType = typename MapContainer::key_type;
+	using ValueType = typename MapContainer::mapped_type;
 
 	if( !_document.HasMember(key.c_str()) || !_document[key.c_str()].IsObject() )
 	{
@@ -436,9 +443,9 @@ inline CMap<Key, T> CRapidJSONUtil::GetObjectMap(const _tstring& key) const
 	const auto& obj = _document[key.c_str()];
 	for( auto it = obj.MemberBegin(); it != obj.MemberEnd(); ++it )
 	{
-		Key mapKey = ConvertFromJSONValue<Key>(it->name);
+		KeyType mapKey = ConvertFromJSONValue<KeyType>(it->name);
 
-		T mapValue;
+		ValueType mapValue;
 		mapValue.FromJSON(it->value);			// T 타입의 FromJSON 호출
 		result.emplace(mapKey, mapValue);
 	}

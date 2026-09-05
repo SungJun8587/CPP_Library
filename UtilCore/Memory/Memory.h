@@ -109,7 +109,7 @@ private:
 	// 포함하지 않습니다.
 	static atomic<int64> _liveAllocationCount;
 
-	vector<CMemoryPool*> _pools; // 생성된 모든 CMemoryPool 인스턴스 목록 (소멸자에서 일괄 delete)
+	std::vector<CMemoryPool*> _pools; // 생성된 모든 CMemoryPool 인스턴스 목록 (소멸자에서 일괄 delete)
 
 	// 풀 인덱스별 TLS 배치 충전 개수 / 로컬 캐시 상한 테이블
 	int16 _tlsBatchSizeTable[POOL_COUNT];

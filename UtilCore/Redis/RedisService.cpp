@@ -122,6 +122,8 @@ bool CRedisService::SendCommand(const int16 nNodeId, const CVector<std::string>&
 CRedisConnectionPoolRef CRedisService::FindPool(const int16 nNodeId)
 {
 	CRedisConnectionPoolRef pPool;
-	(void)_poolMap.FindObject(nNodeId, pPool);
+	if( !_poolMap.FindObject(nNodeId, pPool) )
+		return nullptr;
+
 	return pPool;
 }
