@@ -6,6 +6,8 @@
 
 #include "pch.h"
 #include "RapidJSONUtil.h"
+#include <locale>     // std::locale, std::locale::classic() (SaveToFile/LoadFromFile에서 직접 사용)
+#include <stdexcept>  // std::runtime_error (로케일 생성 실패 시 catch에서 직접 사용)
 
 //***************************************************************************
 // Construction/Destruction 
@@ -17,7 +19,7 @@
 // @return 없음
 // @detail 내부 문서 객체 할당자를 초기화하고, 기본 문서를 빈 JSON 객체(`kObjectType`) 상태로 설정합니다.
 //***************************************************************************
-CRapidJSONUtil::CRapidJSONUtil() : _allocator(_document.GetAllocator())
+CRapidJSONUtil::CRapidJSONUtil() : _bIsDebugPrint(false)
 {
 	_document.SetObject();
 }
@@ -28,9 +30,9 @@ CRapidJSONUtil::CRapidJSONUtil() : _allocator(_document.GetAllocator())
 // @return 없음
 // @detail 원본 객체가 가진 내부 JSON 문서의 전체 내용을 할당자를 통해 깊은 복사(`CopyFrom`)합니다.
 //***************************************************************************
-CRapidJSONUtil::CRapidJSONUtil(const CRapidJSONUtil& other) : _allocator(_document.GetAllocator())
+CRapidJSONUtil::CRapidJSONUtil(const CRapidJSONUtil& other) : _bIsDebugPrint(other._bIsDebugPrint)
 {
-	_document.CopyFrom(other._document, _allocator);		// 객체 복사
+	_document.CopyFrom(other._document, _document.GetAllocator());		// 객체 복사
 }
 
 //***************************************************************************
@@ -55,6 +57,33 @@ void CRapidJSONUtil::Print_DebugInfo(const TCHAR* ptszFormat, ...)
 }
 
 //***************************************************************************
+// @brief 지정한 키의 멤버가 존재하면 재귀적으로 정리한 뒤 제거합니다.
+// @param key 검사/제거할 멤버의 키 이름
+// @return 없음
+// @detail FindMember를 한 번만 호출해 얻은 이터레이터를 그대로 재사용하여
+//         존재 검사와 삭제를 모두 처리합니다(HasMember + operator[] 이중 탐색 방지).
+//         제거에는 RemoveMember가 아닌 EraseMember를 사용합니다. RemoveMember는 삭제 위치에
+//         마지막 멤버를 옮겨 채우는 O(1) 스왑 방식이라 멤버 순서가 바뀌는 반면, EraseMember는
+//         뒤 요소들을 한 칸씩 시프트하여 O(n)이지만 나머지 멤버들의 상대 순서를 보존합니다.
+//         Add* 계열 함수들이 "추가"가 아닌 "설정" 의미를 갖도록 호출 전에 사용되므로,
+//         같은 키에 값을 반복 설정해도 그 필드가 맨 뒤로 밀려나지 않고 원래 위치를 유지합니다.
+//***************************************************************************
+void CRapidJSONUtil::RemoveMemberIfExists(const _tstring& key)
+{
+	if( !_document.IsObject() )
+	{
+		return;
+	}
+
+	auto itr = _document.FindMember(key.c_str());
+	if( itr != _document.MemberEnd() )
+	{
+		RecursiveRemove(itr->value);
+		_document.EraseMember(itr);
+	}
+}
+
+//***************************************************************************
 // @brief 대입 연산자 오버로딩을 통해 다른 `CRapidJSONUtil` 객체의 JSON 문서를 복사합니다.
 // @param other 대입할 원본 `CRapidJSONUtil` 객체
 // @return 자기 자신(`CRapidJSONUtil&`)에 대한 참조
@@ -64,7 +93,7 @@ CRapidJSONUtil& CRapidJSONUtil::operator=(const CRapidJSONUtil& other)
 {
 	if( this != &other )
 	{
-		_document.CopyFrom(other._document, _allocator);
+		_document.CopyFrom(other._document, _document.GetAllocator());
 	}
 	return *this;  // 자신을 리턴하여 연속적인 연산 가능
 }
@@ -74,10 +103,16 @@ CRapidJSONUtil& CRapidJSONUtil::operator=(const CRapidJSONUtil& other)
 // @param ptszValue 설정할 문자열 포인터 (`TCHAR*`)
 // @return 자기 자신(`CRapidJSONUtil&`)에 대한 참조
 // @detail 내부 문서를 문자열 타입으로 전환하고 지정한 문자열을 할당한 뒤 객체 참조를 반환합니다.
+//         nullptr이 전달된 경우 빈 문자열로 안전하게 처리합니다.
 //***************************************************************************
 CRapidJSONUtil& CRapidJSONUtil::operator=(const TCHAR* ptszValue)
 {
-	_document.SetString(ptszValue, _allocator);
+	if( nullptr == ptszValue )
+	{
+		_document.SetString(_T(""), 0, _document.GetAllocator());
+		return *this;
+	}
+	_document.SetString(ptszValue, _document.GetAllocator());
 	return *this;
 }
 
@@ -89,7 +124,7 @@ CRapidJSONUtil& CRapidJSONUtil::operator=(const TCHAR* ptszValue)
 //***************************************************************************
 CRapidJSONUtil& CRapidJSONUtil::operator=(const _tstring& strValue)
 {
-	_document.SetString(strValue.c_str(), (rapidjson::SizeType)strValue.length(), _allocator);
+	_document.SetString(strValue.c_str(), (rapidjson::SizeType)strValue.length(), _document.GetAllocator());
 	return *this;
 }
 
@@ -169,22 +204,31 @@ CRapidJSONUtil& CRapidJSONUtil::operator=(bool bValue)
 // @brief 키-값 쌍(문자열 포인터 키)을 객체에 추가하여 확장합니다.
 // @param keyValue 추가할 키와 `CRapidJSONUtil` 객체가 담긴 페어(`std::pair`)
 // @return 자기 자신(`CRapidJSONUtil&`)에 대한 참조
-// @detail 현재 문서가 객체 타입이 아닐 경우 객체로 초기화한 뒤, 전달된 서브 문서 객체를 복사하여 새로운 멤버로 추가합니다.
+// @detail 현재 문서가 객체 타입이 아닐 경우 객체로 초기화한 뒤, 기존 동일 키가 있으면 제거하고
+//         전달된 서브 문서 객체를 복사하여 새로운 멤버로 추가합니다.
 //***************************************************************************
 CRapidJSONUtil& CRapidJSONUtil::operator+(const std::pair<const TCHAR*, CRapidJSONUtil>& keyValue)
 {
+	if( nullptr == keyValue.first )
+	{
+		return *this; // 키가 없으면 추가할 수 없으므로 무시
+	}
+
 	if( !_document.IsObject() )
 	{
 		_document.SetObject();
 	}
 
-	_tValue key(keyValue.first, _allocator);	// Key를 rapidjson::Value로 변환
+	RemoveMemberIfExists(keyValue.first);
+
+	auto& allocator = _document.GetAllocator();
+	_tValue key(keyValue.first, allocator);	// Key를 rapidjson::Value로 변환
 	_tValue value;
 
 	// Value도 복사하여 추가해야 함
-	value.CopyFrom(keyValue.second._document, _allocator);
+	value.CopyFrom(keyValue.second._document, allocator);
 
-	_document.AddMember(key, value, _allocator);
+	_document.AddMember(key, value, allocator);
 	return *this;
 }
 
@@ -192,7 +236,8 @@ CRapidJSONUtil& CRapidJSONUtil::operator+(const std::pair<const TCHAR*, CRapidJS
 // @brief 키-값 쌍(`_tstring` 키)을 객체에 추가하여 확장합니다.
 // @param keyValue 추가할 키와 `CRapidJSONUtil` 객체가 담긴 페어(`std::pair`)
 // @return 자기 자신(`CRapidJSONUtil&`)에 대한 참조
-// @detail 현재 문서가 객체 타입이 아닐 경우 객체로 초기화한 뒤, 전달된 서브 문서 객체를 복사하여 새로운 멤버로 추가합니다.
+// @detail 현재 문서가 객체 타입이 아닐 경우 객체로 초기화한 뒤, 기존 동일 키가 있으면 제거하고
+//         전달된 서브 문서 객체를 복사하여 새로운 멤버로 추가합니다.
 //***************************************************************************
 CRapidJSONUtil& CRapidJSONUtil::operator+(const std::pair<_tstring, CRapidJSONUtil>& keyValue)
 {
@@ -201,13 +246,16 @@ CRapidJSONUtil& CRapidJSONUtil::operator+(const std::pair<_tstring, CRapidJSONUt
 		_document.SetObject();
 	}
 
-	_tValue key(keyValue.first.c_str(), _allocator);	// Key를 rapidjson::Value로 변환
+	RemoveMemberIfExists(keyValue.first);
+
+	auto& allocator = _document.GetAllocator();
+	_tValue key(keyValue.first.c_str(), (rapidjson::SizeType)keyValue.first.length(), allocator);	// Key를 rapidjson::Value로 변환
 	_tValue value;
 
 	// Value도 복사하여 추가해야 함
-	value.CopyFrom(keyValue.second._document, _allocator);
+	value.CopyFrom(keyValue.second._document, allocator);
 
-	_document.AddMember(key, value, _allocator);
+	_document.AddMember(key, value, allocator);
 	return *this;
 }
 
@@ -224,8 +272,8 @@ CRapidJSONUtil& CRapidJSONUtil::operator+(const CRapidJSONUtil& other)
 		_document.SetArray();
 	}
 	_tValue value;
-	value.CopyFrom(other._document, _allocator);	// JSON 객체를 복사하여 추가
-	_document.PushBack(value, _allocator);
+	value.CopyFrom(other._document, _document.GetAllocator());	// JSON 객체를 복사하여 추가
+	_document.PushBack(value, _document.GetAllocator());
 	return *this;
 }
 
@@ -233,14 +281,13 @@ CRapidJSONUtil& CRapidJSONUtil::operator+(const CRapidJSONUtil& other)
 // @brief 문자열 포인터에 해당하는 객체 속성을 삭제합니다.
 // @param ptszKey 삭제할 JSON 멤버의 키 이름 (`TCHAR*`)
 // @return 자기 자신(`CRapidJSONUtil&`)에 대한 참조
-// @detail 현재 문서가 객체이고 해당 키가 존재하면, 하위 요소를 재귀적으로 정리한 뒤 문서에서 멤버를 제거합니다.
+// @detail RemoveMemberIfExists를 통해 존재 검사와 재귀 정리, 제거를 한 번의 탐색으로 처리합니다.
 //***************************************************************************
 CRapidJSONUtil& CRapidJSONUtil::operator-(const TCHAR* ptszKey)
 {
-	if( _document.IsObject() && _document.HasMember(ptszKey) )
+	if( nullptr != ptszKey )
 	{
-		RecursiveRemove(_document[ptszKey]);
-		_document.RemoveMember(ptszKey);
+		RemoveMemberIfExists(ptszKey);
 	}
 	return *this;
 }
@@ -280,7 +327,9 @@ CRapidJSONUtil& CRapidJSONUtil::operator-(const uint32 index)
 //***************************************************************************
 bool CRapidJSONUtil::IsExists(const TCHAR* ptszKey) const
 {
-	return _document.HasMember(ptszKey);
+	if( nullptr == ptszKey )
+		return false;
+	return _document.IsObject() && _document.HasMember(ptszKey);
 }
 
 //***************************************************************************
@@ -342,7 +391,12 @@ bool CRapidJSONUtil::IsNumber() const
 // @brief 현재 문서의 문자열 값이 숫자로 변환 가능한 형태인지 확인합니다.
 // @param 없음
 // @return 숫자 형태의 문자열일 경우 true, 그렇지 않으면 false
-// @detail 문자열 내부를 순회하며 부호, 소수점 개수, 숫자 여부를 수동 파싱하여 숫자로 유효한지 판별합니다.
+// @detail 부호(-), 정수부/소수부(점 하나까지), 그리고 지수부(e/E, 부호, 자릿수)까지
+//         지원하는 형태로 문자열을 파싱하여 숫자로 유효한지 판별합니다.
+//         "1e10", "1.5e-3", "-2.5E+10" 등을 숫자로 인식합니다.
+//         - 빈 문자열, "-" 단독, "." 단독, 지수부에 자릿수가 없는 경우("1e", "1e+")는 false.
+//         - `_istdigit`을 사용하여 TCHAR가 char/wchar_t 어느 쪽이든 안전하게 판별합니다
+//           (isdigit에 wchar_t를 직접 넘기는 것은 UB이므로 이를 회피합니다).
 //***************************************************************************
 bool CRapidJSONUtil::IsStringNumber() const
 {
@@ -350,21 +404,59 @@ bool CRapidJSONUtil::IsStringNumber() const
 		return false;
 
 	const TCHAR* cch = _document.GetString();
-	if( L'-' == *cch )
+	if( nullptr == cch || _T('\0') == *cch )
+		return false;
+
+	if( _T('-') == *cch )
 		++cch;
 
-	int iDotCount = 0;
-	for( ; *cch != 0; ++cch )
-	{
-		if( 0 == isdigit(*cch) )
-		{
-			if( '.' != *cch )
-				return false;
+	if( _T('\0') == *cch )
+		return false; // "-" 단독은 숫자가 아님
 
+	// 정수부/소수부: 점은 최대 한 번, 최소 하나의 자릿수가 필요.
+	int  iDotCount = 0;
+	bool bHasDigit = false;
+
+	for( ; *cch != 0 && *cch != _T('e') && *cch != _T('E'); ++cch )
+	{
+		if( 0 != _istdigit(*cch) )
+		{
+			bHasDigit = true;
+			continue;
+		}
+
+		if( _T('.') == *cch )
+		{
 			++iDotCount;
 			if( 1 < iDotCount )
 				return false;
+			continue;
 		}
+
+		return false; // 그 외 문자는 숫자로 볼 수 없음
+	}
+
+	if( !bHasDigit )
+		return false; // 정수부/소수부에 자릿수가 하나도 없음(".", "" 등)
+
+	// 지수부(선택 사항): e/E [+/-] 자릿수+
+	if( _T('e') == *cch || _T('E') == *cch )
+	{
+		++cch;
+
+		if( _T('+') == *cch || _T('-') == *cch )
+			++cch;
+
+		bool bHasExpDigit = false;
+		for( ; *cch != 0; ++cch )
+		{
+			if( 0 == _istdigit(*cch) )
+				return false;
+			bHasExpDigit = true;
+		}
+
+		if( !bHasExpDigit )
+			return false; // "1e", "1e+" 등은 숫자가 아님
 	}
 
 	return true;
@@ -429,17 +521,10 @@ bool CRapidJSONUtil::IsDouble() const
 // @brief 현재 문서가 부울(참/거짓) 타입인지 확인합니다.
 // @param 없음
 // @return 부울 타입일 경우 true, 그렇지 않으면 false
-// @detail RapidJSON 문서의 타입이 참(`kTrueType`) 또는 거짓(`kFalseType`)에 속하는지 검사합니다.
+// @detail RapidJSON 문서의 IsBool()로 참/거짓 타입 여부를 검사합니다.
 //***************************************************************************
 bool CRapidJSONUtil::IsBool() const
 {
-	switch( _document.GetType() )
-	{
-	case kTrueType:
-	case kFalseType:
-		return true;
-	}
-
 	return _document.IsBool();
 }
 
@@ -527,7 +612,11 @@ bool CRapidJSONUtil::SaveToFile(const _tstring& filename, _tstring& jsonString, 
 // @param filename 저장할 파일 경로 및 이름
 // @param pretty 들여쓰기 적용 여부
 // @return 저장 성공 시 true, 실패 시 false
-// @detail 라이터를 통해 문자열을 생성한 뒤, 인코딩 환경(`ko_KR.UTF-8` 등)에 맞추어 파일 스트림에 내용을 기록합니다.
+// @detail 라이터를 통해 문자열을 생성한 뒤, 논유니코드 빌드에서는 내부 문자열(CP949)을
+//         UTF-8로 변환하여 파일에 기록합니다. LoadFromFile은 이 변환을 역으로 되돌리므로
+//         Save/Load 왕복 시 인코딩이 어긋나지 않습니다.
+//         로케일 설정("ko_KR.UTF-8")이 시스템에 없을 수 있으므로 예외를 잡아
+//         실패 시 기본 로케일로 안전하게 대체합니다.
 //***************************************************************************
 bool CRapidJSONUtil::SaveToFile(const _tstring& filename, const bool pretty)
 {
@@ -565,9 +654,23 @@ bool CRapidJSONUtil::SaveToFile(const _tstring& filename, const bool pretty)
 	_tstring temp = buffer.GetString();
 
 	_tofstream out(filename, _tofstream::trunc);
+	if( !out.is_open() )
+	{
+		Print_DebugInfo(_T("%s failed to open output file [%s]\n"), __TFUNCTION__, filename.c_str());
+		return false;
+	}
 
 #ifdef _UNICODE
-	out.imbue(std::locale("ko_KR.UTF-8"));
+	try
+	{
+		out.imbue(std::locale("ko_KR.UTF-8"));
+	}
+	catch( const std::runtime_error& )
+	{
+		// 시스템에 해당 로케일이 설치되어 있지 않은 경우, 기본(classic) 로케일로 대체.
+		Print_DebugInfo(_T("%s locale ko_KR.UTF-8 not available, falling back to classic locale\n"), __TFUNCTION__);
+		out.imbue(std::locale::classic());
+	}
 	out << temp;
 #else
 	out << Iconv::CIconvUtil::ConvertEncoding(temp, "CP949", "UTF-8");
@@ -584,6 +687,13 @@ bool CRapidJSONUtil::SaveToFile(const _tstring& filename, const bool pretty)
 // @param filename 로드할 파일 경로 및 이름
 // @return 로드 및 파싱 성공 시 true, 실패 시 false
 // @detail 파일 스트림을 열어 전체 텍스트를 읽어온 뒤 `Parse` 함수를 통해 문서화합니다.
+//         - 유니코드 빌드: SaveToFile이 "ko_KR.UTF-8" 로케일로 imbue하여 내부 wchar_t를
+//           UTF-8 바이트로 인코딩해 저장하므로, 읽을 때도 동일한 로케일을 imbue해야 합니다.
+//           imbue하지 않으면 기본("C") 로케일이 UTF-8을 디코딩하지 못해 바이트를 그대로
+//           wchar_t로 확장(1:1)해버려 비ASCII 문자가 깨집니다. (이전에는 이 imbue가 누락되어
+//           SaveToFile→LoadFromFile 왕복 시 한글 등이 깨지는 버그가 있었습니다.)
+//         - 논유니코드 빌드: SaveToFile의 CP949→UTF-8 변환을 역으로 되돌립니다.
+//         두 경우 모두 SaveToFile과 대칭을 이루어 왕복 시 인코딩이 깨지지 않도록 합니다.
 //***************************************************************************
 bool CRapidJSONUtil::LoadFromFile(const _tstring& filename)
 {
@@ -593,8 +703,26 @@ bool CRapidJSONUtil::LoadFromFile(const _tstring& filename)
 		_tcerr << _T("Failed to open file: ") << filename << std::endl;
 		return false;
 	}
+
+#ifdef _UNICODE
+	try
+	{
+		ifs.imbue(std::locale("ko_KR.UTF-8"));
+	}
+	catch( const std::runtime_error& )
+	{
+		// SaveToFile과 동일하게, 로케일이 없으면 기본(classic) 로케일로 대체.
+		Print_DebugInfo(_T("%s locale ko_KR.UTF-8 not available, falling back to classic locale\n"), __TFUNCTION__);
+		ifs.imbue(std::locale::classic());
+	}
+#endif
+
 	_tstring content((std::istreambuf_iterator<TCHAR>(ifs)), std::istreambuf_iterator<TCHAR>());
 	ifs.close();
+
+#ifndef _UNICODE
+	content = Iconv::CIconvUtil::ConvertEncoding(content, "UTF-8", "CP949");
+#endif
 
 	return Parse(content);
 }
@@ -604,14 +732,16 @@ bool CRapidJSONUtil::LoadFromFile(const _tstring& filename)
 // @param 없음
 // @return 키 이름이 담긴 문자열 벡터 (`std::vector<_tstring>`)
 // @detail 문서가 객체 형태일 경우, 내부 멤버들을 순회하며 각 멤버의 이름을 벡터에 수집하여 반환합니다.
+//         재할당 횟수를 줄이기 위해 미리 멤버 수만큼 reserve합니다.
 //***************************************************************************
-std::vector<_tstring> CRapidJSONUtil::GetKeys()
+std::vector<_tstring> CRapidJSONUtil::GetKeys() const
 {
 	std::vector<_tstring> keys;
 
 	// JSON 객체 순회
 	if( _document.IsObject() )
 	{
+		keys.reserve(_document.MemberCount());
 		for( auto& member : _document.GetObject() )
 		{
 			keys.push_back(member.name.GetString());
@@ -625,15 +755,13 @@ std::vector<_tstring> CRapidJSONUtil::GetKeys()
 // @brief 지정한 키 포인터에 해당하는 객체 속성을 삭제합니다.
 // @param ptszKey 삭제할 멤버의 키 이름 (`TCHAR*`)
 // @return 없음
-// @detail 문서가 객체이고 해당 키가 존재하면, 하위 요소를 재귀 정리한 후 멤버를 제거합니다.
+// @detail RemoveMemberIfExists를 통해 존재 검사, 재귀 정리, 제거를 한 번의 탐색으로 처리합니다.
 //***************************************************************************
 void CRapidJSONUtil::Remove(const TCHAR* ptszKey)
 {
-	if( _document.IsObject() && _document.HasMember(ptszKey) )
-	{
-		RecursiveRemove(_document[ptszKey]);
-		_document.RemoveMember(ptszKey);
-	}
+	if( nullptr == ptszKey )
+		return;
+	RemoveMemberIfExists(ptszKey);
 }
 
 //***************************************************************************
@@ -652,34 +780,53 @@ void CRapidJSONUtil::Remove(const _tstring& key)
 // @param key 대상 배열이 위치한 키 이름
 // @param index 삭제할 배열 요소의 인덱스 위치
 // @return 없음
-// @detail 해당 키가 유효한 배열인지 검사하고 범위 내에 있을 경우, 요소를 재귀 정리한 뒤 배열에서 지웁니다.
+// @detail FindMember로 한 번만 탐색한 이터레이터를 재사용하여 배열 여부와 범위를 검사하고,
+//         범위 내에 있을 경우 해당 인덱스의 요소만 재귀 정리한 뒤 배열에서 지웁니다.
+//         (기존 코드는 배열 전체를 RecursiveRemove하여 삭제 대상이 아닌 요소까지
+//         초기화해버리는 버그가 있었습니다.)
 //***************************************************************************
 void CRapidJSONUtil::Remove(const _tstring& key, uint32 index)
 {
-	if( _document.HasMember(key.c_str()) && _document[key.c_str()].IsArray() )
+	if( !_document.IsObject() )
 	{
-		auto& arr = _document[key.c_str()];
-		if( index < arr.Size() )
-		{
-			RecursiveRemove(arr);
-			arr.Erase(arr.Begin() + index);
-		}
+		return;
+	}
+
+	auto itr = _document.FindMember(key.c_str());
+	if( itr == _document.MemberEnd() || !itr->value.IsArray() )
+	{
+		return;
+	}
+
+	auto& arr = itr->value;
+	if( index < arr.Size() )
+	{
+		RecursiveRemove(arr[index]);
+		arr.Erase(arr.Begin() + index);
 	}
 }
 
 //***************************************************************************
 // @brief JSON 값 내부의 객체나 배열 요소를 재귀적으로 순회하며 정리합니다.
 // @param value 정리할 대상 RapidJSON 값 객체 (`_tValue`)
+// @param depth 현재 재귀 깊이 (기본값 0). 신뢰할 수 없는 입력으로 인한
+//              스택 오버플로우를 방지하기 위해 RAPIDJSONUTIL_MAX_RECURSION_DEPTH에서 중단합니다.
 // @return 없음
 // @detail 값이 객체인 경우 멤버들을 재귀 탐색하고 객체로 초기화하며, 배열인 경우 원소들을 재귀 탐색하고 배열로 초기화합니다.
 //***************************************************************************
-void CRapidJSONUtil::RecursiveRemove(_tValue& value)
+void CRapidJSONUtil::RecursiveRemove(_tValue& value, int depth)
 {
+	if( depth >= RAPIDJSONUTIL_MAX_RECURSION_DEPTH )
+	{
+		Print_DebugInfo(_T("%s max recursion depth reached, aborting cleanup early\n"), __TFUNCTION__);
+		return;
+	}
+
 	if( value.IsObject() )
 	{
 		for( auto itr = value.MemberBegin(); itr != value.MemberEnd(); ++itr )
 		{
-			RecursiveRemove(itr->value);
+			RecursiveRemove(itr->value, depth + 1);
 		}
 		value.SetObject();
 	}
@@ -687,7 +834,7 @@ void CRapidJSONUtil::RecursiveRemove(_tValue& value)
 	{
 		for( auto itr = value.Begin(); itr != value.End(); ++itr )
 		{
-			RecursiveRemove(*itr);
+			RecursiveRemove(*itr, depth + 1);
 		}
 		value.SetArray();
 	}

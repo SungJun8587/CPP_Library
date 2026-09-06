@@ -1,0 +1,36 @@
+{
+    "Name": "GameServer",
+    "IP": "127.0.0.1",
+    "Port": 30201,
+    "UseTestMode": "OFF",
+    "KeepAliveSec": 3000,
+    "MaxUser": 2000,
+    "RedisPoolSize": 8,
+    "DbWorkerThreadCnt": 4,
+    "HeartbeatTtlSec": 15,
+    "HeartbeatIntervalSec": 5,
+    "GameType": "ALL",
+    "DBNode": [
+        {
+            "ID": 2,
+            "DBClass": 2,
+            "DSNDriver": "{MySQL ODBC 9.7 Unicode Driver}",
+            "IP": "127.0.0.1",
+            "Port": 3306,
+            "DBName": "common",
+            "UID": "root",
+            "PWD": "villdev!@"
+        }
+    ],
+	"ServerNode":[        
+	    {
+            "ID": 1,
+            "Name": "AuthServer",
+            "IP": "127.0.0.1",
+            "Port": 32101
+        }
+	]
+}
+
+
+

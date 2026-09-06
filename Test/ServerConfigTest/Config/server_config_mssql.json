@@ -1,0 +1,36 @@
+{
+    "Name": "GameServer",
+    "IP": "127.0.0.1",
+    "Port": 30201,
+    "UseTestMode": "OFF",
+    "KeepAliveSec": 3000,
+    "MaxUser": 2000,
+    "RedisPoolSize": 8,
+    "DbWorkerThreadCnt": 4,
+    "HeartbeatTtlSec": 15,
+    "HeartbeatIntervalSec": 5,
+    "GameType": "ALL",
+    "DBNode": [
+        {
+            "ID": 1,
+            "DBClass": 1,
+            "DSNDriver": "{ODBC Driver 18 for SQL Server}",
+            "IP": "127.0.0.1",
+            "Port": 1433,
+            "DBName": "Common",
+            "UID": "sa",
+            "PWD": "dnpqxlaA123!@"
+        }    
+    ],
+	"ServerNode":[        
+	    {
+            "ID": 1,
+            "Name": "AuthServer",
+            "IP": "127.0.0.1",
+            "Port": 32101
+        }
+	]
+}
+
+
+

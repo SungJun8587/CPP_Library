@@ -7,6 +7,7 @@
 #ifndef UC_ODBCASYNCSRV_H
 #define UC_ODBCASYNCSRV_H
 
+#include <Memory/Singleton.h>
 #include <DB/OdbcConnPool.h>
 #include <Containers/Queue/ChunkedSwapQueue.h>
 
@@ -14,7 +15,7 @@
 // @brief 비동기 ODBC 데이터베이스 서비스 클래스
 // @details 비동기 DB 요청 큐를 관리하고 커넥션 풀을 통해 스레드 세이프하게 쿼리를 처리합니다.
 //***************************************************************************
-class COdbcAsyncSrv
+class COdbcAsyncSrv : public CSingleton<COdbcAsyncSrv>
 {
 	typedef std::unordered_map<uint16, std::shared_ptr<CDBAsyncSrvHandler>>	COMMAND_MAP;
 
@@ -29,6 +30,8 @@ class COdbcAsyncSrv
 public:
 	COdbcAsyncSrv();
 	virtual ~COdbcAsyncSrv();
+
+	static COdbcAsyncSrv* Instance() { return GetSingletonPtr(); }
 
 	virtual bool	RunningThread();
 
@@ -112,9 +115,6 @@ public:
 	bool								_bOpen;						// 서비스 오픈 여부
 	int32								_nMaxThreadCnt;				// 최대 스레드 수
 	COdbcConnPool**						_pOdbcConnPools;			// ODBC 연결 풀 배열
-
-public:
-	static std::shared_ptr<COdbcAsyncSrv> Instance();
 
 protected:
 	void		Clear(void);

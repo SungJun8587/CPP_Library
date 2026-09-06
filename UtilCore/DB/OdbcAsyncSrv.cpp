@@ -10,15 +10,6 @@
 extern CThreadManager* gpThreadManager;
 
 //***************************************************************************
-// @brief 싱글톤 인스턴스를 반환합니다.
-// @return COdbcAsyncSrv 공유 포인터
-//***************************************************************************
-std::shared_ptr<COdbcAsyncSrv> COdbcAsyncSrv::Instance() {
-	static std::shared_ptr<COdbcAsyncSrv> instance = std::make_shared<COdbcAsyncSrv>();
-	return instance;
-}
-
-//***************************************************************************
 // @brief 생성자: 기본 멤버 초기화
 //***************************************************************************
 COdbcAsyncSrv::COdbcAsyncSrv()
@@ -36,8 +27,8 @@ COdbcAsyncSrv::COdbcAsyncSrv()
 COdbcAsyncSrv::~COdbcAsyncSrv()
 {
 	FlushRemainingTasks();
-	StopThread();
-	Clear();
+	//StopThread();
+	//Clear();
 	ClearOdbcPools();
 
 	_nMaxThreadCnt = 0;

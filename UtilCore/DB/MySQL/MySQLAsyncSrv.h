@@ -15,7 +15,7 @@
 // @detail 데이터베이스 요청을 큐에 쌓아 비동기 스레드에서 처리하며,
 //         비동기 핸들러 맵 관리 및 MySQL 커넥션 풀을 제공합니다.
 //***************************************************************************
-class CMySQLAsyncSrv
+class CMySQLAsyncSrv : public CSingleton<CMySQLAsyncSrv>
 {
 	typedef std::unordered_map<uint16, std::shared_ptr<CDBAsyncSrvHandler>>	COMMAND_MAP;
 
@@ -35,6 +35,8 @@ class CMySQLAsyncSrv
 public:
 	CMySQLAsyncSrv();
 	virtual ~CMySQLAsyncSrv();
+
+	static CMySQLAsyncSrv* Instance() { return GetSingletonPtr(); }
 
 	virtual bool	RunningThread();
 
@@ -117,10 +119,7 @@ public:
 	int32								_nDBCount;						// DB 개수
 	bool								_bOpen;							// 서비스 오픈 여부
 	int32								_nMaxThreadCnt;					// 최대 스레드 수
-	CMySQLConnPool** _pMySQLConnPools;				// MySQL 연결 풀 배열
-
-public:
-	static std::shared_ptr<CMySQLAsyncSrv> Instance();
+	CMySQLConnPool**					_pMySQLConnPools;				// MySQL 연결 풀 배열
 
 protected:
 	void		Clear(void);

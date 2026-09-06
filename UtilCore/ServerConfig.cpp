@@ -11,8 +11,13 @@
 // Construction/Destruction
 //***************************************************************************
 
+//***************************************************************************
+// @brief CServerConfig 클래스의 생성자
+//***************************************************************************
 CServerConfig::CServerConfig(void)
 	: _nServerPort(0), _nMaxUser(0), _nKeepAliveSec(0)
+	, _nRedisPoolSize(0), _nDbWorkerThreadCnt(0)
+	, _nHeartbeatTtlSec(0), _nHeartbeatIntervalSec(0)
 {
 	memset(_tszServerName, 0, sizeof(_tszServerName));
 	memset(_tszIP, 0, sizeof(_tszIP));
@@ -22,13 +27,19 @@ CServerConfig::CServerConfig(void)
 	Clear();
 }
 
+//***************************************************************************
+// @brief CServerConfig 클래스의 소멸자
+//***************************************************************************
 CServerConfig::~CServerConfig(void)
 {
 	Clear();
 }
 
 //***************************************************************************
-//
+// @brief JSON 설정 파일로부터 서버 구성 정보를 읽어와 초기화합니다.
+// @param tszServerInfo JSON 설정 파일 경로
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
 bool CServerConfig::Init(const TCHAR* tszServerInfo)
 {
 	int32 nSize = 0;
@@ -44,6 +55,22 @@ bool CServerConfig::Init(const TCHAR* tszServerInfo)
 	_nMaxUser = jsonUtil[_T("MaxUser")];
 	_nKeepAliveSec = jsonUtil[_T("KeepAliveSec")];
 
+	// [신규] Redis/DB 풀·워커, 하트비트 설정
+	_nRedisPoolSize = jsonUtil[_T("RedisPoolSize")];
+	_nDbWorkerThreadCnt = jsonUtil[_T("DbWorkerThreadCnt")];
+	_nHeartbeatTtlSec = jsonUtil[_T("HeartbeatTtlSec")];
+	_nHeartbeatIntervalSec = jsonUtil[_T("HeartbeatIntervalSec")];
+
+	// heartbeat 주기가 TTL보다 같거나 크면 갱신 전에 TTL이 만료되는 창이
+	// 생긴다(CRedisServerHeartbeat::Start()도 동일하게 검증하지만, 설정
+	// 파일 단계에서 미리 걸러 잘못된 값으로 서버가 뜨는 걸 막는다).
+	if( _nHeartbeatIntervalSec <= 0 || _nHeartbeatTtlSec <= _nHeartbeatIntervalSec )
+	{
+		LOG_ERROR(_T("CServerConfig::Init: invalid heartbeat config (TtlSec=%d, IntervalSec=%d) — IntervalSec must be > 0 and < TtlSec"),
+			_nHeartbeatTtlSec, _nHeartbeatIntervalSec);
+		return false;
+	}
+
 	_serverNodeVec = jsonUtil.Deserialize<CVector<CServerNode>>(_T("ServerNode"));
 	_dbNodeVec = jsonUtil.Deserialize<CVector<CDBNode>>(_T("DBNode"));
 	_redisNodeVec = jsonUtil.Deserialize<CVector<CRedisNode>>(_T("RedisNode"));
@@ -52,7 +79,8 @@ bool CServerConfig::Init(const TCHAR* tszServerInfo)
 }
 
 //***************************************************************************
-//
+// @brief 내부 동적 컨테이너 데이터를 소거하여 초기화합니다.
+//***************************************************************************
 void CServerConfig::Clear(void)
 {
 	_serverNodeVec.clear();
@@ -61,7 +89,8 @@ void CServerConfig::Clear(void)
 }
 
 //***************************************************************************
-//
+// @brief 로드된 서버 설정 정보 및 노드 목록을 로그로 출력합니다.
+//***************************************************************************
 void CServerConfig::PrintServerSettingInfo()
 {
 	LOG_INFO(_T("###################################################################"));
@@ -71,6 +100,10 @@ void CServerConfig::PrintServerSettingInfo()
 	LOG_INFO(_T("Port : %d"), _nServerPort);
 	LOG_INFO(_T("KeepAliveSec : %d"), _nKeepAliveSec);
 	LOG_INFO(_T("MaxUser : %d"), _nMaxUser);
+	LOG_INFO(_T("RedisPoolSize : %d"), _nRedisPoolSize);
+	LOG_INFO(_T("DbWorkerThreadCnt : %d"), _nDbWorkerThreadCnt);
+	LOG_INFO(_T("HeartbeatTtlSec : %d"), _nHeartbeatTtlSec);
+	LOG_INFO(_T("HeartbeatIntervalSec : %d"), _nHeartbeatIntervalSec);
 
 	LOG_INFO(_T("--------------- Connect ServerNode size : %d ---------------"), static_cast<int>(_serverNodeVec.size()));
 	for( uint32 i = 0; i < _serverNodeVec.size(); i++ )

@@ -1,4 +1,5 @@
-﻿//***************************************************************************
+﻿
+//***************************************************************************
 // RapidJSONUtil.h : interface and implementation for the CRapidJSONUtil class.
 //
 //***************************************************************************
@@ -56,6 +57,10 @@ typedef PrettyWriter<StringBuffer, UTF8<>, UTF8<>> _tPrettyWriter;
 typedef GenericArray<true, Value> _tArray;
 #endif
 
+// 신뢰할 수 없는 JSON을 재귀적으로 정리(RecursiveRemove)할 때 스택 오버플로우를
+// 방지하기 위한 최대 재귀 깊이. 필요 시 조정 가능.
+static constexpr int RAPIDJSONUTIL_MAX_RECURSION_DEPTH = 256;
+
 //***************************************************************************
 // @brief RapidJSON 라이브러리를 래핑하여 JSON 데이터 조작, 파싱, 직렬화를 지원하는 유틸리티 클래스입니다.
 // @detail 유니코드/멀티바이트 환경에 대응하며 연산자 오버로딩 및 프록시 패턴을 통한 직관적인 데이터 접근을 제공합니다.
@@ -84,9 +89,16 @@ public:
     //***************************************************************************
     // @brief 내부 JSON 문서를 초기화합니다.
     // @detail 내부 문서를 빈 JSON 객체 상태로 설정합니다.
+    //         단순히 SetObject()만 호출하면 타입만 바뀔 뿐, 기본 MemoryPoolAllocator가
+    //         이전에 할당한 메모리 청크는 반환되지 않고 계속 누적됩니다. 이 객체를
+    //         (예: 커넥션 풀이나 세션 객체에서) 요청마다 Clear() 후 재사용하는 패턴에서는
+    //         메모리 사용량이 무한정 증가할 수 있습니다. 기본 생성자로 새 Document를 만들어
+    //         이동 대입하면 이전 allocator 체인이 소멸자를 통해 정상적으로 해제되어
+    //         진짜 빈 상태로 리셋됩니다.
     //***************************************************************************
     void Clear() {
-        _document.SetObject();		// 객체 초기화
+        _document = _tDocument();
+        _document.SetObject();
     }
 
     //***************************************************************************
@@ -147,7 +159,7 @@ public:
     bool SaveToFile(const _tstring& filename, const bool pretty = false);
     bool LoadFromFile(const _tstring& filename);
 
-    std::vector<_tstring> GetKeys();
+    std::vector<_tstring> GetKeys() const;
 
     void Remove(const TCHAR* ptszKey);
     void Remove(const _tstring& key);
@@ -171,6 +183,8 @@ public:
         Proxy(CRapidJSONUtil& jsonUtil, const _tstring& key) : _jsonUtil(jsonUtil), _key(key) {}
 
         // = 연산자 오버로딩(값 설정)
+        // NOTE: AddValue()는 내부적으로 기존 동일 키를 제거한 뒤 추가하므로
+        //       같은 키에 반복 대입해도 중복 멤버가 생기지 않습니다.
         template <typename T>
         Proxy& operator=(const T& value) {
             _jsonUtil.AddValue(_key, value);
@@ -186,9 +200,11 @@ public:
     // @brief 키 문자열을 인자로 받아 프록시 객체를 반환합니다.
     // @param key 접근할 키 문자열
     // @return 생성된 Proxy 객체
+    // @detail key가 nullptr이면 Proxy 생성 시 _tstring(nullptr) 생성자가 호출되어
+    //         크래시하므로, 빈 문자열 키로 안전하게 대체합니다.
     //***************************************************************************
     Proxy operator[](const TCHAR* key) {
-        return Proxy(*this, key);
+        return Proxy(*this, key ? key : _T(""));
     }
 
     //***************************************************************************
@@ -204,7 +220,7 @@ public:
     inline _tstring Serialize(const _tstring& key, const T& obj, const bool pretty = false);
 
     template <typename T>
-    inline T Deserialize(const _tstring& key);
+    inline T Deserialize(const _tstring& key) const;
 
     template <typename T>
     inline void AddValue(const _tstring& key, const T& value);
@@ -231,13 +247,13 @@ public:
     inline void AddVector(const _tstring& key, const Container& vec);
 
     template <typename Container, typename ValueType = typename Container::value_type>
-    inline Container GetVector(const _tstring& key);
+    inline Container GetVector(const _tstring& key) const;
 
     template <typename Container, typename ValueType = typename Container::value_type>
     inline void AddObjectVector(const _tstring& key, const Container& vec);
 
     template <typename Container, typename ValueType = typename Container::value_type>
-    inline Container GetObjectVector(const _tstring& key);
+    inline Container GetObjectVector(const _tstring& key) const;
 
     template <typename MapContainer>
     inline void AddMap(const _tstring& key, const MapContainer& map);
@@ -255,10 +271,22 @@ private:
     void Print_DebugInfo(const TCHAR* ptszFormat, ...);
 
     //***************************************************************************
+    // @brief 지정한 키의 멤버가 이미 존재하면 재귀적으로 정리한 뒤 제거합니다.
+    // @detail Add* 계열 함수들이 "추가"가 아니라 "설정(덮어쓰기)" 의미로 동작하도록
+    //         호출 전에 기존 동일 키 멤버를 제거해 rapidjson::AddMember가 중복 키를
+    //         만들지 않게 합니다. HasMember/FindMember를 한 번만 사용하여
+    //         불필요한 이중 탐색을 피합니다.
+    //***************************************************************************
+    void RemoveMemberIfExists(const _tstring& key);
+
+    //***************************************************************************
     // @brief C++ 구조체 → JSON 변환(템플릿(T) 변수값을 _tValue 변수에 할당)
+    // @detail 값을 새로 할당(rapidjson allocator 사용)해야 하므로 non-const로 선언합니다.
+    //         (allocator를 참조 멤버로 들고 있지 않으므로 항상 _document.GetAllocator()를
+    //         통해 얻어야 하며, 이는 비-const 컨텍스트에서만 가능합니다.)
     //***************************************************************************
     template <typename T>
-    _tValue ConvertToJSONValue(const T& value) const;
+    _tValue ConvertToJSONValue(const T& value);
 
     //***************************************************************************
     // @brief JSON → C++ 구조체 변환(_tValue 변수값을 템플릿(T) 변수에 할당)
@@ -266,7 +294,18 @@ private:
     template <typename T>
     T ConvertFromJSONValue(const _tValue& value) const;
 
-    void RecursiveRemove(_tValue& value);
+    //***************************************************************************
+    // @brief 지정한 _tValue가 T로 안전하게 변환 가능한 JSON 타입인지 검사합니다.
+    // @detail GetValue/GetVector/GetMap 등에서 저장된 JSON 값의 실제 타입이 요청한 C++
+    //         타입과 다를 때(예: 문자열 필드를 int로 읽으려는 경우) rapidjson의 GetInt() 등이
+    //         릴리스 빌드에서 어서션 없이 정의되지 않은 동작을 일으키는 것을 막기 위한
+    //         사전 검증입니다. 불일치 시 호출자는 defaultValue/빈 값으로 폴백해야 합니다.
+    //         ToJSON/FromJSON을 쓰는 사용자 정의 타입은 일반적으로 판별할 수 없어 true를 반환합니다.
+    //***************************************************************************
+    template <typename T>
+    bool IsConvertible(const _tValue& value) const;
+
+    void RecursiveRemove(_tValue& value, int depth = 0);
 
     //***************************************************************************
     // @brief 벡터 타입 확인
@@ -301,12 +340,20 @@ private:
 
     //***************************************************************************
     // @brief T에 ToXML 멤버 함수가 있는지 확인하는 타입 트레이트
+    // @detail AddObject/AddObjectVector/AddObjectMap은 모두 대상 객체를 `const T&`로 받아
+    //         ToJSON을 호출합니다(예: `const auto& item : vec` 순회 후 `item.ToJSON(...)`).
+    //         트레이트도 동일하게 `const T&` 기준으로 호출 가능 여부를 검사해야, ToJSON이
+    //         const로 선언되지 않은 타입에 대해 여기서 즉시 false를 반환하고 다른 분기로
+    //         빠지거나 명확한 static_assert 메시지를 내도록 유도할 수 있습니다. `declval<T>()`
+    //         (비-const)로 검사하면 그런 타입도 true로 잘못 판정되어, 실제로는 AddObject 등의
+    //         본문 깊숙한 곳에서 "const 객체에서 비-const 멤버 함수 호출 불가"라는 알아보기
+    //         힘든 컴파일 에러로 이어집니다.
     //***************************************************************************
     template <typename T, typename = void>
     struct has_tojson_method : std::false_type {};
 
     template <typename T>
-    struct has_tojson_method<T, std::void_t<decltype(std::declval<T>().ToJSON(std::declval<_tValue&>(), std::declval<_tDocument::AllocatorType&>()))>> : std::true_type {};
+    struct has_tojson_method<T, std::void_t<decltype(std::declval<const T&>().ToJSON(std::declval<_tValue&>(), std::declval<_tDocument::AllocatorType&>()))>> : std::true_type {};
 
     //***************************************************************************
     // @brief 컴파일 타임 에러 유도용 유틸리티
@@ -315,8 +362,13 @@ private:
     struct dependent_false : std::false_type {};
 
 private:
+    // NOTE: allocator는 더 이상 참조 멤버로 보관하지 않습니다. 참조 멤버가 있으면
+    // 컴파일러가 이동 생성자/이동 대입 연산자를 암묵적으로 생성하지 않아, 값 전달/반환/
+    // 컨테이너 저장 시마다 CopyFrom()에 의한 JSON 트리 전체 깊은 복사가 강제로 일어납니다.
+    // _document만 멤버로 남기면(rapidjson::GenericDocument는 이동 가능) 컴파일러가
+    // 이동 연산을 자동 생성해 불필요한 복사를 피할 수 있습니다. allocator가 필요하면
+    // 그때그때 _document.GetAllocator()로 얻습니다(비-const 컨텍스트에서만 가능).
     _tDocument                  _document;  // JSON Document
-    _tDocument::AllocatorType& _allocator; // Allocator
 
     bool                        _bIsDebugPrint; // 디버그 출력 활성화 여부 플래그
 };

@@ -11,6 +11,9 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <fstream>
+#include <sstream>
+#include <locale.h>
 #include <type_traits>
 
 #include <BaseRedefineDataType.h> 
@@ -29,6 +32,11 @@ using namespace rapidxml;
 #define MapValue		_T("Value")
 #define ItemName		_T("Item")
 
+// XML 문자열 ↔ 숫자 변환에 사용하는 로케일입니다. RapidXMLUtil.cpp에서 "C" 로케일로
+// 생성되며, 프로세스 전역 로케일 설정(setlocale)과 무관하게 항상 동일한 소수점
+// 구분자로 파싱/포맷팅되도록 보장합니다.
+extern _locale_t g_xmlNumericLocale;
+
 //***************************************************************************
 // @class CXMLNode
 // @brief RapidXML의 xml_node<> 포인터를 래핑하여 안전하고 편리한 데이터 접근을 제공하는 클래스입니다.
@@ -42,6 +50,9 @@ using namespace rapidxml;
 //  - RapidXML raw 포인터(xml_node<>*) 캡슐화 및 Null 포인터 안정성 제공 (IsValid)
 //  - 다양한 타입별 속성(Get*Attr) 및 노드 값(Get*Value) 추출 기능 지원
 //  - 단일 자식 노드 탐색(FindChild) 및 목록 형태의 다중 자식 노드 탐색(FindChildren) 지원
+//  - GetStringAttr/GetStringValue는 스레드별 정적 버퍼에 결과를 담아 반환하므로,
+//    반환된 포인터는 같은 스레드에서 다음 GetString* 호출 전까지만 유효합니다.
+//    포인터를 오래 보관해야 한다면 즉시 _tstring으로 복사해서 사용해야 합니다.
 //***************************************************************************
 class CXMLNode
 {
@@ -66,7 +77,7 @@ public:
 	int64				GetInt64Attr(const TCHAR* ptszKey, int64 defaultValue = 0);
 	float				GetFloatAttr(const TCHAR* ptszKey, float defaultValue = 0.0f);
 	double				GetDoubleAttr(const TCHAR* ptszKey, double defaultValue = 0.0);
-	const TCHAR*		GetStringAttr(const TCHAR* ptszKey, const TCHAR* defaultValue = _T(""));
+	const TCHAR* GetStringAttr(const TCHAR* ptszKey, const TCHAR* defaultValue = _T(""));
 
 	bool				GetBoolValue(bool defaultValue = false);
 	int8				GetInt8Value(int8 defaultValue = 0);
@@ -75,13 +86,13 @@ public:
 	int64				GetInt64Value(int64 defaultValue = 0);
 	float				GetFloatValue(float defaultValue = 0.0f);
 	double				GetDoubleValue(double defaultValue = 0.0);
-	const TCHAR*		GetStringValue(const TCHAR* defaultValue = _T(""));
+	const TCHAR* GetStringValue(const TCHAR* defaultValue = _T(""));
 
 	CXMLNode			FindChild(const TCHAR* ptszKey);
 	CVector<CXMLNode>	FindChildren(const TCHAR* ptszKey);
 
 private:
-	rapidxml::xml_node<>*		_node = nullptr;
+	rapidxml::xml_node<>* _node = nullptr;
 };
 
 //***************************************************************************
@@ -90,14 +101,16 @@ private:
 //
 // @details
 // XML 문서의 파일 입출력(ParseFromFile, SaveFile), 노드/속성 편집 및 C++ 데이터 구조체,
-// 컨테이너(CVector, CMap)의 자동 XML 직렬화/역직렬화 기능을 종합적으로 관리합니다.
-// 내부적으로 TCHAR 문자열과 UTF-8 간 인코딩 변환을 자동으로 수행합니다.
+// 컨테이너(CVector/std::vector, CMap/std::map)의 자동 XML 직렬화/역직렬화 기능을 종합적으로 관리합니다.
+// 내부적으로 TCHAR 문자열과 UTF-8 간 인코딩 변환을 자동으로 수행하며, 숫자 값의 문자열 변환은
+// 항상 로케일에 독립적으로 처리되어 실행 환경(OS 로케일 설정)에 관계없이 동일한 결과를 보장합니다.
 //
 // 주요 처리 및 특징:
 //  - XML 파일 및 문자열 파싱, 포맷팅 저장/출력 기능 제공
 //  - 노드, 속성(Attribute), CData의 동적 추가/수정/삭제 관리
-//  - C++ 기본 자료형, 구조체 및 컨테이너(CVector, CMap)의 직렬화/역직렬화 템플릿 지원
+//  - C++ 기본 자료형, 구조체 및 컨테이너(CVector/std::vector, CMap/std::map)의 직렬화/역직렬화 템플릿 지원
 //  - operator[] 연산자 오버로딩 및 Proxy 개체를 통한 직관적인 데이터 접근 지원
+//  - Serialize()는 압축된 형태로, SerializeWithIndent()는 들여쓰기가 포함된 형태로 XML 문자열을 생성합니다.
 //***************************************************************************
 class CRapidXMLUtil
 {
@@ -107,8 +120,8 @@ public:
 	CRapidXMLUtil(const CRapidXMLUtil& other);
 	~CRapidXMLUtil();
 
-	rapidxml::xml_document<>& GetDocument() { 
-		return _doc;  
+	rapidxml::xml_document<>& GetDocument() {
+		return _doc;
 	}
 
 	xml_node<char>* GetRootNode() {
@@ -142,25 +155,28 @@ public:
 
 	//***************************************************************************
 	// CRapidXMLUtil 클래스 operator[] Setter, Getter Operator Overloading을 위한 프록시 클래스
-	class Proxy 
+	class Proxy
 	{
-		private:
-			CRapidXMLUtil&	_xmlUtil;
-			_tstring		_nodeName;
+	private:
+		CRapidXMLUtil& _xmlUtil;
+		_tstring		_nodeName;
 
-		public:
-			Proxy(CRapidXMLUtil& xmlUtil, const _tstring& nodeName) : _xmlUtil(xmlUtil), _nodeName(nodeName) {}
+	public:
+		Proxy(CRapidXMLUtil& xmlUtil, const _tstring& nodeName) : _xmlUtil(xmlUtil), _nodeName(nodeName) {}
 
-			// = 연산자 오버로딩(값 설정)
-			template <typename T>
-			Proxy& operator=(const T& value) {
-				_xmlUtil.ConvertToXML(_nodeName, value);
-				return *this;
-			}
+		// = 연산자 오버로딩(값 설정)
+		template <typename T>
+		Proxy& operator=(const T& value) {
+			// 중첩 클래스는 바깥 클래스의 private 멤버에 접근할 수 있으므로,
+			// 반환값을 쓰지 않는 이 경로는 굳이 문서 전체를 문자열로 직렬화하는
+			// ConvertToXML 대신 트리만 구성하는 BuildXMLNode를 직접 호출합니다.
+			_xmlUtil.BuildXMLNode(_nodeName, value);
+			return *this;
+		}
 
-			// T() 연산자 오버로딩(값 읽기)
-			template <typename T>
-			operator T() const { return _xmlUtil.ConvertFromXML<T>(_nodeName).value(); }
+		// T() 연산자 오버로딩(값 읽기)
+		template <typename T>
+		operator T() const { return _xmlUtil.ConvertFromXML<T>(_nodeName).value(); }
 	};
 
 	Proxy operator[](const TCHAR* key) {
@@ -201,29 +217,31 @@ public:
 	template <typename T>
 	inline void GetObject(T& obj, xml_node<>* node);
 
-	template <typename T>
-	inline void AddVector(const CVector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName = VectorName);
+	// container는 CVector<T> 또는 std::vector<T>를 모두 받을 수 있습니다.
+	template <typename Container, typename ValueType = typename Container::value_type>
+	inline void AddVector(const Container& container, xml_node<>* parent, const TCHAR* ptszTagName = VectorName);
 
-	template <typename T>
-	inline void GetVector(CVector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName = VectorName);
+	template <typename Container, typename ValueType = typename Container::value_type>
+	inline void GetVector(Container& container, xml_node<>* parent, const TCHAR* ptszTagName = VectorName);
 
-	template <typename T>
-	inline void AddObjectVector(const CVector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName = VectorName);
+	template <typename Container, typename ValueType = typename Container::value_type>
+	inline void AddObjectVector(const Container& container, xml_node<>* parent, const TCHAR* ptszTagName = VectorName);
 
-	template <typename T>
-	inline void GetObjectVector(CVector<T>& container, xml_node<>* parent, const TCHAR* ptszTagName = VectorName);
+	template <typename Container, typename ValueType = typename Container::value_type>
+	inline void GetObjectVector(Container& container, xml_node<>* parent, const TCHAR* ptszTagName = VectorName);
 
-	template <typename K, typename V>
-	inline void AddMap(const CMap<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName = MapName);
+	// container는 CMap<K,V> 또는 std::map<K,V>를 모두 받을 수 있습니다. (키는 _tstring만 지원)
+	template <typename MapContainer>
+	inline void AddMap(const MapContainer& container, xml_node<>* parent, const TCHAR* ptszTagName = MapName);
 
-	template <typename K, typename V>
-	inline void GetMap(CMap<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName = MapName);
+	template <typename MapContainer>
+	inline void GetMap(MapContainer& container, xml_node<>* parent, const TCHAR* ptszTagName = MapName);
 
-	template <typename K, typename V>
-	inline void AddObjectMap(const CMap<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName = MapName);
+	template <typename MapContainer>
+	inline void AddObjectMap(const MapContainer& container, xml_node<>* parent, const TCHAR* ptszTagName = MapName);
 
-	template <typename K, typename V>
-	inline void GetObjectMap(CMap<K, V>& container, xml_node<>* parent, const TCHAR* ptszTagName = MapName);
+	template <typename MapContainer>
+	inline void GetObjectMap(MapContainer& container, xml_node<>* parent, const TCHAR* ptszTagName = MapName);
 
 	template <typename T, typename std::enable_if<std::is_arithmetic<T>::value>::type* = nullptr>
 	inline void AddValue(const T& value, xml_node<>* parent, const TCHAR* ptszTagName = ItemName);
@@ -268,7 +286,11 @@ public:
 	{
 		if constexpr( std::is_arithmetic<T>::value )
 		{
-			if( node ) value = static_cast<T>(std::stod(node->value()));
+			// _strtod_l은 std::stod와 달리 변환할 수 없는 입력(빈 문자열 등)에 대해
+			// 예외를 던지지 않고 0.0을 반환하며, 전역 로케일(setlocale) 설정과
+			// 무관하게 항상 "C" 로케일 기준으로 파싱합니다.
+			if( node && node->value() )
+				value = static_cast<T>(_strtod_l(node->value(), nullptr, g_xmlNumericLocale));
 		}
 		else if constexpr( std::is_same_v<T, _tstring> )
 		{
@@ -277,26 +299,47 @@ public:
 	}
 
 private:
-	// 벡터 타입 확인
+	// 재귀 호출마다 attName의 UTF-8 변환을 반복하지 않도록, 이미 변환된 문자열을 받는 내부 헬퍼
+	void RemoveAttributeUtf8(xml_node<>* node, const std::string& utf8AttName);
+
+	// obj를 문서 트리에 채워 넣기만 하고 문자열로 직렬화하지 않는 내부 헬퍼.
+	// ConvertToXML은 문자열 결과가 필요한 호출자를 위해 이 함수 뒤에 직렬화를 1회 수행하고,
+	// 문자열 결과가 필요 없는 AddNode/UpdateNode/Proxy::operator=/Serialize 등은 이 함수를
+	// 직접 호출하여 호출할 때마다 문서 전체를 문자열로 직렬화하는 비용을 피합니다.
+	template <typename T>
+	inline void BuildXMLNode(const _tstring& nodeName, const T& obj);
+
+	// 벡터 타입 확인 (CVector, std::vector 지원 / std::vector<bool>은 비트 압축 특수화라 제외)
 	template <typename T>
 	struct is_vector : std::false_type {};
 
 	template <typename T, typename Alloc>
 	struct is_vector<CVector<T, Alloc>> : std::true_type {};
 
-	// 맵 타입 확인
+	template <typename T, typename Alloc>
+	struct is_vector<std::vector<T, Alloc>> : std::true_type {};
+
+	template <typename Alloc>
+	struct is_vector<std::vector<bool, Alloc>> : std::false_type {};
+
+	// 맵 타입 확인 (CMap, std::map 지원)
 	template <typename T>
 	struct is_map : std::false_type {};
 
 	template <typename K, typename V, typename Comp, typename Alloc>
 	struct is_map<std::map<K, V, Comp, Alloc>> : std::true_type {};
 
+	template <typename K, typename V, typename Comp, typename Alloc>
+	struct is_map<CMap<K, V, Comp, Alloc>> : std::true_type {};
+
 	// T에 ToXML 멤버 함수가 있는지 확인하는 타입 트레이트
+	// AddObject/AddObjectVector/AddObjectMap은 대상 객체를 const T&로 받아 ToXML을 호출하므로,
+	// 트레이트도 동일하게 const T& 기준으로 호출 가능 여부를 검사합니다.
 	template <typename T, typename = void>
 	struct has_toxml_method : std::false_type {};
 
 	template <typename T>
-	struct has_toxml_method<T, std::void_t<decltype(std::declval<T>().ToXML(std::declval<xml_node<>*>(), std::declval<xml_document<>&>()))>> : std::true_type {};
+	struct has_toxml_method<T, std::void_t<decltype(std::declval<const T&>().ToXML(std::declval<xml_node<>*>(), std::declval<xml_document<>&>()))>> : std::true_type {};
 
 	// 컴파일 타임 에러 유도용 유틸리티
 	template <typename T>

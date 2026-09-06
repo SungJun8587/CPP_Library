@@ -10,15 +10,6 @@
 extern CThreadManager* gpThreadManager;
 
 //***************************************************************************
-// @brief 싱글톤 인스턴스를 반환합니다.
-// @return CMySQLAsyncSrv 공유 포인터
-//***************************************************************************
-std::shared_ptr<CMySQLAsyncSrv> CMySQLAsyncSrv::Instance() {
-	static std::shared_ptr<CMySQLAsyncSrv> instance = std::make_shared<CMySQLAsyncSrv>();
-	return instance;
-}
-
-//***************************************************************************
 // @brief 생성자: 기본 멤버 초기화
 //***************************************************************************
 CMySQLAsyncSrv::CMySQLAsyncSrv()

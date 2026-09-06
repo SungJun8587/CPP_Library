@@ -7,7 +7,11 @@
 #include "pch.h"
 #include "RapidXMLUtil.h"
 
-_locale_t kr = _create_locale(LC_NUMERIC, "kor");
+// 실수 파싱/포맷팅에 사용하는 로케일. 소수점 구분자가 OS/사용자 로케일 설정에 따라
+// 바뀌면(예: "," 를 소수점으로 쓰는 로케일) 동일한 XML 데이터를 환경에 따라 다르게
+// 해석하는 문제가 생기므로, 실행 환경과 무관하게 항상 "C" 로케일(소수점 ".")로
+// 고정하여 로케일 독립적으로 동작하도록 합니다.
+_locale_t g_xmlNumericLocale = _create_locale(LC_NUMERIC, "C");
 
 //***************************************************************************
 // @brief 특정 속성(Attribute)의 불리언(bool) 값을 읽어옵니다.
@@ -108,7 +112,7 @@ float CXMLNode::GetFloatAttr(const TCHAR* ptszKey, float defaultValue)
 
 	xml_attribute<>* attr = _node->first_attribute(TStringToUtf8(ptszKey).c_str());
 	if( attr && attr->value() )
-		return static_cast<float>(atof(attr->value()));
+		return static_cast<float>(_atof_l(attr->value(), g_xmlNumericLocale));
 
 	return defaultValue;
 }
@@ -125,7 +129,7 @@ double CXMLNode::GetDoubleAttr(const TCHAR* ptszKey, double defaultValue)
 
 	xml_attribute<>* attr = _node->first_attribute(TStringToUtf8(ptszKey).c_str());
 	if( attr && attr->value() )
-		return _atof_l(attr->value(), kr);
+		return _atof_l(attr->value(), g_xmlNumericLocale);
 
 	return defaultValue;
 }
@@ -134,7 +138,8 @@ double CXMLNode::GetDoubleAttr(const TCHAR* ptszKey, double defaultValue)
 // @brief 특정 속성(Attribute)의 문자열 값을 읽어옵니다.
 // @param ptszKey 속성 키 이름
 // @param defaultValue 실패 시 반환할 기본값
-// @return 변환된 TCHAR 문자열 포인터
+// @return 변환된 TCHAR 문자열 포인터 (스레드별 정적 버퍼를 가리키며, 같은 스레드의
+//         다음 GetStringAttr/GetStringValue 호출 전까지만 유효합니다)
 //***************************************************************************
 const TCHAR* CXMLNode::GetStringAttr(const TCHAR* ptszKey, const TCHAR* defaultValue)
 {
@@ -143,10 +148,11 @@ const TCHAR* CXMLNode::GetStringAttr(const TCHAR* ptszKey, const TCHAR* defaultV
 	xml_attribute<>* attr = _node->first_attribute(TStringToUtf8(ptszKey).c_str());
 	if( attr && attr->value() )
 	{
+		// 속성이 존재하면(값이 빈 문자열이더라도) 그 값을 그대로 반환합니다.
+		// defaultValue는 속성 자체가 없을 때만 사용됩니다.
 		thread_local static _tstring resultStr;
 		resultStr = Utf8ToTString(attr->value());
-		if( !resultStr.empty() )
-			return resultStr.c_str();
+		return resultStr.c_str();
 	}
 	return defaultValue;
 }
@@ -242,7 +248,7 @@ float CXMLNode::GetFloatValue(float defaultValue)
 
 	char* val = _node->value();
 	if( val )
-		return static_cast<float>(atof(val));
+		return static_cast<float>(_atof_l(val, g_xmlNumericLocale));
 
 	return defaultValue;
 }
@@ -258,7 +264,7 @@ double CXMLNode::GetDoubleValue(double defaultValue)
 
 	char* val = _node->value();
 	if( val )
-		return ::_atof_l(val, kr);
+		return ::_atof_l(val, g_xmlNumericLocale);
 
 	return defaultValue;
 }
@@ -266,7 +272,8 @@ double CXMLNode::GetDoubleValue(double defaultValue)
 //***************************************************************************
 // @brief 노드의 텍스트 문자열 값을 읽어옵니다.
 // @param defaultValue 실패 시 반환할 기본값
-// @return 변환된 TCHAR 문자열 포인터
+// @return 변환된 TCHAR 문자열 포인터 (스레드별 정적 버퍼를 가리키며, 같은 스레드의
+//         다음 GetStringAttr/GetStringValue 호출 전까지만 유효합니다)
 //***************************************************************************
 const TCHAR* CXMLNode::GetStringValue(const TCHAR* defaultValue)
 {
@@ -275,10 +282,10 @@ const TCHAR* CXMLNode::GetStringValue(const TCHAR* defaultValue)
 	char* val = _node->value();
 	if( val )
 	{
+		// 노드가 존재하면(텍스트가 빈 문자열이더라도) 그 값을 그대로 반환합니다.
 		thread_local static _tstring resultStr;
 		resultStr = Utf8ToTString(val);
-		if( !resultStr.empty() )
-			return resultStr.c_str();
+		return resultStr.c_str();
 	}
 
 	return defaultValue;
@@ -363,13 +370,35 @@ CRapidXMLUtil::~CRapidXMLUtil()
 // @param filename 파일 경로
 // @param root [OUT] 파싱 결과를 전달받을 CXMLNode 참조 객체
 // @return 성공 시 true, 실패 시 false
+// @detail 파일의 원문 내용을 있는 그대로 읽어 XML로 파싱합니다. (특정 T로 값을
+//         역직렬화하는 LoadFromFile<T>와는 별개의 경로이며, 파일 내용이 임의의
+//         XML 문서 형태여도 그대로 파싱할 수 있습니다.)
 //***************************************************************************
 bool CRapidXMLUtil::ParseFromFile(const _tstring& filename, OUT CXMLNode& root)
 {
-	_xmlString = LoadFromFile<std::string>(filename);
+	std::ifstream file(filename, std::ios::binary);
+	if( !file.is_open() )
+	{
+		_tcerr << _T("Failed to open file for reading: ") << filename << std::endl;
+		return false;
+	}
+
+	std::stringstream buffer;
+	buffer << file.rdbuf();
+	_xmlString = buffer.str();
 	if( _xmlString.empty() ) return false;
 
-	_doc.parse<0>(reinterpret_cast<char*>(&_xmlString[0]));
+	_doc.clear();
+	try
+	{
+		_doc.parse<0>(&_xmlString[0]);
+	}
+	catch( const parse_error& e )
+	{
+		_tcerr << _T("XML parse error : ") << e.what() << std::endl;
+		return false;
+	}
+
 	root = CXMLNode(_doc.first_node());
 
 	return true;
@@ -533,9 +562,18 @@ void CRapidXMLUtil::SetAttribute(xml_node<>* node, const _tstring& attName, cons
 //***************************************************************************
 void CRapidXMLUtil::RemoveAttribute(xml_node<>* node, const _tstring& attName)
 {
-	if( node == nullptr ) return;
+	// attName의 UTF-8 변환은 한 번만 수행하고, 재귀 순회에는 변환된 문자열을 그대로 재사용합니다.
+	RemoveAttributeUtf8(node, TStringToUtf8(attName));
+}
 
-	std::string utf8AttName = TStringToUtf8(attName);
+//***************************************************************************
+// @brief RemoveAttribute의 내부 구현. 이미 UTF-8로 변환된 속성 이름을 받아 재귀적으로 처리합니다.
+// @param node 대상 노드 포인터
+// @param utf8AttName UTF-8로 변환된 속성 이름
+//***************************************************************************
+void CRapidXMLUtil::RemoveAttributeUtf8(xml_node<>* node, const std::string& utf8AttName)
+{
+	if( node == nullptr ) return;
 
 	xml_attribute<>* attr = node->first_attribute(utf8AttName.c_str());
 	if( attr )
@@ -545,7 +583,7 @@ void CRapidXMLUtil::RemoveAttribute(xml_node<>* node, const _tstring& attName)
 
 	for( xml_node<>* child = node->first_node(); child; child = child->next_sibling() )
 	{
-		RemoveAttribute(child, attName);
+		RemoveAttributeUtf8(child, utf8AttName);
 	}
 }
 

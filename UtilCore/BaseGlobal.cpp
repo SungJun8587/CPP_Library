@@ -141,5 +141,9 @@ namespace BaseGlobal
 			gpMemory = nullptr;
 		}
 #endif	
+
+#ifdef _STOMP
+		StompAllocator::Cleanup();  // gpMemory 소멸 이후, 더 이상 아무 할당/해제도 없을 때
+#endif
 	}
 }

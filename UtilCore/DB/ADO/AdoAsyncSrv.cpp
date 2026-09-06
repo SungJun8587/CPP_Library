@@ -10,15 +10,6 @@
 extern CThreadManager* gpThreadManager;
 
 //***************************************************************************
-// @brief 싱글톤 인스턴스를 반환합니다.
-// @return CAdoAsyncSrv 공유 포인터
-//***************************************************************************
-std::shared_ptr<CAdoAsyncSrv> CAdoAsyncSrv::Instance() {
-	static std::shared_ptr<CAdoAsyncSrv> instance = std::make_shared<CAdoAsyncSrv>();
-	return instance;
-}
-
-//***************************************************************************
 // @brief 생성자: 기본 멤버 초기화
 //***************************************************************************
 CAdoAsyncSrv::CAdoAsyncSrv()
