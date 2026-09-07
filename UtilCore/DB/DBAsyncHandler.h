@@ -25,7 +25,7 @@ public:\
 	\
 	static std::shared_ptr<CDBAsyncSrvHandler> asyncHandler; \
 }; \
-	shared_ptr<CDBAsyncSrvHandler> command##_handler::asyncHandler = srvClass::Instance()->Regist(command, std::make_shared<command##_handler>()); \
+	shared_ptr<CDBAsyncSrvHandler> command##_handler::asyncHandler = (srvClass).Regist(command, std::make_shared<command##_handler>()); \
 	EDBReturnType command##_handler::ProcessAsyncCall(st_DBAsyncRq* pStAsync)
 
 #endif // ndef UC_DBASYNCHANDLER_H

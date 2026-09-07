@@ -7,74 +7,68 @@
 #include "pch.h"
 #include "AdoAsyncSrv.h"
 
-extern CThreadManager* gpThreadManager;
-
 //***************************************************************************
 // @brief 생성자: 기본 멤버 초기화
 //***************************************************************************
 CAdoAsyncSrv::CAdoAsyncSrv()
 {
-	_nDBCount = 0;
 	_bOpen = false;
 	_nMaxThreadCnt = 0;
 	_bStopThread = false;
-	_pAdoConnPools = nullptr;
 }
 
 //***************************************************************************
-// @brief 소멸자: 남은 작업 처리 후 리소스 정리
+// @brief 소멸자.
+// @details [수정] 이전에는 FlushRemainingTasks()(내부에서 StopThread() 신호만
+// 보냄) 직후 곧바로 ClearAdoPools()를 호출해, 아직 실행 중일 수 있는 워커
+// 스레드가 이미 해제된 커넥션 풀을 참조할 여지가 있었다. 이제는 Stop()으로
+// 신호를 보낸 뒤 Join()으로 모든 워커 스레드가 실제로 종료했음을 확인하고
+// 나서야 FlushRemainingTasks()/ClearAdoPools()로 넘어간다 — 이 순서가
+// 지켜지면 "워커가 아직 도는데 자원이 먼저 사라지는" 경쟁 자체가 성립하지
+// 않는다.
 //***************************************************************************
 CAdoAsyncSrv::~CAdoAsyncSrv()
 {
+	Stop();
+	Join();
+
 	FlushRemainingTasks();
-	StopThread();
-	Clear();
 	ClearAdoPools();
 
 	_nMaxThreadCnt = 0;
 	_bOpen = false;
-	_nDBCount = 0;
 }
 
 //***************************************************************************
-// @brief 큐를 비웁니다.
-// @details 큐에 남아있는 모든 요청을 안전하게 삭제합니다.
+// @brief Stop()으로 신호를 보낸 워커 스레드들이 전부 종료할 때까지 대기합니다.
 //***************************************************************************
-void CAdoAsyncSrv::Clear()
+void CAdoAsyncSrv::Join()
 {
-	// [2번 수정] 크기를 먼저 읽고 그 값만큼 SwapChunk하는 대신, 큐 전체를 한 번의 락 구간 안에서
-	// 통째로 이관하는 전용 Swap()을 사용한다. 대상 큐가 비어 있으므로 내부적으로 O(1) 컨테이너
-	// 스왑이 되고, "크기 조회 이후 들어온 항목이 이번 드레인에서 누락되는" TOCTOU 여지도 없앤다.
-	CQueue<std::unique_ptr<st_DBAsyncRq>> tempQueue;
-	_queueDBAsyncRq.Swap(tempQueue);
-
-	// tempQueue가 비워질 때 unique_ptr이 알아서 메모리를 해제하므로 별도의 SAFE_DELETE가 불필요합니다.
-	while( !tempQueue.empty() )
+	for( auto& worker : _workerThreads )
 	{
-		tempQueue.pop();
+		if( worker.joinable() )
+			worker.join();
 	}
+	_workerThreads.clear();
 }
 
 //***************************************************************************
-// @brief 남은 작업을 강제로 처리합니다.
-// @details 스레드를 중단하고 큐에 남은 요청을 메인 스레드에서 직접 실행합니다.
+// @brief 남은 작업을 강제로 동기 처리합니다.
+// @details [전제] 이 함수가 호출되는 시점엔 이미 Join()이 끝나 워커
+// 스레드가 하나도 남아있지 않다고 가정한다 — 그래서 여기서 다시
+// _bStopThread를 세팅하거나 조건 변수를 notify할 필요가 없다.
 //***************************************************************************
 void CAdoAsyncSrv::FlushRemainingTasks()
 {
-	LOG_INFO(_T("Main program requested to flush remaining async ADO tasks..."));
+	LOG_INFO(_T("Flushing remaining async ADO tasks..."));
 
-	_bStopThread.store(true);
-	_cva.notify_all();
-	_cvProducer.notify_all();
-
-	// [2번 수정] Clear()와 동일하게 GetSize()+SwapChunk 대신 Swap()으로 한 번에 이관한다.
 	CQueue<std::unique_ptr<st_DBAsyncRq>> tempQueue;
 	_queueDBAsyncRq.Swap(tempQueue);
 
 	int32 remainingCount = static_cast<int32>(tempQueue.size());
 	if( remainingCount > 0 )
 	{
-		LOG_INFO(_T("Processing %d remaining ADO requests in main thread..."), remainingCount);
+		LOG_INFO(_T("Processing %d remaining ADO requests synchronously..."), remainingCount);
 
 		while( !tempQueue.empty() )
 		{
@@ -87,71 +81,97 @@ void CAdoAsyncSrv::FlushRemainingTasks()
 			if( it != _mapCommand.end() )
 			{
 				std::shared_ptr<CDBAsyncSrvHandler> command = it->second;
-				EDBReturnType Ret = command->ProcessAsyncCall(pAsyncRq.get());
+				EDBReturnType ret = command->ProcessAsyncCall(pAsyncRq.get());
 
-				if( Ret != EDBReturnType::OK )
+				if( ret != EDBReturnType::OK )
 				{
-					LOG_ERROR(_T("Failed to process ADO task during manual flush... callIdent: [%u]"), pAsyncRq->callIdent);
+					LOG_ERROR(_T("Failed to process ADO task during flush... callIdent: [%u]"), pAsyncRq->callIdent);
 				}
 			}
 			else
 			{
-				LOG_ERROR(_T("Error not found command handler for ADO task... callIdent: [%u]"), pAsyncRq->callIdent);
+				LOG_ERROR(_T("No handler found for ADO task during flush... callIdent: [%u]"), pAsyncRq->callIdent);
 			}
 
 			SubOutstandingRequest();
 		}
 	}
 
-	LOG_INFO(_T("Manual flush completed for ADO. All tasks processed."));
+	LOG_INFO(_T("Flush completed for ADO."));
 }
 
 //***************************************************************************
 // @brief ADO 연결 풀을 정리합니다.
-// @details 모든 연결 풀 객체를 삭제합니다.
 //***************************************************************************
 void CAdoAsyncSrv::ClearAdoPools()
 {
-	if( _pAdoConnPools == nullptr ) return;
-
-	for( int32 i = 0; i < _nDBCount; i++ )
-	{
-		SAFE_DELETE(_pAdoConnPools[i]);
-	}
-	SAFE_DELETE_ARRAY(_pAdoConnPools);
+	_adoPools.clear(); // unique_ptr가 각자 알아서 해제 — 수동 delete 불필요
 }
 
 //***************************************************************************
 // @brief 명령 핸들러를 등록합니다.
-// @param command 명령 식별자
-// @param handler 명령 핸들러 객체
-// @return 등록된 핸들러
+// @details [수정] 이전엔 insert()가 중복 키에 조용히 실패해도 무조건
+// 넘겨받은 handler를 그대로 반환해, "반환값과 실제 맵에 등록된 것이
+// 다른" 상황이 가능했다. emplace()의 결과로 실제 등록된(또는 원래
+// 있던) 항목을 반환하고, 중복이면 로그로 알린다.
 //***************************************************************************
 std::shared_ptr<CDBAsyncSrvHandler> CAdoAsyncSrv::Regist(const BYTE command, std::shared_ptr<CDBAsyncSrvHandler> const handler)
 {
-	_mapCommand.insert(COMMAND_MAP::value_type(command, handler));
-	return handler;
+	auto [it, inserted] = _mapCommand.emplace(command, handler);
+
+	if( !inserted )
+	{
+		LOG_ERROR(_T("CAdoAsyncSrv::Regist: duplicate async DB command registration... command: [%u]"), command);
+	}
+
+	return it->second;
 }
 
 //***************************************************************************
-// @brief 서비스 시작
-// @param dbNodeVec DB 노드 벡터
-// @param nMaxThreadCnt 최대 스레드 수
-// @return 성공 여부
+// @brief 서비스 시작 — ADO 초기화 + 워커 스레드 기동까지 한 번에 처리합니다.
 //***************************************************************************
-bool CAdoAsyncSrv::StartService(CVector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt)
+bool CAdoAsyncSrv::StartService(const CVector<CDBNode>& dbNodeVec, const int32 nMaxThreadCnt)
 {
-	return InitAdo(dbNodeVec, nMaxThreadCnt);
+	// [수정] 이미 시작된 인스턴스에 다시 호출되면 InitAdo()의
+	// _adoPools.clear()가 현재 실행 중인 워커 스레드가 참조 중인 풀을
+	// 파괴할 수 있다 — 재호출 자체를 막는다.
+	if( _bStarted )
+	{
+		LOG_ERROR(_T("CAdoAsyncSrv::StartService: already started."));
+		return false;
+	}
+
+	if( !InitAdo(dbNodeVec, nMaxThreadCnt) )
+		return false;
+
+	// [수정] StartIoThreads()가 실패(std::thread 생성 예외)하면 그 함수
+	// 내부에서 이미 Stop()+Join()으로 스레드 쪽은 정리되지만, _bOpen과
+	// _adoPools는 그대로 남는다 — 여기서 명시적으로 정리한다.
+	try
+	{
+		StartIoThreads();
+	}
+	catch( ... )
+	{
+		_bOpen = false;
+		ClearAdoPools();
+		throw;
+	}
+
+	_bStarted = true;
+	return true;
 }
 
 //***************************************************************************
 // @brief ADO 초기화
-// @param dbNodeVec DB 노드 벡터
-// @param nMaxThreadCnt 최대 스레드 수
-// @return 성공 여부
 //***************************************************************************
-bool CAdoAsyncSrv::InitAdo(CVector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt)
+bool CAdoAsyncSrv::InitAdo(const CVector<CDBNode>& dbNodeVec, const int32 nMaxThreadCnt)
 {
+	// [수정 — 주석 정정] 여기서 상태를 리셋하는 이유는 오직 "StartService()
+	// 도중 실패(StartIoThreads() 예외 등)한 뒤 같은 인스턴스로 재시도하는"
+	// 예외 경로 하나뿐이다 — _bStarted가 true인 정상 실행 상태에서는
+	// StartService() 재호출 자체가 거부된다(재시작 불가).
+	_bOpen = false;
 	_bStopThread.store(false);
 
 	if( 0 == nMaxThreadCnt )
@@ -159,37 +179,37 @@ bool CAdoAsyncSrv::InitAdo(CVector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt
 	else
 		_nMaxThreadCnt = nMaxThreadCnt;
 
-	_nDBCount = static_cast<int32>(dbNodeVec.size());
-	if( _nDBCount <= 0 )
-		return true;
+	const int32 nDBCount = static_cast<int32>(dbNodeVec.size());
+	if( nDBCount <= 0 )
+	{
+		// [수정] 예전엔 여기서 true를 반환해 "DB 없는 서비스"를 성공으로
+		// 취급했는데, 그러면 StartService()가 뒤이어 StartIoThreads()로
+		// 워커 스레드를 만들어도 _bOpen이 false라 RunningThread()가
+		// 즉시 리턴해버려 스레드가 아무 일도 안 하고 바로 끝난다 —
+		// 의미 없는 스레드 생성/소멸 비용만 발생. DB 서비스는 최소
+		// 1개의 DB 노드가 있어야 한다는 계약으로 명시한다.
+		LOG_ERROR(_T("InitAdo: dbNodeVec is empty — a DB service requires at least one DB node."));
+		return false;
+	}
 
-	_pAdoConnPools = new CAdoConnPool * [_nDBCount]();
+	_adoPools.clear();
+	_adoPools.reserve(nDBCount);
 
 	CAdoConnPool::TReconnectConfig reconnectCfg;
 	reconnectCfg.nWorkerCount = std::max(4, _nMaxThreadCnt / 4);
 
-	int32 nIdx = 0;
 	for( auto& iter : dbNodeVec )
 	{
-		if( nIdx >= _nDBCount ) break;
+		auto pool = std::make_unique<CAdoConnPool>(_nMaxThreadCnt);
 
-		_pAdoConnPools[nIdx] = new CAdoConnPool(_nMaxThreadCnt);
-		if( nullptr == _pAdoConnPools[nIdx] )
+		if( !pool->Init(iter._dbClass, iter._tszDSN, 5, reconnectCfg) )
 		{
-			// [4번 수정] 실패 원인을 구분할 수 있도록 로그 추가 (ODBC판과 동일한 수준으로 맞춤)
-			LOG_ERROR(_T("InitAdo: Failed to alloc CAdoConnPool (index=%d)"), nIdx);
-			ClearAdoPools();
+			LOG_ERROR(_T("Failed to Initialize CAdoConnPool"));
+			_adoPools.clear(); // 지금까지 만든 풀들도 함께 정리(부분 초기화 상태로 안 남김)
 			return false;
 		}
 
-		if( false == _pAdoConnPools[nIdx]->Init(iter._dbClass, iter._tszDSN, 5, reconnectCfg) )
-		{
-			// [4번 수정] 실패 원인을 구분할 수 있도록 로그 추가
-			LOG_ERROR(_T("InitAdo: Failed to Initialize CAdoConnPool (index=%d)"), nIdx);
-			ClearAdoPools();
-			return false;
-		}
-		++nIdx;
+		_adoPools.push_back(std::move(pool));
 	}
 
 	_bOpen = true;
@@ -198,52 +218,73 @@ bool CAdoAsyncSrv::InitAdo(CVector<CDBNode> dbNodeVec, const int32 nMaxThreadCnt
 
 //***************************************************************************
 // @brief IO 스레드를 시작합니다.
-// @details ThreadManager를 통해 실행 스레드를 생성합니다.
+// @details [변경] gpThreadManager를 거치지 않고 이 인스턴스가 std::thread를
+// 직접 소유한다 — Join()이 "정확히 이 인스턴스가 만든 스레드만" 기다려야
+// 하는데, 공용 컨테이너에 맡기면 그 사이 다른 코드가 만든 스레드와 섞여서
+// 정확한 대상만 골라 join하기 어렵다.
+// [수정] std::thread 생성자는 시스템 자원 부족 등으로 std::system_error를
+// 던질 수 있다 — 이미 만든 스레드들을 Stop()+Join()으로 안전하게 정리한
+// 뒤 예외를 다시 던진다.
 //***************************************************************************
 void CAdoAsyncSrv::StartIoThreads()
 {
-	if( gpThreadManager == nullptr ) return;
+	_workerThreads.clear();
+	_workerThreads.reserve(static_cast<size_t>(_nMaxThreadCnt));
 
-	for( int32 i = 0; i < _nMaxThreadCnt; i++ )
+	try
 	{
-		gpThreadManager->CreateThread([this]() { RunningThread(); });
+		for( int32 i = 0; i < _nMaxThreadCnt; i++ )
+		{
+			_workerThreads.emplace_back([this]() { RunningThread(); });
+		}
+	}
+	catch( ... )
+	{
+		Stop();
+		Join();
+		throw;
 	}
 }
 
 //***************************************************************************
 // @brief 스레드 실행 루프
-// @return 항상 true
 //***************************************************************************
-bool CAdoAsyncSrv::RunningThread()
+void CAdoAsyncSrv::RunningThread()
 {
 	if( _bOpen )
 	{
 		Action();
 	}
-	return true;
 }
 
 //***************************************************************************
 // @brief 요청 처리 루프
-// @details 큐에서 요청을 꺼내 핸들러로 처리합니다.
-// @return 항상 true
+// @details [수정 — 데이터 유실 버그] 예전엔 while(!_bStopThread.load())로
+// 종료 여부를 판단했다. Pop()이 SwapChunk(64)로 로컬 큐에 최대 64개를
+// 한 번에 가져오는데, 그중 1개만 처리한 시점에 Stop()이 호출되면 while
+// 조건이 곧바로 false가 되어 Action()이 리턴 — 로컬 큐에 남아있던 나머지
+// 항목들이 처리되지 않은 채 스택에서 그냥 파괴됐다(DB 요청 자체가 유실됨).
+// 이제는 Pop()의 반환값(nullptr 여부)만으로 종료를 판단한다 — Pop()은
+// "로컬 큐를 무조건 먼저 소진 → 전역 큐 확인 → 로컬+전역 큐가 둘 다
+// 비었고 Stop 상태일 때만 nullptr"라는 순서로 짜여 있으므로, Stop() 시점에
+// 이미 큐에 들어 있던 요청은 전부 정상 처리 경로를 거쳐 소진된 뒤에야
+// 워커가 종료된다.
 //***************************************************************************
-bool CAdoAsyncSrv::Action()
+void CAdoAsyncSrv::Action()
 {
 	CQueue<std::unique_ptr<st_DBAsyncRq>> localQueue;
 
-	while( !_bStopThread.load() )
+	for( ;; )
 	{
 		std::unique_ptr<st_DBAsyncRq> pAsyncRq = Pop(localQueue);
-		if( pAsyncRq == nullptr ) continue;
+		if( pAsyncRq == nullptr )
+			break;
 
 		COMMAND_MAP::iterator it = _mapCommand.find(pAsyncRq->callIdent);
 		if( _mapCommand.end() == it )
 		{
 			// [3번 수정] 핸들러 미등록으로 이 요청을 더 이상 처리하지 않고 버리는 경로이므로,
 			// Push() 이전에 호출부가 걸어둔 AddOutstandingRequest()와 짝을 맞춰 감소시켜야 한다.
-			// 이 호출이 없으면 미등록 callIdent가 한 번이라도 들어올 때마다 outstanding 카운터가
-			// 영구히 어긋난다.
 			SubOutstandingRequest();
 			continue;
 		}
@@ -259,7 +300,13 @@ bool CAdoAsyncSrv::Action()
 				int nSize = Push(std::move(pAsyncRq));
 				if( nSize == 0 )
 				{
+					// [수정] 재큐잉 실패(서비스 종료 시점 등) — 이 요청의
+					// 소유권이 완전히 소멸했으므로 더 이상 outstanding이
+					// 아니다. 이전 버전은 이 분기에서 SubOutstandingRequest()
+					// 호출이 누락돼 있었다(성공 시엔 유지가 맞고, 실패
+					// 시에만 감소해야 하는데 그 분기 자체가 비어있었음).
 					LOG_ERROR(_T("Failed to retry ADO query because service is stopping..."));
+					SubOutstandingRequest();
 				}
 				continue;
 			}
@@ -267,39 +314,32 @@ bool CAdoAsyncSrv::Action()
 
 		SubOutstandingRequest();
 	}
-
-	return true;
 }
 
 //***************************************************************************
 // @brief 큐에 요청을 추가합니다.
-// @param pAsyncRq 비동기 요청 객체
-// @return 큐 크기 (0이면 실패)
+// @details [수정] _bStopThread 확인을 _mutex 밖에서 했던 걸 안으로
+// 옮겼다 — 이전엔 "Push()가 플래그를 false로 확인한 직후 Stop()이
+// 끼어들어 플래그를 true로 바꾸고, 그 뒤에야 Push()가 큐에 항목을 넣는"
+// 경쟁이 가능했다. Stop()도 같은 _mutex 임계구역에서 플래그를 세팅하도록
+// 맞춰서, 이제 Push()와 Stop() 중 하나만 먼저 완전히 끝난 뒤 다른 하나가
+// 시작된다.
 //***************************************************************************
 int CAdoAsyncSrv::Push(std::unique_ptr<st_DBAsyncRq> pAsyncRq)
 {
-	if( _bStopThread.load() ) return 0;
+	std::lock_guard<std::mutex> lockGuard(_mutex);
 
-	// [1번 수정] PushAndGetSize()가 잡는 큐 내부 락과 별개로, Pop()이 대기하는 조건(_cva)을
-	// 보호하는 _mutex를 여기서도 잡은 뒤 notify_one()까지 같은 임계구역 안에서 수행한다.
-	// - 기존에는 이 구간이 _mutex 밖에서 실행되어, 컨슈머가 "predicate 검사 후 실제 wait()
-	//   진입 전" 사이의 틈에 push+notify가 끼어들면 notify가 유실될 수 있었다(lost wakeup).
-	// - Pop()도 SwapChunk() 호출 전에 이미 같은 _mutex를 먼저 잡으므로, 잠금 순서는 항상
-	//   (_mutex → 큐 내부 락)으로 일관되어 데드락 위험이 없다.
-	int queueSize = 0;
-	{
-		std::lock_guard<std::mutex> lockGuard(_mutex);
-		queueSize = static_cast<int>(_queueDBAsyncRq.PushAndGetSize(std::move(pAsyncRq)));
-		_cva.notify_one();
-	}
+	if( _bStopThread.load() )
+		return 0;
+
+	const int queueSize = static_cast<int>(_queueDBAsyncRq.PushAndGetSize(std::move(pAsyncRq)));
+	_cva.notify_one();
 
 	return queueSize;
 }
 
 //***************************************************************************
 // @brief 큐에서 요청을 꺼냅니다.
-// @param localQueue 로컬 큐
-// @return 요청 객체 (없으면 nullptr)
 //***************************************************************************
 std::unique_ptr<st_DBAsyncRq> CAdoAsyncSrv::Pop(CQueue<std::unique_ptr<st_DBAsyncRq>>& localQueue)
 {
@@ -320,24 +360,11 @@ std::unique_ptr<st_DBAsyncRq> CAdoAsyncSrv::Pop(CQueue<std::unique_ptr<st_DBAsyn
 		if( _bStopThread.load() && _queueDBAsyncRq.IsEmpty() && localQueue.empty() )
 			return nullptr;
 
-		// [5번 수정] 큐 크기 경고 로직 재설계.
-		//
-		// 기존 방식의 두 가지 문제:
-		//  (a) LOG_ERROR가 [MAX_WARNING_QUERY_QUEUE_SIZE, +10] 폭 11짜리 좁은 창을 지날 때만
-		//      찍혔다 — 부하가 몰려 표본 사이에 크기가 그 창을 건너뛰면 정작 필요한 경고가
-		//      누락될 수 있었다.
-		//  (b) LOG_WARNING이 "새 최댓값을 경신할 때마다" 무조건 찍혀, 큐가 계속 자라는(=이미
-		//      시스템이 과부하인) 바로 그 상황에서 로그 I/O가 함께 폭증했다. 초기값(2)도 너무
-		//      낮아 기동 직후 워밍업만으로도 로그가 스팸처럼 남았다.
-		//
-		// 새 방식:
-		//  (a) 임계값을 "넘어서는 순간" 1회만 LOG_ERROR로 알리고(>= 비교, 창 없음), 이후에는
-		//      히스테리시스 하한(MAX_WARNING_RESET_QUEUE_SIZE) 아래로 실제로 내려와야 다시
-		//      무장(rearm)된다 — 문턱 근처에서 오르내려도 매번 재알림하지 않는다.
-		//  (b) "새 최댓값 경신" 시에만 LOG_WARNING 후보로 삼는 것은 유지하되, 실제 로그 출력은
-		//      QUEUE_SIZE_WARN_COOLDOWN_MS(기본 5초) 쿨다운을 통과했을 때만 허용한다 — 큐가
-		//      계속 자라도 초당 로그 폭주 없이 일정 간격으로만 남는다. 초기 기준치도
-		//      INITIAL_WARN_QUEUE_SIZE(1000)로 올려 사소한 워밍업 증가는 무시한다.
+		// 큐 크기 경고: 임계값을 "넘어서는 순간" 1회만 LOG_ERROR로 알리고
+		// (>= 비교, 창 없음), 이후에는 히스테리시스 하한 아래로 실제로
+		// 내려와야 다시 무장(rearm)된다. "새 최댓값 경신" 시에만
+		// LOG_WARNING 후보로 삼되, 실제 로그 출력은 쿨다운을 통과했을
+		// 때만 허용한다.
 		int64 currentSize = _queueDBAsyncRq.GetSize();
 		int currentCount = static_cast<int>(currentSize);
 
@@ -380,40 +407,40 @@ std::unique_ptr<st_DBAsyncRq> CAdoAsyncSrv::Pop(CQueue<std::unique_ptr<st_DBAsyn
 }
 
 //***************************************************************************
-// @brief 첫 번째 ADO 연결 풀 반환
-// @return 계정용 ADO 연결 풀
+// @brief 이 서비스(도메인)의 기본(0번) 커넥션 풀을 반환합니다.
+// @details [수정] assert()는 Release 빌드에서 사라지므로, StartService()
+// 전에(또는 실패 후) 이 함수가 호출되면 Release에서는 아무 방어 없이
+// _adoPools[0]에 접근해 미정의 동작이 났다 — assert는 개발 중 계약
+// 위반을 조기에 알리는 용도로 남겨두고, 별도로 nullptr을 반환하는
+// 명시적 방어를 추가했다.
 //***************************************************************************
-CAdoConnPool* CAdoAsyncSrv::GetAccountAdoConnPool(void)
+CAdoConnPool* CAdoAsyncSrv::GetAdoConnPool()
 {
-	assert(_pAdoConnPools != nullptr && _nDBCount > 0);
-	return _pAdoConnPools[0];
+	assert(!_adoPools.empty());
+	if( _adoPools.empty() )
+		return nullptr;
+
+	return _adoPools[0].get();
 }
 
 //***************************************************************************
-// @brief ID 기반 ADO 연결 풀 반환
-// @param m_nID DB ID
-// @return 해당 ADO 연결 풀
+// @brief id로 담당 샤드의 커넥션 풀을 반환합니다.
+// @details [단순화] 예전엔 "인덱스 0을 계정 DB로, 인덱스 2를 로그 DB로
+// 예약하고 나머지를 게임 DB 샤드로 배치"하는 정책이 섞여 있었는데, 이건
+// "인스턴스 하나가 멤버+게임+로그를 겸하던" 옛 설계의 흔적이라 이
+// 프로젝트가 실제로 그 정책을 요구한다는 근거가 없었다. 도메인별로
+// 인스턴스가 분리된 지금은 균등 모듈로 샤딩으로 단순화한다 — 풀이
+// 1개뿐이면 그 하나만 반환.
 //***************************************************************************
-CAdoConnPool* CAdoAsyncSrv::GetAdoConnPool(uint64 m_nID)
+CAdoConnPool* CAdoAsyncSrv::GetAdoConnPool(uint64 id)
 {
-	assert(_pAdoConnPools != nullptr && _nDBCount > 0);
+	assert(!_adoPools.empty());
+	if( _adoPools.empty() )
+		return nullptr;
 
-	int32 nIdx = _nDBCount - 1;
-	if( 2 < _nDBCount )
-	{
-		if( 0 < m_nID )
-			nIdx = (m_nID % (_nDBCount - 1)) + 1;
-	}
+	if( _adoPools.size() == 1 )
+		return _adoPools[0].get();
 
-	return _pAdoConnPools[nIdx];
-}
-
-//***************************************************************************
-// @brief 로그용 ADO 연결 풀 반환
-// @return 로그 DB 연결 풀
-//***************************************************************************
-CAdoConnPool* CAdoAsyncSrv::GetLogAdoConnPool()
-{
-	assert(_pAdoConnPools != nullptr && _nDBCount > 2);
-	return _pAdoConnPools[2];
+	const size_t index = static_cast<size_t>(id) % _adoPools.size();
+	return _adoPools[index].get();
 }
