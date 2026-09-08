@@ -27,7 +27,6 @@ CAdoConnPool::CAdoConnPool(int32 nMaxPoolSize)
 	, _nBackoffJitterMs(250)
 	, _bStopHealthCheck(false)
 	, _nHealthCheckIntervalMs(500)
-	, _nNextSlotHint(0)
 	, _bStopReconnectWorkers(false)
 	, _nCurrentWorkerCount(0)
 	, _nDesiredWorkerCount(0)
@@ -39,6 +38,7 @@ CAdoConnPool::CAdoConnPool(int32 nMaxPoolSize)
 
 	_pReconnecting = std::make_unique<CachePaddedAtomic<bool>[]>(_nMaxPoolSize);
 	_pRetryFailCount = std::make_unique<CachePaddedAtomic<int32>[]>(_nMaxPoolSize);
+	_pInFreeSlotQueue = std::make_unique<CachePaddedAtomic<bool>[]>(_nMaxPoolSize);
 
 	// 모든 슬롯의 상태 초기화
 	for( int32 i = 0; i < _nMaxPoolSize; i++ )
@@ -47,6 +47,7 @@ CAdoConnPool::CAdoConnPool(int32 nMaxPoolSize)
 		_pRefCount[i].value.store(0, std::memory_order_relaxed);
 		_pReconnecting[i].value.store(false, std::memory_order_relaxed);
 		_pRetryFailCount[i].value.store(0, std::memory_order_relaxed);
+		_pInFreeSlotQueue[i].value.store(false, std::memory_order_relaxed);
 	}
 	memset(&_tszConnStr[0], 0, sizeof(_tszConnStr));
 }
@@ -134,6 +135,10 @@ bool CAdoConnPool::Init(const EDBClass dbClass, const TCHAR* ptszConnStr, const 
 		}
 
 		_pAdoConns[i].value.store(pConn, std::memory_order_release);
+
+		// [이식 — 프리 큐] 초기 연결에 성공한 슬롯을 즉시 프리 큐에 넣어둔다.
+		// PopFreeSlotIndex()는 이제 이 큐만 보고 O(1)에 가깝게 슬롯을 찾는다.
+		EnqueueFreeSlot(i);
 	}
 
 	// 백그라운드 관리 스레드 및 워커 구동
@@ -212,36 +217,87 @@ CAdoDB* CAdoConnPool::GetPooledConnUnsafe(int32 nType) const
 //***************************************************************************
 // CAdoConnPool::ReleaseAdoConn
 // @brief 사용을 완료한 커넥션 슬롯의 참조 카운트를 감소시킵니다.
+// @details [수정 — use-after-free 방지 + 프리 큐 등록] 연결 상태 확인
+// (GetDBCon())을 반드시 참조 카운트를 감소시키기 "전에" 수행한다(COdbcConnPool
+// 과 동일한 이유 — ApplyReconnectedConn()의 진입 게이트가 refcount>0을
+// 보고 이 슬롯을 건드리지 않으므로 커넥션 객체가 안전하게 보장된다).
+// 또한 참조가 정확히 0이 되고 연결도 살아있는 경우에만 프리 큐에 등록해
+// PopFreeSlotIndex()가 다시 찾아갈 수 있게 한다 — 이전에는 이 등록이
+// 아예 없었다(PopFreeSlotIndex()가 O(n) 라운드로빈 스캔이라 필요 없었음).
 // @param nType 사용을 완료한 커넥션 슬롯 인덱스
 //***************************************************************************
 void CAdoConnPool::ReleaseAdoConn(int32 nType)
 {
 	if( !IsValidIndex(nType) ) return;
-	// 사용 완료에 따른 참조 카운트 감소
-	_pRefCount[nType].value.fetch_sub(1, std::memory_order_release);
+
+	CAdoDB* pConn = _pAdoConns[nType].value.load(std::memory_order_acquire);
+	bool bStillConnected = (pConn != nullptr && pConn->GetDBCon());
+
+	int32 prev = _pRefCount[nType].value.fetch_sub(1, std::memory_order_release);
+	if( prev != 1 ) return; // 아직 다른 참조가 남아 있음 — 프리 큐에 넣지 않는다
+
+	if( bStillConnected )
+		EnqueueFreeSlot(nType);
+}
+
+//***************************************************************************
+// CAdoConnPool::EnqueueFreeSlot
+// @brief 슬롯을 프리 큐에 등록합니다(중복 삽입 방지 포함).
+//***************************************************************************
+void CAdoConnPool::EnqueueFreeSlot(int32 nType)
+{
+	bool expected = false;
+	if( !_pInFreeSlotQueue[nType].value.compare_exchange_strong(expected, true, std::memory_order_acq_rel) )
+		return; // 이미 큐에 들어가 있음 — 중복 삽입 방지
+
+	std::lock_guard<std::mutex> lock(_freeSlotMutex);
+	_freeSlotQueue.push(nType);
 }
 
 //***************************************************************************
 // CAdoConnPool::PopFreeSlotIndex
-// @brief 라운드 로빈 방식으로 사용 가능하고 즉시 대여할 수 있는 프리 슬롯의 인덱스를 탐색하여 반환합니다.
+// @brief 빈 슬롯을 탐색하고 즉시 선점합니다.
+// @details [수정 — O(n) 스캔 제거] 예전에는 라운드로빈으로 풀 전체를
+// 스캔했다(최악의 경우 O(n)). 이제는 "비어 있고 연결된 것으로 확인된"
+// 슬롯 인덱스만 담긴 _freeSlotQueue에서 후보를 하나씩 꺼내 검증한다.
+// 큐에는 원칙적으로 참조 카운트 0인 슬롯만 들어오므로 CAS는 거의 항상
+// 성공하지만, 큐에 있는 동안 연결이 끊긴 경우(재연결 워커가 아직 갱신
+// 전)나 GetAdoConn(명시적 인덱스)로 직접 선점된 경우처럼 CAS가 실패할
+// 수 있는 경우에는 그 후보를 버리고 다음 후보로 넘어간다. 큐가 비어
+// 있으면 즉시 -1을 반환한다(예전과 동일한 실패 시맨틱).
 // @return 사용 가능한 슬롯 인덱스, 없거나 실패 시 -1
 //***************************************************************************
 int32 CAdoConnPool::PopFreeSlotIndex(void) {
-	uint32 nStart = _nNextSlotHint.fetch_add(1, std::memory_order_relaxed);
+	for( ;; ) {
+		int32 candidate = -1;
+		{
+			std::lock_guard<std::mutex> lock(_freeSlotMutex);
+			if( _freeSlotQueue.empty() )
+				return -1;
+			candidate = _freeSlotQueue.front();
+			_freeSlotQueue.pop();
+		}
 
-	// 라운드 로빈 방식으로 사용 가능한 프리 슬롯 탐색
-	for( int32 k = 0; k < _nMaxPoolSize; ++k ) {
-		int32 i = static_cast<int32>((nStart + k) % _nMaxPoolSize);
+		// 큐에서 빠져나온 즉시 "큐에 있음" 플래그를 내린다 — 이 후보를
+		// 최종적으로 못 쓰게 되더라도, 이후 EnqueueFreeSlot()이 이 슬롯을
+		// 다시 정상적으로 큐에 넣을 수 있어야 하기 때문이다.
+		_pInFreeSlotQueue[candidate].value.store(false, std::memory_order_release);
 
 		int32 expected = 0;
-		if( _pRefCount[i].value.compare_exchange_strong(expected, 1, std::memory_order_acq_rel) ) {
-			CAdoDB* pConn = _pAdoConns[i].value.load(std::memory_order_acquire);
-			if( pConn && pConn->GetDBCon() ) return i;
-
-			_pRefCount[i].value.store(0, std::memory_order_release);
+		if( !_pRefCount[candidate].value.compare_exchange_strong(expected, 1, std::memory_order_acq_rel) ) {
+			// GetAdoConn(명시적 인덱스)이 큐를 거치지 않고 먼저 선점했을
+			// 수 있다 — 정상적인 레이스이므로 이 후보는 버리고 다음
+			// 후보를 시도한다.
+			continue;
 		}
+
+		CAdoDB* pConn = _pAdoConns[candidate].value.load(std::memory_order_acquire);
+		if( pConn && pConn->GetDBCon() ) return candidate;
+
+		// 큐에 있는 동안 연결이 끊겼다 — 선점을 되돌리고 다음 후보를 시도한다.
+		// 이 슬롯은 헬스체크가 알아서 감지해 재연결 큐로 옮긴다.
+		_pRefCount[candidate].value.store(0, std::memory_order_release);
 	}
-	return -1;
 }
 
 //***************************************************************************
@@ -249,14 +305,15 @@ int32 CAdoConnPool::PopFreeSlotIndex(void) {
 // @brief 재접속된 새로운 커넥션을 해당 슬롯에 반영하고 기존 커넥션을 안전하게 교체 또는 격리합니다.
 // @param nType 새로 연결된 커넥션을 반영할 슬롯 인덱스
 // @param pNewConn 새로 생성 및 접속 완료된 ADO 커넥션 객체 포인터
+// @return 실제로 스왑을 적용했으면 true, refcount 경합으로 포기했으면 false.
 //***************************************************************************
-void CAdoConnPool::ApplyReconnectedConn(int32 nType, CAdoDB* pNewConn)
+bool CAdoConnPool::ApplyReconnectedConn(int32 nType, CAdoDB* pNewConn)
 {
 	// 재연결을 완료하는 동안 슬롯이 다시 대여 상태가 되었다면 새로 만든 커넥션을 폐기
 	if( _pRefCount[nType].value.load(std::memory_order_acquire) > 0 )
 	{
 		xdelete(pNewConn);
-		return;
+		return false;
 	}
 
 	CAdoDB* pOldConn = nullptr;
@@ -266,7 +323,14 @@ void CAdoConnPool::ApplyReconnectedConn(int32 nType, CAdoDB* pNewConn)
 		_pAdoConns[nType].value.store(pNewConn, std::memory_order_release);
 	}
 
-	if( pOldConn == nullptr ) return;
+	if( pOldConn == nullptr )
+	{
+		// [이식 — 프리 큐] 최초 슬롯 생성 이후 첫 재연결처럼 이전 커넥션이
+		// 없던 경우도, 스왑이 끝난 지금 이 슬롯은 참조 0(함수 진입 시
+		// 이미 확인됨) & 연결됨 상태이므로 프리 큐에 등록해야 한다.
+		EnqueueFreeSlot(nType);
+		return true;
+	}
 
 	auto startTime = std::chrono::steady_clock::now();
 	bool bTimeout = false;
@@ -299,14 +363,31 @@ void CAdoConnPool::ApplyReconnectedConn(int32 nType, CAdoDB* pNewConn)
 	{
 		LOG_ERROR(_T("ReconnectWorker (ADO): Slot(%d) refcount high during swap. Moving to quarantine."), nType);
 
+		// [수정] enqueueTime/lastLogTime 모두 격리 시작 시각(now)으로
+		// 초기화한다 — enqueueTime은 이후 절대 갱신되지 않고 강제 정리
+		// 타임아웃 판단에만 쓰인다(AdoConnPool.h TQuarantineItem 참고).
+		// [주의 — 프리 큐] 이 시점엔 refcount가 아직 0으로 안 떨어졌으므로
+		// 이 슬롯을 프리 큐에 넣지 않는다 — 나중에 그 참조가 실제로
+		// ReleaseAdoConn()을 호출해 0이 되는 순간, 그 함수가 알아서
+		// 프리 큐에 등록해 준다.
 		auto now = std::chrono::steady_clock::now();
 		PLockGuard qGuard(_globalQuarantineLock);
-		_quarantineQueue.push({ pOldConn, &_pRefCount[nType].value, now });
+		_quarantineQueue.push({ pOldConn, &_pRefCount[nType].value, now, now });
 	}
 	else
 	{
 		xdelete(pOldConn);
+
+		// [이식 — 프리 큐] 대기 루프가 정상 종료됐다는 것은 이 시점에
+		// refcount가 확실히 0이라는 뜻 — 이제 이 슬롯은 새 커넥션으로
+		// 완전히 사용 가능한 상태이므로 프리 큐에 등록한다.
+		EnqueueFreeSlot(nType);
 	}
+
+	// 두 분기(격리/즉시 삭제) 모두 pNewConn은 이미 위에서 _pAdoConns[nType]에
+	// 스왑되어 슬롯에 적용된 상태다 — 옛 커넥션을 격리하느냐 바로
+	// 삭제하느냐의 차이일 뿐, "적용 성공" 여부와는 무관하므로 둘 다 true.
+	return true;
 }
 
 //***************************************************************************
@@ -396,8 +477,16 @@ void CAdoConnPool::HealthCheckLoop(void)
 				_quarantineQueue.pop();
 
 				auto now = std::chrono::steady_clock::now();
+
+				// [수정 — 강제 정리 타임아웃 버그] 전체 격리 경과 시간은
+				// enqueueTime(최초 격리 시각, 절대 갱신되지 않음) 기준으로
+				// 계산한다. 예전에는 lastLogTime을 여기와 아래 경고
+				// 쿨다운 판단 양쪽에 같이 썼는데, 경고를 남길 때마다
+				// lastLogTime이 now로 리셋되면서 이 경과 시간도 함께
+				// 리셋되어 FORCE_CLEANUP_TIMEOUT_MS(10분) 조건에 절대
+				// 도달하지 못하는 버그가 있었다.
 				auto elapsedTotal = std::chrono::duration_cast<std::chrono::milliseconds>(
-					now - item.lastLogTime).count();
+					now - item.enqueueTime).count();
 
 				if( item.pRefCount->load(std::memory_order_acquire) == 0 || elapsedTotal >= FORCE_CLEANUP_TIMEOUT_MS )
 				{
@@ -418,6 +507,8 @@ void CAdoConnPool::HealthCheckLoop(void)
 					if( elapsedFromLastLog >= LOG_ALERT_INTERVAL_MS )
 					{
 						LOG_ERROR(_T("Quarantine Persistent Warning (ADO): Connection is still stuck in quarantine!"));
+						// [수정] lastLogTime만 갱신한다 — enqueueTime은 절대
+						// 건드리지 않아야 강제 정리 타임아웃이 정상 동작한다.
 						item.lastLogTime = now;
 					}
 
@@ -584,8 +675,17 @@ void CAdoConnPool::ReconnectWorkerLoop(void)
 		}
 
 		// 재접속 성공 시 슬롯 교체 및 상태 초기화
-		ApplyReconnectedConn(nType, pNewConn);
-		OnReconnectSucceeded(nType);
+		// [수정 — 스왑 실패를 성공으로 오인하던 버그] 이전에는
+		// ApplyReconnectedConn()의 반환값이 없어, refcount 경합으로
+		// 스왑을 포기(pNewConn 폐기)한 경우에도 무조건 OnReconnectSucceeded()가
+		// 불려 백오프 실패 카운트가 부정확하게 리셋됐다. 실제 적용 여부에
+		// 따라 분기한다 — 포기된 경우는 아직 슬롯이 재연결되지 않은
+		// 상태이므로 OnReconnectFailed()로 백오프 재시도를 예약한다.
+		if( ApplyReconnectedConn(nType, pNewConn) )
+			OnReconnectSucceeded(nType);
+		else
+			OnReconnectFailed(nType);
+
 		_pReconnecting[nType].value.store(false, std::memory_order_release);
 	}
 }
@@ -698,6 +798,22 @@ CAdoConnPool::TReconnectConfig CAdoConnPool::GetReconnectConfig(void) const
 //***************************************************************************
 void CAdoConnPool::Clear(void)
 {
+	// [이식 — 프리 큐] 아래에서 각 슬롯의 커넥션을 실제로 삭제/격리하기
+	// 전에 프리 큐부터 비워둔다 — 그러지 않으면 재Init() 이후 새로 채워질
+	// 프리 큐가 이번 Clear() 이전 슬롯 상태를 가리키는 오래된 인덱스와
+	// 뒤섞일 수 있다(PopFreeSlotIndex()의 CAS/GetDBCon() 방어 덕에 즉시
+	// 크래시로 이어지진 않지만, 굳이 남겨둘 이유도 없다). 큐를 비운
+	// 뒤에는 _pInFreeSlotQueue 플래그도 전부 false로 되돌려야 한다.
+	{
+		std::lock_guard<std::mutex> lock(_freeSlotMutex);
+		while( !_freeSlotQueue.empty() )
+			_freeSlotQueue.pop();
+	}
+	for( int32 i = 0; i < _nMaxPoolSize; i++ )
+	{
+		_pInFreeSlotQueue[i].value.store(false, std::memory_order_relaxed);
+	}
+
 	auto now = std::chrono::steady_clock::now();
 	CVector<CAdoDB*> vShutdownDeletes;
 
@@ -736,7 +852,7 @@ void CAdoConnPool::Clear(void)
 		{
 			LOG_ERROR(_T("Clear (ADO): Slot(%d) refcount is zombie. Moving to quarantine."), i);
 			PLockGuard qGuard(_globalQuarantineLock);
-			_quarantineQueue.push({ pConn, &_pRefCount[i].value, now });
+			_quarantineQueue.push({ pConn, &_pRefCount[i].value, now, now });
 		}
 		else
 		{

@@ -1,8 +1,10 @@
 # CMySQLConnPool 설계 문서
 
 > 이 문서는 `CMySQLConnPool`을 중심으로 작성되었으며, 그 위에서 큐+워커로 동작하는
-> 비동기 서비스 계층 `CMySQLAsyncSrv`(§11)까지 함께 다룬다. `COdbcConnPool`과 설계
-> 철학이 동일한 자매 클래스이므로, 구조 자체는 §1~10 전반에서 대부분 대응된다.
+> 비동기 서비스 계층 `CMySQLAsyncSrv`(§11)와, 이를 도메인별로 소유·관리하는
+> `CDbServiceManager`(§12), 핸들러 등록 매크로 `DBAsyncHandler.h`(§11.1) 및 공용
+> 요청 게시 헬퍼 `DBAsyncPushHelper.h`(§11.6)까지 함께 다룬다. `COdbcConnPool`/`CAdoConnPool`과
+> 설계 철학이 동일한 자매 클래스이므로, 구조 자체는 대부분 대응된다.
 
 ## 1. 개념
 
@@ -23,16 +25,16 @@
 |---|---|
 | 슬롯 기반 고정 크기 풀 | `_nMaxPoolSize`로 크기가 고정되며 런타임에 늘어나거나 줄지 않는다 |
 | Lock-free 대여/반납 | `GetMySQLConn` / `ReleaseMySQLConn`은 `std::atomic`의 fetch_add/fetch_sub만 사용 |
+| O(1) 프리 슬롯 획득 | 비어 있고 연결된 슬롯 인덱스만 담아두는 전용 큐(`_freeSlotQueue`)에서 즉시 후보를 꺼낸다 — 풀이 바쁠 때도 풀 전체를 스캔하지 않는다 |
 | 비동기 자동 재연결 | 헬스체크 스레드가 끊어진 슬롯을 감지하고, 별도 워커 풀이 실제 재연결(I/O)을 병렬 수행 |
 | 지수 백오프 + 지터 | DB 전체 장애 시 모든 슬롯이 동시에 재시도하는 connection storm을 방지 |
 | 백오프 하한 강제 | `RECONNECT_BACKOFF_MIN_MS`(10ms) 미만의 `nBackoffBaseMs`는 재연결 폭주로 이어질 수 있어 `ValidateReconnectConfig`에서 거부 |
 | 이벤트 기반 정밀 재시도 스케줄링 | 백오프 대기는 `CDelayedTaskQueue`(§3의 `_delayedTaskQueue`)가 전담하며, 계산된 지연 시간이 정확히 지난 시점에 콜백이 1회 실행되어 재시도를 트리거한다. 헬스체크 스캔 주기(500ms)와는 독립적으로 동작한다 |
 | 동적 워커 수 조정 | `SetReconnectConfig`로 런타임 중 재연결 워커 수/백오프 정책을 조정 가능 |
-| 격리(Quarantine) 큐 | 교체된 낡은 커넥션에 참조가 남아있으면 즉시 삭제하지 않고 격리 후 안전할 때 삭제 |
-| 격리 큐 요약 경보 | 갇힌 항목이 있어도 개별 로그 대신 5분(`LOG_ALERT_INTERVAL_MS`) 주기로 개수와 최장 체류 시간을 한 줄로 요약 로깅해 로그 폭주 방지 |
+| 격리(Quarantine) 큐 — 이중 시각 관리 | 교체된 낡은 커넥션에 참조가 남아있으면 즉시 삭제하지 않고 격리한다. "최초 격리 시각"(`enqueueTime`, 절대 갱신 안 됨)과 "마지막 경고 로그 시각"(`lastLogTime`, 경고마다 갱신)을 분리해 관리하므로, 5분마다 경고 로그를 남기는 것과 무관하게 10분 강제 정리 타임아웃이 정확히 동작한다 |
 | Safe Leak | 프로세스 종료 시점까지 참조가 남은 커넥션은 삭제를 포기(누수)하여 UAF 크래시를 방지 |
-| False sharing 방지 | 슬롯별 원자 배열(`_pMySQLConns`, `_pRefCount`, `_pReconnecting`, `_pRetryFailCount`)을 `CachePaddedAtomic<T>[]`로, `_slotLocks`를 슬롯별 단독 락인 `PLock[]`로 구성해 슬롯 간 캐시라인 공유를 차단 |
-| char/wchar_t 이중 접속정보 입력 | `Init()`이 `char*`/`wchar_t*` 두 오버로드를 제공하며, wchar_t 버전은 `WideCharToMultiByte` 변환 후 공통 로직(`FinishInit`)에 합류 |
+| False sharing 방지 | 슬롯별 원자 배열(`_pMySQLConns`, `_pRefCount`, `_pReconnecting`, `_pRetryFailCount`, `_pInFreeSlotQueue`)을 `CachePaddedAtomic<T>[]`로, `_slotLocks`를 슬롯별 단독 락인 `PLock[]`로 구성해 슬롯 간 캐시라인 공유를 차단 |
+| char/wchar_t 이중 접속정보 입력 | `Init()`이 `char*`/`wchar_t*` 두 오버로드를 제공하며, wchar_t 버전은 `UnicodeToAnsi` 변환 후 공통 로직(`FinishInit`)에 합류 |
 | 할당자 분리 | `CMySQLConnPool` 자신은 `BaseAllocator` 상속으로 RawAllocator 경로를, 내부 `CBaseMySQL` 커넥션은 `xnew`/`xdelete`(PoolAllocator)로 별도 관리 (§10 참고) |
 
 ## 3. 멤버 변수 설명
@@ -52,8 +54,7 @@
 | `_nBackoffJitterMs` | 재시도 타이밍 분산을 위한 지터 상한 |
 
 > 구조체 전체를 `std::atomic<TReconnectConfig>`로 감싸면 내부적으로 뮤텍스 폴백이 걸려 lock-free가
-> 깨지기 때문에, 서로 독립적으로만 쓰인다는 성질을 이용해 필드별로 쪼개 관리한다. (`OnReconnectFailed`
-> 같은 핫패스에 숨은 락이 생기는 것을 막기 위함)
+> 깨지기 때문에, 서로 독립적으로만 쓰인다는 성질을 이용해 필드별로 쪼개 관리한다.
 
 ### 슬롯 배열 (생성자에서 단 1회만 할당되는 불변 배열)
 | 변수 | 설명 |
@@ -63,23 +64,23 @@
 | `_slotLocks` | 슬롯별 교체(swap) 보호용 스핀락 배열 (`PLock[]`) |
 | `_pReconnecting` | 슬롯별 "재연결 워커가 처리 중" 플래그 (`CachePaddedAtomic<bool>[]`, 중복 디스패치 방지) |
 | `_pRetryFailCount` | 슬롯별 연속 재연결 실패 횟수 (`CachePaddedAtomic<int32>[]`). 지수 백오프 shift 계산에 쓰이는 동시에, 0보다 크면 "이미 `_delayedTaskQueue`에 재시도가 예약된 상태"임을 나타내는 상태 플래그 역할도 겸함(§5.2) |
+| `_pInFreeSlotQueue` | 슬롯별 "현재 `_freeSlotQueue`에 이미 들어가 있는지" 플래그 (`CachePaddedAtomic<bool>[]`). `EnqueueFreeSlot()`의 중복 삽입 방지용 CAS 게이트(§5.1) |
 
 > `_quarantineQueue`가 `&_pRefCount[i].value` 주소를 그대로 저장하므로, 위 배열들은 런타임 중
 > 재할당(make_unique 재호출 등)이 절대 금지된다. 각 슬롯이 `CachePaddedAtomic<T>`로 캐시라인
 > 하나씩을 점유해, 서로 다른 슬롯을 동시에 다루는 스레드들이 false sharing으로 서로의
 > 캐시라인을 무효화시키는 것을 막는다.
 
-### 헬스체크 / 재연결 워커
+### 헬스체크 / 재연결 워커 / 프리 슬롯 큐
 | 변수 | 설명 |
 |---|---|
 | `_healthCheckThreadMgr` / `_bStopHealthCheck` / `_nHealthCheckIntervalMs` | 헬스체크 스레드 관리, 종료 신호, 주기(기본 500ms) |
 | `_delayedTaskQueue` / `_delayedTaskThreadMgr` | 재연결 실패 시 계산된 백오프 지연을 정확한 시각에 1회 실행하기 위한 `CDelayedTaskQueue`와, 이를 처리하는 전담 스레드(단일 컨슈머) |
-| `_nNextSlotHint` | `PopFreeSlotIndex` 탐색 시작 위치 힌트 (경합 분산용) |
+| `_freeSlotMutex` / `_freeSlotQueue` | 비어 있고 연결된 슬롯 인덱스만 담아두는 O(1) 프리 큐와 이를 보호하는 뮤텍스(§5.1) |
 | `_reconnectWorkerMgr` / `_bStopReconnectWorkers` | 재연결 워커 스레드 관리, 전체 종료 신호 |
 | `_nCurrentWorkerCount` / `_nDesiredWorkerCount` | 현재 워커 수 / 목표 워커 수 |
 | `_reconnectQueueMutex` / `_reconnectQueueCv` / `_reconnectPendingSlots` | 재연결 대기열과 그 동기화 객체 |
 | `_globalQuarantineLock` / `_quarantineQueue` | 격리 큐와 이를 보호하는 전역 스핀락 |
-| `_quarantineLastSummaryLogTime` | 격리 큐 요약 경보를 마지막으로 남긴 시각. HealthCheckLoop 스레드에서만 읽고 쓰므로 원자적일 필요가 없다 |
 
 ## 4. 멤버 함수 설명
 
@@ -87,44 +88,51 @@
 | 함수 | 설명 |
 |---|---|
 | `Init(char* 접속정보..., reconnectConfig)` | 풀을 초기화하고 접속 정보로 커넥션을 동기적으로 채운다. 잘못된 `reconnectConfig`는 기본값으로 대체된다 |
-| `Init(wchar_t* 접속정보..., reconnectConfig)` | 와이드 문자열 접속 정보를 `WideCharToMultiByte`로 변환한 뒤 동일한 `FinishInit`으로 합류 |
+| `Init(wchar_t* 접속정보..., reconnectConfig)` | 와이드 문자열 접속 정보를 `UnicodeToAnsi`로 변환한 뒤(빈 문자열이거나 각 필드의 최대 길이를 넘으면 즉시 `false`) 동일한 `FinishInit`으로 합류 |
 | `GetMySQLConn(nType)` | 슬롯의 참조 카운트를 증가시키고 커넥션을 반환. 끊어진 슬롯이면 즉시 `nullptr`을 반환하고 카운트를 되돌린다 |
-| `ReleaseMySQLConn(nType)` | 참조 카운트를 감소시켜 슬롯을 반납 |
+| `ReleaseMySQLConn(nType)` | 참조 카운트를 감소시켜 슬롯을 반납. 연결 상태 확인(`IsConnected()`)은 반드시 참조 카운트 감소 "전"에 수행해 `ApplyReconnectedConn()`과의 use-after-free를 방지한다. 감소가 마지막 참조였고(참조 0) 커넥션이 여전히 연결돼 있으면 `EnqueueFreeSlot()`으로 프리 큐에 등록한다 |
 | `GetPooledConnUnsafe(nType)` | `PopFreeSlotIndex`로 이미 선점된 슬롯을 카운트 변경 없이 조회 (`MySQLConnGuard` 전용) |
 | `GetMaxPoolSize()` | 풀의 최대 크기 조회 |
-| `PopFreeSlotIndex()` | 빈 슬롯(참조 카운트 0)을 찾아 즉시 원자적으로 선점하고 인덱스 반환 |
+| `PopFreeSlotIndex()` | `_freeSlotQueue`에서 후보를 하나씩 꺼내 참조 카운트 0→1 CAS로 즉시 선점한다. 큐에 있는 동안 연결이 끊겼거나 다른 경로(`GetMySQLConn` 명시적 인덱스)로 이미 선점된 후보는 버리고 다음 후보로 넘어간다. 큐가 비어 있으면 즉시 `-1` 반환 |
 | `SetReconnectConfig(cfg)` | 백오프/워커 수 정책을 런타임에 변경. 유효성 실패 시 전체 거부(부분 적용 없음) |
 | `GetReconnectConfig()` | 현재 정책 스냅샷 조회 (모니터링용) |
 
 ### Protected 내부 로직
 | 함수 | 설명 |
 |---|---|
-| `Clear()` | 모든 슬롯을 정리. 참조가 남은 슬롯은 격리 큐로 보냄 (Shutdown/재초기화 공용) |
+| `Clear()` | 모든 슬롯을 정리. 프리 큐를 먼저 비우고 `_pInFreeSlotQueue` 플래그를 전부 리셋한 뒤, 참조가 남은 슬롯은 격리 큐로 보냄 (Shutdown/재초기화 공용) |
 | `IsValidIndex(nType)` | 슬롯 인덱스 범위 검사 |
 | `ValidateReconnectConfig(cfg)` | 재연결 설정값의 상식적 범위 검사 (Init/SetReconnectConfig 공용). `nBackoffBaseMs < RECONNECT_BACKOFF_MIN_MS`, `nBackoffMaxShift`가 0~30 범위를 벗어나는 경우 등을 거부 |
-| `FinishInit(reconnectConfig)` | 접속 정보가 이미 채워진 뒤 공통으로 실행되는 마무리 로직 — 정책 검증/적용, 커넥션 사전 생성, 헬스체크/재연결 스레드 기동 |
+| `FinishInit(reconnectConfig)` | 접속 정보가 이미 채워진 뒤 공통으로 실행되는 마무리 로직 — 정책 검증/적용, 커넥션 사전 생성(성공한 슬롯은 즉시 `EnqueueFreeSlot()`), 헬스체크/재연결 스레드 기동 |
 | `TryReconnect(nType)` | 새 커넥션을 생성하고 실제 연결까지 시도하는 블로킹 I/O 로직 |
-| `ApplyReconnectedConn(nType, pNewConn)` | 새 커넥션으로 슬롯을 스왑하고, 낡은 커넥션을 안전하게 삭제 또는 격리 |
+| `ApplyReconnectedConn(nType, pNewConn)` | 새 커넥션으로 슬롯을 스왑하고, 낡은 커넥션을 안전하게 삭제 또는 격리한다. 진입 시점에 슬롯 참조 카운트가 이미 0이 아니면(다른 경로로 재선점된 정상적인 레이스) 스왑을 포기하고 `pNewConn`을 폐기한 뒤 `false`를 반환한다 — 호출부(`ReconnectWorkerLoop`)는 이 반환값으로 실제 적용 여부를 정확히 구분해 `OnReconnectSucceeded`/`OnReconnectFailed`를 분기한다. 스왑이 실제로 일어난 경우(격리로 빠지든 즉시 삭제되든)는 항상 `true` |
 | `ScheduleRetry(nType)` | 실패 횟수(`_pRetryFailCount`)를 늘리고 지수 백오프+지터로 지연 시간을 계산한 뒤, `_delayedTaskQueue.Reserve()`로 그 시간 뒤 1회 실행될 재시도 콜백을 예약 |
-| `OnReconnectFailed(nType)` | `ScheduleRetry(nType)` 호출로 위임 |
-| `OnReconnectSucceeded(nType)` | `_pRetryFailCount`를 0으로 초기화 (백오프 상태 리셋) |
-| `HealthCheckLoop()` | 격리 큐 청소(PART A) + 끊어진 슬롯 스캔(PART B). `_pReconnecting`을 CAS로 선점한 뒤 `_pRetryFailCount == 0`(아직 예약된 재시도가 없는 슬롯)인 경우에만 즉시 재연결 큐에 등록하고, 실패 이력이 있는 슬롯은 `_delayedTaskQueue`의 예약에 맡기고 그냥 넘어감 (블로킹 I/O 없음) |
+| `OnReconnectFailed(nType)` | `ScheduleRetry(nType)` 호출로 위임. `ApplyReconnectedConn()`이 스왑을 포기한 경우(반환값 `false`)에도 이 경로를 타 재시도가 예약된다 |
+| `OnReconnectSucceeded(nType)` | `_pRetryFailCount`를 0으로 초기화 (백오프 상태 리셋). `ApplyReconnectedConn()`이 실제로 스왑을 적용했을 때(반환값 `true`)만 호출된다 |
+| `HealthCheckLoop()` | 격리 큐 청소 + 끊어진 슬롯 스캔. 격리 큐 항목의 전체 경과 시간은 `enqueueTime` 기준으로, 경고 쿨다운은 `lastLogTime` 기준으로 각각 독립적으로 판단한다. `_pReconnecting`을 CAS로 선점한 뒤 `_pRetryFailCount == 0`(아직 예약된 재시도가 없는 슬롯)인 경우에만 즉시 재연결 큐에 등록하고, 실패 이력이 있는 슬롯은 `_delayedTaskQueue`의 예약에 맡기고 그냥 넘어감 (블로킹 I/O 없음) |
 | `StartHealthCheckThread()` / `StopHealthCheckThread()` | 헬스체크 스레드 기동/종료(Join까지 대기) |
 | `DelayedTaskLoop()` | `_delayedTaskQueue.ProcessExpiredTasks()`를 호출해 만료된 재시도 콜백들을 실행하는 루프 |
 | `StartDelayedTaskThread()` / `StopDelayedTaskThread()` | 지연 타이머 전담 스레드 기동 / `_delayedTaskQueue.Stop()` 후 안전 종료(join) |
-| `ReconnectWorkerLoop()` | 대기열에서 슬롯을 꺼내 실제 `TryReconnect` + 스왑을 수행하는 워커 루프 |
+| `ReconnectWorkerLoop()` | 대기열에서 슬롯을 꺼내 실제 `TryReconnect` + `ApplyReconnectedConn`을 수행하는 워커 루프. 반환값에 따라 `OnReconnectSucceeded`/`OnReconnectFailed`를 분기한다 |
 | `StartReconnectWorkers(n)` / `StopReconnectWorkers()` | 재연결 워커 풀 기동/종료 |
 | `SetWorkerCount(n)` | 목표 워커 수 갱신. 확대는 즉시 스폰, 축소는 워커가 스스로 종료하도록 유도 |
 | `TryExitIfExcess()` | 현재 워커가 초과 인원인지 CAS로 판정하고, 맞다면 스스로 종료 |
 | `EnqueueReconnect(nType)` | 재연결 대기열에 슬롯을 넣고 워커 하나를 깨움 |
+| `EnqueueFreeSlot(nType)` | 슬롯을 프리 큐에 등록한다. `_pInFreeSlotQueue[nType]`을 CAS(false→true)로 먼저 확인해, 이미 큐에 들어가 있으면 중복 삽입하지 않는다. `FinishInit()`/`ReleaseMySQLConn()`/`ApplyReconnectedConn()` 세 곳에서 "이 슬롯이 지금 사용 가능해졌다"는 이벤트가 발생할 때마다 호출된다 |
 
 ## 5. 동작 흐름
 
 ### 5.1 커넥션 대여/반납 (핫패스)
-1. `MySQLConnGuard` 생성 시 `PopFreeSlotIndex()`로 빈 슬롯을 원자적으로 선점 (참조 카운트 1)
-2. `GetPooledConnUnsafe()`로 커넥션 포인터 조회. 스왑 타이밍 등으로 슬롯이 이미 무효화됐다면
-   `ReleaseMySQLConn()`으로 선점했던 카운트를 되돌리고 대여 실패로 처리
-3. 소멸 시 `ReleaseMySQLConn()`으로 참조 카운트 반납
+1. `MySQLConnGuard` 생성 시 `PopFreeSlotIndex()`로 `_freeSlotQueue`에서 후보를 꺼내 참조 카운트
+   0→1 CAS로 즉시 선점한다 (실질 O(1) — 후보가 큐에 있는 동안 연결이 끊겼거나 이미 다른 경로로
+   선점된 경우에만 다음 후보로 넘어간다).
+2. `GetPooledConnUnsafe()`로 커넥션 포인터 조회
+3. 소멸 시 `ReleaseMySQLConn()`으로 참조 카운트 반납. 반납으로 참조가 정확히 0이 되고 커넥션이
+   여전히 연결돼 있으면, 같은 함수 안에서 `EnqueueFreeSlot()`을 호출해 다음 대여자를 위해 다시
+   프리 큐에 등록한다.
+
+> `GetMySQLConn(nType)`으로 특정 슬롯을 직접 지정해 대여하는 경로는 프리 큐를 거치지 않는다.
+> 정확성에는 영향이 없다(참조 카운트 CAS가 안전망이므로) — §6 단점 참고.
 
 ### 5.2 자동 재연결
 1. `HealthCheckLoop()`이 500ms마다 순회하며 참조 카운트 0 & 연결 끊김인 슬롯을 찾고, `_pReconnecting`을
@@ -133,13 +141,18 @@
    `EnqueueReconnect()`로 즉시 대기열에 등록해 워커를 깨운다. 실패 이력이 있어 이미
    `_delayedTaskQueue`에 재시도가 예약된 슬롯은 이번 순회에서 `_pReconnecting`만 반납하고 넘어간다.
 3. `ReconnectWorkerLoop()`이 `TryReconnect()`로 블로킹 I/O 수행 (다른 워커들은 각자 슬롯을 병렬 처리)
-4. 성공 시 `ApplyReconnectedConn()`으로 슬롯 스왑, 낡은 커넥션은 참조가 빠질 때까지 최대
-   `WAIT_TIMEOUT_MS`(100ms) 대기 후 삭제(또는 타임아웃 시 격리), `OnReconnectSucceeded()`로
-   `_pRetryFailCount`를 0으로 리셋
-5. 실패 시 `OnReconnectFailed()` → `ScheduleRetry()`가 실패 횟수를 늘려 지수 백오프+지터 지연을
-   계산하고, `_delayedTaskQueue.Reserve(지연ms, 콜백)`으로 정확히 그 시간 뒤 1회 실행되는 재시도
-   콜백을 예약한다. 콜백은 만료 시점에 슬롯이 여전히 재연결이 필요한 상태인지 재확인한 뒤
-   `EnqueueReconnect()`하거나, 그 사이 다른 경로로 이미 해소됐다면 `_pReconnecting`만 반납한다.
+4. 연결에 성공하면 `ApplyReconnectedConn()`으로 슬롯 스왑을 시도한다. 이 시점에 슬롯이 아직
+   참조 카운트 0인 상태여야 실제로 스왑이 적용되며(스왑된 슬롯은 프리 큐에도 다시 등록된다),
+   그 사이 다른 경로로 슬롯이 재선점됐다면(드문 레이스) 스왑을 포기하고 새로 만든 커넥션을
+   버린다. 호출부는 `ApplyReconnectedConn()`의 반환값으로 이 둘을 구분해, 실제 적용됐을 때만
+   `OnReconnectSucceeded()`로 `_pRetryFailCount`를 리셋하고, 포기된 경우는 `OnReconnectFailed()`로
+   재시도를 다시 예약한다. 낡은 커넥션은 참조가 빠질 때까지 최대 `WAIT_TIMEOUT_MS`(100ms) 대기
+   후 삭제(또는 타임아웃 시 격리)한다.
+5. 연결 실패, 또는 스왑이 포기된 경우 모두 `OnReconnectFailed()` → `ScheduleRetry()`가 실패
+   횟수를 늘려 지수 백오프+지터 지연을 계산하고, `_delayedTaskQueue.Reserve(지연ms, 콜백)`으로
+   정확히 그 시간 뒤 1회 실행되는 재시도 콜백을 예약한다. 콜백은 만료 시점에 슬롯이 여전히
+   재연결이 필요한 상태인지 재확인한 뒤 `EnqueueReconnect()`하거나, 그 사이 다른 경로로 이미
+   해소됐다면 `_pReconnecting`만 반납한다.
 
 > 풀 시작 시에는 `FinishInit()`이 `StartDelayedTaskThread()` → `StartHealthCheckThread()` →
 > `StartReconnectWorkers()` 순으로 기동해, 헬스체크나 재연결 워커가 첫 실패로 `ScheduleRetry()`를
@@ -147,12 +160,17 @@
 > `StopHealthCheckThread()` → `StopDelayedTaskThread()` → `StopReconnectWorkers()` 순으로 정지한다
 > (`~CMySQLConnPool()`/재`Init()` 공통).
 
-### 5.3 격리 큐 처리
-1. `HealthCheckLoop()` PART A에서 매 사이클 `_globalQuarantineLock` 안에서 큐 전체를 순회하며
-   각 항목의 참조 카운트가 0이 됐는지 재검사
-2. 0이 된 항목은 삭제 대상 리스트(`vDeletes`)에 적재만 하고, 락을 벗어난 뒤(PART A-1) 실제 `xdelete` 수행
-3. 여전히 참조가 남은 항목은 큐에 재삽입하고, 그 중 가장 오래 갇힌 시각을 집계
-4. 갇힌 항목이 있으면 5분(`LOG_ALERT_INTERVAL_MS`)마다 한 번만 "개수 + 최장 체류 시간" 요약 로그를 남김
+### 5.3 격리 큐의 두 시각 필드와 강제 정리
+`TQuarantineItem`은 격리된 커넥션마다 `enqueueTime`(최초 격리 시각, 절대 갱신되지 않음)과
+`lastLogTime`(마지막 경고 로그 시각, 5분 경고마다 갱신)을 별도로 들고 있다.
+
+- `HealthCheckLoop()`은 매 순회마다 격리 큐 전체를 훑으며, 참조 카운트가 0이 됐으면 즉시 삭제
+  대상으로 옮긴다.
+- 아직 참조가 남아있는 항목은 `now - enqueueTime`이 `FORCE_CLEANUP_TIMEOUT_MS`(10분)를 넘었는지로
+  강제 정리 여부를 판단하고, `now - lastLogTime`이 `LOG_ALERT_INTERVAL_MS`(5분)를 넘었을 때만
+  경고 로그를 남기며 그 시점의 `lastLogTime`을 갱신한다.
+- 두 필드가 분리돼 있어, 5분마다 반복되는 경고 로그가 10분 강제 정리 판정 시점을 뒤로 미루는
+  일이 없다 — `enqueueTime`은 격리된 순간 이후 어떤 경로에서도 다시 쓰이지 않는다.
 
 ### 5.4 워커 수 동적 조정
 - 확대: `_nDesiredWorkerCount`를 CAS로 목표까지 끌어올리고 부족분만큼 즉시 스폰
@@ -163,10 +181,11 @@
 
 ### 장점
 - 대여/반납 핫패스가 원자 연산만 사용해 뮤텍스 경합이 없다.
+- 프리 슬롯 탐색이 전용 큐 기반 O(1)이라, 풀이 바쁠수록 느려지는 스캔 비용이 없다.
 - 재연결 I/O가 별도 워커 풀에서 병렬 처리되어 헬스체크나 대여 경로를 막지 않는다.
 - 지수 백오프 + 지터로 DB 장애 시 재연결 폭주(connection storm)를 방지한다.
-- 격리 큐와 Safe Leak 정책으로 UAF 크래시 위험을 구조적으로 차단한다.
-- 격리 큐가 개별 로그 대신 요약 로그만 남겨, 대량 격리 상황에서도 로그가 폭주하지 않는다.
+- 격리 큐와 Safe Leak 정책으로 UAF 크래시 위험을 구조적으로 차단하고, 강제 정리 타임아웃이
+  경고 로그 빈도와 무관하게 정확히 동작한다.
 - 워커 수/백오프 정책을 서비스 운영 중 무중단으로 조정할 수 있다.
 - char/wchar_t 양쪽 접속 정보를 모두 지원해 호출부 인코딩 제약이 적다.
 - 재시도 대기는 `CDelayedTaskQueue` 기반 이벤트 방식으로 처리되어, 헬스체크 스캔 주기(500ms)와
@@ -183,8 +202,9 @@
   일시적으로 메모리를 계속 점유(격리)하게 된다.
 - Safe Leak 정책은 크래시를 막는 대신 셧다운 시점에 의도적인 메모리 누수를 허용한다.
 - 재연결 워커 축소가 즉시 반영되지 않고 다음 워커 순회 시점에 반영된다 (지연 수렴).
-- 격리 큐 요약 로그는 5분 주기이므로, 그 사이 격리 상황이 심각해져도 로그만으로는 실시간
-  파악이 어렵다 (모니터링 지표로 별도 노출하는 것을 권장).
+- `GetMySQLConn(nType)`(명시적 인덱스 대여)은 프리 큐와 동기화되지 않는다 — 정확성에는 영향이
+  없지만, 이 경로 사용 빈도가 높으면 프리 큐에 무효 후보가 남아 `PopFreeSlotIndex()`가 그 후보를
+  버리고 다음으로 넘어가는 낭비가 소폭 생길 수 있다.
 
 ## 7. 재연결 워커 스레드 개수(`nWorkerCount`) 설정 가이드
 
@@ -249,8 +269,8 @@
 |---|---|---|
 | IOCP 워커 | `GetQueuedCompletionStatusEx`로 완료된 Recv/Send I/O를 꺼내 세션에 전달. 순수 네트워크 I/O 처리만 담당 | 물리 코어 수 기준 (I/O 대기 비중에 따라 조정) |
 | 게임 로직(콘텐츠) 워커 | JobQueue에서 패킷 처리/게임 로직 Job을 꺼내 실행. IOCP 워커와 분리해 로직 처리 지연이 네트워크 I/O를 막지 않게 함 | 콘텐츠 샤딩 여부에 따라 1개(단일 월드) ~ 샤드 수 |
-| DB 비동기 워커 (`CMySQLAsyncSrv`) | DB 요청 큐(`_queueDBAsyncRq`)에서 쿼리 요청을 꺼내 `CMySQLConnPool`에서 커넥션을 빌려 실제 쿼리(블로킹) 실행 후 결과를 완료 큐로 반환 | 예상 동시 DB 요청 수 기준. `_nMaxPoolSize`(=`_nMaxThreadCnt`)를 넘지 않는 선에서 결정 |
-| `CMySQLConnPool` 헬스체크 스레드 | 끊어진 슬롯을 감지해 재연결 대기열에 등록 (논블로킹) | DB 노드당 1개 고정 (클래스 내부에서 자동 생성) |
+| DB 비동기 워커 | `CMySQLAsyncSrv`의 요청 큐에서 쿼리 요청을 꺼내 `CMySQLConnPool`에서 커넥션을 빌려 실제 쿼리(블로킹) 실행 | 예상 동시 DB 요청 수 기준. `CMySQLConnPool`의 `_nMaxPoolSize`를 넘지 않는 선에서 결정 |
+| `CMySQLConnPool` 헬스체크 스레드 | 끊어진 슬롯을 감지해 재연결 대기열에 등록 (논블로킹) | 1개 고정 (클래스 내부에서 자동 생성) |
 | `CMySQLConnPool` 재연결 워커 스레드 | 실제 재연결 I/O 수행 (`TryReconnect`) | §7 기준 (풀 크기 대비 10~25%, 소규모면 기본값 4) |
 | 타이머/틱 스레드 | 게임 틱, 스케줄된 이벤트(리스폰, 버프 만료 등) 처리 | 1개 (로직 워커의 주기 Job으로 흡수 가능) |
 | 비동기 로깅 스레드 | 로그를 큐에 쌓고 파일/네트워크로 flush (로직 스레드가 디스크 I/O로 막히지 않게) | 1개 |
@@ -263,11 +283,11 @@
 | IOCP 워커 | 8 |
 | 게임 로직 워커 | 1~4 |
 | DB 비동기 워커 | 4~8 |
-| `CMySQLConnPool` 헬스체크 (DB 노드 수만큼) | 1~3 |
-| `CMySQLConnPool` 재연결 워커 (노드당) | 2~4 |
+| `CMySQLConnPool` 헬스체크 | 1 |
+| `CMySQLConnPool` 재연결 워커 | 2~4 |
 | 타이머/틱 | 1 |
 | 비동기 로깅 | 1 |
-| **총합** | **약 18~29개** |
+| **총합** | **약 18~26개** |
 
 IOCP 워커 + 게임 로직 워커 = 9~12로 코어 수(8) 근처~살짝 초과하지만, 나머지는
 대부분 I/O 대기형 스레드라 실질적인 CPU 경합 부담은 크지 않다.
@@ -279,11 +299,11 @@ IOCP 워커 + 게임 로직 워커 = 9~12로 코어 수(8) 근처~살짝 초과�
 | IOCP 워커 | 16 |
 | 게임 로직 워커 | 4~8 |
 | DB 비동기 워커 | 8~16 |
-| `CMySQLConnPool` 헬스체크 (DB 노드 수만큼) | 1~3 |
-| `CMySQLConnPool` 재연결 워커 (노드당) | 4~8 |
+| `CMySQLConnPool` 헬스체크 | 1 |
+| `CMySQLConnPool` 재연결 워커 | 4~8 |
 | 타이머/틱 | 1 |
 | 비동기 로깅 | 1 |
-| **총합** | **약 35~53개** |
+| **총합** | **약 35~51개** |
 
 IOCP 워커 + 게임 로직 워커 = 20~24로 코어 수(16)보다 다소 많지만, DB/재연결
 워커처럼 블로킹 I/O 대기가 대부분인 스레드가 큰 비중을 차지해 컨텍스트 스위칭
@@ -294,16 +314,19 @@ IOCP 워커 + 게임 로직 워커 = 20~24로 코어 수(16)보다 다소 많지
 - IOCP 워커 + 게임 로직 워커의 합은 코어 수의 1.5배를 크게 넘기지 않는 선에서
   시작하고, 실측 CPU 사용률/지연시간을 보며 조정한다.
 - DB 워커·재연결 워커는 대부분 블로킹 I/O 대기 상태이므로 코어 수보다 많아도
-  실질적인 CPU 경합은 적다. `SYSTEM::CoreCount()`(§11.1)로 코어 수를 런타임에
-  조회해 초기값의 기준점으로 삼는 것을 권장한다.
-- DB 비동기 워커 스레드 수(`_nMaxThreadCnt`)와 `CMySQLConnPool` 풀 크기(`_nMaxPoolSize`)는
-  `CMySQLAsyncSrv::InitMySQL`에서 항상 동일하게(`new CMySQLConnPool(_nMaxThreadCnt)`)
-  맞춰진다 — 워커가 풀 크기보다 많으면 대여 실패(`PopFreeSlotIndex` → -1)만 늘어나므로
-  구조적으로 이를 방지한 설계다.
+  실질적인 CPU 경합은 적다. `std::thread::hardware_concurrency()`로 코어 수를
+  런타임에 조회해 초기값의 기준점으로 삼는 것을 권장한다.
+- DB 비동기 워커 스레드 수(`CMySQLAsyncSrv::StartService`의 `nMaxThreadCnt`)와 각
+  `CMySQLConnPool`의 크기는 같은 값으로 맞춰진다(§11.1 — `InitMySQL`이 자동으로
+  `_nMaxThreadCnt`를 각 풀의 `nMaxPoolSize`로 사용) — 워커가 풀보다 많으면
+  `PopFreeSlotIndex()` 실패(-1)가 늘어난다.
 - 위 수치는 시작점일 뿐이며, 최종적으로는 실제 부하 테스트(동접자 수, DB 쿼리
   QPS, 패킷 처리량)로 튜닝해야 한다.
 
-## 9. 사용법
+## 9. 사용법 — `CMySQLConnPool` 단독 사용
+
+`CMySQLConnPool`은 그 자체로도 독립적인 컴포넌트라, `CMySQLAsyncSrv`/`CDbServiceManager`
+없이 직접 생성해 쓸 수 있다.
 
 ```cpp
 // 1. 풀 생성 및 초기화
@@ -316,7 +339,7 @@ cfg.nBackoffMaxMs    = 30000;
 cfg.nBackoffMaxShift = 6;
 cfg.nBackoffJitterMs = 250;
 
-if( !pool.Init("127.0.0.1", "user", "passwd", "dbname", 3306, cfg) )
+if( !pool.Init("127.0.0.1", "game_user", "***", "game_db", /*uiPort=*/3306, cfg) )
 {
     // 초기 커넥션 생성 실패 처리
 }
@@ -326,7 +349,7 @@ if( !pool.Init("127.0.0.1", "user", "passwd", "dbname", 3306, cfg) )
     MySQLConnGuard guard(&pool);
     if( guard != nullptr )
     {
-        guard->Query("SELECT ...");
+        guard->ExecuteQuery("SELECT ...");
     }
     // 스코프 종료 시 자동으로 ReleaseMySQLConn 호출됨
 }
@@ -337,55 +360,20 @@ newCfg.nWorkerCount = 8;
 pool.SetReconnectConfig(newCfg);
 ```
 
-- `MySQLConnGuard`를 사용하지 않고 `GetMySQLConn`/`ReleaseMySQLConn`을 직접 짝지어 호출할 수도 있으나,
-  예외 발생 시 반납 누락 위험이 있으므로 가드 사용을 권장한다.
+- `MySQLConnGuard`를 사용하지 않고 `GetMySQLConn`/`ReleaseMySQLConn`을 직접 짝지어 호출할
+  수도 있으나, 예외 발생 시 반납 누락 위험이 있으므로 가드 사용을 권장한다.
 - 풀 소멸 시 `~CMySQLConnPool()`이 헬스체크 → 지연 타이머 → 재연결 워커 스레드를 순서대로
   먼저 종료한 뒤 `Clear()`로 자원을 정리한다(§5.2 참고).
-
-### 9.1 여러 DB를 다루는 실제 서비스 통합 패턴
-
-계정 DB, 게임 DB, 로그 DB처럼 DB가 여러 개인 서비스에서는 `CMySQLConnPool`을 DB 노드 수만큼
-배열로 만들어 두고, DB 비동기 워커 스레드들이 공용 요청 큐에서 작업을 꺼내 필요한 풀을
-선택해 쓰는 구조가 일반적이다. `CMySQLAsyncSrv::InitMySQL`이 실제로 이 패턴을 구현한다.
-
-```cpp
-// DB 노드 개수만큼 풀을 생성 (예: 계정 DB, 게임 DB, 로그 DB)
-// 값 초기화(...) 로 모든 슬롯을 nullptr로 두어, 초기화 도중 실패해도
-// 아직 생성되지 않은 슬롯을 쓰레기 포인터로 delete하는 일이 없게 한다.
-CMySQLConnPool** pMySQLConnPools = new CMySQLConnPool*[nDBCount]();
-
-// 재연결 워커 수는 각 풀 크기(= DB 비동기 워커 스레드 수) 대비 비례 산정 (§7.4)
-CMySQLConnPool::TReconnectConfig reconnectCfg;
-reconnectCfg.nWorkerCount = std::max(4, nMaxThreadCnt / 4);
-
-for( int32 i = 0; i < nDBCount; ++i )
-{
-    // CMySQLConnPool이 BaseAllocator를 상속하므로 평범한 new로도 RawAllocator 경로를 타고,
-    // 실패 시 예외 대신 nullptr을 반환한다 (§10 참고)
-    pMySQLConnPools[i] = new CMySQLConnPool(nMaxThreadCnt);
-    if( pMySQLConnPools[i] == nullptr ||
-        !pMySQLConnPools[i]->Init(dbNode[i]._tszDBHost, dbNode[i]._tszDBUserId,
-                                   dbNode[i]._tszDBPasswd, dbNode[i]._tszDBName,
-                                   dbNode[i]._nPort, reconnectCfg) )
-    {
-        // 이미 만든 풀들까지 함께 정리(ClearMySQLConnPools)한 뒤 실패 처리
-        break;
-    }
-}
-```
-
-- 배열을 `new CMySQLConnPool*[nDBCount]()`처럼 값 초기화해 두면, 아직 만들어지지 않은
-  슬롯도 항상 `nullptr` 상태로 유지되어 정리 루틴이 모든 인덱스를 안전하게 순회할 수 있다.
-- 각 풀은 독립된 `CMySQLConnPool` 인스턴스이므로 DB별로 서로 다른 접속 정보/재연결 정책을 줄 수 있다.
-- DB 비동기 워커 스레드 수(`_nMaxThreadCnt`)와 풀 크기를 동일하게 맞추면, 워커 스레드 각각이
-  항상 자기 몫의 슬롯을 확보할 수 있어 `PopFreeSlotIndex()` 실패(풀 고갈)를 구조적으로 방지한다.
+- 여러 DB(계정/게임/로그 등)를 다루는 실제 서비스에서는 이렇게 `CMySQLConnPool`을 직접 여러
+  개 만들어 관리하기보다, §11의 `CMySQLAsyncSrv`와 §12의 `CDbServiceManager`를 통해 DB 노드
+  목록으로부터 자동으로 풀 집합을 구성하는 쪽을 권장한다.
 
 ## 10. 할당자(Allocator) 설계
 
 `CMySQLConnPool`은 `class CMySQLConnPool : public BaseAllocator`로 선언되어 있다. 즉 이
-클래스를 직접 `new`/`delete`하면(예: 위 §9.1의 `new CMySQLConnPool(nMaxThreadCnt)`) 전역
-`::operator new`/`delete`가 아니라 `BaseAllocator`가 오버라이드한 `operator new`/`delete`가
-호출되어, 프로젝트의 `RawAllocator` 경로를 탄다.
+클래스를 직접 `new`/`delete`하면 전역 `::operator new`/`delete`가 아니라 `BaseAllocator`가
+오버라이드한 `operator new`/`delete`가 호출되어, 프로젝트의 `RawAllocator`(mimalloc/jemalloc/
+tcmalloc/malloc 중 컴파일 타임 선택) 경로를 탄다.
 
 ### 10.1 왜 PoolAllocator(xnew/xdelete)가 아니라 BaseAllocator인가
 
@@ -394,7 +382,7 @@ for( int32 i = 0; i < nDBCount; ++i )
 | 할당자 | 설계 목적 | `CMySQLConnPool`과의 적합성 |
 |---|---|---|
 | `PoolAllocator` (→ `xnew`/`xdelete`) | 실서비스 핫패스(패킷, 세션 등 고빈도 할당/해제) | 부적합 — 풀 자체는 DB 노드당 1개, 서버 기동 시 한 번만 생성됨 |
-| `BaseAllocator` | 크기가 크거나 드물게 생성되는 객체를 풀과 분리 | 적합 — 위 프로필과 정확히 일치 (`COdbcConnPool`과 동일한 근거) |
+| `BaseAllocator` | 크기가 크거나 드물게 생성되는 객체를 풀과 분리 | 적합 — 위 프로필과 정확히 일치 |
 
 `BaseAllocator`는 데이터 멤버가 없고 상속되는 함수도 모두 non-virtual이라, 상속해도
 `CMySQLConnPool` 인스턴스에 vptr 등 추가 메모리 오버헤드가 붙지 않는다.
@@ -407,238 +395,370 @@ for( int32 i = 0; i < nDBCount; ++i )
 (`PoolAllocator` 경로)를 그대로 사용한다 — 같은 클래스 계층 안에서도 "이 객체를 만드는 빈도"에
 따라 할당자를 다르게 선택한 것이다.
 
-### 10.3 `make_shared`로 생성하는 타입에는 적용 무의미
+### 10.3 `CMySQLAsyncSrv`/`CDbServiceManager`는 `BaseAllocator`를 상속하지 않는다
 
-`BaseAllocator` 상속이 효과를 가지려면 해당 타입이 **직접 `new 타입(...)`** 형태로 생성돼야
-한다. `std::make_shared<T>()`는 컨트롤 블록과 객체를 하나로 묶어 자체 할당 경로로 확보하고
-`T`의 `operator new`를 거치지 않으므로, 그런 방식으로 생성되는 타입에 `BaseAllocator`를
-상속해도 효과가 없다 (`CMySQLConnPool`은 위 예시처럼 직접 `new`되므로 해당 사항 없음. 반면
-§11의 `CMySQLAsyncSrv`는 `make_shared`로 생성되는 진짜 싱글턴이라 해당 사항이다).
+`CMySQLAsyncSrv`와 `CDbServiceManager`는 둘 다 `BaseAllocator`를 상속하지 않는 평범한
+클래스다. `CDbServiceManager::Instance()`가 함수-지역 `static`(Meyer's singleton, §12)으로
+생성되고, 그 안의 `CMySQLAsyncSrv` 인스턴스는 `std::make_unique<CMySQLAsyncSrv>()`로
+생성된다. `std::make_unique`/`std::make_shared`는 컨트롤 블록과 객체를 하나로 묶어 자체
+할당 경로로 확보하고 `operator new`를 거치지 않으므로, 설령 이 타입들이 `BaseAllocator`를
+상속하더라도 효과가 없었을 것이다 — 두 클래스 다 프로세스 수명 동안 도메인당 1개만 생성되는
+경량 객체라, 할당자를 별도로 신경 쓸 실익 자체가 크지 않다.
 
 ## 11. 비동기 서비스 계층 — `CMySQLAsyncSrv`
 
-풀(`CMySQLConnPool`) 위에, DB 노드별로 풀을 배열로 들고 공용 요청 큐 +
-워커 스레드 풀로 쿼리를 비동기 처리하는 서비스 계층이다.
+풀(`CMySQLConnPool`) 위에, DB 노드별로 풀을 관리하며 공용 요청 큐 + 워커 스레드 풀로 쿼리를
+비동기 처리하는 서비스 계층이다. `CMySQLAsyncSrv` 자신은 싱글턴이 아니라 "DB 서비스 하나를
+나타내는 재사용 가능한 부품"이며, 여러 인스턴스(멤버/게임/로그 등 도메인별)를 소유·관리하는
+책임은 §12의 `CDbServiceManager`가 진다 — `COdbcAsyncSrv`/`CAdoAsyncSrv`와 동일한 구조다.
 
 ### 11.1 구조 요약
 
-- `Regist(command, handler)`로 명령어별 핸들러를 등록해두면, `Push()`로 큐에 들어온
+- 요청 베이스 구조체(`st_DBAsyncRq`/`st_DBAsyncRp`)와 핸들러 인터페이스(`CDBAsyncSrvHandler`)는
+  다른 두 백엔드와 완전히 동일하게 `DBAsyncSrv.h`의 공용 타입을 그대로 재사용한다(이 클래스
+  쪽에서 별도 재정의는 없다). 자연 정렬(패딩 없음)을 쓴다.
+- `Regist(callIdent, handler)`로 명령어별 핸들러를 등록해두면, `Push()`로 큐에 들어온
   `st_DBAsyncRq` 요청을 워커 스레드들이 `Pop()` → `callIdent`로 핸들러 조회 → 실행한다.
-  핸들러 조회는 매 DB 비동기 호출마다(핫패스) 이루어지므로 O(log n) 탐색인 `std::map`
-  대신 O(1) 평균 탐색인 `std::unordered_map`(`COMMAND_MAP`)을 사용한다.
-- DB 노드 수만큼 `CMySQLConnPool*` 배열(`_pMySQLConnPools`)을 두고,
-  `GetAccountConnPool()`(인덱스 0)/`GetMySQLConnPool(m_nID)`(3개 초과 시 `(m_nID % (DBCount-1)) + 1`로
-  해시 분산, 그 외엔 마지막 인덱스)/`GetLogConnPool()`(인덱스 2, DB 3개 초과 전제)로
-  용도별 풀을 가져다 쓴다 (§9.1 참고). 배열은 값 초기화되어 있고, 정리 전용 함수
-  `ClearMySQLConnPools()`가 소멸자와 초기화 실패 경로 양쪽에서 공용으로 각 풀을 안전하게 해제한다.
-- `Instance()`는 C++11 Meyers' Singleton(함수 내 static 지역 변수, magic statics)으로
-  스레드 안전하게 생성되는 `std::make_shared` 기반 진짜 싱글턴이다 — `T::operator new`를
-  거치지 않으므로 `BaseAllocator` 상속은 이 클래스에는 적용하지 않는다(§10.3).
+  핸들러 조회는 `std::unordered_map`을 사용해 매 쿼리마다의 조회 비용을 O(1) 평균으로 유지한다.
+  `Regist()`는 `emplace()`의 결과로 실제 등록된(또는 이미 있던) 항목을 반환하며, 중복 등록
+  시도는 로그로 알린다.
+- 핸들러 클래스 작성과 `Regist()` 호출을 매번 손으로 반복하지 않도록, `DBAsyncHandler.h`가
+  `DECLARE_DBASYNC_HANDLER_EX(srvClass, command)` 매크로를 제공한다. `CMySQLAsyncSrv`도
+  `srvClass` 자리에 §12의 `MEMBER_DB_ASYNC`(= `CDbServiceManager::Instance().MemberDB()`,
+  실제로 `CMySQLAsyncSrv&`를 반환)를 그대로 넣어 재사용한다.
 - 요청 큐 `_queueDBAsyncRq`는 `CChunkedSwapQueue<std::unique_ptr<st_DBAsyncRq>>`다. 요청은
-  원시 포인터가 아니라 `std::unique_ptr`로 소유되며, 큐를 떠난 요청 객체는 `SAFE_DELETE` 같은
-  수동 해제 없이 `unique_ptr`가 스코프를 벗어나는 시점에 RAII로 자동 해제된다.
+  원시 포인터가 아니라 `std::unique_ptr`로 소유되며, 큐를 떠난 요청 객체는 수동 해제 없이
+  `unique_ptr`가 스코프를 벗어나는 시점에 RAII로 자동 해제된다.
 - 큐 동기화는 두 겹이다 — `CChunkedSwapQueue` 자신의 내부 락이 큐 데이터(`_inQueue`/`_size`)를
   보호하고, `CMySQLAsyncSrv`의 `std::mutex`(`_mutex`) + `std::condition_variable`(`_cva`)는
-  그 위에서 `Pop()`의 블로킹 대기/기상을 담당한다. `Push()`는 `_mutex`를 잡은 채로
-  `_queueDBAsyncRq.PushAndGetSize()`와 `_cva.notify_one()`을 같은 임계구역 안에서 수행한다 —
-  `Pop()`이 `_cva.wait()`의 predicate(`!IsEmpty()`)를 검사하는 구간과 `Push()`의 push+notify
-  구간이 동일한 `_mutex`로 직렬화되어, "predicate 검사 직후·`wait()` 진입 직전"의 틈에 notify가
-  끼어들어 유실되는 lost-wakeup을 원천 차단한다. `Pop()`도 `SwapChunk()` 호출 전에 이미 같은
-  `_mutex`를 먼저 잡으므로, 잠금 순서는 항상 (`_mutex` → 큐 내부 락)으로 일관되어 데드락 위험은
-  없다. `Pop()`은 소비자이므로 `notify_all()`을 호출하지 않는다(다른 소비자를 깨울 필요가 없음).
-  `_mutex`가 매 요청마다 잠기는 핫패스이고, `GetQueryQueueSize`/`IsEmpty` 같은 공유 잠금 경로는
-  모니터링용으로 드물게만 쓰이므로 `shared_mutex` 대신 표준 `mutex`/`condition_variable`을
-  사용한다(`shared_mutex`의 배타 잠금 자체가 더 무겁고 `condition_variable_any`도 락 타입 소거
-  오버헤드가 있기 때문).
-- `st_DBAsyncRq`는 `callIdent`별로 실제 쿼리 데이터를 담은 파생 구조체의 베이스 타입이다.
-  타임아웃 재시도 시, 베이스 타입으로 복사(`new st_DBAsyncRq{ *pAsyncRq }`)하면 파생
-  클래스의 실제 쿼리 파라미터가 잘려나가는 오브젝트 슬라이싱 버그가 발생하므로, 복사본을
-  새로 만들지 않고 **원본 `unique_ptr`를 그대로 `std::move`로 재사용**해 `bReTry` 플래그만
-  세팅한 뒤 재큐잉한다. 슬라이싱 버그가 사라지는 것은 물론, 이미 DB가 지연되고 있는 상황에서
-  불필요한 heap 할당/해제 한 쌍도 없어진다. 재큐잉이 실패하면(`Push()`가 0을 반환 — 서비스
-  종료 시점과 겹친 경우) 해당 `unique_ptr`는 `Push()` 내부에서 버려지는 즉시 소멸자에 의해
-  자동 해제된다 — 별도의 명시적 delete 호출이 없다.
-- `InitMySQL`은 호출 시작 시 `_bStopThread`를 `false`로 재설정해, `StopThread()`
-  이후 서비스를 다시 시작하는 재시작 시나리오에서도 워커 스레드들이 정상적으로 큐를
-  처리한다(기존에는 이 초기화가 없어 재시작 시 워커가 즉시 종료 조건으로 빠지는 문제가 있었음).
-  또한 `_pMySQLConnPools` 배열을 `new CMySQLConnPool*[_nDBCount]()`로 값 초기화해,
-  초기화 도중 일부만 생성된 상태에서 실패해도 `ClearMySQLConnPools()`가 미생성 슬롯을
-  쓰레기 포인터로 delete하지 않게 한다. 풀 할당(`new CMySQLConnPool(...)`) 실패나
-  `Init()` 실패 시에도 이미 만들어진 앞쪽 풀들까지 `ClearMySQLConnPools()`로 함께
-  정리한 뒤 반환한다(기존에는 이 정리가 없어 누수가 있었음). 각 DB 노드의 풀을 생성할
-  때는 `TReconnectConfig.nWorkerCount`를 `max(4, _nMaxThreadCnt / 4)`로 산정해 전달함으로써,
-  재연결 워커 수가 풀 크기(= DB 비동기 워커 스레드 수)에 비례하도록 한다.
-- `StartIoThreads()`는 워커 스레드 생성에 `std::bind` 대신 `this`만 캡처하는 람다
-  (`[this]() { RunningThread(); }`)를 사용한다. `std::bind`는 내부적으로 타입 소거된 호출
-  객체를 만들어 컴파일러 인라인 최적화가 잘 들어가지 않는 경우가 많아, 더 가볍고
-  `CMySQLConnPool`의 워커 스레드들과도 스타일이 일치하는 람다를 택했다. 다만 두 방식
-  모두 캡처/바인딩되는 것은 동일한 raw `this` 포인터라서, 댕글링 포인터에 대한 안전성
-  자체는 동일하다(`std::bind`가 더 안전한 것은 아님).
+  그 위에서 블로킹 대기/기상을 담당한다. `Push()`는 `_mutex`를 잡은 채로
+  `_queueDBAsyncRq.PushAndGetSize()`만 수행하고, **락을 해제한 뒤에** `_cva.notify_one()`을
+  호출한다 — 깨어난 소비자가 곧바로 같은 락을 다시 잡으려다 막히는 불필요한 컨텍스트 스위치를
+  피하기 위함이다. `Pop()`이 `_cva.wait()`의 predicate(`!IsEmpty()`)를 검사하는 구간과
+  `Push()`의 push 구간은 여전히 동일한 `_mutex`로 직렬화되므로, lost-wakeup은 notify 위치와
+  무관하게 발생하지 않는다 — `_bStopThread` 체크/세팅이 같은 `_mutex`로 직렬화되는 데서 이
+  보장이 나온다. `Pop()`도 `SwapChunk()` 호출 전에 이미 같은 `_mutex`를 먼저 잡으므로, 잠금
+  순서는 항상 (`_mutex` → 큐 내부 락)으로 일관되어 데드락 위험은 없다.
+- 쿼리가 타임아웃되어 처음 재시도될 때는 원본 요청 객체(`unique_ptr`)를 그대로 `std::move`로
+  재사용해 `bReTry` 플래그만 세팅한 뒤 `Push()`로 재큐잉한다 — 파생 구조체를 통째로 다시
+  할당하지 않는다. `callIdent`는 `move` 전에 로컬 변수로 미리 복사해 둬서 로그에 사용한다.
+  재큐잉이 실패하면(반환값 0, 서비스 종료 시점과 겹친 경우) 해당 `unique_ptr`는 `Push()`
+  내부에서 버려지는 즉시 소멸자에 의해 자동 해제된다.
+- `InitMySQL`은 호출 시작 시 `_bOpen`/`_bStopThread`를 재설정하고, `dbNodeVec`이 비어 있으면
+  즉시 실패 처리한다. `nMaxThreadCnt`가 `0`이면 `SYSTEM::CoreCount()`로 코어 수를 자동
+  산정한다. 각 DB 노드마다 `CMySQLConnPool`을 만들 때 풀 크기를 `nMaxThreadCnt`(=DB 비동기
+  워커 스레드 수)로, 재연결 워커 수(`TReconnectConfig.nWorkerCount`)는 `max(4, nMaxThreadCnt
+  / 4)`로 산정해 전달함으로써, 재연결 워커 수가 풀 크기에 비례하도록 한다.
 - `Action()`의 지연 쿼리 경고는 빌드 구성에 따라 임계값이 다르다 — 디버그 빌드는 300ms,
-  릴리즈 빌드는 1000ms 이상 걸린 쿼리에 대해 경고 로그를 남긴다. 누적 호출 수를 세는
-  `cumulateCallCnt`는 `static std::atomic<uint64>`이고 `fetch_add(memory_order_relaxed)`로
-  증가시킨다 — `_nMaxThreadCnt`개의 워커 스레드가 모두 같은 `Action()`을 동시에 실행하며 이
-  static 변수를 공유하므로, 원자적이지 않은 단순 증가(`++`)는 데이터 레이스(정의되지 않은
-  동작)가 된다.
-- `Clear()`는 DB 요청 큐(`_queueDBAsyncRq`)를 비우는 역할만 담당한다. `GetSize()`로 크기를
-  먼저 읽어 `SwapChunk`로 그만큼만 옮기는 대신, 전용 `_queueDBAsyncRq.Swap(tempQueue)`로 그
-  시점의 큐 전체를 한 번의 락 구간 안에서 통째로 이관한다 — 대상 큐가 비어 있으므로 내부적으로
-  컨테이너 자체를 O(1)로 스왑하며, 크기 조회 이후 들어온 새 항목이 이번 드레인에서 누락되는
-  TOCTOU 여지도 없앤다. 등록된 핸들러(`_mapCommand`)는 `Clear()`의 영향을 받지 않으므로,
-  초기화가 중간에 실패해 `Clear()`가 호출되어도 `Regist()`로 등록해둔 핸들러는 그대로 유지된다.
-
+  릴리즈 빌드는 1000ms 이상 걸린 쿼리에 대해 경고 로그를 남긴다. 처리 결과가 `OK`가 아니면
+  항상 별도의 실패 로그(`Failed Async Call`)도 남긴다. 누적 호출 수를 세는 `_cumulateCallCnt`는
+  인스턴스 멤버(`std::atomic<uint64>`)로, `CDbServiceManager`가 멤버/게임/로그 등 여러 도메인
+  인스턴스를 동시에 소유하고 각자 자기 `Action()`을 자기 워커 스레드에서 돌리기 때문에
+  도메인별로 독립적으로 집계된다(함수 지역 `static`이었다면 모든 도메인 인스턴스가 이
+  카운터를 공유해, "이 도메인에서 몇 번째 지연 쿼리인지"라는 진단 정보의 의미가 깨졌을
+  것이다).
+- `Clear()`는 DB 요청 큐를 비우는 역할만 담당한다. 전용 `_queueDBAsyncRq.Swap(tempQueue)`로
+  그 시점의 큐 전체를 한 번의 락 구간 안에서 통째로 이관해 TOCTOU 여지를 없앤다. 등록된
+  핸들러(`_mapCommand`)는 `Clear()`의 영향을 받지 않는다.
 
 ### 11.1a `Pop()`의 배치 인출과 큐 크기 경고
 
 `Pop()`은 워커(소비자)별 로컬 큐(`localQueue`)를 두고, 비어 있을 때만 `_mutex`를 잡아
 `_cva.wait()`로 대기한 뒤 `_queueDBAsyncRq.SwapChunk(localQueue, 64)`로 한 번에 최대 64개만
 떼어온다 — 워커 하나가 백로그 전체를 독점하지 못하게 막고, 락을 잡는 빈도를 항목 1개당
-1회에서 최대 64개당 1회로 줄인다.
+1회에서 최대 64개당 1회로 줄인다. 락을 해제한 뒤에는 `_cvProducer.notify_all()`로
+`WaitPushCapacity()` 대기 중인 생산자를 모두 깨운다 — 한 번에 최대 64개 분량의 여유가
+생겼을 수 있으므로 대기 중인 생산자가 여럿이면 전부 깨워 각자 자기 predicate로 재검증하게
+한다.
 
-락을 쥔 상태에서 큐 크기 경고도 함께 수행하며, 두 단계 모두 문턱 교차 감지 + 쿨다운
-방식으로 설계되어 있다:
+여기에 더해 `CMySQLAsyncSrv`는 락을 쥔 상태에서 큐 크기 경고 로직을 추가로 수행한다(ODBC판에는
+없는 부분, ADO판과 동일한 설계). 두 단계 경고 모두 문턱 교차 감지 + 쿨다운 방식으로
+설계되어 있다:
 
 - **`LOG_ERROR` (심각 수준)**: `currentSize >= MAX_WARNING_QUERY_QUEUE_SIZE`(`100000`)를
-  처음 넘어서는 순간 1회만 발령한다(`_bMaxWarningActive` 플래그로 무장). 좁은 구간을
-  표본으로 삼지 않고 `>=` 비교 하나로만 판정하므로, 표본 사이에 크기가 크게 튀어도 경고가
-  누락되지 않는다. 이후 `currentSize`가 히스테리시스 하한인
-  `MAX_WARNING_RESET_QUEUE_SIZE`(`90000`) 아래로 실제로 내려와야 재무장되어, 문턱 근처에서
-  값이 오르내려도 매번 재알림하지 않는다.
+  처음 넘어서는 순간 1회만 발령한다(`_bMaxWarningActive` 플래그로 무장). 이후 `currentSize`가
+  히스테리시스 하한인 `MAX_WARNING_RESET_QUEUE_SIZE`(`90000`) 아래로 실제로 내려와야
+  재무장되어, 문턱 근처에서 값이 오르내려도 매번 재알림하지 않는다.
 - **`LOG_WARNING` (증가 추세 알림)**: "마지막으로 경고한 값(`_nLastWarnedQueueSize`, 초기값
-  `INITIAL_WARN_QUEUE_SIZE`=`1000`)보다 커질 때"를 후보 조건으로 삼되, 실제 로그 출력은
-  `QUEUE_SIZE_WARN_COOLDOWN_MS`(`5000ms`) 쿨다운을 통과했을 때만 허용한다 — 큐가 계속 자라
-  매 `Pop()` 재획득마다 새 최댓값을 경신하는 상황(=시스템이 이미 과부하인 바로 그 타이밍)에도
-  로그가 최대 5초에 한 번으로 제한된다. 초기 기준치도 `2`에서 `1000`으로 올려, 기동 직후
-  워밍업 단계의 사소한 큐 증가만으로 경고가 찍히지 않게 했다.
+  `INITIAL_WARN_QUEUE_SIZE`=`1000`)보다 커질 때"를 후보 조건으로 삼고, 실제 로그 출력은
+  `QUEUE_SIZE_WARN_COOLDOWN_MS`(`5000ms`) 쿨다운을 통과했을 때만 허용한다. `_nLastWarnedQueueSize`
+  자체는 새 최댓값을 찍을 때만 갱신되는 래칫이라, 큐가 완전히 비어도 그대로 유지된다 — 이를
+  보완하기 위해 `currentCount`가 `INITIAL_WARN_QUEUE_SIZE` 이하까지 실제로 줄어들면
+  `_nLastWarnedQueueSize`를 초기값으로 되돌려 재무장한다. 이 재무장이 없으면, 서비스 초반에
+  한 번 큰 스파이크가 난 뒤로는 그보다 낮은(그래도 심각한) 수준의 재발 스파이크에 경고가
+  전혀 찍히지 않는 문제가 생긴다.
 
-### 11.2 스레드 생성
+### 11.2 서비스 시작 — `StartService()`
 
-`StartIoThreads()`는 `_nMaxThreadCnt`개의 워커 스레드를 람다(`[this]() { RunningThread(); }`)로
-생성한다(`gpThreadManager`를 통해). 각 워커는 `RunningThread()` → `Action()`으로 이어지는
-루프를 돌며 큐에서 요청을 꺼내 처리한다. `_nMaxThreadCnt`는 `nMaxThreadCnt`가 0으로
-주어지면 `SYSTEM::CoreCount()`(물리 코어 수)로 자동 산정된다.
+`CMySQLAsyncSrv`는 생성자에서 아무 것도 시작하지 않는다 — MySQL 커넥션 풀 초기화와 워커
+스레드 기동을 한 번에 처리하는 `StartService(dbNodeVec, nMaxThreadCnt = 0)`을 명시적으로
+호출해야 실제로 동작을 시작한다.
 
-### 11.3 종료 시 잔여 작업 처리 — `FlushRemainingTasks()`
+- `_bStarted` 플래그로 한 인스턴스당 정확히 한 번만 호출 가능하도록 막는다. 이미 시작된
+  인스턴스에 다시 호출하면, 내부적으로 `InitMySQL()`이 `_mysqlPools.clear()`를 하는 과정에서
+  기존 워커 스레드가 아직 그 풀들을 참조하며 실행 중일 수 있어 위험하기 때문이다 — 재시작이
+  필요하면 인스턴스를 새로 만들어야 한다.
+- 내부적으로 `InitMySQL()`(풀 집합 생성 및 초기 연결) → `StartIoThreads()`(`_nMaxThreadCnt`개의
+  `std::thread`를 `[this]() { RunningThread(); }` 람다로 생성) 순서로 진행한다. `StartIoThreads()`
+  도중 `std::thread` 생성이 예외를 던지면, 이미 스폰된 스레드들을 `Stop()`+`Join()`으로
+  안전하게 정리한 뒤 예외를 다시 던진다. `StartService()` 자신도 이 예외를 잡아
+  `_bOpen = false` 및 `ClearMySQLConnPools()`로 마저 정리한다.
+- 각 워커는 `RunningThread()` → (`_bOpen`이면) `Action()`으로 이어지는 루프를 돈다.
 
-프로세스 종료 등으로 워커 스레드들을 더 기다릴 수 없는 상황에서, 큐에 남은 요청들을
-비동기 워커 대신 동기적으로 마저 처리하기 위한 함수다. `~CMySQLAsyncSrv()` 소멸자
-맨 앞에서, `StopThread()`(워커 종료)·`Clear()`(요청 큐 정리)·`ClearMySQLConnPools()`(커넥션
-풀 해제)보다 먼저 호출한다 — 워커를 세우거나 커넥션 풀을 해제하기 전에 남은 요청을
-먼저 다 처리해 둠으로써, 아직 처리되지 않은 요청이 워커 종료·풀 해제와 타이밍이 겹쳐
-유실되거나(요청이 처리되지 못한 채 `Clear()`로 그냥 비워짐) 이미 해제된 풀을 참조하는
-일이 없게 한다.
+### 11.3 종료 — `Stop()` / `Join()` / 소멸자
 
-1. `_bStopThread`를 `true`로 설정하고 `_cva.notify_all()` / `_cvProducer.notify_all()`을
-   호출해, 이후 새 `Push()`를 막고 대기 중이던 워커/생산자들이 종료 조건을 확인하도록 깨운다.
-2. `_queueDBAsyncRq.Swap(tempQueue)`로 남은 전체 요청을 지역 임시 큐(`tempQueue`)로 한
-   번에 옮긴다 — `GetSize()`로 크기를 먼저 재는 절차 없이 그 시점의 큐를 통째로 이관하므로
-   잠금 구간이 짧고, 크기 조회와 실제 이관 사이에 새 요청이 끼어들 여지도 없다.
-   `CMySQLAsyncSrv::_mutex`는 이 구간에서 쓰이지 않으며, 보호는 `CChunkedSwapQueue` 자신의
-   내부 락이 `Swap()` 호출 한 번 동안만 담당한다.
-3. 임시 큐에 옮겨 담은 요청들을 하나씩 `std::move`로 꺼내 `_mapCommand`에서 핸들러를 찾아
-   `ProcessAsyncCall()`을 호출부 스레드에서 직접 실행한다. `Action()`의 워커 루프와 동일하게
-   핸들러를 찾지 못하거나 처리 결과가 `EDBReturnType::OK`가 아니면 에러를 로그로 남긴다. 각
-   요청은 `unique_ptr`이므로 별도의 해제 호출 없이, 루프를 도는 동안 지역 변수가 재대입/소멸될
-   때 자동으로 메모리가 해제된다. `SubOutstandingRequest()`는 핸들러를 찾았는지 여부와
-   무관하게(`pAsyncRq == nullptr`로 건너뛴 경우만 제외) 루프 맨 끝에서 항상 호출된다 —
-   원래는 핸들러를 찾은 분기 안에만 있어 미등록 `callIdent`를 만나면 카운터가 감소하지 않는
-   버그가 있었는데, if/else 바깥으로 옮겨 두 경로 모두 항상 호출되도록 바로잡았다(§11.5 참고).
-4. 큐가 빌 때까지 반복한 뒤 완료 로그를 남기고 반환한다.
+- `Stop()`은 `_mutex` 임계구역 안에서 `_bStopThread`를 `true`로 세팅한 뒤 `_cva.notify_all()`
+  / `_cvProducer.notify_all()`을 호출한다. 신호만 보낼 뿐 대기하지 않는다.
+- `Join()`은 `_workerThreads`의 모든 스레드를 순회하며 `join()`한다. 반드시 `Stop()` 다음에
+  호출해야 하며, `Stop()` 없이 `Join()`만 호출하면 워커가 절대 끝나지 않아 영원히 블로킹된다.
+- 소멸자 `~CMySQLAsyncSrv()`는 `Stop()` → `Join()` → `FlushRemainingTasks()` →
+  `ClearMySQLConnPools()` 순으로 정리한다. 워커 스레드가 실제로 전부 종료했음을 `Join()`으로
+  먼저 확인한 뒤에야 커넥션 풀을 정리하므로, "워커가 아직 도는데 자원이 먼저 사라지는"
+  경쟁이 성립하지 않는다.
 
-* `Action()`의 워커 루프에 있던 타임아웃 재시도 로직(§11.1의 `bReTry` 재큐잉)은 여기에는
-  없다 — 종료 처리 경로이므로 실패한 요청을 다시 큐에 넣지 않고 에러 로그만 남기고 넘어간다.
-* 2단계(`Swap()`)와 3단계(순차 처리) 모두 `CMySQLAsyncSrv::_mutex`를 잡지 않으므로,
-  `FlushRemainingTasks()` 실행 중에도 다른 스레드가 `GetQueryQueueSize()`/`IsEmpty()` 같은
-  조회 함수를 호출하는 것 자체는 안전하다 (다만 이미 `_bStopThread`가 켜진 뒤라 `Push()`는
-  더 이상 큐에 쌓이지 않는다).
+### 11.3a 종료 시 잔여 작업 처리 — `FlushRemainingTasks()`
 
-### 11.4 요청 큐 백프레셔 — `WaitPushCapacity()`
+`Join()`으로 워커 스레드가 하나도 남아있지 않음을 이미 확인한 뒤에 호출된다는 전제 하에,
+큐에 남은 요청들을 호출부 스레드에서 직접 동기적으로 마저 처리하는 함수다.
 
-`_queueDBAsyncRq`는 크기 상한이 없는 큐다. 지금까지는 `MAX_WARNING_QUERY_QUEUE_SIZE`(10만 건)를
-넘기면 경고 로그만 남길 뿐, 실제로 큐가 계속 커지는 것을 막지는 못했다 — 워커의 처리 속도보다
-`Push()`가 더 빠른 상황이 지속되면 큐가 무한정 쌓여 메모리를 소모할 수 있다. `WaitPushCapacity()`는
-이 문제를 해결하기 위한 백프레셔(back-pressure) 장치로, "생산자(요청을 넣는 쪽)를 큐 크기 기준으로
-직접 감속시키는" 방식이다.
+1. `_queueDBAsyncRq.Swap()`으로 남은 전체 요청을 지역 임시 큐(`tempQueue`)로 한 번에 옮긴다.
+2. 옮겨 담은 요청들을 하나씩 `std::move`로 꺼내 `_mapCommand`에서 핸들러를 찾아
+   `ProcessAsyncCall()`을 **호출부 스레드에서 직접** 실행한다. 핸들러를 찾지 못하거나
+   처리 결과가 `EDBReturnType::OK`가 아니면 에러를 로그로 남긴다.
+3. 큐가 빌 때까지 반복한 뒤 완료 로그를 남기고 반환한다.
 
-**추가된 요소**
+- `Action()`의 워커 루프에 있던 타임아웃 재시도 로직은 여기에는 없다 — 종료 처리 경로이므로
+  실패한 요청을 다시 큐에 넣지 않고 에러 로그만 남기고 넘어간다.
 
-- `_cvProducer` (`std::condition_variable`) — 큐 공간 부족으로 대기 중인 생산자 전용 조건 변수.
-  워커 대기용 `_cva`와 분리되어 있어, 소비자(워커)를 깨우는 알림과 생산자를 깨우는 알림이
-  서로 불필요하게 섞이지 않는다.
-- `WaitPushCapacity(size_t maxCapacity)` (public, 인라인) — 큐 크기가 `maxCapacity` 미만이 될
-  때까지, 또는 `_bStopThread`가 켜질 때까지 `_cvProducer`에서 대기한다. 호출부는 `Push()` 앞에서
-  이 함수를 호출해 큐가 일정 크기 이하로 유지되도록 스스로 속도를 늦출 수 있다.
+### 11.4 Back-pressure — `WaitPushCapacity()`
 
-**깨우는 지점**
+DB 처리 속도보다 요청 생산 속도가 빠른 상황에서 큐가 무한정 커지는 것을 막기 위한
+선택적 안전장치다. `Push()` 자체는 큐 크기를 검사하지 않으므로, 이 기능을 쓰려면
+생산자 쪽 호출부가 `Push()` 전에 `WaitPushCapacity(maxCapacity)`를 명시적으로 호출해야
+한다 — 강제되는 하드 리밋이 아니라 협조적(cooperative) 방식이다.
 
-| 지점 | 동작 |
+```cpp
+pAsyncSrv->WaitPushCapacity(10000); // 큐가 10000개 미만으로 줄어들 때까지 대기
+pAsyncSrv->Push(std::move(pRequest));
+```
+
+- 내부적으로 워커 대기용(`_cva`)과 분리된 별도 조건 변수 `_cvProducer`를 사용한다.
+  `Pop()`이 큐에서 항목을 최대 64개까지 꺼낼 때마다(락 해제 후) `_cvProducer.notify_all()`을
+  호출해, `WaitPushCapacity()`로 대기 중이던 생산자들을 모두 깨운다(§11.1a).
+- `Stop()`과 `FlushRemainingTasks()`가 트리거되는 소멸 경로 양쪽 모두 `_cva`뿐 아니라
+  `_cvProducer`도 함께 `notify_all()`하므로, 종료 시점에 큐 공간을 기다리며 블로킹 중이던
+  생산자 스레드도 함께 깨어나 빠져나올 수 있다.
+- 생산자가 여러 스레드라면, `WaitPushCapacity()`가 반환된 직후와 실제 `Push()` 사이에
+  다른 생산자도 동시에 같은 판단을 내려 함께 `Push()`할 수 있는 TOCTOU 여지가 있다. 즉
+  `maxCapacity`는 동시 생산자 수만큼 일시적으로 초과될 수 있는 **연성(soft) 상한**이다.
+- 성능 측면에서는 `Pop()`마다 추가되는 `notify_all()` 호출 하나뿐이다. 대기 중인 생산자가
+  없으면(가장 흔한 경우) 사실상 비용이 거의 없는 연산이라 핫패스인 `Pop()`에 유의미한
+  오버헤드를 주지 않는다.
+
+### 11.5 미완료 요청 카운터 — Outstanding Requests
+
+큐에 들어갔지만 아직 끝까지 처리되지 않은 요청이 몇 개인지 외부에서 조회할 수 있도록,
+`_nOutstandingRequests`(원자 정수)와 이를 캡슐화한 세 개의 인터페이스를 제공한다.
+
+| 함수 | 설명 |
 |---|---|
-| `Pop()` | 워커가 항목을 하나 꺼내 공간이 하나 생길 때마다 `_cvProducer.notify_one()`으로 대기 중인 생산자 하나를 깨움. `Push()`와 동일하게 `_mutex` 잠금을 해제한 뒤(블록 스코프 종료 후) notify하여 lock-and-wake-under-lock을 피함 |
-| `StopThread()` | `_cva.notify_all()`과 함께 `_cvProducer.notify_all()`도 호출해, 대기 중이던 모든 생산자가 종료 조건(`_bStopThread`)을 확인하고 빠져나가게 함 |
-| `FlushRemainingTasks()` | 종료 플래그를 세우는 1단계에서 `_cva.notify_all()`과 함께 `_cvProducer.notify_all()`도 함께 호출해, 대기 중인 생산자가 flush 과정에 걸려 무한 대기하지 않도록 함 |
+| `AddOutstandingRequest()` | 카운터를 1 증가 (`Push()` 이전에 호출부가 직접 호출) |
+| `SubOutstandingRequest()` | 카운터를 1 감소 |
+| `GetOutstandingRequests()` | 현재 카운터 값 조회 |
 
-**동작 원리**
+### 11.6 공용 요청 생성/게시 헬퍼 — `DBAsyncPushHelper.h`
 
-1. 생산자 스레드가 `WaitPushCapacity(maxCapacity)`를 호출하면, 큐 크기가 `maxCapacity` 미만이
-   될 때까지 블로킹 대기한다 (조건이 이미 만족되면 즉시 반환).
-2. 워커가 `Pop()`으로 큐를 소비할 때마다 대기 중인 생산자 하나가 깨어나 조건을 재검사한다.
-3. 조건을 만족하면 대기를 빠져나와 `Push()`를 호출해 요청을 큐에 넣는다.
-4. 서비스 종료(`StopThread()`/`FlushRemainingTasks()`) 시에는 큐 크기와 무관하게 즉시 깨어나
-   대기 상태에서 빠져나온다 — `_bStopThread`가 조건식에 포함되어 있기 때문이다.
+§11.4의 `WaitPushCapacity()` + `Push()` 조합이나, 요청 생성 → `callIdent` 세팅 →
+`AddOutstandingRequest()` → `Push()` → 실패 시 `SubOutstandingRequest()`로 되돌리는
+패턴은 `CMySQLAsyncSrv`뿐 아니라 `COdbcAsyncSrv`/`CAdoAsyncSrv`에서도 호출부마다
+거의 동일하게 반복된다. `DBAsyncPushHelper.h`는 이 반복을 함수 템플릿 두 개로
+공용화한다.
 
-**설계 포인트**
+| 함수 | 스레드 제약 | 큐 포화 시 동작 |
+|---|---|---|
+| `PushDBAsyncRequest<TSrv, TReq>(srv, cmd, initializer, maxQueueCapacity)` | 논블로킹 — IOCP 워커/네트워크 콜백처럼 **절대 재우면 안 되는 스레드** 전용 | `srv.GetQueryQueueSize() >= maxQueueCapacity`면 대기 없이 즉시 `false` 반환 |
+| `PushDBAsyncRequestBlocking<TSrv, TReq>(srv, cmd, initializer, maxQueueCapacity)` | 블로킹 — `srv.WaitPushCapacity()`로 호출 스레드를 재움. 배치 Producer/Consumer 같은 **전용 피더/워커 스레드**에서만 사용 | 큐에 여유가 생길 때까지 대기한 뒤 진행 |
 
-- `Pop()`은 이제 `unique_lock`을 전체 함수 스코프가 아니라 블록으로 감싸, 큐 조작이 끝나는
-  즉시 락을 해제한 뒤 `_cvProducer.notify_one()`을 호출한다. 락을 쥔 채로 notify하면 깨어난
-  생산자가 곧바로 락을 잡지 못하고 다시 잠드는 컨텍스트 스위칭 낭비가 생기므로, `Push()`에서
-  이미 쓰던 것과 동일한 패턴을 `Pop()`에도 맞춘 것이다.
-- `WaitPushCapacity()` 자체는 큐에 넣는 동작(`Push()`)을 수행하지 않는다 — 순수하게 "지금
-  넣어도 되는 상태인지"를 기다리는 게이트 역할만 하며, 실제 `Push()` 호출은 별도로 해야 한다.
-- `maxCapacity`는 호출부에서 자유롭게 정할 수 있는 값이라, 상황(DB 노드별 처리량, 요청
-  긴급도 등)에 따라 다른 상한을 적용할 수 있다.
+```cpp
+// 논블로킹 — IOCP 워커/네트워크 콜백 스레드에서 호출
+bool bOk = PushDBAsyncRequest<CMySQLAsyncSrv, PRODUCER_DATA_BATCH_REQ>(
+    MEMBER_DB_ASYNC, CMD_PRODUCER_DATA_BATCH,
+    [&](PRODUCER_DATA_BATCH_REQ* pReq) { pReq->nUserID = nUserID; /* ... */ },
+    10000);
 
-### 11.5 미완료 요청 수 카운터 — `Outstanding Requests`
+// 블로킹 — 배치 Producer 전용 피더 스레드에서 호출
+bool bOk2 = PushDBAsyncRequestBlocking<CMySQLAsyncSrv, PRODUCER_DATA_BATCH_REQ>(
+    MEMBER_DB_ASYNC, CMD_PRODUCER_DATA_BATCH,
+    [&](PRODUCER_DATA_BATCH_REQ* pReq) { pReq->nUserID = nUserID; /* ... */ },
+    10000);
+```
 
-큐에 들어간 뒤 아직 최종적으로 끝나지 않은 요청이 몇 개인지를 별도의 원자 카운터로
-추적하는 기능이다. 큐 크기(`GetQueryQueueSize()`)는 "아직 워커가 꺼내가지 않은 개수"만
-보여주는 반면, 이 카운터는 "꺼내갔지만 아직 완전히 끝나지 않은 것"까지 포함해 실제로
-시스템에 떠 있는 요청 수를 나타낸다.
+공통 동작 순서(둘 다 동일, 용량 확인 방식만 다름):
+1. (블로킹 버전만) `srv.WaitPushCapacity(maxQueueCapacity)`로 대기, 또는 (논블로킹
+   버전만) `srv.GetQueryQueueSize()`가 상한 이상이면 즉시 실패 반환
+2. `std::make_unique<TReq>()`로 요청 객체를 예외 안전하게 생성하고 `callIdent`를 세팅
+3. 호출자가 넘긴 `initializer`로 나머지 필드를 채움 — `Fn&&`로 perfect-forwarding되는
+   템플릿 매개변수라, 캡처가 큰 람다를 넘겨도 `std::function`을 거칠 때 생기는 힙 할당이
+   없다
+4. `srv.AddOutstandingRequest()` 호출 후 `srv.Push()`. `Push()`가 `0`을 반환하면(서비스
+   종료 등) `srv.SubOutstandingRequest()`로 카운터를 대칭적으로 되돌리고 `false` 반환
 
-**추가된 요소**
+- 반환값이 `false`라는 것은 요청 객체가 애초에 만들어지지도, 큐에 들어가지도 않았다는
+  뜻이다. 호출부가 이 실패를 알리는 응답을 직접 처리해야 한다.
 
-| 멤버 | 설명 |
+### 11.7 멤버 변수 설명
+
+#### DB 풀 / 서비스 상태
+| 변수 | 설명 |
 |---|---|
-| `_nOutstandingRequests` (`std::atomic<int32>`) | 미완료 요청 수 카운터. 기본값 0으로 초기화 |
-| `GetOutstandingRequests() const` | 현재 값을 조회 (`memory_order_relaxed`) |
-| `AddOutstandingRequest()` | 카운터를 1 증가 (`memory_order_relaxed`) — 요청을 생성해 `Push()`하는 외부 호출부가 사용 |
-| `SubOutstandingRequest()` | 카운터를 1 감소 (`memory_order_relaxed`) — 요청이 최종적으로 끝나는 지점에서 클래스 내부(`Action()`, `FlushRemainingTasks()`)가 호출 |
+| `_bOpen` | 서비스 오픈(초기화 완료) 여부 |
+| `_bStarted` | `StartService()`가 이미 호출됐는지(중복 호출 방지) |
+| `_nMaxThreadCnt` | DB 비동기 워커 스레드 수(= 각 `CMySQLConnPool`의 풀 크기이기도 함) |
+| `_mysqlPools` | `std::vector<std::unique_ptr<CMySQLConnPool>>` — DB 노드 수만큼의 풀 집합 |
+| `_workerThreads` | `std::vector<std::thread>` — 이 인스턴스가 직접 소유하는 워커 스레드 |
 
-세 함수 모두 헤더에 인라인으로 정의되어 있고, 단순 증감 카운터라서 `memory_order_relaxed`로
-충분하다 — 다른 메모리 접근과의 순서를 보장할 필요 없이 카운트 값 자체만 정확하면 되기
-때문이다.
+#### 요청 큐 / 핸들러
+| 변수 | 설명 |
+|---|---|
+| `_queueDBAsyncRq` | `CChunkedSwapQueue<std::unique_ptr<st_DBAsyncRq>>` — 비동기 요청 큐 본체 |
+| `_mapCommand` | `std::unordered_map<uint16, std::shared_ptr<CDBAsyncSrvHandler>>` — `callIdent` → 핸들러 매핑 (`COMMAND_MAP` 타입 별칭) |
 
-**감소 시점 — "요청이 끝났다고 간주되는" 모든 경로에서 항상 호출**
+#### 동기화
+| 변수 | 설명 |
+|---|---|
+| `_mutex` | `_cva`/`_cvProducer`의 조건 검사·대기를 보호하는 뮤텍스. 큐 내부 락과는 역할이 다른 별개의 락(§11.1) |
+| `_cva` | 컨슈머(워커) 대기 조건 변수 — `Pop()`이 큐가 비었을 때 대기 |
+| `_cvProducer` | 생산자 대기 조건 변수 — `WaitPushCapacity()`가 큐가 가득 찼을 때 대기(§11.4) |
+| `_bStopThread` | `std::atomic<bool>` — 스레드 중단 플래그. `Push()` 진입 시 이 값을 검사해 종료 후 신규 삽입을 차단 |
 
-- `Action()`: 워커 루프에서 요청이 완전히 처리되든(성공/최종 실패), 애초에 핸들러를 찾지
-  못해 처리를 포기하든, 두 경로 모두 `SubOutstandingRequest()`를 호출한다. 핸들러 미등록
-  경로도 호출하도록 되어 있는데, 이 요청은 어차피 다시 처리되지 않고 버려지는 것이므로
-  "요청이 끝났다"고 봐야 카운터 정합성이 맞기 때문이다. 싱글턴 인스턴스 자신의 메서드
-  안에서 호출되는 것이므로 `CMySQLAsyncSrv::Instance()->`를 다시 거치지 않고 암묵적 `this`로
-  바로 호출한다.
-- `FlushRemainingTasks()`: 종료 시점에 메인 스레드가 남은 요청을 동기 처리하는 루프에서도,
-  핸들러를 찾아 `ProcessAsyncCall()`을 실행했는지(성공/실패 불문) 또는 핸들러를 찾지
-  못했는지와 무관하게, `pAsyncRq`가 유효한 모든 반복에서 루프 맨 끝에 `SubOutstandingRequest()`를
-  호출한다. `Action()`과 동일한 기준으로 카운터를 관리해, 정상 종료 경로든 강제 flush
-  경로든 요청이 "처리를 시도해 끝난" 시점에 항상 카운터가 감소한다.
+#### 카운터 / 모니터링
+| 변수 | 설명 |
+|---|---|
+| `_nOutstandingRequests` | `std::atomic<int32>`(기본값 0) — 아직 끝나지 않은 요청 수 |
+| `_cumulateCallCnt` | `std::atomic<uint64>`(기본값 0) — `Action()`의 지연 쿼리 경고 로그에 찍히는 누적 카운트. 인스턴스 멤버라 도메인(멤버/게임/로그)별로 독립적으로 집계된다 |
+| `_nLastWarnedQueueSize` | `int`(초기값 `INITIAL_WARN_QUEUE_SIZE`=1000) — 마지막으로 `LOG_WARNING`을 남긴 큐 크기. 큐가 `INITIAL_WARN_QUEUE_SIZE` 이하로 다시 줄어들면 초기값으로 재무장된다(§11.1a) |
+| `_bMaxWarningActive` | `bool`(초기값 false) — `MAX_WARNING_QUERY_QUEUE_SIZE` 심각 경고가 이미 발령된 상태인지. 히스테리시스 재무장 판정에 사용(§11.1a) |
+| `_lastQueueSizeWarnTime` | `std::chrono::steady_clock::time_point` — 마지막 `LOG_WARNING` 시각. `QUEUE_SIZE_WARN_COOLDOWN_MS` 쿨다운 판단에 사용 |
 
-> 이전 버전에서는 `FlushRemainingTasks()`의 이 호출이 `if( it != _mapCommand.end() )` 블록
-> **안쪽에만** 있어서, 핸들러를 찾지 못한 요청은 루프를 그냥 지나쳤다 — `Action()`의 동일
-> 분기는 호출하는데 `FlushRemainingTasks()`만 빠져 있던 비대칭이었다. if/else 바깥으로
-> 옮겨 두 함수의 동작을 통일했다.
+> 위 경고 상태 필드들은 모두 `Pop()`이 `_mutex`를 쥔 구간 안에서만 읽고 쓰이므로 `atomic`이
+> 아니어도 데이터 레이스가 없다. 관련 상수: `MAX_WARNING_QUERY_QUEUE_SIZE`(100000, 심각 경고
+> 문턱), `MAX_WARNING_RESET_QUEUE_SIZE`(90000, 히스테리시스 재무장 하한), `INITIAL_WARN_QUEUE_SIZE`
+> (1000, 초기 증가 경고 기준치)는 `private enum`으로, `QUEUE_SIZE_WARN_COOLDOWN_MS`(5000ms)는
+> `static constexpr int64`로 선언되어 있다. `COdbcAsyncSrv`에는 이 경고 시스템 자체가 없다.
 
-**카운터를 건드리지 않는 유일한 경로**
+### 11.8 멤버 함수 설명
 
-- 타임아웃으로 재큐잉되는 경로(`Ret == TIMEOUT && bReTry == false` → `Push()`로 재투입)는
-  "최종적으로 끝난" 것이 아니라 다시 큐로 돌아가는 것이므로 이 시점에는 감소시키지 않는다 —
-  재큐잉된 요청이 이후 다시 `Action()`을 통과할 때(성공하든 최종 실패하든, 또는 재큐잉
-  자체가 서비스 종료와 겹쳐 실패하든) 그때 비로소 `SubOutstandingRequest()`가 호출된다.
+#### Public — 서비스 생명주기
+| 함수 | 설명 |
+|---|---|
+| `StartService(dbNodeVec, nMaxThreadCnt=0)` | `InitMySQL()` → `StartIoThreads()` 순으로 서비스를 시작하는 단일 엔트리포인트(§11.2) |
+| `Stop()` | 워커 스레드에게 종료 신호만 보낸다 — 대기하지 않음(§11.3) |
+| `Join()` | `Stop()`으로 신호를 보낸 워커 스레드들이 실제로 전부 종료할 때까지 대기(§11.3) |
+| `InitMySQL(dbNodeVec, nMaxThreadCnt)` | DB 노드 수만큼 `CMySQLConnPool`을 생성해 각각 `Init()`. 도중 실패 시 `_mysqlPools`를 정리하고 `false` 반환 |
+| `StartIoThreads()` | `_nMaxThreadCnt`개의 워커 스레드 생성, 각각 `RunningThread()` 실행 |
+| `RunningThread()` | `_bOpen`이면 `Action()` 호출 |
+| `Action()` | 워커의 메인 루프: `Pop()` → 핸들러 조회(미등록 시 `SubOutstandingRequest()` 후 스킵) → `ProcessAsyncCall()` 실행 → 실패 시 로그 → `TIMEOUT`이고 미재시도면 지연 경고 로그 후 재큐잉(재큐잉 성공/실패 모두 로그), 그 외에는 지연 쿼리 경고 로그 후 `SubOutstandingRequest()` |
+
+#### Public — 요청 등록 / 큐 조작
+| 함수 | 설명 |
+|---|---|
+| `Regist(command, handler)` | `callIdent`별 핸들러 등록. 보통 직접 호출하지 않고 `DECLARE_DBASYNC_HANDLER_EX` 매크로가 정적 초기화 시점에 대신 호출(§11.1) |
+| `Push(pAsyncRq)` | 큐에 요청 추가. `_mutex` 보호 구간 안에서 `PushAndGetSize()`만 수행하고, 락을 해제한 뒤 `_cva.notify_one()`을 호출한다(§11.1). 반환값은 삽입 후 큐 크기, `_bStopThread`가 켜져 있으면 `0` |
+| `Pop(localQueue)` | 로컬 큐 우선 소비, 비어 있으면 `_mutex`+`_cva`로 대기 후 큐 크기 경고 로직 실행 → `SwapChunk(64)`로 일괄 인출, 락 해제 후 `_cvProducer.notify_all()`(§11.1a) |
+| `GetQueryQueueSize()` | 큐에 쌓인 요청 수 조회 |
+| `IsEmpty()` | 큐가 비어 있는지 여부 |
+| `WaitPushCapacity(maxCapacity)` | 큐 크기가 `maxCapacity` 미만이 되거나 종료 신호가 올 때까지 `_cvProducer`로 대기(§11.4 back-pressure) |
+
+#### Public — Outstanding 카운터
+| 함수 | 설명 |
+|---|---|
+| `AddOutstandingRequest()` | `_nOutstandingRequests` 1 증가. `Push()` 이전에 호출부가 직접 호출 |
+| `SubOutstandingRequest()` | `_nOutstandingRequests` 1 감소. 요청이 최종적으로 끝나는 모든 경로에서 호출(§11.5) |
+| `GetOutstandingRequests()` | 현재 카운터 값 조회 |
+
+#### Public — DB 풀 접근자
+| 함수 | 설명 |
+|---|---|
+| `GetMySQLConnPool()` | `_mysqlPools[0]` 반환. 시작 전(또는 실패 후) 호출되면 디버그 빌드에서 `assert`로 잡히고, 릴리즈 빌드에서도 `_mysqlPools.empty()`면 `nullptr`을 명시적으로 반환한다 |
+| `GetMySQLConnPool(id)` | `id % _mysqlPools.size()`로 균등 모듈로 샤딩해 담당 풀을 반환. 풀이 1개뿐이면 그 하나만 반환 |
+
+#### Private — 내부 정리 로직
+| 함수 | 설명 |
+|---|---|
+| `FlushRemainingTasks()` | 종료 시(`Join()` 이후) 남은 요청을 호출부 스레드에서 동기적으로 직접 처리(§11.3a) |
+| `ClearMySQLConnPools()` | `_mysqlPools.clear()` — 각 풀은 `unique_ptr`이라 자동 해제됨 |
+
+### 11.9 사용법
+
+```cpp
+// 1. 핸들러 등록 — 정적 초기화 시점에 자동으로 Regist()가 호출된다(§11.1, DBAsyncHandler.h)
+//    실제 쿼리 실행은 이 ProcessAsyncCall 본문 안에서, GetMySQLConnPool()로 얻은 풀을
+//    MySQLConnGuard로 감싸 수행한다 — Action()의 워커 스레드가 이 코드를 실행하는
+//    바로 그 지점이므로, 블로킹 쿼리를 호출해도 IOCP 워커나 게임 로직 스레드를 막지 않는다.
+DECLARE_DBASYNC_HANDLER_EX(MEMBER_DB_ASYNC, CMD_PRODUCER_DATA_BATCH)
+{
+    PRODUCER_DATA_BATCH_REQ* pReq = static_cast<PRODUCER_DATA_BATCH_REQ*>(pStAsync);
+
+    MySQLConnGuard guard(MEMBER_DB_ASYNC.GetMySQLConnPool(pReq->nUserID));
+    if( guard == nullptr )
+        return EDBReturnType::TIMEOUT; // 재연결 대기 중 등 — bReTry 경로로 재시도(§11)
+
+    if( !guard->ExecuteQuery("SELECT ...") )
+        return EDBReturnType::TIMEOUT;
+
+    return EDBReturnType::OK;
+}
+
+// 2. 서비스 시작 (보통 CDbServiceManager 생성 이후 서버 초기화 루틴에서 한 번 호출, §12)
+CVector<CDBNode> dbNodeVec = { /* 이 도메인의 DB 노드(샤드/복제본) 목록 */ };
+MEMBER_DB_ASYNC.StartService(dbNodeVec, /*nMaxThreadCnt=*/8);
+
+// 3. 요청 게시 — 직접 Push()를 조립하기보다 §11.6의 헬퍼 사용을 권장.
+//    이 호출은 IOCP 워커나 게임 로직 스레드 등 "쿼리를 요청하고 싶은 쪽"에서 하며,
+//    실제 쿼리(위 1번 핸들러 본문)는 별도의 DB 비동기 워커 스레드에서 나중에 실행된다.
+bool bOk = PushDBAsyncRequest<CMySQLAsyncSrv, PRODUCER_DATA_BATCH_REQ>(
+    MEMBER_DB_ASYNC, CMD_PRODUCER_DATA_BATCH,
+    [&](PRODUCER_DATA_BATCH_REQ* pReq) { pReq->nUserID = nUserID; },
+    10000);
+if( !bOk )
+{
+    // 큐 포화 또는 서비스 종료 중 — 호출부가 실패 응답을 직접 처리
+}
+
+// 4. 서비스 종료 (보통 CDbServiceManager::ShutdownAll()을 통해 일괄 수행, §12)
+CDbServiceManager::Instance().ShutdownAll();
+```
+
+- 즉 이 서비스는 "요청 게시(3번, 호출 스레드)"와 "실제 쿼리 실행(1번 핸들러 본문, DB
+  비동기 워커 스레드)"이 서로 다른 스레드에서 시차를 두고 일어나는 구조다.
+  `GetMySQLConnPool()`/`MySQLConnGuard`로 커넥션을 빌려 블로킹 쿼리를 실행하는 코드는
+  항상 후자, 즉 핸들러 본문 안에 있어야 한다.
+- DB 비동기 워커 스레드 수(`nMaxThreadCnt`)와 각 `CMySQLConnPool`의 크기는 `InitMySQL()`이
+  자동으로 동일하게 맞춘다(§11.1) — 이 값을 너무 작게 잡으면 `PopFreeSlotIndex()` 실패(-1)가
+  늘어난다는 점은 §9와 동일하다.
+- `Stop()`을 명시적으로 호출하지 않아도, `~CMySQLAsyncSrv()`가 실행되면 그 안에서
+  `Stop()` → `Join()` → `FlushRemainingTasks()`가 순서대로 실행되어 요청 유실 없이
+  종료된다(§11.3).
+
+## 12. 도메인별 서비스 관리 — `CDbServiceManager`
+
+`DbServiceManager.h`는 멤버/게임/로그 등 도메인별 DB 비동기 서비스 인스턴스를 소유하고 이름
+있는 접근자로 노출하는 프로세스 전역 매니저다. 백엔드(Odbc/Ado/MySQL)는 빌드 구성에 따라
+달라질 수 있는데, `MemberDB()`가 `CMySQLAsyncSrv&`를 반환하는 구성에서는 이 절의
+`CMySQLAsyncSrv`가 곧 `MEMBER_DB_ASYNC`가 가리키는 실체다.
+
+- `CDbServiceManager::Instance()`는 함수-지역 `static CDbServiceManager instance;`로
+  구현된 Meyer's singleton이다 — 최초 호출 시점에 생성되므로, `DECLARE_DBASYNC_HANDLER_EX`
+  매크로의 정적 멤버 초기화식처럼 다른 전역 객체의 정적 초기화 도중 이 함수가 호출돼도
+  정적 초기화 순서 문제(SIOF)에서 자유롭다.
+- 생성자에서 `_memberDB = std::make_unique<CMySQLAsyncSrv>()`로 인스턴스만 만들 뿐,
+  `StartService()`는 자동으로 호출하지 않는다 — 실제 DB 접속/워커 스레드 기동은 호출부가
+  `MEMBER_DB_ASYNC.StartService(...)`(§11.9의 2번)를 명시적으로 호출해야 한다.
+- `MemberDB()`는 `*_memberDB`를 반환한다. 매크로 `MEMBER_DB_ASYNC`는
+  `CDbServiceManager::Instance().MemberDB()`의 축약형이며, 이 헤더가 include된 모든
+  번역 단위에 이름이 그대로 노출된다.
+- `ShutdownAll()`은 등록된 모든 도메인 서비스를 한 번에 종료한다. `_memberDB->Stop()` →
+  `_memberDB->Join()` → `_memberDB.reset()` 순으로 처리하며, `_memberDB`가 이미
+  `nullptr`이면(두 번째 호출 등) 아무 일도 하지 않고 조용히 반환해 멱등하게 동작한다.
+- 도메인이 늘어나면(예: 게임 DB, 로그 DB) `_gameDB`/`_logDB` 같은 멤버와 `GameDB()`/
+  `LogDB()` 접근자, `GAME_DB_ASYNC`/`LOG_DB_ASYNC` 매크로를 같은 패턴으로 추가하면 된다.

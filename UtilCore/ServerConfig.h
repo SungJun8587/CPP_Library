@@ -52,28 +52,40 @@ public:
 	uint16& GetServerPort(void) { return _nServerPort; }
 
 	//***************************************************************************
+	// @brief 최대 동시 접속 사용자 수를 반환합니다.
+	// @return 최대 동시 접속 사용자 수
+	//***************************************************************************
+	int32 GetMaxSessionCount(void) { return _nMaxSessionCount; }
+
+	//***************************************************************************
+	// @brief 워커 스레드 수를 반환합니다.
+	// @return 워커 스레드 수
+	//***************************************************************************
+	int32 GetWorkerThreadCnt(void) { return _nWorkerThreadCnt; }
+
+	//***************************************************************************
 	// @brief Redis 연결 풀 크기를 반환합니다.
 	// @return Redis 연결 풀 크기
 	//***************************************************************************
-	int32							GetRedisPoolSize(void) { return _nRedisPoolSize; }
+	int32 GetRedisPoolSize(void) { return _nRedisPoolSize; }
 
 	//***************************************************************************
 	// @brief DB 워커 스레드 개수를 반환합니다.
 	// @return DB 워커 스레드 수
 	//***************************************************************************
-	int32							GetDbWorkerThreadCnt(void) { return _nDbWorkerThreadCnt; }
+	int32 GetDbWorkerThreadCnt(void) { return _nDbWorkerThreadCnt; }
 
 	//***************************************************************************
 	// @brief 서버 하트비트 TTL(초)을 반환합니다.
 	// @return 하트비트 TTL(초)
 	//***************************************************************************
-	int32							GetHeartbeatTtlSec(void) { return _nHeartbeatTtlSec; }
+	int32 GetHeartbeatTtlSec(void) { return _nHeartbeatTtlSec; }
 
 	//***************************************************************************
 	// @brief 서버 하트비트 갱신 주기(초)를 반환합니다.
 	// @return 하트비트 갱신 주기(초)
 	//***************************************************************************
-	int32							GetHeartbeatIntervalSec(void) { return _nHeartbeatIntervalSec; }
+	int32 GetHeartbeatIntervalSec(void) { return _nHeartbeatIntervalSec; }
 
 	//***************************************************************************
 	// @brief 서버 노드 목록의 참조를 반환합니다.
@@ -130,7 +142,8 @@ public:
 		value.AddMember(_T("IP"), _tValue(_tszIP, allocator), allocator);
 		value.AddMember(_T("Port"), _nServerPort, allocator);
 		value.AddMember(_T("KeepAliveSec"), _nKeepAliveSec, allocator);
-		value.AddMember(_T("MaxUser"), _nMaxUser, allocator);
+		value.AddMember(_T("MaxSessionCount"), _nMaxSessionCount, allocator);
+		value.AddMember(_T("WorkerThreadCnt"), _nWorkerThreadCnt, allocator);
 		value.AddMember(_T("RedisPoolSize"), _nRedisPoolSize, allocator);
 		value.AddMember(_T("DbWorkerThreadCnt"), _nDbWorkerThreadCnt, allocator);
 		value.AddMember(_T("HeartbeatTtlSec"), _nHeartbeatTtlSec, allocator);
@@ -149,7 +162,8 @@ public:
 		_tcsncpy_s(_tszIP, _countof(_tszIP), value[_T("IP")].GetString(), _TRUNCATE);
 		_nServerPort = value[_T("Port")].GetInt();
 		_nKeepAliveSec = value[_T("KeepAliveSec")].GetInt();
-		_nMaxUser = value[_T("MaxUser")].GetInt();
+		_nMaxSessionCount = value[_T("MaxSessionCount")].GetInt();
+		_nWorkerThreadCnt = value[_T("WorkerThreadCnt")].GetInt();
 		_nRedisPoolSize = value[_T("RedisPoolSize")].GetInt();
 		_nDbWorkerThreadCnt = value[_T("DbWorkerThreadCnt")].GetInt();
 		_nHeartbeatTtlSec = value[_T("HeartbeatTtlSec")].GetInt();
@@ -168,7 +182,8 @@ private:
 	uint16						_nServerPort;                     // 서버 포트 번호
 
 	int32						_nKeepAliveSec;                   // KeepAlive 주기(초)
-	int32						_nMaxUser;                        // 최대 동시 접속 사용자 수
+	int32						_nMaxSessionCount;                // 최대 동시 접속 사용자 수
+	int32						_nWorkerThreadCnt;				  // 워커 스레드 수
 
 	int32						_nRedisPoolSize;                  // Redis 커넥션 풀 크기
 	int32						_nDbWorkerThreadCnt;              // DB 처리 워커 스레드 수

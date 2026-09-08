@@ -196,6 +196,19 @@ private:
 	bool						_bStarted{ false };					// StartService()가 이미 호출됐는지(중복 호출 방지)
 	std::atomic<int32>			_nOutstandingRequests{ 0 };			// 처리 중 요청 수
 
+	// [수정 — 인스턴스별 분리] 이전에는 Action() 함수 안의 지역 static
+	// 변수였다. 이 클래스가 싱글턴이던 시절에는 프로세스에 인스턴스가
+	// 하나뿐이라 문제가 없었지만, 지금은 CDbServiceManager가 멤버/게임/
+	// 로그 등 여러 도메인 인스턴스를 동시에 소유하고 각자 자기 Action()을
+	// 자기 워커 스레드에서 돌린다. 함수 지역 static은 "함수 하나당 하나"인
+	// 전역 저장소이므로, 서로 다른 도메인 인스턴스들이 이 카운터를 전부
+	// 공유하게 되어 지연 쿼리 로그의 cumulateCallCnt 값이 도메인 구분 없이
+	// 뒤섞인다(크래시나 데이터 레이스는 아니다 — atomic이라 증가 자체는
+	// 안전하지만, "이 도메인에서 몇 번째 지연 쿼리인지"라는 진단 정보로서의
+	// 의미가 깨진다). 인스턴스 멤버로 옮겨 도메인별로 독립적으로 집계되게
+	// 한다.
+	std::atomic<uint64>			_cumulateCallCnt{ 0 };				// 지연 쿼리 누적 카운트(도메인별 진단용)
+
 	std::mutex					_mutex;								// 동기화용 뮤텍스
 	std::condition_variable		_cva;								// 소비자 대기 조건 변수
 	std::condition_variable		_cvProducer;						// 생산자 대기 조건 변수

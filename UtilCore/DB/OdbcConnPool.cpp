@@ -24,7 +24,6 @@ COdbcConnPool::COdbcConnPool(int32 nMaxPoolSize)
 	, _nBackoffJitterMs(250)
 	, _bStopHealthCheck(false)
 	, _nHealthCheckIntervalMs(500)
-	, _nNextSlotHint(0)
 	, _bStopReconnectWorkers(false)
 	, _nCurrentWorkerCount(0)
 	, _nDesiredWorkerCount(0)
@@ -35,6 +34,7 @@ COdbcConnPool::COdbcConnPool(int32 nMaxPoolSize)
 
 	_pReconnecting = std::make_unique<CachePaddedAtomic<bool>[]>(_nMaxPoolSize);
 	_pRetryFailCount = std::make_unique<CachePaddedAtomic<int32>[]>(_nMaxPoolSize);
+	_pInFreeSlotQueue = std::make_unique<CachePaddedAtomic<bool>[]>(_nMaxPoolSize);
 
 	for( int32 i = 0; i < _nMaxPoolSize; i++ )
 	{
@@ -42,6 +42,7 @@ COdbcConnPool::COdbcConnPool(int32 nMaxPoolSize)
 		_pRefCount[i].value.store(0, std::memory_order_relaxed);
 		_pReconnecting[i].value.store(false, std::memory_order_relaxed);
 		_pRetryFailCount[i].value.store(0, std::memory_order_relaxed);
+		_pInFreeSlotQueue[i].value.store(false, std::memory_order_relaxed);
 	}
 	memset(&_tszDSN[0], 0, sizeof(_tszDSN));
 }
@@ -120,6 +121,10 @@ bool COdbcConnPool::Init(const EDBClass dbClass, const TCHAR* ptszDSN,
 		}
 
 		_pOdbcConns[i].value.store(pConn, std::memory_order_release);
+
+		// [수정 — 프리 큐] 초기 연결에 성공한 슬롯을 즉시 프리 큐에 넣어둔다.
+		// PopFreeSlotIndex()는 이제 이 큐만 보고 O(1)에 가깝게 슬롯을 찾는다.
+		EnqueueFreeSlot(i);
 	}
 
 	StartDelayedTaskThread();
@@ -190,33 +195,89 @@ CBaseODBC* COdbcConnPool::GetPooledConnUnsafe(int32 nType) const
 
 //***************************************************************************
 // @brief 사용이 끝난 커넥션 슬롯의 참조 카운트를 감소시킵니다.
+// @details [수정 — use-after-free 방지] 연결 상태 확인(IsConnected())을
+// 반드시 참조 카운트를 감소시키기 "전에" 수행한다. 아직 내 참조가
+// 남아있는 동안은(fetch_sub 이전) ApplyReconnectedConn()의 진입 게이트가
+// refcount>0을 보고 이 슬롯을 건드리지 않으므로 커넥션 객체가 안전하게
+// 보장된다. 반대로 감소를 먼저 하고 나서 커넥션을 들여다보면, 그
+// 감소로 참조가 정확히 0이 되는 순간 다른 스레드(ApplyReconnectedConn의
+// 대기 루프)가 곧바로 xdelete()할 수 있어 그 틈에 접근하면
+// use-after-free가 된다.
 // @param nType 반환할 커넥션 슬롯 인덱스 번호
 //***************************************************************************
 void COdbcConnPool::ReleaseOdbcConn(int32 nType)
 {
 	if( !IsValidIndex(nType) ) return;
-	_pRefCount[nType].value.fetch_sub(1, std::memory_order_release);
+
+	CBaseODBC* pConn = _pOdbcConns[nType].value.load(std::memory_order_acquire);
+	bool bStillConnected = (pConn != nullptr && pConn->IsConnected());
+
+	int32 prev = _pRefCount[nType].value.fetch_sub(1, std::memory_order_release);
+	if( prev != 1 ) return; // 아직 다른 참조가 남아 있음 — 프리 큐에 넣지 않는다
+
+	if( bStillConnected )
+		EnqueueFreeSlot(nType);
+}
+
+//***************************************************************************
+// @brief 슬롯을 프리 큐에 등록합니다(중복 삽입 방지 포함).
+// @param nType 등록할 슬롯 인덱스
+//***************************************************************************
+void COdbcConnPool::EnqueueFreeSlot(int32 nType)
+{
+	bool expected = false;
+	if( !_pInFreeSlotQueue[nType].value.compare_exchange_strong(expected, true, std::memory_order_acq_rel) )
+		return; // 이미 큐에 들어가 있음 — 중복 삽입 방지
+
+	std::lock_guard<std::mutex> lock(_freeSlotMutex);
+	_freeSlotQueue.push(nType);
 }
 
 //***************************************************************************
 // @brief 빈 슬롯을 탐색하고 즉시 선점합니다.
+// @details [수정 — O(n) 스캔 제거] 예전에는 라운드로빈으로 풀 전체를
+// 스캔했다(최악의 경우 O(n)). 이제는 "비어 있고 연결된 것으로 확인된"
+// 슬롯 인덱스만 담긴 _freeSlotQueue에서 후보를 하나씩 꺼내 검증한다.
+// 큐에는 원칙적으로 참조 카운트 0인 슬롯만 들어오므로 CAS는 거의 항상
+// 성공하지만, 큐에 있는 동안 연결이 끊긴 경우(재연결 워커가 아직 갱신
+// 전)나 GetOdbcConn(명시적 인덱스)로 직접 선점된 경우처럼 CAS가 실패할
+// 수 있는 경우에는 그 후보를 버리고 다음 후보로 넘어간다 — 재귀 대신
+// 루프로 처리해 스택 오버플로 위험이 없다. 큐가 비어 있으면 즉시 -1을
+// 반환한다(예전과 동일한 실패 시맨틱).
 // @return 선점 성공한 슬롯 인덱스 번호, 실패 시 -1
 //***************************************************************************
 int32 COdbcConnPool::PopFreeSlotIndex(void) {
-	uint32 nStart = _nNextSlotHint.fetch_add(1, std::memory_order_relaxed);
+	for( ;; ) {
+		int32 candidate = -1;
+		{
+			std::lock_guard<std::mutex> lock(_freeSlotMutex);
+			if( _freeSlotQueue.empty() )
+				return -1;
+			candidate = _freeSlotQueue.front();
+			_freeSlotQueue.pop();
+		}
 
-	for( int32 k = 0; k < _nMaxPoolSize; ++k ) {
-		int32 i = static_cast<int32>((nStart + k) % _nMaxPoolSize);
+		// [수정] 큐에서 빠져나온 즉시 "큐에 있음" 플래그를 내린다 — 이
+		// 후보를 최종적으로 못 쓰게 되더라도(아래에서 버려지더라도),
+		// 이후 EnqueueFreeSlot()가 이 슬롯을 다시 정상적으로 큐에
+		// 넣을 수 있어야 하기 때문이다.
+		_pInFreeSlotQueue[candidate].value.store(false, std::memory_order_release);
 
 		int32 expected = 0;
-		if( _pRefCount[i].value.compare_exchange_strong(expected, 1, std::memory_order_acq_rel) ) {
-			CBaseODBC* pConn = _pOdbcConns[i].value.load(std::memory_order_acquire);
-			if( pConn && pConn->IsConnected() ) return i;
-
-			_pRefCount[i].value.store(0, std::memory_order_release);
+		if( !_pRefCount[candidate].value.compare_exchange_strong(expected, 1, std::memory_order_acq_rel) ) {
+			// GetOdbcConn(명시적 인덱스)이 큐를 거치지 않고 먼저 선점했을
+			// 수 있다 — 정상적인 레이스이므로 이 후보는 버리고 다음
+			// 후보를 시도한다.
+			continue;
 		}
+
+		CBaseODBC* pConn = _pOdbcConns[candidate].value.load(std::memory_order_acquire);
+		if( pConn && pConn->IsConnected() ) return candidate;
+
+		// 큐에 있는 동안 연결이 끊겼다 — 선점을 되돌리고 다음 후보를 시도한다.
+		// 이 슬롯은 헬스체크가 알아서 감지해 재연결 큐로 옮긴다.
+		_pRefCount[candidate].value.store(0, std::memory_order_release);
 	}
-	return -1;
 }
 
 //***************************************************************************
@@ -239,7 +300,14 @@ void COdbcConnPool::ApplyReconnectedConn(int32 nType, CBaseODBC* pNewConn)
 		_pOdbcConns[nType].value.store(pNewConn, std::memory_order_release);
 	}
 
-	if( pOldConn == nullptr ) return;
+	if( pOldConn == nullptr )
+	{
+		// [수정 — 프리 큐] 최초 슬롯 생성 이후 첫 재연결처럼 이전 커넥션이
+		// 없던 경우도, 스왑이 끝난 지금 이 슬롯은 참조 0(함수 진입 시
+		// 이미 확인됨) & 연결됨 상태이므로 프리 큐에 등록해야 한다.
+		EnqueueFreeSlot(nType);
+		return;
+	}
 
 	auto startTime = std::chrono::steady_clock::now();
 	bool bTimeout = false;
@@ -271,13 +339,25 @@ void COdbcConnPool::ApplyReconnectedConn(int32 nType, CBaseODBC* pNewConn)
 	{
 		LOG_ERROR(_T("ReconnectWorker: Slot(%d) refcount high during swap. Moving to quarantine."), nType);
 
+		// [수정] enqueueTime/lastLogTime 모두 격리 시작 시각(now)으로
+		// 초기화한다 — enqueueTime은 이후 절대 갱신되지 않고 강제 정리
+		// 타임아웃 판단에만 쓰인다(OdbcConnPool.h TQuarantineItem 참고).
+		// [주의 — 프리 큐] 이 시점엔 refcount가 아직 0으로 안 떨어졌으므로
+		// (그래서 타임아웃난 것) 이 슬롯을 프리 큐에 넣지 않는다 — 나중에
+		// 그 참조가 실제로 ReleaseOdbcConn()을 호출해 0이 되는 순간, 그
+		// 함수가 알아서 프리 큐에 등록해 준다.
 		auto now = std::chrono::steady_clock::now();
 		PLockGuard qGuard(_globalQuarantineLock);
-		_quarantineQueue.push({ pOldConn, &_pRefCount[nType].value, now });
+		_quarantineQueue.push({ pOldConn, &_pRefCount[nType].value, now, now });
 	}
 	else
 	{
 		xdelete(pOldConn);
+
+		// [수정 — 프리 큐] 대기 루프가 정상 종료됐다는 것은 이 시점에
+		// refcount가 확실히 0이라는 뜻 — 이제 이 슬롯은 새 커넥션으로
+		// 완전히 사용 가능한 상태이므로 프리 큐에 등록한다.
+		EnqueueFreeSlot(nType);
 	}
 }
 
@@ -359,8 +439,16 @@ void COdbcConnPool::HealthCheckLoop(void)
 				_quarantineQueue.pop();
 
 				auto now = std::chrono::steady_clock::now();
+
+				// [수정 — 강제 정리 타임아웃 버그] 전체 격리 경과 시간은
+				// enqueueTime(최초 격리 시각, 절대 갱신되지 않음) 기준으로
+				// 계산한다. 예전에는 lastLogTime을 여기와 아래 경고
+				// 쿨다운 판단 양쪽에 같이 썼는데, 경고를 남길 때마다
+				// lastLogTime이 now로 리셋되면서 이 경과 시간도 함께
+				// 리셋되어 FORCE_CLEANUP_TIMEOUT_MS(10분) 조건에 절대
+				// 도달하지 못하는 버그가 있었다.
 				auto elapsedTotal = std::chrono::duration_cast<std::chrono::milliseconds>(
-					now - item.lastLogTime).count(); // 최초 혹은 갱신 시각 기준 경과
+					now - item.enqueueTime).count();
 
 				// 참조 카운트가 0이 되었거나, 허용 체류 시간을 초과한 경우 강제 회수
 				if( item.pRefCount->load(std::memory_order_acquire) == 0 || elapsedTotal >= FORCE_CLEANUP_TIMEOUT_MS )
@@ -382,7 +470,9 @@ void COdbcConnPool::HealthCheckLoop(void)
 					if( elapsedFromLastLog >= LOG_ALERT_INTERVAL_MS )
 					{
 						LOG_ERROR(_T("Quarantine Persistent Warning: Connection is still stuck in quarantine! Potential leak in application logic."));
-						item.lastLogTime = now; // 주의: lastLogTime 갱신 시점 조율 필요할 수 있음
+						// [수정] lastLogTime만 갱신한다 — enqueueTime은 절대
+						// 건드리지 않아야 강제 정리 타임아웃이 정상 동작한다.
+						item.lastLogTime = now;
 					}
 
 					_quarantineQueue.push(item);
@@ -660,6 +750,24 @@ COdbcConnPool::TReconnectConfig COdbcConnPool::GetReconnectConfig(void) const
 //***************************************************************************
 void COdbcConnPool::Clear(void)
 {
+	// [수정 — 프리 큐] 아래에서 각 슬롯의 커넥션을 실제로 삭제/격리하기
+	// 전에 프리 큐부터 비워둔다 — 그러지 않으면 재Init() 이후 새로 채워질
+	// 프리 큐가 이번 Clear() 이전 슬롯 상태를 가리키는 오래된 인덱스와
+	// 뒤섞일 수 있다(PopFreeSlotIndex()의 CAS/IsConnected() 방어 덕에
+	// 즉시 크래시로 이어지진 않지만, 굳이 남겨둘 이유도 없다). 큐를 비운
+	// 뒤에는 _pInFreeSlotQueue 플래그도 전부 false로 되돌려야 한다 —
+	// 그러지 않으면 "큐에 있다"는 플래그만 true로 남아, 재Init() 이후
+	// EnqueueFreeSlot()이 그 슬롯을 다시는 큐에 넣지 못하게 된다.
+	{
+		std::lock_guard<std::mutex> lock(_freeSlotMutex);
+		while( !_freeSlotQueue.empty() )
+			_freeSlotQueue.pop();
+	}
+	for( int32 i = 0; i < _nMaxPoolSize; i++ )
+	{
+		_pInFreeSlotQueue[i].value.store(false, std::memory_order_relaxed);
+	}
+
 	auto now = std::chrono::steady_clock::now();
 	CVector<CBaseODBC*> vShutdownDeletes;
 
@@ -697,8 +805,10 @@ void COdbcConnPool::Clear(void)
 		{
 			LOG_ERROR(_T("Clear: Slot(%d) refcount is zombie (%d). Moving to quarantine."), i, _pRefCount[i].value.load());
 
+			// [수정] ApplyReconnectedConn()과 동일하게 enqueueTime/
+			// lastLogTime을 모두 now로 초기화한다.
 			PLockGuard qGuard(_globalQuarantineLock);
-			_quarantineQueue.push({ pConn, &_pRefCount[i].value, now });
+			_quarantineQueue.push({ pConn, &_pRefCount[i].value, now, now });
 		}
 		else
 		{

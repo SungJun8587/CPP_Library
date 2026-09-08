@@ -283,19 +283,41 @@ void CAdoAsyncSrv::Action()
 		COMMAND_MAP::iterator it = _mapCommand.find(pAsyncRq->callIdent);
 		if( _mapCommand.end() == it )
 		{
-			// [3번 수정] 핸들러 미등록으로 이 요청을 더 이상 처리하지 않고 버리는 경로이므로,
-			// Push() 이전에 호출부가 걸어둔 AddOutstandingRequest()와 짝을 맞춰 감소시켜야 한다.
+			// [수정 — 관측성 누락] COdbcAsyncSrv/CMySQLAsyncSrv와 달리 이
+			// 분기에 로그가 전혀 없었다 — callIdent 매핑 설정 실수를 조용히
+			// 삼켜서 진단이 어려웠다. 카운터 정합성 처리(SubOutstandingRequest)는
+			// 이미 돼 있었으므로 로그만 추가한다.
+			LOG_ERROR(_T("Error not found Async Call... callIdent: [%u]"), pAsyncRq->callIdent);
 			SubOutstandingRequest();
 			continue;
 		}
 
 		std::shared_ptr<CDBAsyncSrvHandler> command = it->second;
+
+		// [이식 — 지연 쿼리 진단] COdbcAsyncSrv/CMySQLAsyncSrv와 동일하게
+		// 처리 시간을 측정한다. 이전에는 이 측정 자체가 없어, 쿼리가 실패
+		// 없이 그저 느리기만 한 경우 로그에 아무 흔적도 남지 않았다.
+		uint64 startTick = _GetTickCount();
+
 		EDBReturnType Ret = command->ProcessAsyncCall(pAsyncRq.get());
 
 		if( Ret != EDBReturnType::OK )
 		{
+			// [수정 — 관측성 누락] 이전에는 TIMEOUT 첫 재시도 경로 이외의
+			// 실패(다른 에러코드, 또는 이미 한 번 재시도한 TIMEOUT)가
+			// 아무 로그 없이 카운터만 감소하고 조용히 사라졌다 — 장애
+			// 진단 시 정보 손실이 컸다. COdbcAsyncSrv와 동일하게 실패를
+			// 항상 남긴다.
+			LOG_ERROR(_T("Failed Async ADO Call... callIdent: [%u]"), pAsyncRq->callIdent);
+
 			if( Ret == EDBReturnType::TIMEOUT && pAsyncRq->bReTry == false )
 			{
+				uint64 endTick = _GetTickCount();
+				if( 300 <= endTick - startTick )
+					LOG_WARNING(_T("Delay Query %llums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"),
+						endTick - startTick, _cumulateCallCnt.fetch_add(1, std::memory_order_relaxed), static_cast<int>(Ret), pAsyncRq->callIdent);
+
+				uint16 logIdent = pAsyncRq->callIdent;
 				pAsyncRq->bReTry = true;
 				int nSize = Push(std::move(pAsyncRq));
 				if( nSize == 0 )
@@ -305,12 +327,29 @@ void CAdoAsyncSrv::Action()
 					// 아니다. 이전 버전은 이 분기에서 SubOutstandingRequest()
 					// 호출이 누락돼 있었다(성공 시엔 유지가 맞고, 실패
 					// 시에만 감소해야 하는데 그 분기 자체가 비어있었음).
-					LOG_ERROR(_T("Failed to retry ADO query because service is stopping..."));
+					LOG_ERROR(_T("Failed to retry ADO query because service is stopping... callIdent: [%u]"), logIdent);
 					SubOutstandingRequest();
+				}
+				else
+				{
+					// [수정 — 관측성 누락] 재큐잉 성공 여부도 남는 게 없었다.
+					LOG_ERROR(_T("Query timeout ReTry (ADO)... callIdent: [%u], queuesize[%d]"), logIdent, nSize);
 				}
 				continue;
 			}
 		}
+
+#if defined(_DEBUG)
+		uint64 endTick = _GetTickCount();
+		if( 300 <= endTick - startTick )
+			LOG_WARNING(_T("Delay Query %llums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"),
+				endTick - startTick, _cumulateCallCnt.fetch_add(1, std::memory_order_relaxed), static_cast<int>(Ret), pAsyncRq->callIdent);
+#else
+		uint64 endTick = _GetTickCount();
+		if( 1000 <= endTick - startTick )
+			LOG_WARNING(_T("Delay Query %llums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"),
+				endTick - startTick, _cumulateCallCnt.fetch_add(1, std::memory_order_relaxed), static_cast<int>(Ret), pAsyncRq->callIdent);
+#endif
 
 		SubOutstandingRequest();
 	}
@@ -327,12 +366,23 @@ void CAdoAsyncSrv::Action()
 //***************************************************************************
 int CAdoAsyncSrv::Push(std::unique_ptr<st_DBAsyncRq> pAsyncRq)
 {
-	std::lock_guard<std::mutex> lockGuard(_mutex);
+	// [수정 — notify는 락 해제 후에] 이전에는 lock_guard가 함수 끝까지
+	// 스코프를 유지한 채로 그 안에서 notify_one()을 호출했다 — 깨어난
+	// 소비자 스레드가 곧바로 같은 락을 다시 잡으려다 막혀 불필요한
+	// 컨텍스트 스위치가 생길 수 있었다(COdbcAsyncSrv::Push()는 이미 이
+	// 이유로 락 해제 후 notify 패턴을 쓰고 있었는데 이쪽만 누락돼 있었다).
+	// "Stop() 이후 어떤 Push()도 성공하지 않는다"는 계약은 _bStopThread
+	// 체크/세팅을 같은 _mutex로 직렬화하는 데서 나오는 것이지 notify
+	// 위치와는 무관하므로, 잠금 스코프만 좁혀도 안전하다.
+	int queueSize = 0;
+	{
+		std::lock_guard<std::mutex> lockGuard(_mutex);
 
-	if( _bStopThread.load() )
-		return 0;
+		if( _bStopThread.load() )
+			return 0;
 
-	const int queueSize = static_cast<int>(_queueDBAsyncRq.PushAndGetSize(std::move(pAsyncRq)));
+		queueSize = static_cast<int>(_queueDBAsyncRq.PushAndGetSize(std::move(pAsyncRq)));
+	}
 	_cva.notify_one();
 
 	return queueSize;
@@ -353,7 +403,7 @@ std::unique_ptr<st_DBAsyncRq> CAdoAsyncSrv::Pop(CQueue<std::unique_ptr<st_DBAsyn
 	{
 		std::unique_lock<std::mutex> lockGuard(_mutex);
 
-		_cva.wait(lockGuard, [this, &localQueue]() {
+		_cva.wait(lockGuard, [this]() {
 			return !_queueDBAsyncRq.IsEmpty() || _bStopThread.load();
 			});
 
@@ -378,6 +428,19 @@ std::unique_ptr<st_DBAsyncRq> CAdoAsyncSrv::Pop(CQueue<std::unique_ptr<st_DBAsyn
 			_bMaxWarningActive = false; // 히스테리시스 하한 아래로 내려왔으므로 재무장
 		}
 
+		// [수정 — 재무장 누락] _nLastWarnedQueueSize는 새 최댓값을 찍을
+		// 때만 갱신되고 큐가 줄어들어도 절대 내려오지 않는 래칫이었다.
+		// 그래서 서비스 초반에 한 번 크게 스파이크가 나면, 이후 큐가
+		// 완전히 비었다가 다시 그보다 낮은(그래도 심각한) 수준까지
+		// 쌓이는 상황에서 경고가 한 번도 안 찍히는 문제가 있었다.
+		// _bMaxWarningActive와 동일한 히스테리시스 취지로, 큐가
+		// INITIAL_WARN_QUEUE_SIZE 이하까지 실제로 비면 기준치를 초기값으로
+		// 되돌려 다음 스파이크부터 다시 "새 최댓값"으로 인식되게 한다.
+		if( currentCount <= INITIAL_WARN_QUEUE_SIZE && _nLastWarnedQueueSize > INITIAL_WARN_QUEUE_SIZE )
+		{
+			_nLastWarnedQueueSize = INITIAL_WARN_QUEUE_SIZE;
+		}
+
 		if( currentCount > _nLastWarnedQueueSize )
 		{
 			auto now = std::chrono::steady_clock::now();
@@ -396,7 +459,12 @@ std::unique_ptr<st_DBAsyncRq> CAdoAsyncSrv::Pop(CQueue<std::unique_ptr<st_DBAsyn
 		_queueDBAsyncRq.SwapChunk(localQueue, 64);
 	}
 
-	_cvProducer.notify_one();
+	// [수정 — under-wake 방지] COdbcAsyncSrv::Pop()과 동일한 이유로
+	// notify_one() 대신 notify_all()을 쓴다 — SwapChunk()로 한 번에
+	// 최대 64개 분량의 여유가 생겨도 notify_one()은 WaitPushCapacity()에서
+	// 대기 중인 프로듀서 중 하나만 깨웠다. 각 프로듀서가 자기 predicate로
+	// 재검증하므로 notify_all()로 바꿔도 정확성 문제는 없다.
+	_cvProducer.notify_all();
 
 	if( localQueue.empty() )
 		return nullptr;

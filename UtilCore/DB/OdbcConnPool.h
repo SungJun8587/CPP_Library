@@ -31,7 +31,17 @@ private:
 	{
 		CBaseODBC* pConn;                  // 격리 대상 커넥션 포인터
 		std::atomic<int32>* pRefCount;     // 감시할 슬롯의 참조 카운트 주소
-		std::chrono::steady_clock::time_point lastLogTime; // 과도한 체류 경고 로그를 출력하기 위한 마지막 시각
+		// [수정 — 강제 정리 타임아웃이 절대 안 걸리던 버그] 이전에는 이
+		// lastLogTime 한 필드를 "격리 큐에 들어온 이후 전체 경과 시간"과
+		// "마지막 경고 로그 시각" 두 용도로 같이 썼다. HealthCheckLoop가
+		// 5분마다 경고를 남길 때마다 이 필드를 now로 리셋했는데, 그러면
+		// FORCE_CLEANUP_TIMEOUT_MS(10분) 판정에 쓰는 경과 시간도 함께
+		// 리셋되어 참조 카운트가 절대 안 풀리는 좀비 커넥션이 강제
+		// 정리되지 못하고 무한정 격리 큐에 남아있게 됐다. 두 용도를
+		// 분리한다 — enqueueTime은 최초 격리된 시각으로 절대 갱신되지
+		// 않고, lastLogTime만 경고 쿨다운 판단용으로 갱신된다.
+		std::chrono::steady_clock::time_point enqueueTime; // 격리 큐에 들어온 시각(강제 정리 타임아웃 판단용, 절대 갱신되지 않음)
+		std::chrono::steady_clock::time_point lastLogTime; // 마지막 경고 로그 시각(쿨다운 판단용, 경고 시마다 갱신)
 	};
 
 	static constexpr int64 RECONNECT_BACKOFF_MIN_MS = 10; // 백오프 base 하한 값
@@ -105,6 +115,19 @@ protected:
 	bool		TryExitIfExcess(void);
 	void		EnqueueReconnect(int32 nType);
 
+	//***************************************************************************
+	// @brief 슬롯을 프리 큐에 등록합니다(중복 삽입 방지 포함).
+	// @details [신규] Init()/ReleaseOdbcConn()/ApplyReconnectedConn() 세
+	// 곳에서 "이 슬롯이 이제 사용 가능해졌다"는 이벤트가 발생할 때마다
+	// 호출한다. 같은 슬롯이 반복적으로 연결 끊김→재연결을 겪으면서 매번
+	// 프리 큐에 push만 하고 예전 항목을 빼지는 않으면, 사용 빈도가 낮은
+	// 환경에서 재연결 이벤트만 계속 쌓여 큐가 무제한으로 커질 수 있다
+	// (동작 자체는 안전하지만 — 중복 항목은 각각 CAS로 걸러진다 — 자원
+	// 낭비다). _pInFreeSlotQueue로 "이 슬롯이 지금 큐 안에 있는지"를
+	// 추적해, 이미 큐에 있으면 추가로 넣지 않는다.
+	//***************************************************************************
+	void		EnqueueFreeSlot(int32 nType);
+
 protected:
 	COdbcConnPool(const COdbcConnPool& rhs) = delete;
 	COdbcConnPool& operator=(const COdbcConnPool& rhs) = delete;
@@ -139,7 +162,16 @@ protected:
 	CDelayedTaskQueue			_delayedTaskQueue;             // 백오프 대기 시간을 처리하기 위한 지연 타이머 큐
 	CThreadManager				_delayedTaskThreadMgr;         // 지연 타이머 큐의 작업을 처리하는 전담 스레드 매니저
 
-	std::atomic<uint32>			_nNextSlotHint;                // 슬롯 탐지 시 경합을 분산하기 위한 회전식 시작 인덱스 힌트
+	// [수정 — O(n) 스캔 제거] 예전에는 PopFreeSlotIndex()가 매 호출마다
+	// _nNextSlotHint로 회전 시작점만 바꿔가며 풀 전체를 라운드로빈으로
+	// 스캔했다 — 슬롯 대부분이 사용 중이거나 끊긴 상태일수록(=풀이 바쁠수록)
+	// 최악의 경우 O(n)이 되는 구조였다. "지금 비어 있고 연결된 것으로 확인된"
+	// 슬롯 인덱스만 담아두는 프리 큐로 바꿔, 정상 상황에서는 O(1)에 가깝게
+	// 슬롯을 획득한다. 기존 회전식 힌트(_nNextSlotHint)는 더 이상 쓰이지
+	// 않아 제거했다.
+	std::mutex					_freeSlotMutex;                // 프리 슬롯 큐 보호용 뮤텍스
+	CQueue<int32>				_freeSlotQueue;                // 사용 가능(참조 0 & 연결됨)한 슬롯 인덱스 큐
+	std::unique_ptr<CachePaddedAtomic<bool>[]>	_pInFreeSlotQueue; // [신규] 슬롯별 "현재 프리 큐에 이미 들어가 있는지" 플래그 — 중복 삽입(큐 무제한 증식) 방지
 
 	// 재연결 워커 풀 관련 멤버
 	CThreadManager				_reconnectWorkerMgr;           // 실제 I/O 재연결 및 스왑을 병렬 수행하는 워커 스레드 매니저
@@ -228,8 +260,8 @@ public:
 	OdbcConnGuard& operator=(const OdbcConnGuard&) = delete;
 
 private:
-	COdbcConnPool*	_pPool;             // 커넥션이 소속된 풀 객체 포인터
-	CBaseODBC*		_pConn;             // 획득된 실제 데이터베이스 연결 객체 포인터
+	COdbcConnPool* _pPool;             // 커넥션이 소속된 풀 객체 포인터
+	CBaseODBC* _pConn;             // 획득된 실제 데이터베이스 연결 객체 포인터
 	int32			_nAllocatedIndex;   // 선점된 슬롯의 인덱스 번호
 };
 

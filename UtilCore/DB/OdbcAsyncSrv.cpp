@@ -287,8 +287,15 @@ void COdbcAsyncSrv::RunningThread()
 // 전부 정상 처리 경로(핸들러 디스패치)를 거쳐 소진된 뒤에야 워커가
 // 종료된다.
 //
-// [주의 — 예외] 이건 "이미 큐에 들어 있던 요청"에만 해당한다. 처리
-// *도중* TIMEOUT이 나서 재시도하려는 요청은 다르다 — 재시도는
+// [수정 — cumulateCallCnt 인스턴스 분리] 예전엔 이 카운터가 함수 지역
+// static이었다 — 이 클래스가 싱글턴이던 시절엔 문제없었지만, 지금은
+// 여러 도메인 인스턴스가 동시에 이 Action()을 각자 실행하므로 지역
+// static은 그 모든 인스턴스가 공유하는 전역 카운터가 되어버린다.
+// 헤더의 인스턴스 멤버(_cumulateCallCnt)로 옮겨 도메인별로 독립적으로
+// 집계되게 한다.
+//
+// [주의 — 예외] "이미 큐에 들어 있던 요청"만 이 drain 보장의 대상이다.
+// 처리 *도중* TIMEOUT이 나서 재시도하려는 요청은 다르다 — 재시도는
 // Push()를 다시 호출하는 건데, Push()는 Stop() 이후 항상 실패하므로
 // (아래 Push() 참고) Stop()이 이미 호출된 뒤에 타임아웃난 요청의
 // 재시도는 성공하지 못하고 그 자리에서 폐기된다(SubOutstandingRequest()로
@@ -304,7 +311,6 @@ void COdbcAsyncSrv::RunningThread()
 //***************************************************************************
 void COdbcAsyncSrv::Action()
 {
-	static std::atomic<uint64> cumulateCallCnt{ 0 };
 	CQueue<std::unique_ptr<st_DBAsyncRq>> localQueue;
 
 	for( ;; )
@@ -338,7 +344,7 @@ void COdbcAsyncSrv::Action()
 			{
 				uint64 endTick = _GetTickCount();
 				if( 300 <= endTick - startTick )
-					LOG_WARNING(_T("Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"), endTick - startTick, cumulateCallCnt.fetch_add(1, std::memory_order_relaxed), static_cast<int>(Ret), pAsyncRq->callIdent);
+					LOG_WARNING(_T("Delay Query %llums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"), endTick - startTick, _cumulateCallCnt.fetch_add(1, std::memory_order_relaxed), static_cast<int>(Ret), pAsyncRq->callIdent);
 
 				uint16 logIdent = pAsyncRq->callIdent;
 				pAsyncRq->bReTry = true;
@@ -367,11 +373,11 @@ void COdbcAsyncSrv::Action()
 #if defined(_DEBUG)
 		uint64 endTick = _GetTickCount();
 		if( 300 <= endTick - startTick )
-			LOG_WARNING(_T("Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"), endTick - startTick, cumulateCallCnt.fetch_add(1, std::memory_order_relaxed), static_cast<int>(Ret), pAsyncRq->callIdent);
+			LOG_WARNING(_T("Delay Query %llums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"), endTick - startTick, _cumulateCallCnt.fetch_add(1, std::memory_order_relaxed), static_cast<int>(Ret), pAsyncRq->callIdent);
 #else
 		uint64 endTick = _GetTickCount();
 		if( 1000 <= endTick - startTick )
-			LOG_WARNING(_T("Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"), endTick - startTick, cumulateCallCnt.fetch_add(1, std::memory_order_relaxed), static_cast<int>(Ret), pAsyncRq->callIdent);
+			LOG_WARNING(_T("Delay Query %llums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"), endTick - startTick, _cumulateCallCnt.fetch_add(1, std::memory_order_relaxed), static_cast<int>(Ret), pAsyncRq->callIdent);
 #endif
 
 		SubOutstandingRequest();
@@ -390,12 +396,24 @@ void COdbcAsyncSrv::Action()
 //***************************************************************************
 int COdbcAsyncSrv::Push(std::unique_ptr<st_DBAsyncRq> pAsyncRq)
 {
-	std::lock_guard<std::mutex> lockGuard(_mutex);
+	// [수정 — notify는 락 해제 후에] std::condition_variable::wait(lock, pred)는
+	// "predicate 확인"과 "대기자 등록"을 원자적으로 처리하므로, notify를
+	// 락 안에서 부르든 밖에서 부르든 lost-wakeup 방지 효과는 동일하다 —
+	// "Stop() 이후 어떤 Push()도 성공하지 않는다"는 계약은 _bStopThread
+	// 체크/세팅을 같은 _mutex로 직렬화하는 데서 나오는 것이지 notify
+	// 위치와는 무관하다. 반면 락을 쥔 채로 notify하면 깨어난 소비자가
+	// 곧바로 같은 락을 다시 잡으려다 막혀 불필요한 컨텍스트 스위치가
+	// 생길 수 있다 — Stop()/Pop()이 이미 쓰고 있는 "락 해제 후 notify"
+	// 패턴으로 통일한다.
+	int queueSize = 0;
+	{
+		std::lock_guard<std::mutex> lockGuard(_mutex);
 
-	if( _bStopThread.load() )
-		return 0;
+		if( _bStopThread.load() )
+			return 0;
 
-	const int queueSize = static_cast<int>(_queueDBAsyncRq.PushAndGetSize(std::move(pAsyncRq)));
+		queueSize = static_cast<int>(_queueDBAsyncRq.PushAndGetSize(std::move(pAsyncRq)));
+	}
 	_cva.notify_one();
 
 	return queueSize;
@@ -416,7 +434,7 @@ std::unique_ptr<st_DBAsyncRq> COdbcAsyncSrv::Pop(CQueue<std::unique_ptr<st_DBAsy
 	{
 		std::unique_lock<std::mutex> lockGuard(_mutex);
 
-		_cva.wait(lockGuard, [this, &localQueue]() {
+		_cva.wait(lockGuard, [this]() {
 			return !_queueDBAsyncRq.IsEmpty() || _bStopThread.load();
 			});
 
@@ -426,7 +444,17 @@ std::unique_ptr<st_DBAsyncRq> COdbcAsyncSrv::Pop(CQueue<std::unique_ptr<st_DBAsy
 		_queueDBAsyncRq.SwapChunk(localQueue, 64);
 	}
 
-	_cvProducer.notify_one();
+	// [수정 — under-wake 방지] 이전에는 notify_one()이라 SwapChunk()로
+	// 한 번에 최대 64개 분량의 여유가 생겨도 WaitPushCapacity()에서 대기
+	// 중인 프로듀서 스레드 중 딱 하나만 깨어났다. 대기 중인 프로듀서가
+	// 여러 개고 maxQueueCapacity가 호출부마다 다를 수 있는 구조라(각자
+	// std::function으로 서로 다른 조건을 검사), notify_one()이 깨운
+	// 스레드가 정작 조건을 만족 못 해 바로 재취침하는 동안 조건을 만족하는
+	// 다른 프로듀서는 다음 Pop() 호출까지 계속 잠들어 있는 지연이
+	// 생길 수 있었다. 각 프로듀서가 자기 predicate로 재검증하므로
+	// notify_all()로 바꿔도 정확성 문제는 없고, 여기서는 전용 피더
+	// 스레드 소수만 대기하는 용도라 thundering herd 비용도 미미하다.
+	_cvProducer.notify_all();
 
 	if( localQueue.empty() )
 		return nullptr;

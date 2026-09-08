@@ -198,6 +198,15 @@ private:
 	bool						_bMaxWarningActive{ false };						// MAX_WARNING_QUERY_QUEUE_SIZE 경고가 이미 발령된 상태인지(히스테리시스로 재무장)
 	std::chrono::steady_clock::time_point	_lastQueueSizeWarnTime{};				// 마지막 LOG_WARNING 시각(쿨다운 판단용)
 
+	// [이식 — COdbcAsyncSrv/CMySQLAsyncSrv와 동일] 이전에는 Action()에 이
+	// 카운터 및 타이밍 측정 자체가 없어, 쿼리가 아무리 오래 걸려도 실패하지
+	// 않는 한 지연 여부가 로그에 전혀 남지 않았다 — 장애 진단 시 "느린데
+	// 성공은 한" 쿼리를 놓치는 관측성 공백이었다. 인스턴스 멤버로 두어
+	// CDbServiceManager가 소유하는 여러 도메인 인스턴스(멤버/게임/로그)가
+	// 각자 독립적으로 집계하게 한다(함수 지역 static이면 전부 공유되어
+	// 도메인 구분이 깨진다).
+	std::atomic<uint64>			_cumulateCallCnt{ 0 };				// 지연 쿼리 누적 카운트(도메인별 진단용)
+
 	std::mutex					_mutex;								// 동기화용 뮤텍스
 	std::condition_variable		_cva;								// 소비자 대기 조건 변수
 	std::condition_variable		_cvProducer;						// 생산자 대기 조건 변수

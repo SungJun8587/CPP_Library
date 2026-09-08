@@ -32,6 +32,16 @@ private:
 	{
 		CBaseMySQL* pConn;                                  // 격리 대상 커넥션 포인터
 		std::atomic<int32>* pRefCount;                      // 감시할 슬롯의 참조 카운트 주소
+		// [수정 — 강제 정리 타임아웃이 절대 안 걸리던 버그] COdbcConnPool과
+		// 동일한 버그 — 이전에는 이 lastLogTime 한 필드를 "격리 큐에 들어온
+		// 이후 전체 경과 시간"과 "마지막 경고 로그 시각" 두 용도로 같이
+		// 썼다. HealthCheckLoop가 5분마다 경고를 남길 때마다 이 필드를
+		// now로 리셋했는데, 그러면 FORCE_CLEANUP_TIMEOUT_MS(10분) 판정에
+		// 쓰는 경과 시간도 함께 리셋되어 참조 카운트가 절대 안 풀리는
+		// 좀비 커넥션이 강제 정리되지 못하고 무한정 격리 큐에 남아있게
+		// 됐다. enqueueTime은 최초 격리된 시각으로 절대 갱신되지 않고,
+		// lastLogTime만 경고 쿨다운 판단용으로 갱신된다.
+		std::chrono::steady_clock::time_point enqueueTime;  // 격리 큐에 들어온 시각(강제 정리 타임아웃 판단용, 절대 갱신되지 않음)
 		std::chrono::steady_clock::time_point lastLogTime; // 과도한 체류 경고 로그를 출력하기 위한 마지막 시각
 	};
 
@@ -44,7 +54,7 @@ public:
 	//***************************************************************************
 	struct TReconnectConfig
 	{
-		int32	nWorkerCount = 2;			// 재연결을 전담하는 백그라운드 워커 스레드 수
+		int32	nWorkerCount = 4;			// 재연결을 전담하는 백그라운드 워커 스레드 수
 		int64	nBackoffBaseMs = 500;		// 최초 재시도 대기 기본 시간 (밀리초)
 		int64	nBackoffMaxMs = 30000;		// 재시도 대기 시간 상한선 (밀리초)
 		int32	nBackoffMaxShift = 6;		// 백오프 지수 증가 횟수 상한
@@ -87,7 +97,20 @@ protected:
 	bool		FinishInit(const TReconnectConfig& reconnectConfig);
 
 	CBaseMySQL* TryReconnect(int32 nType);
-	void		ApplyReconnectedConn(int32 nType, CBaseMySQL* pNewConn);
+
+	//***************************************************************************
+	// @brief 재연결 워커가 새로 확보한 커넥션을 슬롯에 교체(Swap) 적용합니다.
+	// @details [수정 — 반환값 추가] COdbcConnPool과 동일한 버그 — 이전에는
+	// 반환값이 없어, 진입 시점에 refcount>0이라 스왑을 포기하고 pNewConn을
+	// 그냥 버린 경우(정상적인 레이스)와 실제로 스왑까지 마친 경우를
+	// 호출부(ReconnectWorkerLoop)가 구분할 수 없었다. 그 결과 스왑을
+	// 포기한 경우에도 호출부가 무조건 OnReconnectSucceeded()를 불러
+	// 백오프 실패 카운트를 리셋하는 오정보 상태가 생겼다. 실제 스왑
+	// 여부를 bool로 반환해 호출부가 성공/실패를 정확히 구분하게 한다.
+	// @return 새 커넥션을 슬롯에 실제로 적용했으면 true, refcount 경합으로
+	//         포기(pNewConn 폐기)했으면 false.
+	//***************************************************************************
+	bool		ApplyReconnectedConn(int32 nType, CBaseMySQL* pNewConn);
 
 	void		ScheduleRetry(int32 nType);
 	void		OnReconnectFailed(int32 nType);
@@ -108,6 +131,15 @@ protected:
 	void		SetWorkerCount(int32 nNewCount);
 	bool		TryExitIfExcess(void);
 	void		EnqueueReconnect(int32 nType);
+
+	//***************************************************************************
+	// @brief 슬롯을 프리 큐에 등록합니다(중복 삽입 방지 포함).
+	// @details [이식 — COdbcConnPool과 동일] Init()/ReleaseMySQLConn()/
+	// ApplyReconnectedConn() 세 곳에서 "이 슬롯이 이제 사용 가능해졌다"는
+	// 이벤트가 발생할 때마다 호출한다. _pInFreeSlotQueue로 "이 슬롯이
+	// 지금 큐 안에 있는지"를 추적해, 이미 큐에 있으면 추가로 넣지 않는다.
+	//***************************************************************************
+	void		EnqueueFreeSlot(int32 nType);
 
 protected:
 	CMySQLConnPool(const CMySQLConnPool& rhs) = delete;
@@ -139,7 +171,17 @@ protected:
 	CDelayedTaskQueue			_delayedTaskQueue;                                            // 백오프 대기 시간을 처리하기 위한 지연 타이머 큐
 	CThreadManager				_delayedTaskThreadMgr;                                        // 지연 타이머 큐의 작업을 처리하는 전담 스레드 매니저
 
-	std::atomic<uint32>			_nNextSlotHint;                                               // 슬롯 탐지 시 경합을 분산하기 위한 회전식 시작 인덱스 힌트
+	// [수정 — O(n) 스캔 제거] 예전에는 PopFreeSlotIndex()가 매 호출마다
+	// _nNextSlotHint로 회전 시작점만 바꿔가며 풀 전체를 라운드로빈으로
+	// 스캔했다 — 슬롯 대부분이 사용 중이거나 끊긴 상태일수록(=풀이 바쁠수록)
+	// 최악의 경우 O(n)이 되는 구조였다(COdbcConnPool에 먼저 적용한 것과
+	// 동일한 개선을 이식). "지금 비어 있고 연결된 것으로 확인된" 슬롯
+	// 인덱스만 담아두는 프리 큐로 바꿔, 정상 상황에서는 O(1)에 가깝게
+	// 슬롯을 획득한다. 기존 회전식 힌트(_nNextSlotHint)는 더 이상 쓰이지
+	// 않아 제거했다.
+	std::mutex					_freeSlotMutex;                                               // 프리 슬롯 큐 보호용 뮤텍스
+	CQueue<int32>				_freeSlotQueue;                                               // 사용 가능(참조 0 & 연결됨)한 슬롯 인덱스 큐
+	std::unique_ptr<CachePaddedAtomic<bool>[]>	_pInFreeSlotQueue;                            // 슬롯별 "현재 프리 큐에 이미 들어가 있는지" 플래그 — 중복 삽입 방지
 
 	CThreadManager				_reconnectWorkerMgr;                                          // 실제 I/O 재연결 및 스왑을 병렬 수행하는 워커 스레드 매니저
 	std::atomic<bool>			_bStopReconnectWorkers;                                       // 재연결 워커 전체 종료 신호 플래그

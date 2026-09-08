@@ -15,8 +15,8 @@
 // @brief CServerConfig 클래스의 생성자
 //***************************************************************************
 CServerConfig::CServerConfig(void)
-	: _nServerPort(0), _nMaxUser(0), _nKeepAliveSec(0)
-	, _nRedisPoolSize(0), _nDbWorkerThreadCnt(0)
+	: _nServerPort(0), _nKeepAliveSec(0), _nMaxSessionCount(0)
+	, _nWorkerThreadCnt(0), _nRedisPoolSize(0), _nDbWorkerThreadCnt(0)
 	, _nHeartbeatTtlSec(0), _nHeartbeatIntervalSec(0)
 {
 	memset(_tszServerName, 0, sizeof(_tszServerName));
@@ -52,7 +52,8 @@ bool CServerConfig::Init(const TCHAR* tszServerInfo)
 	_tcsncpy_s(_tszServiceName, _countof(_tszServiceName), jsonUtil[_T("ServiceName")], _TRUNCATE);
 	_tcsncpy_s(_tszDisplayName, _countof(_tszDisplayName), jsonUtil[_T("DisplayName")], _TRUNCATE);
 	_nServerPort = jsonUtil[_T("Port")];
-	_nMaxUser = jsonUtil[_T("MaxUser")];
+	_nMaxSessionCount = jsonUtil[_T("MaxSessionCount")];
+	_nWorkerThreadCnt = jsonUtil[_T("WorkerThreadCnt")];
 	_nKeepAliveSec = jsonUtil[_T("KeepAliveSec")];
 
 	// [신규] Redis/DB 풀·워커, 하트비트 설정
@@ -99,7 +100,8 @@ void CServerConfig::PrintServerSettingInfo()
 	LOG_INFO(_T("IP : %s"), _tszIP);
 	LOG_INFO(_T("Port : %d"), _nServerPort);
 	LOG_INFO(_T("KeepAliveSec : %d"), _nKeepAliveSec);
-	LOG_INFO(_T("MaxUser : %d"), _nMaxUser);
+	LOG_INFO(_T("MaxSessionCount : %d"), _nMaxSessionCount);
+	LOG_INFO(_T("WorkerThreadCnt : %d"), _nWorkerThreadCnt);
 	LOG_INFO(_T("RedisPoolSize : %d"), _nRedisPoolSize);
 	LOG_INFO(_T("DbWorkerThreadCnt : %d"), _nDbWorkerThreadCnt);
 	LOG_INFO(_T("HeartbeatTtlSec : %d"), _nHeartbeatTtlSec);

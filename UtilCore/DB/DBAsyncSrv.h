@@ -7,14 +7,16 @@
 #ifndef UC_DBASYNCSRV_H
 #define UC_DBASYNCSRV_H
 
-#pragma pack(push, 1)
-
 #include <Memory/Allocator.h>
 
 //***************************************************************************
 // @brief 비동기 DB 요청 베이스 구조체
-// @detail BaseAllocator를 상속받아 오버라이드된 operator new/delete를 사용하며,
-//         모든 파생 요청 구조체가 자동으로 메모리 할당기를 타도록 설계된 1바이트 패킹 구조체입니다.
+// @detail BaseAllocator를 상속받아 오버라이드된 operator new/delete를 사용합니다.
+// [수정 — pack(1) 제거] 이 구조체 자체는 BYTE+bool 두 필드뿐이라 packing
+// 여부와 무관하게 레이아웃이 동일하지만(정렬 손해가 원래 없음), 파생
+// 구조체(DBAsyncStruct.h의 PRODUCER_DATA_BATCH_REQ 등)에서 std::vector
+// 등 정렬에 민감한 멤버를 안전하게 추가할 수 있도록 이 헤더에서부터
+// pack(1)을 걷어낸다.
 //***************************************************************************
 struct st_DBAsyncRq : public BaseAllocator
 {
@@ -40,8 +42,11 @@ struct st_DBAsyncRq : public BaseAllocator
 
 //***************************************************************************
 // @brief 비동기 DB 응답 베이스 구조체
-// @detail BaseAllocator를 상속받아 오버라이드된 operator new/delete를 사용하며,
-//         모든 파생 응답 구조체가 자동으로 메모리 할당기를 타도록 설계된 1바이트 패킹 구조체입니다.
+// @detail BaseAllocator를 상속받아 오버라이드된 operator new/delete를 사용합니다.
+// [수정 — pack(1) 제거] pthis(포인터) 필드가 BYTE 바로 뒤에 오는데,
+// pack(1) 상태에서는 자연 정렬 패딩 없이 배치돼 포인터가 오프셋 1에서
+// 시작할 수 있었다(플랫폼에 따라 misaligned access 페널티/이슈 가능) —
+// 제거로 포인터가 정상적으로 정렬된 오프셋에 위치하게 된다.
 //***************************************************************************
 struct st_DBAsyncRp : public BaseAllocator
 {
@@ -56,16 +61,18 @@ struct st_DBAsyncRp : public BaseAllocator
 
 	//***************************************************************************
 	// @brief st_DBAsyncRp 가상 소멸자입니다.
+	// @details [수정 — 로그 스팸] 이전에는 정상적인 소멸 때마다 무조건
+	// LOG_ERROR를 남겼다 — 위 st_DBAsyncRq의 동일한 라인은 주석 처리되어
+	// 있는 걸 보면 디버그용으로 넣었다가 이쪽만 지우는 걸 빠뜨린 것으로
+	// 보인다. 응답 객체가 소멸할 때마다(정상 경로 포함) ERROR 레벨 로그가
+	// 남아 실서비스에서 로그가 폭주하므로 제거한다.
 	//***************************************************************************
 	virtual ~st_DBAsyncRp() {
-		LOG_ERROR(_T("Delete st_DBAsyncRp"));
 	}
 
 	BYTE			callIdent; // 핸들러 식별자
 	st_DBAsyncRp* pthis;     // Self 응답 객체 포인터
 };
-
-#pragma pack(pop)
 
 //***************************************************************************
 // @brief 비동기 DB 요청 처리를 위한 핸들러 인터페이스 클래스

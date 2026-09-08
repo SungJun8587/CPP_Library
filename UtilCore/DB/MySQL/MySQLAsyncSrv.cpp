@@ -268,7 +268,6 @@ void CMySQLAsyncSrv::RunningThread()
 //***************************************************************************
 void CMySQLAsyncSrv::Action()
 {
-	static std::atomic<uint64> cumulateCallCnt{ 0 };
 	CQueue<std::unique_ptr<st_DBAsyncRq>> localQueue;
 
 	for( ;; )
@@ -298,8 +297,8 @@ void CMySQLAsyncSrv::Action()
 			{
 				uint64 endTick = _GetTickCount();
 				if( 300 <= endTick - startTick )
-					LOG_WARNING(_T("Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"),
-						endTick - startTick, cumulateCallCnt.fetch_add(1, std::memory_order_relaxed), static_cast<int>(Ret), pAsyncRq->callIdent);
+					LOG_WARNING(_T("Delay Query %llums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"),
+						endTick - startTick, _cumulateCallCnt.fetch_add(1, std::memory_order_relaxed), static_cast<int>(Ret), pAsyncRq->callIdent);
 
 				uint16 logIdent = pAsyncRq->callIdent;
 				pAsyncRq->bReTry = true;
@@ -327,13 +326,13 @@ void CMySQLAsyncSrv::Action()
 #if defined(_DEBUG)
 		uint64 endTick = _GetTickCount();
 		if( 300 <= endTick - startTick )
-			LOG_WARNING(_T("Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"),
-				endTick - startTick, cumulateCallCnt.fetch_add(1, std::memory_order_relaxed), static_cast<int>(Ret), pAsyncRq->callIdent);
+			LOG_WARNING(_T("Delay Query %llums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"),
+				endTick - startTick, _cumulateCallCnt.fetch_add(1, std::memory_order_relaxed), static_cast<int>(Ret), pAsyncRq->callIdent);
 #else
 		uint64 endTick = _GetTickCount();
 		if( 1000 <= endTick - startTick )
-			LOG_WARNING(_T("Delay Query %lums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"),
-				endTick - startTick, cumulateCallCnt.fetch_add(1, std::memory_order_relaxed), static_cast<int>(Ret), pAsyncRq->callIdent);
+			LOG_WARNING(_T("Delay Query %llums... cumulateCallCnt[%llu], ret:[%d], QueryNo:[%u]"),
+				endTick - startTick, _cumulateCallCnt.fetch_add(1, std::memory_order_relaxed), static_cast<int>(Ret), pAsyncRq->callIdent);
 #endif
 
 		SubOutstandingRequest();
@@ -348,12 +347,20 @@ void CMySQLAsyncSrv::Action()
 //***************************************************************************
 int CMySQLAsyncSrv::Push(std::unique_ptr<st_DBAsyncRq> pAsyncRq)
 {
-	std::lock_guard<std::mutex> lockGuard(_mutex);
+	// [수정 — notify는 락 해제 후에] COdbcAsyncSrv::Push()와 동일한 이유
+	// — 깨어난 소비자 스레드가 곧바로 같은 락을 다시 잡으려다 막혀
+	// 불필요한 컨텍스트 스위치가 생길 수 있었다. "Stop() 이후 어떤
+	// Push()도 성공하지 않는다"는 계약은 _bStopThread 체크/세팅을 같은
+	// _mutex로 직렬화하는 데서 나오는 것이지 notify 위치와는 무관하다.
+	int queueSize = 0;
+	{
+		std::lock_guard<std::mutex> lockGuard(_mutex);
 
-	if( _bStopThread.load() )
-		return 0;
+		if( _bStopThread.load() )
+			return 0;
 
-	const int queueSize = static_cast<int>(_queueDBAsyncRq.PushAndGetSize(std::move(pAsyncRq)));
+		queueSize = static_cast<int>(_queueDBAsyncRq.PushAndGetSize(std::move(pAsyncRq)));
+	}
 	_cva.notify_one();
 
 	return queueSize;
@@ -374,7 +381,7 @@ std::unique_ptr<st_DBAsyncRq> CMySQLAsyncSrv::Pop(CQueue<std::unique_ptr<st_DBAs
 	{
 		std::unique_lock<std::mutex> lockGuard(_mutex);
 
-		_cva.wait(lockGuard, [this, &localQueue]() {
+		_cva.wait(lockGuard, [this]() {
 			return !_queueDBAsyncRq.IsEmpty() || _bStopThread.load();
 			});
 
@@ -392,6 +399,19 @@ std::unique_ptr<st_DBAsyncRq> CMySQLAsyncSrv::Pop(CQueue<std::unique_ptr<st_DBAs
 		else if( _bMaxWarningActive && currentSize <= MAX_WARNING_RESET_QUEUE_SIZE )
 		{
 			_bMaxWarningActive = false; // 히스테리시스 하한 아래로 내려왔으므로 재무장
+		}
+
+		// [수정 — 재무장 누락] _nLastWarnedQueueSize는 새 최댓값을 찍을
+		// 때만 갱신되고 큐가 줄어들어도 절대 내려오지 않는 래칫이었다.
+		// 그래서 서비스 초반에 한 번 크게 스파이크가 나면, 이후 큐가
+		// 완전히 비었다가 다시 그보다 낮은(그래도 심각한) 수준까지
+		// 쌓이는 상황에서 경고가 한 번도 안 찍히는 문제가 있었다.
+		// _bMaxWarningActive와 동일한 히스테리시스 취지로, 큐가
+		// INITIAL_WARN_QUEUE_SIZE 이하까지 실제로 비면 기준치를 초기값으로
+		// 되돌려 다음 스파이크부터 다시 "새 최댓값"으로 인식되게 한다.
+		if( currentCount <= INITIAL_WARN_QUEUE_SIZE && _nLastWarnedQueueSize > INITIAL_WARN_QUEUE_SIZE )
+		{
+			_nLastWarnedQueueSize = INITIAL_WARN_QUEUE_SIZE;
 		}
 
 		if( currentCount > _nLastWarnedQueueSize )
@@ -412,7 +432,12 @@ std::unique_ptr<st_DBAsyncRq> CMySQLAsyncSrv::Pop(CQueue<std::unique_ptr<st_DBAs
 		_queueDBAsyncRq.SwapChunk(localQueue, 64);
 	}
 
-	_cvProducer.notify_one();
+	// [수정 — under-wake 방지] COdbcAsyncSrv::Pop()과 동일한 이유로
+	// notify_one() 대신 notify_all()을 쓴다 — SwapChunk()로 한 번에
+	// 최대 64개 분량의 여유가 생겨도 notify_one()은 WaitPushCapacity()에서
+	// 대기 중인 프로듀서 중 하나만 깨웠다. 각 프로듀서가 자기 predicate로
+	// 재검증하므로 notify_all()로 바꿔도 정확성 문제는 없다.
+	_cvProducer.notify_all();
 
 	if( localQueue.empty() )
 		return nullptr;
