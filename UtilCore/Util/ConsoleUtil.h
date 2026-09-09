@@ -34,30 +34,31 @@
 #endif
 
 //***************************************************************************
-// @brief   콘솔 입출력을 UTF-8로 초기화합니다.
-// @detail  [Windows] 콘솔 기본 코드페이지가 ANSI(CP949/CP1252 등)이므로
-//          SetConsoleOutputCP(CP_UTF8) 호출이 필수적입니다. MSVC 환경에서는
-//          ".UTF8" 로캘 표기를 지원합니다.
-//          [Linux/macOS] 터미널 기본값이 이미 UTF-8이므로 setlocale(LC_ALL, "")
-//          호출만으로 충분합니다.
+// @brief 콘솔 입출력을 UTF-8 환경으로 초기화합니다.
+// @details Windows 환경에서는 CP_UTF8 코드페이지 및 로캘을 설정하고,
+//          Linux/macOS 환경에서는 시스템 기본 UTF-8 로캘을 적용합니다.
+// @note 
+// Windows 환경에서는 콘솔 기본 코드페이지가 ANSI(CP949/CP1252 등)이므로 SetConsoleOutputCP(CP_UTF8) 호출이 필수적.
+// Linux/macOS 환경에서는 터미널 기본값이 이미 UTF-8이므로 setlocale(LC_ALL, "") 호출만으로 충분.
+// 소스 코드 파일 인코딩이 UTF-8(BOM 포함/미포함)로 저장되어 있어야 함.
 //***************************************************************************
 inline void InitUtf8Console()
 {
 #if defined(_WIN32) || defined(_WIN64)
-	std::setlocale(LC_ALL, ".UTF8");
-	SetConsoleOutputCP(CP_UTF8);
-	SetConsoleCP(CP_UTF8);
+	std::setlocale(LC_ALL, ".UTF8");	// C/C++ 표준 런타임의 Locale 환경을 UTF-8 인코딩으로 설정
+	SetConsoleOutputCP(CP_UTF8);		// std::cout(콘솔 출력)을 UTF-8(Code Page 65001)로 설정
+	SetConsoleCP(CP_UTF8);				// std::cin(콘솔 입력)을 UTF-8(Code Page 65001)로 설정
 #else
-	std::setlocale(LC_ALL, "");
+	std::setlocale(LC_ALL, "");			// 프로그램의 Locale을 "현재 운영체제(OS)의 기본 Locale"로 설정
 #endif
 }
 
 //***************************************************************************
-// @brief   콘솔 화면을 지우고 커서를 좌상단(0,0)으로 이동시킵니다.
-// @detail  system("cls")를 대체합니다. 새 프로세스를 생성하지 않고, 현재 콘솔
-//          버퍼 전체를 공백 문자와 기본 속성으로 채운 뒤 커서 위치만
-//          초기화하는 방식으로 동일한 시각적 효과를 냅니다. Windows 전용이며,
-//          비Windows 환경에서는 아무 동작도 하지 않습니다.
+// @brief 콘솔 화면을 지우고 커서를 좌상단(0,0)으로 이동시킵니다.
+// @detail system("cls")를 대체합니다. 새 프로세스를 생성하지 않고, 현재 콘솔
+//         버퍼 전체를 공백 문자와 기본 속성으로 채운 뒤 커서 위치만
+//         초기화하는 방식으로 동일한 시각적 효과를 냅니다. Windows 전용이며,
+//         비Windows 환경에서는 아무 동작도 하지 않습니다.
 //***************************************************************************
 inline void ClearConsoleScreen()
 {

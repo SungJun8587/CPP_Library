@@ -9,9 +9,14 @@
 
 //***************************************************************************
 // @brief CIocpSessionManager 생성자
+// @details [수정] _nextSessionId를 0이 아니라 1부터 시작한다 — 이유는
+//          IocpSessionManager.h의 _nextSessionId 선언부 주석 참고. 0은
+//          AddSession()/RemoveSession()/FindSession()이 "무효 ID"로 예약해
+//          둔 값이라, 카운터가 0에서 시작하면 fetch_add()가 돌려주는 첫
+//          값이 0이 되어 그 세션이 맵에 등록조차 못 되는 사고가 났다.
 //***************************************************************************
 CIocpSessionManager::CIocpSessionManager()
-    : _nextSessionId(0)
+    : _nextSessionId(1)
 {
 }
 
