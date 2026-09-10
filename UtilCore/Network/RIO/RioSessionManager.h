@@ -51,7 +51,7 @@ public:
 
 private:
 	CClusterSpinUnorderedMap<uint64, CRioSessionRef, Rio::kSessionClusterCnt, true> _sessions;	// SessionId를 키로 하고, 클러스터별로 분산 처리하여 락 경합을 최소화하는 고성능 해시맵
-	std::atomic<uint64> _nextSessionId{ 0 };														// 세션 ID 자동 증가 카운터
+	std::atomic<uint64> _nextSessionId{ 1 };													// 세션 ID 자동 증가 카운터
 };
 
 #endif // ndef UC_RIOSESSIONMANAGER_H

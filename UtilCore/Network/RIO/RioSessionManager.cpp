@@ -11,7 +11,7 @@
 // @brief CRioSessionManager 생성자
 //***************************************************************************
 CRioSessionManager::CRioSessionManager()
-	: _nextSessionId(0)
+	: _nextSessionId(1)
 {
 }
 

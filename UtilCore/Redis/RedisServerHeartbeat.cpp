@@ -12,14 +12,16 @@
 //***************************************************************************
 // @brief CRedisServerHeartbeat 생성자
 // @param redisService 명령 전송에 사용할 Redis 서비스 (nullptr이면 Start()가 실패)
-// @param serverType 서버 종류 식별자 (예: "GameServer", "LoginServer")
-// @param serverId 서버 인스턴스 식별자 (예: 서버 번호, 호스트명 등)
+// @param serverName 서버 이름 (예: "ChatServer")
+// @param serverGroupId 서버 그룹 식별자 (예: "GameServer", "LoginServer")
+// @param serverChannelId 서버 채널(인스턴스) 식별자 (예: 서버 번호, 호스트명 등)
 // @param port 클라이언트/내부 연동이 접속할 포트 (등록 정보용)
 //***************************************************************************
-CRedisServerHeartbeat::CRedisServerHeartbeat(CRedisService* redisService, std::string serverType, std::string serverId, uint16 port)
+CRedisServerHeartbeat::CRedisServerHeartbeat(CRedisService* redisService, std::string serverName, std::string serverGroupId, std::string serverChannelId, uint16 port)
 	: _redisService(redisService)
-	, _serverType(std::move(serverType))
-	, _serverId(std::move(serverId))
+	, _serverName(std::move(serverName))
+	, _serverGroupId(std::move(serverGroupId))
+	, _serverChannelId(std::move(serverChannelId))
 	, _port(port)
 {
 }
@@ -34,11 +36,11 @@ CRedisServerHeartbeat::~CRedisServerHeartbeat()
 
 //***************************************************************************
 // @brief Redis 등록 키를 생성합니다.
-// @return "Server:{serverType}:{serverId}" 형식의 키 문자열
+// @return "Server:{serverGroupId}:{serverChannelId}" 형식의 키 문자열
 //***************************************************************************
 std::string CRedisServerHeartbeat::BuildKey() const
 {
-	return "Server:" + _serverType + ":" + _serverId;
+	return _serverName + ":" + _serverGroupId + ":" + _serverChannelId;
 }
 
 //***************************************************************************
@@ -107,10 +109,12 @@ void CRedisServerHeartbeat::RegisterInitial()
 	CVector<std::string> args;
 	args.push_back("HSET");
 	args.push_back(key);
-	args.push_back("serverType");	args.push_back(_serverType);
-	args.push_back("serverId");	args.push_back(_serverId);
+	args.push_back("serverName");	args.push_back(_serverName);
+	args.push_back("serverGroupId");	args.push_back(_serverGroupId);
+	args.push_back("serverChannelId");	args.push_back(_serverChannelId);
 	args.push_back("port");		args.push_back(std::to_string(_port));
 	args.push_back("pid");			args.push_back(std::to_string(static_cast<int64>(::GetCurrentProcessId())));
+	args.push_back("sessionCount");	args.push_back(std::to_string(_sessionCountProvider ? _sessionCountProvider() : 0));
 	args.push_back("startedAt");	args.push_back(std::to_string(nowMs));
 	args.push_back("updatedAt");	args.push_back(std::to_string(nowMs));
 
@@ -153,6 +157,8 @@ void CRedisServerHeartbeat::SendHeartbeat()
 	hsetArgs.push_back(key);
 	hsetArgs.push_back("updatedAt");
 	hsetArgs.push_back(std::to_string(nowMs));
+	hsetArgs.push_back("sessionCount");
+	hsetArgs.push_back(std::to_string(_sessionCountProvider ? _sessionCountProvider() : 0));
 	_redisService->SendCommand(hsetArgs, [](const RedisValue& /*res*/) {});
 
 	CVector<std::string> expireArgs;

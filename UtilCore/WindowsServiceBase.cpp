@@ -118,12 +118,12 @@ bool WindowsServiceBase::Init(const TCHAR* ptszArgv)
 		exit(-1);
 	}
 
-	if( _tcslen(SERVER_CONFIG->GetServerName()) > 0 )
-		_tcsncpy_s(m_tszAppName, _countof(m_tszAppName), SERVER_CONFIG->GetServerName(), _TRUNCATE);
 	if( _tcslen(SERVER_CONFIG->GetServiceName()) > 0 )
 		_tcsncpy_s(m_tszServiceName, _countof(m_tszServiceName), SERVER_CONFIG->GetServiceName(), _TRUNCATE);
 	if( _tcslen(SERVER_CONFIG->GetDisplayName()) > 0 )
 		_tcsncpy_s(m_tszDisplayName, _countof(m_tszDisplayName), SERVER_CONFIG->GetDisplayName(), _TRUNCATE);
+	if( _tcslen(SERVER_CONFIG->GetServerName()) > 0 )
+		_tcsncpy_s(m_tszAppName, _countof(m_tszAppName), SERVER_CONFIG->GetServerName(), _TRUNCATE);
 
 	return true;
 }

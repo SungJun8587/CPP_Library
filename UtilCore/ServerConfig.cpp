@@ -14,15 +14,14 @@
 //***************************************************************************
 // @brief CServerConfig 클래스의 생성자
 //***************************************************************************
-CServerConfig::CServerConfig(void)
-	: _nServerPort(0), _nKeepAliveSec(0), _nMaxSessionCount(0)
-	, _nWorkerThreadCnt(0), _nRedisPoolSize(0), _nDbWorkerThreadCnt(0)
-	, _nHeartbeatTtlSec(0), _nHeartbeatIntervalSec(0)
+CServerConfig::CServerConfig()
+	: _nServerGroupId(0), _nServerChannelId(0), _nServerPort(0), _nKeepAliveSec(0), _nMaxSessionCount(0)
+	, _nWorkerThreadCnt(0), _nRedisPoolSize(0), _nDbWorkerThreadCnt(0), _nHeartbeatTtlSec(0), _nHeartbeatIntervalSec(0)
 {
-	memset(_tszServerName, 0, sizeof(_tszServerName));
-	memset(_tszIP, 0, sizeof(_tszIP));
 	memset(_tszServiceName, 0, sizeof(_tszServiceName));
 	memset(_tszDisplayName, 0, sizeof(_tszDisplayName));
+	memset(_tszServerName, 0, sizeof(_tszServerName));
+	memset(_tszIP, 0, sizeof(_tszIP));
 
 	Clear();
 }
@@ -30,7 +29,7 @@ CServerConfig::CServerConfig(void)
 //***************************************************************************
 // @brief CServerConfig 클래스의 소멸자
 //***************************************************************************
-CServerConfig::~CServerConfig(void)
+CServerConfig::~CServerConfig()
 {
 	Clear();
 }
@@ -47,16 +46,18 @@ bool CServerConfig::Init(const TCHAR* tszServerInfo)
 	CRapidJSONUtil jsonUtil;
 	jsonUtil.LoadFromFile(tszServerInfo);
 
-	_tcsncpy_s(_tszServerName, _countof(_tszServerName), jsonUtil[_T("Name")], _TRUNCATE);
-	_tcsncpy_s(_tszIP, _countof(_tszIP), jsonUtil[_T("IP")], _TRUNCATE);
 	_tcsncpy_s(_tszServiceName, _countof(_tszServiceName), jsonUtil[_T("ServiceName")], _TRUNCATE);
 	_tcsncpy_s(_tszDisplayName, _countof(_tszDisplayName), jsonUtil[_T("DisplayName")], _TRUNCATE);
+	_tcsncpy_s(_tszServerName, _countof(_tszServerName), jsonUtil[_T("Name")], _TRUNCATE);
+	_nServerGroupId = jsonUtil[_T("GroupId")];
+	_nServerChannelId = jsonUtil[_T("ChannelId")];
+
+	_tcsncpy_s(_tszIP, _countof(_tszIP), jsonUtil[_T("IP")], _TRUNCATE);
 	_nServerPort = jsonUtil[_T("Port")];
 	_nMaxSessionCount = jsonUtil[_T("MaxSessionCount")];
 	_nWorkerThreadCnt = jsonUtil[_T("WorkerThreadCnt")];
 	_nKeepAliveSec = jsonUtil[_T("KeepAliveSec")];
 
-	// [신규] Redis/DB 풀·워커, 하트비트 설정
 	_nRedisPoolSize = jsonUtil[_T("RedisPoolSize")];
 	_nDbWorkerThreadCnt = jsonUtil[_T("DbWorkerThreadCnt")];
 	_nHeartbeatTtlSec = jsonUtil[_T("HeartbeatTtlSec")];
@@ -82,7 +83,7 @@ bool CServerConfig::Init(const TCHAR* tszServerInfo)
 //***************************************************************************
 // @brief 내부 동적 컨테이너 데이터를 소거하여 초기화합니다.
 //***************************************************************************
-void CServerConfig::Clear(void)
+void CServerConfig::Clear()
 {
 	_serverNodeVec.clear();
 	_dbNodeVec.clear();
@@ -96,7 +97,11 @@ void CServerConfig::PrintServerSettingInfo()
 {
 	LOG_INFO(_T("###################################################################"));
 	LOG_INFO(_T("--------------- [Start Print : Server Setting Info] ---------------"));
-	LOG_INFO(_T("Name : %s"), _tszServerName);
+	LOG_INFO(_T("ServiceName : %s"), _tszServiceName);
+	LOG_INFO(_T("DisplayName : %s"), _tszDisplayName);
+	LOG_INFO(_T("ServerName : %s"), _tszServerName);
+	LOG_INFO(_T("ServerGroupId : %d"), _nServerGroupId);
+	LOG_INFO(_T("ServerChannelId : %d"), _nServerChannelId);
 	LOG_INFO(_T("IP : %s"), _tszIP);
 	LOG_INFO(_T("Port : %d"), _nServerPort);
 	LOG_INFO(_T("KeepAliveSec : %d"), _nKeepAliveSec);

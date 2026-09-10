@@ -1,5 +1,4 @@
-﻿
-//***************************************************************************
+﻿//***************************************************************************
 // RedisServerHeartbeat.h : interface for the CRedisServerHeartbeat class.
 //
 //***************************************************************************
@@ -14,6 +13,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
+#include <functional>
 
 //***************************************************************************
 // @class CRedisServerHeartbeat
@@ -21,8 +21,8 @@
 //        TTL을 갱신(EXPIRE)하여 "살아있음"을 알리는 클래스.
 //
 // @details
-// 등록 키: "Server:{serverType}:{serverId}" (Redis Hash)
-//     필드: serverType, serverId, port, pid, startedAt, updatedAt
+// 등록 키: "{serverName}:{serverGroupId}:{serverChannelId}" (Redis Hash)
+//     필드: serverName, serverGroupId, serverChannelId, port, pid, sessionCount, startedAt, updatedAt
 //
 // TTL 기반 자동 정리:
 //     kTtlSec(살아있음으로 간주할 시간)을 걸어두고, 그보다 충분히 짧은
@@ -58,11 +58,24 @@
 class CRedisServerHeartbeat
 {
 public:
-	CRedisServerHeartbeat(CRedisService* redisService, std::string serverType, std::string serverId, uint16 port);
+	CRedisServerHeartbeat(CRedisService* redisService, std::string serverName, std::string serverGroupId, std::string serverChannelId, uint16 port);
 	~CRedisServerHeartbeat();
 
 	CRedisServerHeartbeat(const CRedisServerHeartbeat&) = delete;
 	CRedisServerHeartbeat& operator=(const CRedisServerHeartbeat&) = delete;
+
+	//***************************************************************************
+	// @brief 매 heartbeat 갱신마다(최초 등록 + 이후 매 주기) 호출해 "지금 이
+	//        서버의 세션 수(동접자수)"를 물어볼 콜백을 등록합니다.
+	// @details 콜백은 heartbeat 전용 스레드에서 호출된다(RegisterInitial()/
+	//          SendHeartbeat()가 그 스레드에서 실행됨) — 세션 매니저의
+	//          GetSessionCount()는 락 기반 스냅샷 카운트라 다른 스레드에서
+	//          불러도 안전하다. Start() 호출 *전에* 등록해야 최초 등록
+	//          (RegisterInitial())부터 값이 반영된다 — 등록하지 않으면
+	//          (또는 nullptr이면) sessionCount 필드는 항상 0으로 채워진다.
+	//***************************************************************************
+	using SessionCountProvider = std::function<int32()>;
+	void SetSessionCountProvider(SessionCountProvider provider) { _sessionCountProvider = std::move(provider); }
 
 	//***************************************************************************
 	// @brief Redis에 최초 등록(HSET) 후 주기적 EXPIRE 갱신 스레드를 시작합니다.
@@ -86,27 +99,22 @@ private:
 	std::string		BuildKey() const;
 
 private:
-	//***************************************************************************
-	// @brief Redis 및 서버 식별 정보
-	//***************************************************************************
-	CRedisService* _redisService = nullptr;			// Redis 커넥션 관리 서비스 포인터
-	std::string			_serverType;				// 서버 종류 (예: GameServer, MasterServer)
-	std::string			_serverId;					// 서버 ID (예: 1, 2, 101)
-	uint16				_port = 0;					// 서버 바인딩 포트 번호
+private:
+	CRedisService*			_redisService = nullptr;	// Redis 명령 전송 대상 객체 포인터 (비소유 참조)
+	std::string				_serverName;				// 서버 이름 (예: "ChatServer")
+	std::string				_serverGroupId;				// 서버 그룹 ID (예: "1")
+	std::string				_serverChannelId;			// 서버 채널/인스턴스 ID (예: "101")
+	uint16					_port = 0;					// 서버 바인딩 포트 번호
 
-	//***************************************************************************
-	// @brief 주기 및 TTL 설정
-	//***************************************************************************
-	int32				_ttlSec = 15;				// 살아있음으로 간주할 시간 (초 단위)
-	int32				_heartbeatIntervalSec = 5;	// Heartbeat(EXPIRE) 갱신 주기 (초 단위)
+	int32					_ttlSec = 15;				// Redis 키 유지 시간 (TTL, 초 단위)
+	int32					_heartbeatIntervalSec = 5;	// Heartbeat(EXPIRE 갱신) 전송 주기 (초 단위)
 
-	//***************************************************************************
-	// @brief 스레드 및 동기화 객체
-	//***************************************************************************
-	std::thread				_thread;				// Heartbeat 주기적 갱신을 담당하는 전용 스레드
-	std::mutex				_lock;                  // _cv 조건 변수의 대기/신호 전달 전용 뮤텍스
-	std::condition_variable	_cv;					// Heartbeat 주기 대기 및 즉시 종료 신호 수신용 조건 변수
-	std::atomic<bool>		_stopping{ false };		// 스레드 정지 요청 여부 플래그 (스레드 간 원자적 공유)
+	SessionCountProvider	_sessionCountProvider;		// 현재 접속자 수를 조회하는 콜백 함수
+
+	std::thread				_thread;					// Heartbeat 루프를 수행하는 전용 워커 스레드
+	std::mutex				_lock;						// 조건 변수(_cv) 대기용 뮤텍스
+	std::condition_variable	_cv;						// 정지 요청 시 스레드 대기를 즉시 깨우기 위한 조건 변수
+	std::atomic<bool>		_stopping{ false };			// 스레드 종료 진행 여부 플래그 (중복 종료 방지 및 루프 탈출용)
 };
 
 #endif // ndef UC_REDISSERVERHEARTBEAT_H
