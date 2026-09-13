@@ -25,6 +25,8 @@
 #include <Network/RingBuffer.h>
 #include <Network/Session.h>
 #include <Network/NetService.h>
+#include <Network/Packet.h>
+#include <Network/PacketDispatcher.h>
 
 #if defined(USE_NETWORK_IOCP)
 #include <Network/IOCP/IocpCommon.h>

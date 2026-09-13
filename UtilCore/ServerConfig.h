@@ -100,6 +100,15 @@ public:
 	int32 GetHeartbeatIntervalSec() { return _nHeartbeatIntervalSec; }
 
 	//***************************************************************************
+	// @brief 클라이언트에게 알려줄 파일 서버 주소를 반환합니다.
+	// @details 프로필 이미지 업로드를 처리하는 별도 서버(이 프로세스와는
+	//          별개)의 주소 — 예: "http://192.168.0.10:8081". 설정 파일에
+	//          없으면 빈 문자열이며, 이 경우 클라이언트는 업로드 토큰
+	//          발급 요청에 실패 응답을 받게 된다(ChatServerMain::RequestUploadToken()).
+	//***************************************************************************
+	TCHAR* GetFileServerUrl() { return _tszFileServerUrl; }
+
+	//***************************************************************************
 	// @brief 서버 노드 목록의 참조를 반환합니다.
 	// @return 서버 노드 Vector 참조
 	//***************************************************************************
@@ -162,6 +171,7 @@ public:
 		value.AddMember(_T("DbWorkerThreadCnt"), _nDbWorkerThreadCnt, allocator);
 		value.AddMember(_T("HeartbeatTtlSec"), _nHeartbeatTtlSec, allocator);
 		value.AddMember(_T("HeartbeatIntervalSec"), _nHeartbeatIntervalSec, allocator);
+		value.AddMember(_T("FileServerUrl"), _tValue(_tszFileServerUrl, allocator), allocator);
 	}
 
 	//***************************************************************************
@@ -184,6 +194,7 @@ public:
 		_nDbWorkerThreadCnt = value[_T("DbWorkerThreadCnt")].GetInt();
 		_nHeartbeatTtlSec = value[_T("HeartbeatTtlSec")].GetInt();
 		_nHeartbeatIntervalSec = value[_T("HeartbeatIntervalSec")].GetInt();
+		_tcsncpy_s(_tszFileServerUrl, _countof(_tszFileServerUrl), value[_T("FileServerUrl")].GetString(), _TRUNCATE);
 	}
 
 protected:
@@ -207,6 +218,8 @@ private:
 	int32						_nDbWorkerThreadCnt;				// DB 처리 워커 스레드 수
 	int32						_nHeartbeatTtlSec;					// 하트비트 TTL(초)
 	int32						_nHeartbeatIntervalSec;				// 하트비트 갱신 주기(초)
+
+	TCHAR						_tszFileServerUrl[HOSTNAME_STRLEN];	// 클라이언트에게 알려줄 파일 서버 주소(프로필 이미지 업로드용, 채팅 서버와 별개 프로세스)
 
 	CVector<CServerNode>		_serverNodeVec;						// 연동 서버 노드 목록
 	CVector<CDBNode>			_dbNodeVec;							// DB 노드 목록

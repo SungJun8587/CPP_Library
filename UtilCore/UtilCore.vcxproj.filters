@@ -574,6 +574,12 @@
     <ClInclude Include="DB\DBAsyncPushHelper.h">
       <Filter>DB</Filter>
     </ClInclude>
+    <ClInclude Include="Network\Packet.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\PacketDispatcher.h">
+      <Filter>Network</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">
@@ -847,6 +853,9 @@
     </ClCompile>
     <ClCompile Include="Redis\RedisServerHeartbeat.cpp">
       <Filter>Redis</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\PacketDispatcher.cpp">
+      <Filter>Network</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

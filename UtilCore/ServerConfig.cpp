@@ -22,6 +22,7 @@ CServerConfig::CServerConfig()
 	memset(_tszDisplayName, 0, sizeof(_tszDisplayName));
 	memset(_tszServerName, 0, sizeof(_tszServerName));
 	memset(_tszIP, 0, sizeof(_tszIP));
+	memset(_tszFileServerUrl, 0, sizeof(_tszFileServerUrl));
 
 	Clear();
 }
@@ -73,6 +74,8 @@ bool CServerConfig::Init(const TCHAR* tszServerInfo)
 		return false;
 	}
 
+	_tcsncpy_s(_tszFileServerUrl, _countof(_tszFileServerUrl), jsonUtil[_T("FileServerUrl")], _TRUNCATE);
+
 	_serverNodeVec = jsonUtil.Deserialize<CVector<CServerNode>>(_T("ServerNode"));
 	_dbNodeVec = jsonUtil.Deserialize<CVector<CDBNode>>(_T("DBNode"));
 	_redisNodeVec = jsonUtil.Deserialize<CVector<CRedisNode>>(_T("RedisNode"));
@@ -111,6 +114,7 @@ void CServerConfig::PrintServerSettingInfo()
 	LOG_INFO(_T("DbWorkerThreadCnt : %d"), _nDbWorkerThreadCnt);
 	LOG_INFO(_T("HeartbeatTtlSec : %d"), _nHeartbeatTtlSec);
 	LOG_INFO(_T("HeartbeatIntervalSec : %d"), _nHeartbeatIntervalSec);
+	LOG_INFO(_T("FileServerUrl : %s"), _tszFileServerUrl);
 
 	LOG_INFO(_T("--------------- Connect ServerNode size : %d ---------------"), static_cast<int>(_serverNodeVec.size()));
 	for( uint32 i = 0; i < _serverNodeVec.size(); i++ )

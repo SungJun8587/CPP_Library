@@ -116,6 +116,8 @@
     <ClInclude Include="Network\NetworkCommon.h" />
     <ClInclude Include="Network\NetworkFactory.h" />
     <ClInclude Include="Network\NetworkRedefineDataType.h" />
+    <ClInclude Include="Network\Packet.h" />
+    <ClInclude Include="Network\PacketDispatcher.h" />
     <ClInclude Include="Network\RingBuffer.h" />
     <ClInclude Include="Network\RIO\RioBuffer.h" />
     <ClInclude Include="Network\RIO\RioCommon.h" />
@@ -232,6 +234,7 @@
     <ClCompile Include="Network\NetAddress.cpp" />
     <ClCompile Include="Network\NetService.cpp" />
     <ClCompile Include="Network\NetworkFactory.cpp" />
+    <ClCompile Include="Network\PacketDispatcher.cpp" />
     <ClCompile Include="Network\RingBuffer.cpp" />
     <ClCompile Include="Network\RIO\RioBuffer.cpp" />
     <ClCompile Include="Network\RIO\RioConnectDispatcher.cpp" />
