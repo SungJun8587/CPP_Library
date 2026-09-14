@@ -67,6 +67,48 @@ namespace HTTP
 		while( !sv.empty() && (sv.back() == ' ' || sv.back() == '\t') ) sv.remove_suffix(1);
 		return sv;
 	}
+
+	//***************************************************************************
+	// @brief RFC 3986 퍼센트 인코딩("%XX")을 원래 바이트로 디코딩합니다.
+	// @details MultipartFormParser.h(RFC 5987 filename*=)와
+	//          FormUrlEncodedParser.h(application/x-www-form-urlencoded)가
+	//          공통으로 쓰는 유틸이라 여기(공용 파싱 유틸리티)로 옮겼다.
+	//          결과는 원본 바이트 그대로(문자셋이 UTF-8이라는 전제하에 별도
+	//          변환 없이 그대로 둠). "%" 뒤에 유효한 16진수 두 글자가 없으면
+	//          그 "%"는 원본 그대로 둔다(관용적 처리 — 엄격한 RFC 위반 검출이
+	//          목적이 아니므로).
+	//***************************************************************************
+	inline std::string PercentDecode(std::string_view encoded)
+	{
+		auto hexDigit = [](char c) -> int
+			{
+				if( c >= '0' && c <= '9' ) return c - '0';
+				if( c >= 'a' && c <= 'f' ) return c - 'a' + 10;
+				if( c >= 'A' && c <= 'F' ) return c - 'A' + 10;
+				return -1;
+			};
+
+		std::string result;
+		result.reserve(encoded.size());
+
+		for( size_t i = 0; i < encoded.size(); ++i )
+		{
+			if( encoded[i] == '%' && i + 2 < encoded.size() )
+			{
+				const int hi = hexDigit(encoded[i + 1]);
+				const int lo = hexDigit(encoded[i + 2]);
+				if( hi >= 0 && lo >= 0 )
+				{
+					result.push_back(static_cast<char>((hi << 4) | lo));
+					i += 2;
+					continue;
+				}
+			}
+			result.push_back(encoded[i]);
+		}
+
+		return result;
+	}
 }
 
 #endif // ndef UC_HTTPPARSEUTIL_H

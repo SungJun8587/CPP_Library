@@ -580,6 +580,12 @@
     <ClInclude Include="Network\PacketDispatcher.h">
       <Filter>Network</Filter>
     </ClInclude>
+    <ClInclude Include="Network\HTTP\FormUrlEncodedParser.h">
+      <Filter>Network\HTTP</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\HTTP\MultipartFormParser.h">
+      <Filter>Network\HTTP</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">
