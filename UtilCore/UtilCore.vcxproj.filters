@@ -70,6 +70,9 @@
     <Filter Include="Redis">
       <UniqueIdentifier>{af4525ed-529e-41cf-bce7-32c35192c31b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Image">
+      <UniqueIdentifier>{828a3a25-d518-4a82-8968-58c71b01389d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Memory\Containers.h">
@@ -586,6 +589,45 @@
     <ClInclude Include="Network\HTTP\MultipartFormParser.h">
       <Filter>Network\HTTP</Filter>
     </ClInclude>
+    <ClInclude Include="Image\BmpCodec.h">
+      <Filter>Image</Filter>
+    </ClInclude>
+    <ClInclude Include="Image\Checksum.h">
+      <Filter>Image</Filter>
+    </ClInclude>
+    <ClInclude Include="Image\ColorSpace.h">
+      <Filter>Image</Filter>
+    </ClInclude>
+    <ClInclude Include="Image\Deflate.h">
+      <Filter>Image</Filter>
+    </ClInclude>
+    <ClInclude Include="Image\ICodec.h">
+      <Filter>Image</Filter>
+    </ClInclude>
+    <ClInclude Include="Image\ImageFilters.h">
+      <Filter>Image</Filter>
+    </ClInclude>
+    <ClInclude Include="Image\ImageIO.h">
+      <Filter>Image</Filter>
+    </ClInclude>
+    <ClInclude Include="Image\ImageProcessor.h">
+      <Filter>Image</Filter>
+    </ClInclude>
+    <ClInclude Include="Image\ImageTypes.h">
+      <Filter>Image</Filter>
+    </ClInclude>
+    <ClInclude Include="Image\Inflate.h">
+      <Filter>Image</Filter>
+    </ClInclude>
+    <ClInclude Include="Image\JpegCodec.h">
+      <Filter>Image</Filter>
+    </ClInclude>
+    <ClInclude Include="Image\PngCodec.h">
+      <Filter>Image</Filter>
+    </ClInclude>
+    <ClInclude Include="Image\ImageCommon.h">
+      <Filter>Image</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">
@@ -862,6 +904,39 @@
     </ClCompile>
     <ClCompile Include="Network\PacketDispatcher.cpp">
       <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Image\BmpCodec.cpp">
+      <Filter>Image</Filter>
+    </ClCompile>
+    <ClCompile Include="Image\Checksum.cpp">
+      <Filter>Image</Filter>
+    </ClCompile>
+    <ClCompile Include="Image\ColorSpace.cpp">
+      <Filter>Image</Filter>
+    </ClCompile>
+    <ClCompile Include="Image\Deflate.cpp">
+      <Filter>Image</Filter>
+    </ClCompile>
+    <ClCompile Include="Image\ImageFilters.cpp">
+      <Filter>Image</Filter>
+    </ClCompile>
+    <ClCompile Include="Image\ImageIO.cpp">
+      <Filter>Image</Filter>
+    </ClCompile>
+    <ClCompile Include="Image\ImageProcessor.cpp">
+      <Filter>Image</Filter>
+    </ClCompile>
+    <ClCompile Include="Image\ImageTypes.cpp">
+      <Filter>Image</Filter>
+    </ClCompile>
+    <ClCompile Include="Image\Inflate.cpp">
+      <Filter>Image</Filter>
+    </ClCompile>
+    <ClCompile Include="Image\JpegCodec.cpp">
+      <Filter>Image</Filter>
+    </ClCompile>
+    <ClCompile Include="Image\PngCodec.cpp">
+      <Filter>Image</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

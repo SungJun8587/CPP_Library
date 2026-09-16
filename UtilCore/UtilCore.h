@@ -191,6 +191,8 @@ using namespace std;
 #include <Redis/HiRedisConn.h>
 #include <Redis/RedisCommon.h>
 
+#include <Image/ImageCommon.h>
+
 #include <WindowsServiceBase.h>
 
 #endif // ndef UC_UTILCORE_H
