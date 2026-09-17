@@ -71,9 +71,11 @@
     <ClInclude Include="GcpService\GcpServiceAccountAuth.h" />
     <ClInclude Include="GcpService\JsonFieldExtract.h" />
     <ClInclude Include="Image\BmpCodec.h" />
+    <ClInclude Include="Image\Canvas.h" />
     <ClInclude Include="Image\Checksum.h" />
     <ClInclude Include="Image\ColorSpace.h" />
     <ClInclude Include="Image\Deflate.h" />
+    <ClInclude Include="Image\FileManager.h" />
     <ClInclude Include="Image\ICodec.h" />
     <ClInclude Include="Image\ImageCommon.h" />
     <ClInclude Include="Image\ImageFilters.h" />
@@ -83,6 +85,8 @@
     <ClInclude Include="Image\Inflate.h" />
     <ClInclude Include="Image\JpegCodec.h" />
     <ClInclude Include="Image\PngCodec.h" />
+    <ClInclude Include="Image\Quantize.h" />
+    <ClInclude Include="Image\Sprite.h" />
     <ClInclude Include="Job\GlobalQueue.h" />
     <ClInclude Include="Job\Job.h" />
     <ClInclude Include="Job\JobCommon.h" />
@@ -230,9 +234,11 @@
     <ClCompile Include="DB\OdbcConnPool.cpp" />
     <ClCompile Include="EXCEL\XlntUtil.cpp" />
     <ClCompile Include="Image\BmpCodec.cpp" />
+    <ClCompile Include="Image\Canvas.cpp" />
     <ClCompile Include="Image\Checksum.cpp" />
     <ClCompile Include="Image\ColorSpace.cpp" />
     <ClCompile Include="Image\Deflate.cpp" />
+    <ClCompile Include="Image\FileManager.cpp" />
     <ClCompile Include="Image\ImageFilters.cpp" />
     <ClCompile Include="Image\ImageIO.cpp" />
     <ClCompile Include="Image\ImageProcessor.cpp" />
@@ -240,6 +246,8 @@
     <ClCompile Include="Image\Inflate.cpp" />
     <ClCompile Include="Image\JpegCodec.cpp" />
     <ClCompile Include="Image\PngCodec.cpp" />
+    <ClCompile Include="Image\Quantize.cpp" />
+    <ClCompile Include="Image\Sprite.cpp" />
     <ClCompile Include="Job\GlobalQueue.cpp" />
     <ClCompile Include="Job\Job.cpp" />
     <ClCompile Include="Job\JobQueue.cpp" />
