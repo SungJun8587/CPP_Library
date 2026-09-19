@@ -530,43 +530,95 @@ bool ReadFile(std::vector<BYTE>& byteDestination, const TCHAR* ptszFullPath)
 //***************************************************************************
 bool ReadFileMap(std::vector<BYTE>& byteDestination, const TCHAR* ptszFullPath)
 {
-	DWORD	dwLength = 0;
-	HANDLE	hFile, hFileMap;
-	LPVOID	lpvFile;
+	byteDestination.clear();
 
-	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
+	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) == 0 )
+		return false;
 
-	hFile = ::CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	// 1. 파일 열기
+	HANDLE hFile = ::CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, nullptr);
 	if( hFile == INVALID_HANDLE_VALUE )
 		return false;
 
-	dwLength = GetFileSize(ptszFullPath);
+	// 2. 파일 크기 확인
+	LARGE_INTEGER liFileSize = {};
+	if( !::GetFileSizeEx(hFile, &liFileSize) || liFileSize.QuadPart < 0 )
+	{
+		::CloseHandle(hFile);
+		return false;
+	}
 
-	// 파일 매핑 객체 생성
-	hFileMap = ::CreateFileMapping(hFile, nullptr, PAGE_WRITECOPY, 0, dwLength, nullptr);
+	// 빈 파일 처리
+	if( liFileSize.QuadPart == 0 )
+	{
+		::CloseHandle(hFile);
+		return true;
+	}
+
+	// SIZE_T 범위 오버플로우 검사
+	const ULONGLONG ullFileSize = static_cast<ULONGLONG>(liFileSize.QuadPart);
+
+	if( ullFileSize > static_cast<ULONGLONG>((std::numeric_limits<SIZE_T>::max)()) )
+	{
+		::CloseHandle(hFile);
+		return false;
+	}
+
+	const SIZE_T fileSize = static_cast<SIZE_T>(ullFileSize);
+
+	// std::vector의 size_type 범위 확인
+	if( fileSize > (std::vector<BYTE>::max_size)() )
+	{
+		::CloseHandle(hFile);
+		return false;
+	}
+
+	// 3. 파일 매핑 객체 생성
+	//
+	// 파일을 읽기만 하므로 PAGE_READONLY / FILE_MAP_READ을 사용합니다.
+	// PAGE_WRITECOPY / FILE_MAP_COPY는 이 함수에서는 필요하지 않습니다.
+	const DWORD dwSizeHigh = static_cast<DWORD>(ullFileSize >> 32);
+	const DWORD dwSizeLow = static_cast<DWORD>(ullFileSize & 0xFFFFFFFFULL);
+
+	HANDLE hFileMap = ::CreateFileMapping(hFile, nullptr, PAGE_READONLY, dwSizeHigh, dwSizeLow, nullptr);
 	if( hFileMap == nullptr )
 	{
 		::CloseHandle(hFile);
 		return false;
 	}
 
-	// 뷰 생성하여 메모리 주소 획득
-	lpvFile = ::MapViewOfFile(hFileMap, FILE_MAP_COPY, 0, 0, 0);
-	if( lpvFile == nullptr )
+	// 4. 파일 뷰 생성
+	const BYTE* pFileData = static_cast<const BYTE*>(::MapViewOfFile(hFileMap, FILE_MAP_READ, 0, 0, 0));
+	if( pFileData == nullptr )
 	{
-		::CloseHandle(hFile);
 		::CloseHandle(hFileMap);
+		::CloseHandle(hFile);
 		return false;
 	}
 
-	// 파일 크기를 맞추고 메모리 복사 수행
-	byteDestination.resize(dwLength);
-	memcpy(byteDestination.data(), lpvFile, dwLength);
+	// 5. 메모리에서 vector로 전체 파일 복사
+	//
+	// resize()가 실패하면 std::bad_alloc이 발생할 수 있으므로,
+	// 파일 매핑 리소스와 별개로 예외가 발생할 수 있다는 점에 주의합니다.
+	try
+	{
+		byteDestination.resize(fileSize);
+		memcpy(byteDestination.data(), pFileData, fileSize);
+	}
+	catch( ... )
+	{
+		::UnmapViewOfFile(pFileData);
+		::CloseHandle(hFileMap);
+		::CloseHandle(hFile);
 
-	// 리소스 해제
-	::UnmapViewOfFile(lpvFile);
-	::CloseHandle(hFile);
+		byteDestination.clear();
+		return false;
+	}
+
+	// 6. 리소스 해제
+	::UnmapViewOfFile(pFileData);
 	::CloseHandle(hFileMap);
+	::CloseHandle(hFile);
 
 	return true;
 }
@@ -770,109 +822,248 @@ bool ReadFile(_tstring& destString, const TCHAR* ptszFullPath)
 //***************************************************************************
 bool ReadFileMap(_tstring& destString, const TCHAR* ptszFullPath)
 {
-	bool		bIsProcess = false;
-	DWORD		dwLength = 0;
-	EEncoding	eFileType = EEncoding::DEFAULT;
+	destString.clear();
 
-	HANDLE	hFile, hFileMap;
-	LPVOID	lpvFile;
+	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) == 0 )
+		return false;
 
-	if( ptszFullPath == nullptr || _tcslen(ptszFullPath) < 1 ) return false;
-
-	hFile = ::CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, nullptr);
+	// 1. 파일 열기
+	HANDLE hFile = ::CreateFile(ptszFullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, nullptr);
 	if( hFile == INVALID_HANDLE_VALUE )
 		return false;
 
-	eFileType = DetectFileEncoding(hFile);
+	// 2. 파일 인코딩 확인
+	const EEncoding eFileType = DetectFileEncoding(hFile);
 	if( eFileType == EEncoding::DEFAULT )
 	{
-		// 인코딩 판별 실패(최소 BOM 크기를 읽지 못함 등) - 매핑을 시도하지 않고 실패 처리
 		::CloseHandle(hFile);
 		return false;
 	}
 
-	dwLength = ::GetFileSize(hFile, nullptr);
+	// 3. 파일 크기 확인
+	LARGE_INTEGER liFileSize = {};
+	if( !::GetFileSizeEx(hFile, &liFileSize) || liFileSize.QuadPart < 0 )
+	{
+		::CloseHandle(hFile);
+		return false;
+	}
 
-	// [최적화] CreateFileMapping은 파일 포인터 위치와 무관하게 동작하므로
-	// 위에서 판별에 사용한 핸들을 재오픈 없이 그대로 매핑에 사용합니다.
-	hFileMap = ::CreateFileMapping(hFile, nullptr, PAGE_WRITECOPY, 0, dwLength, nullptr);
+	// 빈 파일 처리
+	if( liFileSize.QuadPart == 0 )
+	{
+		::CloseHandle(hFile);
+		return true;
+	}
+
+	// SIZE_T 범위 오버플로우 검사 (32bit 빌드 대응)
+	const ULONGLONG ullFileSize = static_cast<ULONGLONG>(liFileSize.QuadPart);
+	if( ullFileSize > static_cast<ULONGLONG>((std::numeric_limits<SIZE_T>::max)()) )
+	{
+		::CloseHandle(hFile);
+		return false;
+	}
+
+	const SIZE_T fileSize = static_cast<SIZE_T>(ullFileSize);
+
+	// 4. 파일 매핑 생성 및 뷰 매핑
+	const DWORD dwSizeHigh = static_cast<DWORD>(ullFileSize >> 32);
+	const DWORD dwSizeLow = static_cast<DWORD>(ullFileSize & 0xFFFFFFFFULL);
+
+	HANDLE hFileMap = ::CreateFileMapping(hFile, nullptr, PAGE_READONLY, dwSizeHigh, dwSizeLow, nullptr);
 	if( hFileMap == nullptr )
 	{
 		::CloseHandle(hFile);
 		return false;
 	}
 
-	lpvFile = ::MapViewOfFile(hFileMap, FILE_MAP_COPY, 0, 0, 0);
-	if( lpvFile == nullptr )
+	const BYTE* pFileData = static_cast<const BYTE*>(::MapViewOfFile(hFileMap, FILE_MAP_READ, 0, 0, 0));
+	if( pFileData == nullptr )
 	{
-		::CloseHandle(hFile);
 		::CloseHandle(hFileMap);
+		::CloseHandle(hFile);
 		return false;
 	}
 
-	bIsProcess = true;
+	bool bIsProcess = true;
+
+	// 5. BOM 및 실제 데이터 오프셋 결정
+	const BYTE* pData = pFileData;
+	SIZE_T dataLen = fileSize;
+
+	switch( eFileType )
+	{
+	case EEncoding::UTF16_LE:
+	case EEncoding::UTF16_BE:
+	{
+		if( fileSize < 2 )
+		{
+			bIsProcess = false;
+			break;
+		}
+
+		pData += 2;
+		dataLen -= 2;
+		break;
+	}
+	case EEncoding::UTF8_BOM:
+	{
+		if( fileSize < 3 )
+		{
+			bIsProcess = false;
+			break;
+		}
+
+		pData += 3;
+		dataLen -= 3;
+		break;
+	}
+	case EEncoding::UTF8_NOBOM:
+	case EEncoding::ANSI:
+		break;
+	default:
+		bIsProcess = false;
+		break;
+	}
+
+	// 6. 데이터 변환 처리
+	if( bIsProcess && dataLen > 0 )
+	{
+		const char* pMultibyteData = reinterpret_cast<const char*>(pData);
+
+		switch( eFileType )
+		{
+		case EEncoding::UTF16_LE:
+		case EEncoding::UTF16_BE:
+		{
+			// UTF-16은 반드시 2바이트 단위로 구성되어야 합니다.
+			if( (dataLen & 1) != 0 )
+			{
+				bIsProcess = false;
+				break;
+			}
+
+			const SIZE_T wcharCount = dataLen / 2;
 
 #ifdef _UNICODE
-	if( eFileType == EEncoding::UTF16_LE )
-	{
-		destString = (wchar_t*)lpvFile + 1;
-	}
-	else if( eFileType == EEncoding::UTF16_BE )
-	{
-		std::wstring temp((wchar_t*)lpvFile + 1);
-		for( wchar_t& ch : temp )
-		{
-			ch = SWAP16(ch);
-		}
+			if( wcharCount > destString.max_size() )
+			{
+				bIsProcess = false;
+				break;
+			}
 
-		destString = temp;
-	}
-	else if( eFileType == EEncoding::UTF8_BOM )
-	{
-		if( Utf8ToUnicode_String(destString, (char*)lpvFile + 3, dwLength + 1) != 0 ) bIsProcess = false;
-	}
-	else if( eFileType == EEncoding::UTF8_NOBOM )
-	{
-		if( Utf8ToUnicode_String(destString, (char*)lpvFile, dwLength + 1) != 0 ) bIsProcess = false;
-	}
-	else if( eFileType == EEncoding::ANSI )
-	{
-		if( AnsiToUnicode_String(destString, (char*)lpvFile, dwLength + 1) != 0 ) bIsProcess = false;
-	}
+			destString.resize(wcharCount);
+
+			const bool bBigEndian = (eFileType == EEncoding::UTF16_BE);
+
+			for( SIZE_T i = 0; i < wcharCount; ++i )
+			{
+				const SIZE_T offset = i * 2;
+				uint16_t value;
+
+				if( bBigEndian )
+				{
+					value = static_cast<uint16_t>((static_cast<uint16_t>(pData[offset]) << 8) | static_cast<uint16_t>(pData[offset + 1]));
+				}
+				else
+				{
+					value = static_cast<uint16_t>(static_cast<uint16_t>(pData[offset]) | (static_cast<uint16_t>(pData[offset + 1]) << 8));
+				}
+
+				destString[i] = static_cast<TCHAR>(value);
+			}
 #else
-	if( eFileType == EEncoding::UTF16_LE )
-	{
-		if( UnicodeToAnsi_String(destString, (wchar_t*)lpvFile + 1, dwLength + 1) != 0 ) bIsProcess = false;
-	}
-	else if( eFileType == EEncoding::UTF16_BE )
-	{
-		std::wstring temp((wchar_t*)lpvFile + 1);
-		for( wchar_t& ch : temp )
+
+			{
+				std::wstring wstr;
+
+				if( wcharCount > wstr.max_size() )
+				{
+					bIsProcess = false;
+					break;
+				}
+
+				wstr.resize(wcharCount);
+
+				const bool bBigEndian = (eFileType == EEncoding::UTF16_BE);
+
+				for( SIZE_T i = 0; i < wcharCount; ++i )
+				{
+					const SIZE_T offset = i * 2;
+					uint16_t value;
+
+					if( bBigEndian )
+					{
+						value = static_cast<uint16_t>((static_cast<uint16_t>(pData[offset]) << 8) | static_cast<uint16_t>(pData[offset + 1]));
+					}
+					else
+					{
+						value = static_cast<uint16_t>(static_cast<uint16_t>(pData[offset]) | (static_cast<uint16_t>(pData[offset + 1]) << 8));
+					}
+
+					wstr[i] = static_cast<wchar_t>(value);
+				}
+
+				if( !wstr.empty() )
+				{
+					// NUL 포함(+1)이 아닌 실제 char 개수(wstr.size()) 전달
+					if( UnicodeToAnsi_String(destString, wstr.c_str(), wstr.size()) != 0 )
+					{
+						bIsProcess = false;
+					}
+				}
+			}
+#endif
+			break;
+		}
+		case EEncoding::UTF8_BOM:
+		case EEncoding::UTF8_NOBOM:
 		{
-			ch = SWAP16(ch);
+#ifdef _UNICODE
+			// std::string 할당 없이 포인터(pMultibyteData)와 정확한 길이(dataLen)를 직접 전달
+			if( Utf8ToUnicode_String(destString, pMultibyteData, dataLen) != 0 )
+			{
+				bIsProcess = false;
+			}
+#else
+			if( Utf8ToAnsi_String(destString, pMultibyteData, dataLen) != 0 )
+			{
+				bIsProcess = false;
+			}
+#endif
+			break;
+		}
+		case EEncoding::ANSI:
+		{
+#ifdef _UNICODE
+			if( AnsiToUnicode_String(destString, pMultibyteData, dataLen) != 0 )
+			{
+				bIsProcess = false;
+			}
+#else
+			destString.assign(pMultibyteData, dataLen);
+#endif
+			break;
 		}
 
-		if( UnicodeToAnsi_String(destString, temp.data(), temp.size() + 1) != 0 ) bIsProcess = false;
+		default:
+			bIsProcess = false;
+			break;
+		}
 	}
-	else if( eFileType == EEncoding::UTF8_BOM )
-	{
-		if( Utf8ToAnsi_String(destString, (char*)lpvFile + 3, dwLength + 1) != 0 ) bIsProcess = false;
-	}
-	else if( eFileType == EEncoding::UTF8_NOBOM )
-	{
-		if( Utf8ToAnsi_String(destString, (char*)lpvFile, dwLength + 1) != 0 ) bIsProcess = false;
-	}
-	else if( eFileType == EEncoding::ANSI )
-	{
-		destString = (char*)lpvFile;
-	}
-#endif
 
-	::UnmapViewOfFile(lpvFile);
-	::CloseHandle(hFile);
+	// 7. 자원 해제
+	::UnmapViewOfFile(pFileData);
 	::CloseHandle(hFileMap);
+	::CloseHandle(hFile);
 
-	return bIsProcess;
+	// 8. 실패 시 안전하게 Clear
+	if( !bIsProcess )
+	{
+		destString.clear();
+		return false;
+	}
+
+	return true;
 }
 
 //***************************************************************************
