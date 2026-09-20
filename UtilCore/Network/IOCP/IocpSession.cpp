@@ -90,13 +90,15 @@ void CIocpSession::ProcessConnect()
 	// Send 대기 중(또는 in-flight) 상태로 끊긴 뒤 이 세션 객체가 재사용되면
 	// (1) _sendRegistered가 true로 남아 Send()가 영원히 RegisterSend()를
 	//     트리거하지 못해(exchange(true)==false를 통과 못함) 송신이 마비되고,
-	// (2) _sendQueue에 남아있던 이전 연결의 미전송 버퍼가 이후 어떤 경로로든
-	//     RegisterSend()가 걸릴 때 새 클라이언트에게 그대로 전송되는
-	//     세션 간 데이터 혼선이 발생한다. RegisterSend()의 즉시 실패 분기가
-	//     동일하게 정리하는 것과 대칭되도록 여기서도 락 하에 정리한다.
+	// (2) _sendQueue/_sendEvent에 남아있던 이전 연결의 미전송 버퍼가 이후
+	//     어떤 경로로든 RegisterSend()가 걸릴 때 새 클라이언트에게 그대로
+	//     전송되는 세션 간 데이터 혼선이 발생한다. RegisterSend()의 즉시
+	//     실패 분기가 동일하게 정리하는 것과 대칭되도록 여기서도 락 하에
+	//     정리한다. _sendEvent.Reset()으로 partial-send 커서까지 함께 초기화.
 	{
 		std::lock_guard<std::mutex> guard(_lock);
 		_sendQueue.clear();
+		_sendEvent.Reset();
 		_sendRegistered.store(false);
 	}
 
@@ -279,7 +281,14 @@ void CIocpSession::ProcessRecv(int32 numOfBytes)
 }
 
 //***************************************************************************
-// @brief 비동기 데이터 송신(WSASend) 등록 (Scatter-Gather 패턴)
+// @brief 비동기 데이터 송신(WSASend) 등록 (Scatter-Gather, 부분 전송(Partial
+//        WSASend) 지원)
+// @details
+// _sendEvent.sendBuffers가 비어 있지 않으면 이전 WSASend의 partial-send
+// remainder가 존재하는 것이므로 _sendQueue에서 새로 꺼내지 않고 cursor
+// (currentBufferIndex/currentBufferOffset) 위치부터 이어서 보낸다.
+// 비어 있으면(=새 batch 시작) _sendQueue 전체를 스왑해오고 cursor를 0으로
+// 리셋한다.
 //***************************************************************************
 void CIocpSession::RegisterSend()
 {
@@ -289,21 +298,27 @@ void CIocpSession::RegisterSend()
 	_sendEvent.Init();
 	_sendEvent.owner = GetIocpObjectPtr(); // Ref +1
 
-	// Scatter-Gather: SendQueue에 쌓인 모든 버퍼를 꺼내 1회 WSASend로 전송
+	if( _sendEvent.sendBuffers.empty() )
 	{
+		// 새 batch: _sendQueue 전체를 이번 WSASend의 lifetime owner로 이동한다.
 		std::lock_guard<std::mutex> guard(_lock);
-		_sendEvent.sendBuffers.swap(_sendQueue); // 원본 ref count 보장용 백업
+		_sendEvent.sendBuffers.swap(_sendQueue);
+
+		_sendEvent.currentBufferIndex = 0;
+		_sendEvent.currentBufferOffset = 0;
 	}
+	// else: partial-send remainder가 존재 — sendBuffers/cursor를 그대로 두고
+	//       이어서 보낸다 (ProcessSend()가 remainder가 있을 때만 sendBuffers를
+	//       비우지 않고 여기로 재진입시킨다).
 
-	CVector<WSABUF> wsaBufs;
-	wsaBufs.reserve(_sendEvent.sendBuffers.size());
-
-	for( CSendBufferRef& sendBuffer : _sendEvent.sendBuffers )
+	if( !BuildSendWsaBuffers() )
 	{
-		WSABUF wsaBuf;
-		wsaBuf.buf = reinterpret_cast<char*>(sendBuffer->Buffer());
-		wsaBuf.len = static_cast<ULONG>(sendBuffer->WriteSize());
-		wsaBufs.push_back(wsaBuf);
+		// 전송할 데이터가 하나도 없는 이례적 상황(정상 흐름에서는 발생하지
+		// 않아야 함) — 안전하게 정리하고 종료한다.
+		_sendEvent.owner = nullptr;
+		_sendEvent.Reset();
+		_sendRegistered.store(false);
+		return;
 	}
 
 	DWORD numOfBytes = 0;
@@ -312,7 +327,8 @@ void CIocpSession::RegisterSend()
 	// 절대 안 옴) 바로 롤백한다 — TryFinalizeDisconnect()의 설명 참고.
 	_pendingIoCount.fetch_add(1, std::memory_order_seq_cst);
 
-	if( ::WSASend(_socket, wsaBufs.data(), static_cast<DWORD>(wsaBufs.size()), OUT & numOfBytes, 0, static_cast<LPOVERLAPPED>(&_sendEvent), nullptr) == SOCKET_ERROR )
+	if( ::WSASend(_socket, _sendEvent.wsaBufs.data(), static_cast<DWORD>(_sendEvent.wsaBufs.size()),
+		OUT & numOfBytes, 0, static_cast<LPOVERLAPPED>(&_sendEvent), nullptr) == SOCKET_ERROR )
 	{
 		int32 errorCode = ::WSAGetLastError();
 		if( errorCode != WSA_IO_PENDING )
@@ -331,11 +347,90 @@ void CIocpSession::RegisterSend()
 
 			std::lock_guard<std::mutex> guard(_lock);
 			_sendEvent.owner = nullptr;
-			_sendEvent.sendBuffers.clear();
+			_sendEvent.Reset();
 			_sendQueue.clear();
 			_sendRegistered.store(false);
 		}
 	}
+}
+
+//***************************************************************************
+// @brief 현재 SendEvent cursor(currentBufferIndex/currentBufferOffset)
+//        위치부터 WSABUF 배열(_sendEvent.wsaBufs)을 구성합니다.
+// @return 전송할 데이터가 하나 이상 있으면 true, 없으면 false.
+// @details
+// cursor 이전의 데이터는 이미 전송이 완료된 데이터이므로 WSABUF에 포함하지
+// 않는다. cursor가 가리키는 첫 번째 buffer만 currentBufferOffset을 적용하고,
+// 그 이후의 buffer는 처음부터(offset 0) 전송 대상에 포함시킨다.
+//***************************************************************************
+bool CIocpSession::BuildSendWsaBuffers()
+{
+	_sendEvent.wsaBufs.clear();
+
+	const size_t bufferCount = _sendEvent.sendBuffers.size();
+	if( _sendEvent.currentBufferIndex >= bufferCount )
+		return false;
+
+	for( size_t i = _sendEvent.currentBufferIndex; i < bufferCount; ++i )
+	{
+		CSendBufferRef& sendBuffer = _sendEvent.sendBuffers[i];
+		if( sendBuffer == nullptr )
+			return false;
+
+		const uint32 writeSize = sendBuffer->WriteSize();
+		const uint32 offset = (i == _sendEvent.currentBufferIndex)
+			? _sendEvent.currentBufferOffset
+			: 0;
+
+		if( offset >= writeSize )
+			continue;
+
+		WSABUF wsaBuf;
+		wsaBuf.buf = reinterpret_cast<char*>(sendBuffer->Buffer() + offset);
+		wsaBuf.len = static_cast<ULONG>(writeSize - offset);
+		_sendEvent.wsaBufs.push_back(wsaBuf);
+	}
+
+	return !_sendEvent.wsaBufs.empty();
+}
+
+//***************************************************************************
+// @brief WSASend 완료로 전달된 numOfBytes만큼 SendEvent cursor를 이동합니다.
+// @param numOfBytes 이번 WSASend 완료로 실제 전송된 바이트 수
+// @return numOfBytes가 현재 등록된 전송 범위(sendBuffers 총 잔여량)를
+//         벗어나지 않으면 true, 벗어나면 false.
+//***************************************************************************
+bool CIocpSession::AdvanceSendCursor(uint32 numOfBytes)
+{
+	uint64 remaining = numOfBytes;
+
+	while( remaining > 0 )
+	{
+		if( _sendEvent.currentBufferIndex >= _sendEvent.sendBuffers.size() )
+			return false;
+
+		CSendBufferRef& sendBuffer = _sendEvent.sendBuffers[_sendEvent.currentBufferIndex];
+		if( sendBuffer == nullptr )
+			return false;
+
+		const uint32 writeSize = sendBuffer->WriteSize();
+		if( _sendEvent.currentBufferOffset >= writeSize )
+			return false;
+
+		const uint32 available = writeSize - _sendEvent.currentBufferOffset;
+		const uint32 advance = static_cast<uint32>(std::min<uint64>(remaining, available));
+
+		_sendEvent.currentBufferOffset += advance;
+		remaining -= advance;
+
+		if( _sendEvent.currentBufferOffset == writeSize )
+		{
+			++_sendEvent.currentBufferIndex;
+			_sendEvent.currentBufferOffset = 0;
+		}
+	}
+
+	return true;
 }
 
 //***************************************************************************
@@ -360,25 +455,86 @@ void CIocpSession::RegisterDisconnect()
 //***************************************************************************
 // @brief 전송 완료 처리 (WSASend 완료 통지 시 호출)
 // @param numOfBytes 전송 완료된 바이트 수
+// @details
+// [핵심 — 부분 전송(Partial WSASend) 처리 시 pendingIoCount 감소 순서]
+// remainder(아직 다 보내지 못한 데이터)가 남아있는 completion에 대해서는,
+// 이번 completion의 _pendingIoCount 감소를 "다음 WSASend 재등록
+// (RegisterSend()의 fetch_add)이 끝난 뒤"로 미룬다.
+//
+// 순서를 바꾸지 않고 먼저 fetch_sub부터 하면:
+//     fetch_sub(1) → pendingIoCount == 0 (아직 remainder가 남아있는데도)
+//         ↓
+//     TryFinalizeDisconnect() → (disconnectCompleted도 true라면) OnDisconnected() 조기 통지
+//         ↓
+//     그제서야 remainder를 다음 WSASend로 재등록 시도
+// 라는 순서 역전(회귀)이 발생한다. 이는 ProcessRecv()/ProcessDisconnect()와
+// 달리 이번 completion 자체가 "논리적으로 끝난 작업"이 아니라 "같은 batch의
+// 중간 결과"이기 때문에 생기는 차이다.
+//
+// remainder가 없는 경우(=현재 batch 전체가 전송 완료됨)는 기존과 동일하게
+// 즉시 fetch_sub + TryFinalizeDisconnect()를 수행한다.
 //***************************************************************************
 void CIocpSession::ProcessSend(int32 numOfBytes)
 {
-	// [수정] ProcessRecv()와 동일한 이유로 함수 최상단에서 즉시 감소시킨다.
-	_pendingIoCount.fetch_sub(1, std::memory_order_seq_cst);
-	TryFinalizeDisconnect();
-
-	_sendEvent.owner = nullptr; // Ref -1
-	_sendEvent.sendBuffers.clear(); // 전송 끝난 SendBuffer 수명 해제
-
 	if( numOfBytes == 0 )
 	{
+		// WSASend 취소/실패 완료 — 정상적인 "논리적으로 끝난" completion이므로
+		// 기존과 동일하게 즉시 감소시킨다.
+		_pendingIoCount.fetch_sub(1, std::memory_order_seq_cst);
+		TryFinalizeDisconnect();
+
+		_sendEvent.owner = nullptr; // Ref -1
+		_sendEvent.Reset();         // 전송 끝난(취소된) SendBuffer 수명 해제 + 커서 초기화
+
 		Disconnect(Iocp::CloseReason::SocketError);
 		return;
 	}
 
+	if( !AdvanceSendCursor(static_cast<uint32>(numOfBytes)) )
+	{
+		// numOfBytes가 이번에 게시했던 전송 범위를 벗어남 — 정상적으로는
+		// 발생할 수 없는 상태(WSASend가 요청보다 더 많은 바이트를 보고한
+		// 경우 등). 내부 불변조건 위반으로 간주하고 연결을 끊는다.
+		_pendingIoCount.fetch_sub(1, std::memory_order_seq_cst);
+		TryFinalizeDisconnect();
+
+		_sendEvent.owner = nullptr;
+		_sendEvent.Reset();
+
+		Disconnect(Iocp::CloseReason::InternalError);
+		return;
+	}
+
+	_sendEvent.owner = nullptr; // 이번 completion에 대한 ref는 여기서 해제(Ref -1)
+
 	OnSend(numOfBytes);
 
-	// 대기 중인 남은 Send 데이터 확인 후 재등록
+	// cursor가 sendBuffers 끝에 도달하지 않았으면 아직 이 batch에 보낼
+	// 데이터가 남아있다는 뜻이다 (Partial WSASend).
+	const bool hasRemainder = _sendEvent.currentBufferIndex < _sendEvent.sendBuffers.size();
+
+	if( hasRemainder )
+	{
+		// [순서 중요] 다음 WSASend(내부에서 fetch_add)를 먼저 등록하고,
+		// 그 다음에 이번 completion의 fetch_sub를 수행한다. 이렇게 하면
+		// pendingIoCount가 두 completion 사이에서 순간적으로 0이 되는
+		// 구간이 없다.
+		RegisterSend();
+
+		_pendingIoCount.fetch_sub(1, std::memory_order_seq_cst);
+		TryFinalizeDisconnect();
+		return;
+	}
+
+	// 현재 batch(sendBuffers 전체)가 모두 전송 완료된 경우.
+	// 이 completion은 "논리적으로 끝난 작업"이므로 기존과 동일하게 처리한다.
+	_pendingIoCount.fetch_sub(1, std::memory_order_seq_cst);
+	TryFinalizeDisconnect();
+
+	_sendEvent.Reset(); // sendBuffers/wsaBufs/커서 전부 초기화 — SendBuffer ref 해제
+
+	// 대기 중인 남은 Send 데이터 확인 후 재등록 (OnSend() 안에서 새로운
+	// Send()가 큐에 들어왔을 수 있음)
 	bool hasPendingSend = false;
 	{
 		std::lock_guard<std::mutex> guard(_lock);

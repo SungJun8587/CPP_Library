@@ -10,6 +10,7 @@
 #include <Network/IOCP/IocpCore.h>
 #include <Network/IOCP/IocpEvent.h>
 #include <Network/RingBuffer.h>
+#include <Network/SocketUtils.h>
 
 #include <atomic>
 #include <mutex>
@@ -20,7 +21,8 @@
 // @details
 // 역할:
 //      1. 소켓 관리, WSARecv/WSASend/DisconnectEx 호출 및 완료 이벤트 처리
-//      2. Scatter-Gather Send 지원 (여러 패킷을 1회 WSASend로 일괄 전송)
+//      2. Scatter-Gather Send 지원 (여러 패킷을 1회 WSASend로 일괄 전송,
+//         부분 전송(Partial WSASend) 발생 시 SendEvent의 커서로 이어서 전송)
 //      3. CRingBuffer를 통한 제로카피 비동기 데이터 수신 관리 (WSARecv)
 //      4. 상위 응용 레이어(GameSession 등)로 가상 함수 이벤트(OnConnected 등) 전달
 //      5. ConnectEx를 통한 클라이언트 측 비동기 연결(ConnectAsync) 지원
@@ -132,6 +134,25 @@ private:
 	void			ProcessDisconnect();
 
 	//***************************************************************************
+	// @brief 현재 SendEvent의 cursor(currentBufferIndex/currentBufferOffset)
+	//        위치부터 WSABUF 배열(_sendEvent.wsaBufs)을 구성합니다.
+	// @return 전송할 데이터가 하나 이상 있으면 true, 없으면 false.
+	// @details 부분 전송(Partial WSASend) 지원의 일부. RegisterSend()에서
+	//          WSASend 호출 직전에 사용한다.
+	//***************************************************************************
+	bool			BuildSendWsaBuffers();
+
+	//***************************************************************************
+	// @brief WSASend 완료로 전달된 numOfBytes만큼 SendEvent cursor를 이동합니다.
+	// @param numOfBytes 이번 WSASend 완료로 실제 전송된 바이트 수
+	// @return numOfBytes가 현재 등록된 전송 범위(sendBuffers 총 잔여량)를
+	//         벗어나지 않으면 true, 벗어나면(있어서는 안 되는 상태) false.
+	// @details 부분 전송(Partial WSASend) 지원의 일부. ProcessSend()에서
+	//          가장 먼저 호출한다.
+	//***************************************************************************
+	bool			AdvanceSendCursor(uint32 numOfBytes);
+
+	//***************************************************************************
 	// @brief ConnectEx 비동기 연결을 실제로 게시합니다 (ConnectAsync() 내부에서 호출).
 	//***************************************************************************
 	void			RegisterConnect(const CNetAddress& remoteAddr);
@@ -174,6 +195,13 @@ private:
 	//          나중에 만족되든 그쪽이 실제로 통지를 트리거함) OnDisconnected()를
 	//          호출한다. _disconnectNotified로 이중 통지를 막는다.
 	//
+	//          [부분 전송(Partial WSASend) 관련 주의] ProcessSend()는 remainder가
+	//          남아있는 completion에 대해서는 다음 WSASend 재등록(_pendingIoCount
+	//          fetch_add)을 먼저 마친 뒤에야 이번 completion의 fetch_sub를
+	//          수행한다. 그렇지 않으면 remainder가 남았는데도 pendingIoCount가
+	//          순간적으로 0이 되어 여기서 조기에 OnDisconnected()를 통지하는
+	//          회귀가 발생한다.
+	//
 	//          [알려진 잔여 레이스 — 의도적으로 미해결] RegisterRecv()/RegisterSend()의
 	//          "IsConnected() 체크 후 post" 사이의 극히 좁은 틈에 Disconnect()가
 	//          끼어들면, 그 체크 통과 이후 실제 post(및 _pendingIoCount 증가)가
@@ -212,7 +240,7 @@ private:
 	std::atomic<bool>		_sendRegistered = false;        // WSASend 비동기 요청 중복 호출을 방지하는 원자적 등록 상태 플래그
 
 	RecvEvent				_recvEvent;                     // 비동기 수신(WSARecv) 요청 및 완료 처리를 위한 OVERLAPPED 이벤트 객체
-	SendEvent				_sendEvent;                     // 비동기 송신(WSASend) 요청 및 완료 처리를 위한 OVERLAPPED 이벤트 객체
+	SendEvent				_sendEvent;                     // 비동기 송신(WSASend) 요청 및 완료 처리를 위한 OVERLAPPED 이벤트 객체 (부분 전송 커서 보유)
 	DisconnectEvent			_disconnectEvent;               // 비동기 해제(DisconnectEx) 요청 및 완료 처리를 위한 OVERLAPPED 이벤트 객체
 	ConnectEvent			_connectEvent;                   // 비동기 연결(ConnectEx) 요청 및 완료 처리를 위한 OVERLAPPED 이벤트 객체 (클라이언트 전용)
 };

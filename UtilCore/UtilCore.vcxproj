@@ -114,12 +114,14 @@
     <ClInclude Include="Network\HTTP\HttpMultipartBuilder.h" />
     <ClInclude Include="Network\HTTP\HttpPacketBuilder.h" />
     <ClInclude Include="Network\HTTP\HttpParseUtil.h" />
+    <ClInclude Include="Network\HTTP\HttpRange.h" />
     <ClInclude Include="Network\HTTP\HttpRequestParser.h" />
     <ClInclude Include="Network\HTTP\HttpResponseParser.h" />
     <ClInclude Include="Network\HTTP\HttpSessionIocp.h" />
     <ClInclude Include="Network\HTTP\HttpSessionRio.h" />
     <ClInclude Include="Network\HTTP\HttpUrl.h" />
     <ClInclude Include="Network\HTTP\MultipartFormParser.h" />
+    <ClInclude Include="Network\HTTP\MultipartStreamParser.h" />
     <ClInclude Include="Network\HTTP\TlsFilter.h" />
     <ClInclude Include="Network\IOCP\IocpCommon.h" />
     <ClInclude Include="Network\IOCP\IocpCore.h" />
@@ -199,6 +201,7 @@
     <ClInclude Include="Util\ConsoleUtil.h" />
     <ClInclude Include="Util\DirectoryUtil.h" />
     <ClInclude Include="Util\EncodingConvert.h" />
+    <ClInclude Include="Util\FileStream.h" />
     <ClInclude Include="Util\TypeCast.h" />
     <ClInclude Include="Util\UniqNumGenerator.h" />
     <ClInclude Include="Util\WinCharsetConv.h" />
@@ -317,6 +320,7 @@
     <ClCompile Include="Util\CommonUtil.cpp" />
     <ClCompile Include="Util\DirectoryUtil.cpp" />
     <ClCompile Include="Util\EncodingConvert.cpp" />
+    <ClCompile Include="Util\FileStream.cpp" />
     <ClCompile Include="Util\UniqNumGenerator.cpp" />
     <ClCompile Include="Util\WinCharsetConv.cpp" />
     <ClCompile Include="Util\DateTimeUtil.cpp" />

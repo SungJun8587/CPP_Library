@@ -104,6 +104,8 @@ using namespace std;
 #include <Network/HTTP/HttpResponseParser.h>
 #include <Network/HTTP/FormUrlEncodedParser.h>
 #include <Network/HTTP/MultipartFormParser.h>
+#include <Network/HTTP/MultipartStreamParser.h>
+#include <Network/HTTP/HttpRange.h>
 #include <Network/HTTP/HttpPacketBuilder.h>
 #include <Network/HTTP/HttpClientCore.h>
 #include <Network/HTTP/HttpConnPoolCommon.h>
@@ -146,6 +148,7 @@ using namespace std;
 #include <Util/BitField.h>
 #include <Util/UniqNumGenerator.h>
 #include <Util/BitOperate.h>
+#include <Util/FileStream.h>
 
 #include <System/SystemBaseDefine.h>
 #include <System/PDHPerformanceObject.h>

@@ -40,6 +40,10 @@ enum class EEncoding
 	UTF8_NOBOM
 };
 
+// pBuffer/BuffSize 범위 내의 바이트열이 유효한(malformed 없는) UTF-8 멀티바이트
+// 시퀀스로만 구성되어 있는지 검사합니다(오버롱 인코딩, UTF-16 서로게이트 영역,
+// U+10FFFF 초과 등 malformed 시퀀스는 실패로 처리). 순수 ASCII만 있는 버퍼는
+// ANSI와 구분할 근거가 없으므로 false를 반환합니다(호출부에서 ANSI로 분류됨).
 bool		IsUTF8WithoutBom(const void* pBuffer, const size_t BuffSize);
 
 #ifdef _WIN32
@@ -55,7 +59,11 @@ bool		WriteFile(const TCHAR* ptszFullPath, const TCHAR* ptszBuffer, const size_t
 
 bool		GetFileInfoTime(const TCHAR* ptszFilePath, const int nCase, SYSTEMTIME& stLocal);
 bool		IsExistFile(const TCHAR* ptszFilePath);
-DWORD		GetFileSize(const TCHAR* ptszFilePath);
+
+// 파일 크기를 64비트 값으로 반환합니다(GetFileSizeEx 기반). 4GiB 이상의 파일도
+// 정확한 크기를 반환하며, 실패 시 0을 반환합니다.
+ULONGLONG	GetFileSize(const TCHAR* ptszFilePath);
+
 bool		GetFileInformation(const TCHAR* ptszFilePath, LPBY_HANDLE_FILE_INFORMATION lpFileInformation);
 bool		GetFileInfoAndEncoding(const TCHAR* ptszFullPath, LPBY_HANDLE_FILE_INFORMATION lpFileInformation, EEncoding& outEncoding);
 #endif

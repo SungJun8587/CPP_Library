@@ -640,6 +640,15 @@
     <ClInclude Include="Image\Sprite.h">
       <Filter>Image</Filter>
     </ClInclude>
+    <ClInclude Include="Network\HTTP\MultipartStreamParser.h">
+      <Filter>Network\HTTP</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\HTTP\HttpRange.h">
+      <Filter>Network\HTTP</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\FileStream.h">
+      <Filter>Util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">
@@ -961,6 +970,9 @@
     </ClCompile>
     <ClCompile Include="Image\Sprite.cpp">
       <Filter>Image</Filter>
+    </ClCompile>
+    <ClCompile Include="Util\FileStream.cpp">
+      <Filter>Util</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

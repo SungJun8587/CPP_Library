@@ -165,20 +165,62 @@ public:
 //     흐름:
 //     RegisterSend() → _sendQueue에서 전부 꺼내 sendBuffers에 보관
 //                    → WSABUF 배열 구성 후 WSASend 호출
-//     ProcessSend()  → sendBuffers.clear() → SendBuffer ref 해제
+//     ProcessSend()  → 전송 완료 시 sendBuffers.clear() (Reset() 경유)
+//                    → SendBuffer ref 해제
 //                    → SendBufferChunk ref count 감소 → 풀 반환
 //     
 //     이 벡터가 없으면:
 //         WSASend pending 중에 SendBuffer가 소멸 → WSABUF의 buf 포인터가 댕글링
+//
+//     [부분 전송(Partial WSASend) 지원 — 신규]
+//     WSASend는 요청한 전체 크기보다 적은 바이트만 전송하고 완료될 수 있다.
+//     이 경우 sendBuffers를 절대 비우지 않고, currentBufferIndex/
+//     currentBufferOffset만 갱신한 뒤 남은 데이터만 다시 WSASend한다.
+//     (CIocpSession::RegisterSend/ProcessSend/BuildSendWsaBuffers/
+//      AdvanceSendCursor 참고)
+//
+// wsaBufs / currentBufferIndex / currentBufferOffset:
+//     WSASend에 전달할 Scatter-Gather 버퍼와, 그 중 현재 전송 중인 위치를
+//     가리키는 커서. SendEvent가 재사용하므로 매번 지역 CVector<WSABUF>를
+//     새로 만들지 않는다. Reset()은 capacity를 유지한 채 clear()하므로
+//     반복되는 send에서 재할당 비용을 줄인다.
 //***************************************************************************
 class SendEvent : public CIocpEvent
 {
 public:
     SendEvent() : CIocpEvent(Iocp::EventType::Send) {}
 
+    //***************************************************************************
+    // @brief 현재 SendEvent의 전송 상태를 초기화합니다.
+    //
+    // @details
+    // 이 함수는 해당 WSASend가 더 이상 pending 상태가 아닐 때만 호출해야 한다.
+    // wsaBufs.clear()/sendBuffers.clear()는 capacity를 유지하므로 다음
+    // Scatter-Gather 전송에서 재할당을 줄일 수 있다.
+    //***************************************************************************
+    void Reset()
+    {
+        sendBuffers.clear();
+        wsaBufs.clear();
+
+        currentBufferIndex = 0;
+        currentBufferOffset = 0;
+    }
+
 public:
-    // WSASend pending 중 SendBuffer 수명 보장. ProcessSend 완료 후 clear()
+    // WSASend pending 중 SendBuffer 수명 보장. ProcessSend 완료(batch 전량 전송
+    // 완료) 후 Reset()으로 clear. 부분 전송에서는 모든 데이터가 전송될 때까지 유지.
     CVector<CSendBufferRef>   sendBuffers;
+
+    // WSASend에 전달할 Scatter-Gather 버퍼.
+    // SendEvent가 재사용하므로 지역 CVector 생성/소멸을 피한다.
+    CVector<WSABUF>           wsaBufs;
+
+    // 현재 전송 중인 sendBuffers[] 상의 index.
+    uint32                    currentBufferIndex = 0;
+
+    // 현재 sendBuffers[currentBufferIndex] 내부에서 이미 전송된 byte offset.
+    uint32                    currentBufferOffset = 0;
 };
 
 #endif // ndef UC_IOCPEVENT_H
