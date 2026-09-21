@@ -17,6 +17,7 @@
 CServerConfig::CServerConfig()
 	: _nServerGroupId(0), _nServerChannelId(0), _nServerPort(0), _nKeepAliveSec(0), _nMaxSessionCount(0)
 	, _nWorkerThreadCnt(0), _nRedisPoolSize(0), _nDbWorkerThreadCnt(0), _nHeartbeatTtlSec(0), _nHeartbeatIntervalSec(0)
+	, _nMaxRoomsPerOwner(0)
 {
 	memset(_tszServiceName, 0, sizeof(_tszServiceName));
 	memset(_tszDisplayName, 0, sizeof(_tszDisplayName));
@@ -75,6 +76,7 @@ bool CServerConfig::Init(const TCHAR* tszServerInfo)
 	}
 
 	_tcsncpy_s(_tszFileServerUrl, _countof(_tszFileServerUrl), jsonUtil[_T("FileServerUrl")], _TRUNCATE);
+	_nMaxRoomsPerOwner = jsonUtil[_T("MaxRoomsPerOwner")];
 
 	_serverNodeVec = jsonUtil.Deserialize<CVector<CServerNode>>(_T("ServerNode"));
 	_dbNodeVec = jsonUtil.Deserialize<CVector<CDBNode>>(_T("DBNode"));
@@ -115,6 +117,7 @@ void CServerConfig::PrintServerSettingInfo()
 	LOG_INFO(_T("HeartbeatTtlSec : %d"), _nHeartbeatTtlSec);
 	LOG_INFO(_T("HeartbeatIntervalSec : %d"), _nHeartbeatIntervalSec);
 	LOG_INFO(_T("FileServerUrl : %s"), _tszFileServerUrl);
+	LOG_INFO(_T("MaxRoomsPerOwner : %d"), _nMaxRoomsPerOwner);
 
 	LOG_INFO(_T("--------------- Connect ServerNode size : %d ---------------"), static_cast<int>(_serverNodeVec.size()));
 	for( uint32 i = 0; i < _serverNodeVec.size(); i++ )

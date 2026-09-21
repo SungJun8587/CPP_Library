@@ -109,6 +109,12 @@ public:
 	TCHAR* GetFileServerUrl() { return _tszFileServerUrl; }
 
 	//***************************************************************************
+	// @brief 1인당 생성 가능한 방 개수 상한을 반환합니다.
+	// @details 0 이하면 개수 제한을 적용하지 않는다.
+	//***************************************************************************
+	int32 GetMaxRoomsPerOwner() { return _nMaxRoomsPerOwner; }
+
+	//***************************************************************************
 	// @brief 서버 노드 목록의 참조를 반환합니다.
 	// @return 서버 노드 Vector 참조
 	//***************************************************************************
@@ -172,6 +178,7 @@ public:
 		value.AddMember(_T("HeartbeatTtlSec"), _nHeartbeatTtlSec, allocator);
 		value.AddMember(_T("HeartbeatIntervalSec"), _nHeartbeatIntervalSec, allocator);
 		value.AddMember(_T("FileServerUrl"), _tValue(_tszFileServerUrl, allocator), allocator);
+		value.AddMember(_T("MaxRoomsPerOwner"), _nMaxRoomsPerOwner, allocator);
 	}
 
 	//***************************************************************************
@@ -195,6 +202,7 @@ public:
 		_nHeartbeatTtlSec = value[_T("HeartbeatTtlSec")].GetInt();
 		_nHeartbeatIntervalSec = value[_T("HeartbeatIntervalSec")].GetInt();
 		_tcsncpy_s(_tszFileServerUrl, _countof(_tszFileServerUrl), value[_T("FileServerUrl")].GetString(), _TRUNCATE);
+		_nMaxRoomsPerOwner = value[_T("MaxRoomsPerOwner")].GetInt();
 	}
 
 protected:
@@ -220,6 +228,7 @@ private:
 	int32						_nHeartbeatIntervalSec;				// 하트비트 갱신 주기(초)
 
 	TCHAR						_tszFileServerUrl[HOSTNAME_STRLEN];	// 클라이언트에게 알려줄 파일 서버 주소(프로필 이미지 업로드용, 채팅 서버와 별개 프로세스)
+	int32						_nMaxRoomsPerOwner;					// 1인당 생성 가능한 방 개수 상한(0 이하면 무제한)
 
 	CVector<CServerNode>		_serverNodeVec;						// 연동 서버 노드 목록
 	CVector<CDBNode>			_dbNodeVec;							// DB 노드 목록
