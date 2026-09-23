@@ -37,6 +37,20 @@
 //          시작해 최대 30초까지), 서버가 오래 죽어있는 동안 스윕 주기마다
 //          무의미하게 계속 두드리는 것을 막습니다.
 //
+//          [수정 — 버그 수정] 예전엔 모든 커넥션이 사용 중일 때(풀이
+//          바닥났을 때) SendCommand()가 그냥 false를 돌려주고 그 요청은
+//          조용히 사라졌다 — 대부분의 호출부(CChatServerMain의 여러
+//          Request*() 등)가 SendCommand()의 반환값을 확인하지 않아서,
+//          콜백이 영원히 안 불리는데도 에러 로그 하나 없이 "응답이 그냥
+//          안 오는" 것처럼 보이는 버그였다(짧은 시간에 Redis 요청이
+//          몰리면 — 예: 여러 방에 거의 동시에 입장 — 재현됨). 이제 풀이
+//          바닥나면 요청을 대기 큐(_queuePending)에 넣어두고,
+//          PushConnection()이 커넥션을 돌려받는 즉시 대기 큐에서 꺼내
+//          그 커넥션에 바로 태워 보낸다 — 요청이 유실되지 않고 순서대로
+//          처리된다(다만 그만큼 지연될 수 있음). 대기 큐도 무한정 쌓이면
+//          안 되므로 상한(kMaxPendingCommands)을 두고, 넘으면 그때는
+//          진짜로 실패(false + 콜백 미호출)로 처리한다.
+//
 // @code
 // // 사용 예시:
 // auto pPool = std::make_shared<CRedisConnectionPool>(pIocpCore);
@@ -74,11 +88,30 @@ public:
 	//***************************************************************************
 	void        Clear();
 
+	//***************************************************************************
+	// @brief Redis 명령을 비동기 실행함.
+	// @details [수정] 풀에 놀고 있는 커넥션이 없으면(모두 사용 중) 더 이상
+	//          즉시 실패하지 않는다 — 대기 큐에 넣어두고 true를 반환한다
+	//          ("요청이 접수됨"이라는 뜻 — 실제 전송은 커넥션이 반납되는
+	//          대로 이어짐). 대기 큐가 상한(kMaxPendingCommands)을 넘겼을
+	//          때만 진짜로 실패(false, 콜백 미호출)한다.
+	// @return 요청이 접수(즉시 전송 또는 대기 큐 등록)됐는지 여부. false면
+	//         fnCallback은 절대 호출되지 않는다(대기 큐 포화, 또는 풀
+	//         미초기화).
+	//***************************************************************************
 	bool        SendCommand(const CVector<std::string>& vecArgs, RedisCallback fnCallback);
 
 private:
 	CRedisClientRef		PopConnection();
 	void                PushConnection(CRedisClientRef pClient);
+
+	//***************************************************************************
+	// @brief [추가] pClient 하나를 골라서 실제로 명령을 실어 보낸다 —
+	//        SendCommand()의 즉시 전송 경로와 PushConnection()의 "대기
+	//        중이던 요청을 반납받은 커넥션에 바로 태우는" 경로가 공유하는
+	//        공통 로직.
+	//***************************************************************************
+	void                DispatchOnClient(CRedisClientRef pClient, const CVector<std::string>& vecArgs, RedisCallback fnCallback);
 
 	void                StartReconnectLoop();
 	void                StopReconnectLoop();
@@ -90,10 +123,24 @@ private:
 	uint16                          _nPort = 0;              // 연결 대상 포트
 	int32                           _nDbIndex = 0;           // 각 커넥션이 접속 직후 SELECT로 고정할 논리 DB 인덱스(0이면 생략)
 
-	std::mutex                      _lock;					  // 풀 동기화 락 (_vecAllClients/_queueFree/_queueBroken 공용)
+	std::mutex                      _lock;					  // 풀 동기화 락 (_vecAllClients/_queueFree/_queueBroken/_queuePending 공용)
 	CVector<CRedisClientRef>		_vecAllClients;          // 생성된 전체 클라이언트 리스트
 	CQueue<CRedisClientRef>			_queueFree;              // 사용 가능한(연결된) 클라이언트 큐
 	CQueue<CRedisClientRef>			_queueBroken;            // 연결이 끊겨 재연결을 기다리는 격리 큐
+
+	//***************************************************************************
+	// @brief [추가] 풀이 바닥났을 때(모든 커넥션이 사용 중) 대기시켜둘
+	//        요청 큐. PushConnection()이 커넥션을 돌려받을 때 이 큐를
+	//        먼저 확인해서, 있으면 Free 큐에 넣지 않고 바로 그 커넥션에
+	//        태워 보낸다(선입선출로 처리 순서 유지).
+	//***************************************************************************
+	struct TPendingCommand
+	{
+		CVector<std::string>	vecArgs;
+		RedisCallback			fnCallback;
+	};
+	static constexpr size_t		kMaxPendingCommands = 2000;	// 이 이상 쌓이면 새 요청은 진짜로 실패 처리
+	CQueue<TPendingCommand>			_queuePending;				// 풀이 바닥났을 때 대기 중인 요청들
 
 	std::atomic<bool>               _bInitialized{ false };  // 풀 초기화 여부 플래그
 
