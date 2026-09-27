@@ -17,6 +17,12 @@
 // @param tickAfterMs 지금으로부터 몇 밀리초 후에 실행할지 지정하는 지연 시간
 // @param owner 작업을 처리할 대상 작업 큐의 약한 참조 (weak_ptr)
 // @param job 예약할 작업 객체 레퍼런스
+// @details [수정 — 예외 안전성] _items.push()(내부 벡터 재할당 등으로
+//          bad_alloc 같은 예외를 던질 가능성이 있음)가 실패하면, 이미
+//          객체 풀에서 꺼내온 jobData를 아무도 돌려주지 않아 누수로
+//          남았다 — 발생 확률은 극히 낮지만(메모리 할당 실패 시나리오),
+//          try/catch로 감싸서 실패 시 풀에 반환한 뒤 예외를 그대로
+//          다시 던진다(호출부가 원래 보게 될 예외 자체는 그대로 전파).
 //***************************************************************************
 void CJobTimer::Reserve(uint64 tickAfterMs, weak_ptr<CJobQueue> owner, CJobRef job)
 {
@@ -25,8 +31,16 @@ void CJobTimer::Reserve(uint64 tickAfterMs, weak_ptr<CJobQueue> owner, CJobRef j
 
 	JobData* jobData = CObjectPool<JobData>::Pop(owner, job);
 
-	PRWriteLockGuard writeLock(_lock);
-	_items.push(TimerItem{ executeTick, jobData });
+	try
+	{
+		PRWriteLockGuard writeLock(_lock);
+		_items.push(TimerItem{ executeTick, jobData });
+	}
+	catch( ... )
+	{
+		CObjectPool<JobData>::Push(jobData);
+		throw;
+	}
 }
 
 //***************************************************************************

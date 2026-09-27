@@ -51,6 +51,17 @@ bool CRedisServerHeartbeat::Start(int32 ttlSec, int32 heartbeatIntervalSec)
 	if( _redisService == nullptr )
 		return false;
 
+	// [추가 — 버그 수정] 이미 실행 중인(joinable한) 스레드가 있는 채로
+	// 아래 "_thread = std::thread(...)"를 또 실행하면 std::terminate()로
+	// 즉시 죽는다(joinable한 std::thread에 대한 이동 대입은 표준상
+	// terminate 유발) — Stop()을 먼저 호출해 정지시키지 않은 채 Start()를
+	// 두 번 부르는 실수를 방지한다.
+	if( _thread.joinable() )
+	{
+		ASSERT_CRASH(false);
+		return false;
+	}
+
 	// heartbeat 주기가 TTL보다 같거나 크면, 다음 갱신이 오기 전에 TTL이
 	// 만료되어 실제로는 살아있는데 죽은 것처럼 보이는 창이 생긴다.
 	if( heartbeatIntervalSec <= 0 || ttlSec <= heartbeatIntervalSec )
@@ -97,6 +108,23 @@ void CRedisServerHeartbeat::Stop()
 
 //***************************************************************************
 // @brief 서버 정보를 Redis Hash로 최초 등록하고 TTL을 설정합니다.
+// @details [수정 — 버그 수정: use-after-free 위험] 예전엔 HSET 완료 콜백이
+//          [this, key, ttlSec]를 캡처해서, 콜백 안에서 EXPIRE를 걸 때
+//          "_redisService->SendCommand(...)"라고 썼다 — 이건 암묵적으로
+//          this->_redisService에 접근하는 것과 같다. 이 HSET은 Start()가
+//          호출되는 시점에 곧바로 비동기로 걸리는데, 그 응답이 오기 전에
+//          이 CRedisServerHeartbeat 객체 자체가 소멸되면(예: 서버 시작
+//          직후 어떤 이유로 바로 종료되는 경우) 콜백이 이미 죽은 this를
+//          통해 멤버에 접근하게 된다 — ~CRedisServerHeartbeat()가 부르는
+//          Stop()은 heartbeat *스레드*만 join할 뿐, 이렇게 이미 날아간
+//          개별 Redis 요청까지 기다려주지는 않는다(SendHeartbeat()의
+//          콜백들은 애초에 아무것도 캡처하지 않아 이 문제가 없었는데,
+//          이 함수만 그랬다). _redisService(비소유 raw pointer)를 로컬
+//          변수로 복사해서 그 값 자체를 캡처하도록 바꿨다 — 이러면
+//          콜백이 this가 아니라 포인터 값 하나에만 의존하므로, this가
+//          먼저 소멸돼도 안전하다(다만 _redisService가 가리키는 객체
+//          자체의 수명은 여전히 호출부가 보장해야 한다 — 이 클래스의
+//          원래 raw pointer 계약 그대로).
 //***************************************************************************
 void CRedisServerHeartbeat::RegisterInitial()
 {
@@ -119,20 +147,21 @@ void CRedisServerHeartbeat::RegisterInitial()
 	args.push_back("updatedAt");	args.push_back(std::to_string(nowMs));
 
 	const int32 ttlSec = _ttlSec;
+	CRedisService* redisService = _redisService; // [수정] this 대신 이 값 자체를 캡처
 
 	// HSET 완료 콜백 안에서 EXPIRE를 게시 — HSET이 실패한 채로 TTL만 걸려
 	// "내용 없는" 키가 남는 것을 피하기 위함. (RedisValue의 성공/에러 판별
 	// API가 이 헤더만으론 확인이 안 돼, 여기선 HSET 콜백이 왔다는 것 자체를
 	// "완료됨"으로 보고 무조건 EXPIRE를 건다 — 프로젝트에 에러 체크 메서드가
 	// 있다면 이 콜백 안에서 감싸는 것을 권장한다. TODO)
-	_redisService->SendCommand(args, [this, key, ttlSec](const RedisValue& /*res*/)
+	redisService->SendCommand(args, [redisService, key, ttlSec](const RedisValue& /*res*/)
 		{
 			CVector<std::string> expireArgs;
 			expireArgs.push_back("EXPIRE");
 			expireArgs.push_back(key);
 			expireArgs.push_back(std::to_string(ttlSec));
 
-			_redisService->SendCommand(expireArgs, [](const RedisValue& /*res*/) {});
+			redisService->SendCommand(expireArgs, [](const RedisValue& /*res*/) {});
 		});
 }
 

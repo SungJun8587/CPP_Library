@@ -46,7 +46,7 @@ void CGlobalQueue::Push(CJobQueueRef jobQueue)
 //***************************************************************************
 CJobQueueRef CGlobalQueue::Pop()
 {
-    CJobQueueRef ret;
-    bool flag = _jobQueues.TryPop(ret);
-    return ret;
+	CJobQueueRef ret;
+	_jobQueues.TryPop(ret);
+	return ret;
 }

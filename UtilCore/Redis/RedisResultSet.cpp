@@ -50,6 +50,14 @@ CRedisResultSet::CRedisResultSet(const RedisValue& value)
 			}
 		}
 	}
+
+	// [참고] value.eType == ERedisType::Error인 경우 위 어느 분기에도
+	// 해당하지 않아 _vecResultSplit가 빈 채로 남는다 — 즉 이 클래스는
+	// "에러 응답"과 "진짜 빈 결과"를 구분하지 못하고 둘 다 IsEmpty()==true로
+	// 본다. 에러와 빈 결과를 구분해야 하는 호출부(예: 일시적 연결 오류를
+	// 재시도해야 하는 경우)는 이 클래스를 통하지 말고 RedisValue::eType을
+	// 직접 확인해야 한다 — ChatServerMainChat.cpp::SendCommandWithRetry()가
+	// 이 방식으로 이미 구분하고 있다.
 }
 
 //***************************************************************************
@@ -79,6 +87,17 @@ INT32 CRedisResultSet::GetRankInfoRetCount() const
 
 //***************************************************************************
 // @brief 순차 커서 위치에서 INT8 타입 데이터를 추출함
+// @details [수정 — 버그 수정: 실패 시 커서 이동] 예전엔
+//          "_vecResultSplit[_readCursor++]"를 std::stoi()의 인자 자리에서
+//          직접 평가했다 — 인자 평가는 함수 호출 전에 끝나므로, stoi()가
+//          예외를 던져도(변환 실패) _readCursor는 이미 증가된 뒤였다.
+//          그러면 실패한 필드가 조용히 "소비"되어버려서, 이 함수를 &&로
+//          체이닝하지 않고 개별 호출하는 코드에서는 그 다음 GetData()
+//          호출이 원래 읽어야 할 필드가 아니라 그 다음 필드를 읽게 되는
+//          정렬 밀림이 생길 수 있었다. 이제 먼저 문자열만 복사해두고,
+//          변환에 성공했을 때만 커서를 증가시킨다 — 실패하면 커서가 그
+//          자리에 그대로 남아 있어, 호출부가 같은 필드를 다른 타입으로
+//          다시 시도하거나 원인 파악을 위해 그 값을 들여다볼 수 있다.
 //***************************************************************************
 bool CRedisResultSet::GetData(INT8& Dest)
 {
@@ -87,7 +106,8 @@ bool CRedisResultSet::GetData(INT8& Dest)
 
 	try
 	{
-		Dest = static_cast<INT8>(std::stoi(_vecResultSplit[_readCursor++]));
+		Dest = static_cast<INT8>(std::stoi(_vecResultSplit[_readCursor]));
+		++_readCursor;
 		return true;
 	}
 	catch( const std::exception& )
@@ -106,7 +126,8 @@ bool CRedisResultSet::GetData(UINT8& Dest)
 
 	try
 	{
-		Dest = static_cast<UINT8>(std::stoul(_vecResultSplit[_readCursor++]));
+		Dest = static_cast<UINT8>(std::stoul(_vecResultSplit[_readCursor]));
+		++_readCursor;
 		return true;
 	}
 	catch( const std::exception& )
@@ -125,7 +146,8 @@ bool CRedisResultSet::GetData(INT16& Dest)
 
 	try
 	{
-		Dest = static_cast<INT16>(std::stoi(_vecResultSplit[_readCursor++]));
+		Dest = static_cast<INT16>(std::stoi(_vecResultSplit[_readCursor]));
+		++_readCursor;
 		return true;
 	}
 	catch( const std::exception& )
@@ -144,7 +166,8 @@ bool CRedisResultSet::GetData(INT32& Dest)
 
 	try
 	{
-		Dest = std::stoi(_vecResultSplit[_readCursor++]);
+		Dest = std::stoi(_vecResultSplit[_readCursor]);
+		++_readCursor;
 		return true;
 	}
 	catch( const std::exception& )
@@ -163,7 +186,8 @@ bool CRedisResultSet::GetData(UINT32& Dest)
 
 	try
 	{
-		Dest = static_cast<UINT32>(std::stoul(_vecResultSplit[_readCursor++]));
+		Dest = static_cast<UINT32>(std::stoul(_vecResultSplit[_readCursor]));
+		++_readCursor;
 		return true;
 	}
 	catch( const std::exception& )
@@ -182,7 +206,8 @@ bool CRedisResultSet::GetData(INT64& Dest)
 
 	try
 	{
-		Dest = std::stoll(_vecResultSplit[_readCursor++]);
+		Dest = std::stoll(_vecResultSplit[_readCursor]);
+		++_readCursor;
 		return true;
 	}
 	catch( const std::exception& )
@@ -201,7 +226,8 @@ bool CRedisResultSet::GetData(UINT64& Dest)
 
 	try
 	{
-		Dest = std::stoull(_vecResultSplit[_readCursor++]);
+		Dest = std::stoull(_vecResultSplit[_readCursor]);
+		++_readCursor;
 		return true;
 	}
 	catch( const std::exception& )
@@ -225,6 +251,14 @@ bool CRedisResultSet::GetData(std::string& Dest)
 // @brief 순차 커서 위치에서 TCHAR 문자열 버퍼로 데이터를 문자 인코딩 변환하여 복사함
 // @param Dest 문자열을 저장할 TCHAR 버퍼 포인터
 // @param nSize 버퍼의 TCHAR 요소 개수
+// @details [수정 — 버그 수정: 잘못된 코드페이지] 예전엔 MultiByteToWideChar()에
+//          CP_ACP(시스템 기본 ANSI 코드페이지 — 한글 Windows에선 CP949)를
+//          썼다. 그런데 이 프로젝트의 다른 곳(RedisService.cpp의
+//          TCharToString()/TStringToString())은 UTF-8 변환 유틸을 쓰고
+//          있어서, Redis에 저장/조회되는 문자열은 UTF-8이 관례로 보인다.
+//          CP949와 UTF-8은 한글을 표현하는 바이트 시퀀스 자체가 다르므로,
+//          한글 로케일에서 실행해도 CP_ACP로 UTF-8 바이트를 해석하면 깨진
+//          문자열이 나온다. CP_UTF8로 바꿨다.
 //***************************************************************************
 bool CRedisResultSet::GetData(TCHAR* Dest, int nSize)
 {
@@ -234,7 +268,7 @@ bool CRedisResultSet::GetData(TCHAR* Dest, int nSize)
 	if( _vecResultSplit.empty() || _vecResultSplit.size() <= _readCursor ) return false;
 
 #if defined(UNICODE) || defined(_UNICODE)
-	::MultiByteToWideChar(CP_ACP, 0, _vecResultSplit[_readCursor++].c_str(), -1, Dest, nSize);
+	::MultiByteToWideChar(CP_UTF8, 0, _vecResultSplit[_readCursor++].c_str(), -1, Dest, nSize);
 #else
 	::strncpy_s(Dest, nSize, _vecResultSplit[_readCursor++].c_str(), _TRUNCATE);
 #endif

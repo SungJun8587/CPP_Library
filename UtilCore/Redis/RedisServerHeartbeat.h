@@ -1,4 +1,5 @@
-﻿//***************************************************************************
+﻿
+//***************************************************************************
 // RedisServerHeartbeat.h : interface for the CRedisServerHeartbeat class.
 //
 //***************************************************************************
@@ -44,6 +45,11 @@
 // 이관되어 실행되므로, 이 클래스 내부 상태는 heartbeat 스레드/콜백 양쪽에서
 // 손대지 않는다(콜백은 결과를 읽기만 함) — 별도 락 없이 안전.
 //
+// [추가 — lifecycle 계약] Start()는 Stop()으로 먼저 정지시키지 않은 채로
+// 두 번 연달아 호출하면 안 된다 — 이미 실행 중인 스레드가 있는 상태에서
+// 또 스레드를 만들려 하면 표준상 std::terminate()가 유발된다(아래
+// Start() 선언부 설명 참고).
+//
 // @code
 //	// 사용 예시:
 //	CRedisService redisService(pIocpCore, pJobQueue);
@@ -82,7 +88,15 @@ public:
 	// @param ttlSec 살아있음으로 간주할 TTL(초).
 	// @param heartbeatIntervalSec heartbeat(EXPIRE 갱신) 주기(초). ttlSec보다
 	//        충분히 작아야 합니다(같거나 크면 갱신 전에 TTL이 만료되는 창이 생김).
-	// @return 파라미터가 유효하고 스레드 시작에 성공하면 true.
+	// @return 파라미터가 유효하고 스레드 시작에 성공하면 true. 이미 실행
+	//         중이면(Stop()을 안 부르고 재호출) false.
+	// @details [수정 — 버그 수정: 중복 Start() 크래시] 이미 실행 중인(joinable한)
+	//          heartbeat 스레드가 있는 상태에서 다시 이 함수를 호출하면,
+	//          예전엔 그 스레드에 새 std::thread를 그대로 대입하려다
+	//          std::terminate()로 죽었다(joinable한 std::thread에 대한
+	//          이동 대입은 표준상 terminate 유발). 이제 이미 실행 중이면
+	//          즉시 false를 반환하고 아무 것도 하지 않는다 — Stop()을 먼저
+	//          호출해 완전히 정지시킨 뒤에만 재시작할 수 있다.
 	//***************************************************************************
 	bool Start(int32 ttlSec = 15, int32 heartbeatIntervalSec = 5);
 
@@ -99,22 +113,21 @@ private:
 	std::string		BuildKey() const;
 
 private:
-private:
-	CRedisService*			_redisService = nullptr;	// Redis 명령 전송 대상 객체 포인터 (비소유 참조)
-	std::string				_serverName;				// 서버 이름 (예: "ChatServer")
-	std::string				_serverGroupId;				// 서버 그룹 ID (예: "1")
-	std::string				_serverChannelId;			// 서버 채널/인스턴스 ID (예: "101")
-	uint16					_port = 0;					// 서버 바인딩 포트 번호
+	CRedisService* _redisService = nullptr;	// 명령 전송 대상(비소유) — nullptr이면 Start()가 실패
+	std::string				_serverName;				// 등록 키/HSET의 serverName 필드로 그대로 쓰임(예: "ChatServer")
+	std::string				_serverGroupId;				// 등록 키/HSET의 serverGroupId 필드로 그대로 쓰임(예: 서버군 번호)
+	std::string				_serverChannelId;			// 등록 키/HSET의 serverChannelId 필드로 그대로 쓰임(예: 서버 인스턴스 번호)
+	uint16					_port = 0;					// 클라이언트/내부 연동이 접속할 포트(등록 정보용, HSET의 port 필드)
 
-	int32					_ttlSec = 15;				// Redis 키 유지 시간 (TTL, 초 단위)
-	int32					_heartbeatIntervalSec = 5;	// Heartbeat(EXPIRE 갱신) 전송 주기 (초 단위)
+	int32					_ttlSec = 15;				// Start()에서 넘겨받아 저장 — EXPIRE에 매번 이 값을 씀
+	int32					_heartbeatIntervalSec = 5;	// Start()에서 넘겨받아 저장 — HeartbeatLoop()의 대기 주기로 씀
 
-	SessionCountProvider	_sessionCountProvider;		// 현재 접속자 수를 조회하는 콜백 함수
+	SessionCountProvider	_sessionCountProvider;	// 설정 안 하면(nullptr) sessionCount 필드는 항상 0
 
-	std::thread				_thread;					// Heartbeat 루프를 수행하는 전용 워커 스레드
-	std::mutex				_lock;						// 조건 변수(_cv) 대기용 뮤텍스
-	std::condition_variable	_cv;						// 정지 요청 시 스레드 대기를 즉시 깨우기 위한 조건 변수
-	std::atomic<bool>		_stopping{ false };			// 스레드 종료 진행 여부 플래그 (중복 종료 방지 및 루프 탈출용)
+	std::thread				_thread;					// HeartbeatLoop() 전용 워커 스레드 — Start()에서 기동, Stop()에서 join
+	std::mutex				_lock;               // wait_for 전용 (heartbeat 로직 자체엔 동기화 불필요)
+	std::condition_variable	_cv;					// Stop()이 notify_all()로 대기 중인 _thread를 즉시 깨워 종료시키는 용도
+	std::atomic<bool>		_stopping{ false };			// Stop() 중복 호출 방지 + HeartbeatLoop() 탈출 조건
 };
 
 #endif // ndef UC_REDISSERVERHEARTBEAT_H
