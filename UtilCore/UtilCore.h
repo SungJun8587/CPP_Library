@@ -167,6 +167,7 @@ using namespace std;
 
 #include <ServerConnectInfo.h>
 #include <ServerConfig.h>
+#include <ServiceConfig.h>
 
 #include <DB/DBCommon.h>
 

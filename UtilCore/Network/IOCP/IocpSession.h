@@ -217,22 +217,22 @@ private:
 	void			TryFinalizeDisconnect() noexcept;
 
 private:
-	uint64				_sessionId{ 0 };					// 고유 세션 ID
+	uint64					_sessionId{ 0 };					// 고유 세션 ID
 	SOCKET					_socket = INVALID_SOCKET;			// 통신에 사용되는 WinSock 소켓 핸들
 	CNetAddress				_netAddress;						// 원격 클라이언트의 IP 주소 및 포트 정보
 
 	std::atomic<bool>				_connected = false;							// 원자적(Atomic) 연산을 보장하는 세션 연결/해제 상태 플래그
 	std::atomic<Iocp::CloseReason>	_closeReason{ Iocp::CloseReason::None };	// 세션 종료 사유 변수
 
-	// [수정] TryFinalizeDisconnect() 관련 — OnDisconnected() 통지를 outstanding
+	// TryFinalizeDisconnect() 관련 — OnDisconnected() 통지를 outstanding
 	// recv/send 완료까지 지연시키기 위한 상태. 셋 다 seq_cst로만 접근한다
 	// (TryFinalizeDisconnect()의 주석 참고 — 서로 다른 두 원자 변수에 걸친
 	// "어느 쪽이 나중에 0/true가 되든 그쪽이 통지를 트리거한다"는 인과관계를
 	// 보장하려면 개별 acquire/release 페어링보다 전역 순차 일관성이 더
 	// 단순하고 안전함).
-	std::atomic<int32> _pendingIoCount{ 0 };        // 현재 outstanding 상태인 WSARecv+WSASend 완료 대기 수
-	std::atomic<bool> _disconnectCompleted{ false }; // DisconnectEx 자신의 completion이 이미 처리됐는지
-	std::atomic<bool> _disconnectNotified{ false };  // OnDisconnected() 중복 통지 방지 1회성 CAS 가드
+	std::atomic<int32> _pendingIoCount{ 0 };				// 현재 outstanding 상태인 WSARecv+WSASend 완료 대기 수
+	std::atomic<bool> _disconnectCompleted{ false };		// DisconnectEx 자신의 completion이 이미 처리됐는지
+	std::atomic<bool> _disconnectNotified{ false };			// OnDisconnected() 중복 통지 방지 1회성 CAS 가드
 
 	std::mutex				_lock;                          // 송신 큐(_sendQueue) 스레드 동기화를 위한 뮤텍스
 	CRingBuffer				_recvBuffer;                    // 제로카피 비동기 수신(WSARecv)을 관리하는 수신 링버퍼
@@ -242,7 +242,7 @@ private:
 	RecvEvent				_recvEvent;                     // 비동기 수신(WSARecv) 요청 및 완료 처리를 위한 OVERLAPPED 이벤트 객체
 	SendEvent				_sendEvent;                     // 비동기 송신(WSASend) 요청 및 완료 처리를 위한 OVERLAPPED 이벤트 객체 (부분 전송 커서 보유)
 	DisconnectEvent			_disconnectEvent;               // 비동기 해제(DisconnectEx) 요청 및 완료 처리를 위한 OVERLAPPED 이벤트 객체
-	ConnectEvent			_connectEvent;                   // 비동기 연결(ConnectEx) 요청 및 완료 처리를 위한 OVERLAPPED 이벤트 객체 (클라이언트 전용)
+	ConnectEvent			_connectEvent;                  // 비동기 연결(ConnectEx) 요청 및 완료 처리를 위한 OVERLAPPED 이벤트 객체 (클라이언트 전용)
 };
 
 #endif // ndef UC_IOCPSESSION_H

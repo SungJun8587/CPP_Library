@@ -171,6 +171,7 @@
     <ClInclude Include="Redis\RedisService.h" />
     <ClInclude Include="ServerConfig.h" />
     <ClInclude Include="ServerConnectInfo.h" />
+    <ClInclude Include="ServiceConfig.h" />
     <ClInclude Include="System\CpuInfo.h" />
     <ClInclude Include="System\CrashDumpHandler.h" />
     <ClInclude Include="System\DeviceInfo.h" />
@@ -300,6 +301,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="ServiceConfig.cpp" />
     <ClCompile Include="System\CpuInfo.cpp" />
     <ClCompile Include="System\CrashDumpHandler.cpp" />
     <ClCompile Include="System\DeviceInfo.cpp" />

@@ -649,6 +649,7 @@
     <ClInclude Include="Util\FileStream.h">
       <Filter>Util</Filter>
     </ClInclude>
+    <ClInclude Include="ServiceConfig.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">
@@ -974,6 +975,7 @@
     <ClCompile Include="Util\FileStream.cpp">
       <Filter>Util</Filter>
     </ClCompile>
+    <ClCompile Include="ServiceConfig.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="DB\BaseODBC.inl">

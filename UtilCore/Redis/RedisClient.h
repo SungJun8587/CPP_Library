@@ -73,6 +73,24 @@
 //          내부 상태(std::string)에 대한 data race였다. 이제 _recvLock으로
 //          이 둘을 직렬화한다.
 //***************************************************************************
+//***************************************************************************
+// @brief Disconnect()가 호출된 사유를 구분하는 열거형.
+// @details 대기 중이던 콜백은 이 사유에 대응하는 에러 문자열(RedisValue::strVal)을
+//          받는다. 진짜 TCP 연결 끊김과, 수신 데이터를 RESP로 해석하지 못해
+//          스스로 연결을 끊은 경우(ProtocolError)를 호출부가 구분할 수 있도록
+//          사유를 나눴다. 문자열은 CRedisClient::DisconnectReasonToString()
+//          한 곳에서만 만든다.
+//***************************************************************************
+enum class ERedisDisconnectReason
+{
+	ConnectionClosedRecv,		// recv completion이 0바이트로 도착 — 진짜 TCP 연결 끊김
+	ConnectionClosedSend,		// send completion이 0바이트로 도착 — 진짜 TCP 연결 끊김
+	SendFailed,					// WSASend() 게시 자체가 실패
+	ProtocolError,				// RESP 파싱 실패 — 네트워크 문제가 아니라 수신 데이터 해석 실패
+	RecvRegistrationFailed,		// 다음 WSARecv 재등록(RegisterRecv()) 실패
+	Generic						// 그 외 일반적인 종료(소멸자, Connect() 실패 등 — 콜백이 없거나 사유 구분이 중요하지 않은 경우)
+};
+
 class CRedisClient : public CIocpObject, public std::enable_shared_from_this<CRedisClient>
 {
 public:
@@ -120,6 +138,8 @@ public:
 
 	//***************************************************************************
 	// @brief 소켓 연결을 종료하고 대기 중인 콜백 및 리소스를 정리함
+	// @param reason 대기 중인 콜백에 에러 값으로 전달할 사유(클래스 상단
+	//        ERedisDisconnectReason 설명 참고).
 	// @details _socket을 atomic exchange로 회수해, 이 함수가 여러 스레드에서
 	//          동시에 호출되어도(예: recv/send 완료가 거의 동시에 numOfBytes==0으로
 	//          도착한 경우) 실제 정리(소켓 close, 콜백 드레인, 파서 리셋)는
@@ -127,9 +147,15 @@ public:
 	//          응답을 기다리고 있던 콜백은 이 명령이 다시 완료될 일이 없으므로,
 	//          에러 값으로 즉시 완료 처리하여 호출측(예: 커넥션 풀의 래핑 콜백)이
 	//          커넥션 반납 등 후속 처리를 정상적으로 진행할 수 있게 한다.
+	//          [주의] 이 함수가 실제로 소켓을 회수해 정리를 수행하는 건
+	//          _socket exchange에서 "이긴" 단 한 번뿐이다 — 동시에 호출된
+	//          다른 스레드는 이미 INVALID_SOCKET을 보고 조용히 반환하므로,
+	//          그쪽 호출부가 넘긴 reason은 쓰이지 않을 수 있다(정상 —
+	//          콜백은 어차피 정확히 한 번만 불려야 하므로, 먼저 회수에
+	//          성공한 쪽의 사유가 채택된다).
 	// @return 성공 여부 (true: 성공)
 	//***************************************************************************
-	bool        Disconnect();
+	bool        Disconnect(ERedisDisconnectReason reason = ERedisDisconnectReason::Generic);
 
 	//***************************************************************************
 	// @brief 소켓 연결 여부를 반환함
@@ -206,6 +232,16 @@ private:
 	// @param nTimeoutMs 응답을 기다릴 최대 시간(ms)
 	// @return 성공 여부 (true: SELECT 성공, false: 실패 또는 타임아웃)
 	//***************************************************************************
+	//***************************************************************************
+	// @brief [추가] ERedisDisconnectReason을 콜백에 전달할 RedisValue::strVal
+	//        문자열로 변환함.
+	// @details Disconnect()가 이 함수 하나만 거쳐서 문자열을 만들도록
+	//          일원화한다 — 문구를 바꿀 일이 생겨도 여기 한 곳만 고치면
+	//          되고, 호출부마다 문자열을 직접 만들지 않으므로 오타/불일치
+	//          여지가 없다.
+	//***************************************************************************
+	static const char* DisconnectReasonToString(ERedisDisconnectReason reason);
+
 	bool        SelectDb(const int32 nDbIndex, const int32 nTimeoutMs);
 
 private:

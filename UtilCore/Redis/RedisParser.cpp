@@ -203,25 +203,13 @@ ERedisParseResult CRedisParser::ParseValue(const char* pBuffer, const int32 nSiz
 
 			outValue.strVal.assign(pBuffer + nOffset, static_cast<size_t>(i64Len));
 			nOffset += static_cast<int32>(i64Len);
-			
+
 			// [추가 — 방어 강화] Bulk String 데이터 뒤에 실제로 CRLF가
 			// 오는지 확인한다 — 예전엔 길이만 믿고 그냥 +2를 했는데,
 			// 그 자리가 진짜 "\r\n"이 아니면 이후 스트림 전체가 밀려서
 			// 깨지는데도 아무 에러 없이 계속 진행했다.
 			if( pBuffer[nOffset] != '\r' || pBuffer[nOffset + 1] != '\n' )
 			{
-				LOG_ERROR(_T(
-					"Redis RESP Bulk CRLF mismatch. "
-					"saved=%d current=%d size=%d bulkLen=%lld "
-					"byte0=0x%02X byte1=0x%02X"),
-					nSavedOffset,
-					nOffset,
-					nSize,
-					i64Len,
-					static_cast<unsigned char>(pBuffer[nOffset]),
-					static_cast<unsigned char>(pBuffer[nOffset + 1])
-				);
-
 				nOffset = nSavedOffset;
 				return ERedisParseResult::ProtocolError;
 			}

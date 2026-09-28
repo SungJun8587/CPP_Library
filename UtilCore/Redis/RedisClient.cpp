@@ -150,25 +150,18 @@ bool CRedisClient::Connect(const std::string& strIP, const uint16 nPort, const i
 	// 회수 대상으로 인식한다.
 	_socket.store(hSocket, std::memory_order_release);
 
-	// [추가 — 안정성 강화] TCP keepalive를 켠다. Redis 서버 자체의 idle
-	// 타임아웃(CONFIG GET timeout)이 0(비활성)이어도, 그 사이에 있는
-	// 다른 계층(방화벽/NAT/클라우드 로드밸런서/가상화 네트워크 등)이
-	// 자기 나름의 idle 타임아웃으로 조용히 연결을 끊어버릴 수 있다 —
-	// 양쪽 다 이 사실을 모른 채로 있다가, 나중에 그 커넥션으로 명령을
-	// 보내려는 시점에야 WSASend/WSARecv가 실패로 발견하게 된다(실제로
-	// "대화 기록이 간헐적으로 안 불러와지는" 현상의 원인이었다 —
-	// ChatServerMainChat.cpp의 SendCommandWithRetry() 참고). Windows
-	// 기본 keepalive 간격(보통 2시간 idle 후 감지)은 이런 상황을 막기엔
-	// 너무 길어서, WSAIoctl(SIO_KEEPALIVE_VALS)로 30초 idle 후 10초
-	// 간격으로 직접 짧게 재정의한다. 이 설정 자체가 실패해도(드묾) 연결
-	// 자체는 계속 쓸 수 있으므로 치명적 에러로 취급하지 않는다.
+	// TCP keepalive를 켠다. 풀의 커넥션은 요청이 없는 동안 오래 놀 수 있는데,
+	// 그 사이 경로상의 장비(방화벽/NAT/로드밸런서 등)가 idle 연결을 조용히
+	// 정리하면 양쪽 모두 모른 채로 있다가 다음 명령을 보낼 때에야 실패로
+	// 발견한다. Windows 기본 keepalive는 2시간 idle 뒤에야 동작하므로
+	// WSAIoctl(SIO_KEEPALIVE_VALS)로 30초 idle 후 10초 간격으로 프로브하도록
+	// 재정의한다. 설정에 실패해도 연결 자체는 쓸 수 있으므로 치명적인
+	// 에러로 취급하지 않는다.
 	{
 		tcp_keepalive keepaliveSettings{};
 		keepaliveSettings.onoff = 1;
-		keepaliveSettings.keepalivetime = 5000;			// [수정] 30초 -> 5초 idle 후 첫 프로브 — Docker Desktop(WSL2 NAT 등)
-		// 환경에서 실제 끊김이 1~2초 단위로도 재현돼서, 30초는 keepalive가
-		// 손쓰기 한참 전에 이미 끊긴다는 뜻이었다. 훨씬 공격적으로 줄인다.
-		keepaliveSettings.keepaliveinterval = 3000;		// [수정] 10초 -> 3초 간격으로 재시도
+		keepaliveSettings.keepalivetime = 30000;		// 30초 idle 후 첫 프로브
+		keepaliveSettings.keepaliveinterval = 10000;	// 이후 10초 간격으로 재프로브
 
 		DWORD dwBytesReturned = 0;
 		if( ::WSAIoctl(hSocket, SIO_KEEPALIVE_VALS, &keepaliveSettings, sizeof(keepaliveSettings),
@@ -223,7 +216,24 @@ void CRedisClient::CleanupSocketAndParser(SOCKET hOldSocket)
 // @brief 소켓 연결을 종료하고 대기 중인 콜백 및 리소스를 정리함
 // @return 성공 여부 (true: 성공)
 //***************************************************************************
-bool CRedisClient::Disconnect()
+//***************************************************************************
+// @brief ERedisDisconnectReason을 콜백에 전달할 문자열로 변환함
+//***************************************************************************
+const char* CRedisClient::DisconnectReasonToString(ERedisDisconnectReason reason)
+{
+	switch( reason )
+	{
+	case ERedisDisconnectReason::ConnectionClosedRecv:		return "ERR connection closed (recv 0 bytes)";
+	case ERedisDisconnectReason::ConnectionClosedSend:		return "ERR connection closed (send 0 bytes)";
+	case ERedisDisconnectReason::SendFailed:				return "ERR send failed";
+	case ERedisDisconnectReason::ProtocolError:			return "ERR protocol error";
+	case ERedisDisconnectReason::RecvRegistrationFailed:	return "ERR recv registration failed";
+	case ERedisDisconnectReason::Generic:
+	default:												return "ERR connection closed";
+	}
+}
+
+bool CRedisClient::Disconnect(ERedisDisconnectReason reason)
 {
 	// _socket을 원자적으로 회수한다. exchange에서 실제로 유효한 핸들을
 	// 받아온 단 하나의 호출만 아래 정리 작업을 수행하고, 동시에 호출된
@@ -255,7 +265,7 @@ bool CRedisClient::Disconnect()
 	{
 		RedisValue disconnectedVal;
 		disconnectedVal.eType = ERedisType::Error;
-		disconnectedVal.strVal = "ERR connection closed";
+		disconnectedVal.strVal = DisconnectReasonToString(reason);
 		fnPendingCallback(disconnectedVal);
 	}
 
@@ -393,6 +403,10 @@ bool CRedisClient::DoSend()
 //***************************************************************************
 // @brief 비동기 수신(WSARecv)을 IOCP에 등록함
 // @return 등록 성공 여부 (true: 성공, false: 실패)
+// @details 링버퍼의 쓰기 가능 영역을 최대 2개의 연속 구간(WSABUF)으로 나눠
+//          한 번의 WSARecv에 넘긴다. _pendingIoCount는 게시 직전에 증가시키고,
+//          게시가 즉시 실패해 completion이 오지 않는 경우에만 롤백한다 —
+//          HasNoOutstandingIo()/RedisClient.h의 _pendingIoCount 설명 참고.
 //***************************************************************************
 bool CRedisClient::RegisterRecv()
 {
@@ -406,27 +420,9 @@ bool CRedisClient::RegisterRecv()
 	WSABUF wsaBufs[2];
 	int32 bufferCount = _recvBuffer.GetWSARecvBuffers(wsaBufs);
 
-	LOG_DEBUG(
-		_T("Redis RegisterRecv: this=%p count=%d "
-			"read=%p write=%p used=%lld free=%lld "
-			"buf0=%p len0=%lu buf1=%p len1=%lu"),
-		this,
-		bufferCount,
-		_recvBuffer.GetReadBuffer(),
-		_recvBuffer.GetWriteBuffer(),
-		_recvBuffer.GetSizeUsed(),
-		_recvBuffer.GetSizeFree(),
-		bufferCount > 0 ? wsaBufs[0].buf : nullptr,
-		bufferCount > 0 ? wsaBufs[0].len : 0,
-		bufferCount > 1 ? wsaBufs[1].buf : nullptr,
-		bufferCount > 1 ? wsaBufs[1].len : 0
-	);
-
 	if( bufferCount == 0 )
 	{
-		// [수정 — 버그 수정] 이 경로도 owner를 이미 채운 뒤라, 게시를
-		// 포기하고 그냥 리턴하면 owner가 정리되지 않은 채 남아있었다
-		// (owner 누수 — Dispatch()의 "owner 누수" 설명과 동일한 문제).
+		// 게시를 포기하는 경로에서도 owner를 정리해야 자기 참조가 남지 않는다.
 		_recvEvent.owner = nullptr;
 		return false;
 	}
@@ -434,9 +430,6 @@ bool CRedisClient::RegisterRecv()
 	DWORD dwBytesTransferred = 0;
 	DWORD dwFlags = 0;
 
-	// [추가 — 버그 수정: 재연결 시 stale completion] 실제 게시 직전에
-	// 증가시키고, 게시 자체가 즉시 실패하면(completion이 절대 안 옴) 바로
-	// 롤백한다 — HasNoOutstandingIo()/RedisClient.h 상단 설명 참고.
 	_pendingIoCount.fetch_add(1, std::memory_order_seq_cst);
 
 	if( ::WSARecv(hSocket, wsaBufs, bufferCount, &dwBytesTransferred, &dwFlags, &_recvEvent, NULL) == SOCKET_ERROR )
@@ -498,7 +491,7 @@ void CRedisClient::Dispatch(CIocpEvent* iocpEvent, int32 numOfBytes)
 			// Disconnect()가 트리거하는 콜백 -> Pool -> ReconnectLoop() 경로가
 			// 이 completion 처리가 다 끝나기 전에 재연결을 시작하지 못하도록,
 			// Disconnect() 처리가 전부 끝난 뒤에야 outstanding에서 뺀다.
-			Disconnect();
+			Disconnect(ERedisDisconnectReason::ConnectionClosedRecv);
 			_pendingIoCount.fetch_sub(1, std::memory_order_seq_cst);
 			return;
 		}
@@ -537,7 +530,7 @@ void CRedisClient::Dispatch(CIocpEvent* iocpEvent, int32 numOfBytes)
 
 		// [수정 -- 버그 수정] recv의 numOfBytes==0 경로와 동일한 이유로,
 		// Disconnect()가 완전히 끝난 뒤에 카운트를 감소시킨다.
-		Disconnect();
+		Disconnect(ERedisDisconnectReason::ConnectionClosedSend);
 		_pendingIoCount.fetch_sub(1, std::memory_order_seq_cst);
 		return;
 	}
@@ -589,7 +582,7 @@ void CRedisClient::Dispatch(CIocpEvent* iocpEvent, int32 numOfBytes)
 	{
 		// _commandLock 밖에서 호출해야 한다 -- Disconnect()가 같은
 		// _commandLock을 다시 잡으므로, 락을 쥔 채로 부르면 데드락이다.
-		Disconnect();
+		Disconnect(ERedisDisconnectReason::SendFailed);
 	}
 }
 
@@ -606,27 +599,8 @@ void CRedisClient::Dispatch(CIocpEvent* iocpEvent, int32 numOfBytes)
 //***************************************************************************
 void CRedisClient::ProcessRecv(DWORD dwBytesTransferred)
 {
-	LOG_DEBUG(
-		_T("Redis ProcessRecv: this=%p bytes=%lu "
-			"read=%p write(before)=%p"),
-		this,
-		dwBytesTransferred,
-		_recvBuffer.GetReadBuffer(),
-		_recvBuffer.GetWriteBuffer()
-	);
-
 	// 링 버퍼 쓰기 커서 이동
 	_recvBuffer.MoveWriteBuffer(dwBytesTransferred);
-
-	LOG_DEBUG(
-		_T("Redis ProcessRecv after MoveWrite: this=%p "
-			"read=%p write=%p used=%lld free=%lld"),
-		this,
-		_recvBuffer.GetReadBuffer(),
-		_recvBuffer.GetWriteBuffer(),
-		_recvBuffer.GetSizeUsed(),
-		_recvBuffer.GetSizeFree()
-	);
 
 	std::vector<RedisValue> parsedValues;
 	bool bProtocolError = false;
@@ -638,38 +612,36 @@ void CRedisClient::ProcessRecv(DWORD dwBytesTransferred)
 		// 미완성 패킷 재조립 책임은 CRedisParser 하나로 완전히 넘어가므로,
 		// 넘긴 만큼은 곧바로 읽기 커서를 이동시켜 같은 바이트가 다음 수신
 		// 완료 때 다시 파서로 들어가는 일이 없도록 한다.
-		int64 nReadSize = _recvBuffer.GetSizeUsed();
-		char* pReadBuffer = _recvBuffer.GetReadBuffer();
-
-		if( nReadSize == 1198 )
+		// 링버퍼는 write < read인 wrap 상태에서 데이터가 [read, 버퍼끝) +
+		// [버퍼시작, write) 두 개의 불연속 구간으로 나뉜다. GetReadBuffer()는
+		// 읽기 커서 하나만 돌려주므로, 한 번에 GetSizeUsed()만큼 읽으면 첫
+		// 구간의 끝을 넘어 버퍼 밖을 읽게 된다. CIocpSession::ProcessRecv()와
+		// 동일하게 GetSizeDirectDequeueAble() 만큼의 연속 구간만 파서에 넘기고
+		// 읽기 커서를 옮기는 과정을, 사용 중인 데이터가 없어질 때까지 반복한다
+		// (wrap 상태면 두 번, 아니면 한 번 돈다). 파서가 미완성 조각을 자체
+		// 버퍼(_pendingBuffer)에 보관하므로 링버퍼에는 처리 안 된 데이터가
+		// 남지 않는다. Feed()가 상한 초과로 실패하면 스트림을 신뢰할 수 없으므로
+		// 프로토콜 오류로 취급해 연결을 끊는다.
+		while( true )
 		{
-			LOG_ERROR(_T(
-				"Redis RAW recv buffer: "
-				"size=%lld read=%p write=%p "
-				"offset896=0x%02X offset897=0x%02X"),
-				nReadSize,
-				pReadBuffer,
-				_recvBuffer.GetWriteBuffer(),
-				static_cast<unsigned char>(pReadBuffer[896]),
-				static_cast<unsigned char>(pReadBuffer[897])
-			);
-		}
+			// 사용 중인 데이터를 다 소진하면 루프 종료
+			if( _recvBuffer.GetSizeUsed() <= 0 )
+				break;
 
-		if( nReadSize > 0 )
-		{
-			// [수정 — 버그 수정] Feed()가 이제 bool을 반환한다 —
-			// _pendingBuffer 상한(RedisParser.h::kMaxPendingBufferSize)을
-			// 넘기면 false다. 이 경우 스트림을 더 이상 신뢰할 수 없으므로
-			// 새로 받은 바이트를 읽기 커서로 넘기지 않고(그대로 두면 다음
-			// 수신 때 또 시도하게 될 뿐이므로 의미 없음) 바로 연결을
-			// 끊는다.
-			if( _parser.Feed(_recvBuffer.GetReadBuffer(), static_cast<int32>(nReadSize)) )
-			{
-				_recvBuffer.MoveReadBuffer(static_cast<int32>(nReadSize));
-			}
-			else
+			const int64 nDirectSize = _recvBuffer.GetSizeDirectDequeueAble();
+			if( nDirectSize <= 0 )
+				break;
+
+			if( !_parser.Feed(_recvBuffer.GetReadBuffer(), static_cast<int32>(nDirectSize)) )
 			{
 				bProtocolError = true;
+				break;
+			}
+
+			if( !_recvBuffer.MoveReadBuffer(nDirectSize) )
+			{
+				bProtocolError = true;
+				break;
 			}
 		}
 
@@ -704,7 +676,10 @@ void CRedisClient::ProcessRecv(DWORD dwBytesTransferred)
 
 	if( bProtocolError )
 	{
-		Disconnect();
+		// 이 경로는 TCP 연결이 끊긴 게 아니라 수신한 바이트를 RESP로 해석하지
+		// 못한 경우다. 연결 끊김과 구분되도록 별도 사유(ProtocolError)를
+		// 넘기면 호출부가 RedisValue::strVal로 원인을 구분할 수 있다.
+		Disconnect(ERedisDisconnectReason::ProtocolError);
 		return;
 	}
 
@@ -713,7 +688,7 @@ void CRedisClient::ProcessRecv(DWORD dwBytesTransferred)
 	// 연결을 즉시 끊어 Disconnect()의 에러 완료 경로로 정리되게 한다.
 	if( !RegisterRecv() )
 	{
-		Disconnect();
+		Disconnect(ERedisDisconnectReason::RecvRegistrationFailed);
 	}
 }
 

@@ -42,11 +42,16 @@ void CGlobalQueue::Push(CJobQueueRef jobQueue)
 //***************************************************************************
 // @brief 전역 큐에서 작업 큐를 꺼냅니다.
 // @detail 스레드 안전한 큐로부터 대기 중인 작업 큐를 인출하여 반환합니다.
-// @return 인출된 작업 큐 레퍼런스. 큐가 비어있으면 기본 생성된(빈) 레퍼런스 반환.
+// @return 인출된 작업 큐 레퍼런스. 큐가 비어있으면 빈(null) 레퍼런스 반환.
+//         호출부는 반환값이 null인지 확인해야 합니다.
+// @details TryPop()이 [[nodiscard]]이므로 성공 여부를 직접 확인해서, 실패했을
+//          때 ret에 무엇이 남아있든 항상 빈 레퍼런스가 반환되도록 한다.
 //***************************************************************************
 CJobQueueRef CGlobalQueue::Pop()
 {
 	CJobQueueRef ret;
-	_jobQueues.TryPop(ret);
+	if( !_jobQueues.TryPop(ret) )
+		return CJobQueueRef();
+
 	return ret;
 }

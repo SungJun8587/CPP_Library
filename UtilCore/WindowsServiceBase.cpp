@@ -6,10 +6,6 @@
 #include "pch.h"
 #include "WindowsServiceBase.h"
 
-//***************************************************************************
-// Construction/Destruction
-//***************************************************************************
-
 shared_ptr<WindowsServiceBase> WindowsServiceBase::sm_spSvrInstancePtr;
 
 //***************************************************************************
@@ -112,18 +108,18 @@ bool WindowsServiceBase::Init(const TCHAR* ptszArgv)
 		_tcsncpy_s(tszTempArgv, FULLPATH_STRLEN, ptszArgv, _TRUNCATE);
 	}
 
-	if( false == SERVER_CONFIG->Init(tszTempArgv) )
+	if( false == SERVICE_CONFIG->Init(tszTempArgv) )
 	{
 		printf("SERVER_CONFIG->Init Fail\n");
 		exit(-1);
 	}
 
-	if( _tcslen(SERVER_CONFIG->GetServiceName()) > 0 )
-		_tcsncpy_s(m_tszServiceName, _countof(m_tszServiceName), SERVER_CONFIG->GetServiceName(), _TRUNCATE);
-	if( _tcslen(SERVER_CONFIG->GetDisplayName()) > 0 )
-		_tcsncpy_s(m_tszDisplayName, _countof(m_tszDisplayName), SERVER_CONFIG->GetDisplayName(), _TRUNCATE);
-	if( _tcslen(SERVER_CONFIG->GetServerName()) > 0 )
-		_tcsncpy_s(m_tszAppName, _countof(m_tszAppName), SERVER_CONFIG->GetServerName(), _TRUNCATE);
+	if( _tcslen(SERVICE_CONFIG->GetServiceName()) > 0 )
+		_tcsncpy_s(m_tszServiceName, _countof(m_tszServiceName), SERVICE_CONFIG->GetServiceName(), _TRUNCATE);
+	if( _tcslen(SERVICE_CONFIG->GetDisplayName()) > 0 )
+		_tcsncpy_s(m_tszDisplayName, _countof(m_tszDisplayName), SERVICE_CONFIG->GetDisplayName(), _TRUNCATE);
+	if( _tcslen(SERVICE_CONFIG->GetServerName()) > 0 )
+		_tcsncpy_s(m_tszAppName, _countof(m_tszAppName), SERVICE_CONFIG->GetServerName(), _TRUNCATE);
 
 	return true;
 }

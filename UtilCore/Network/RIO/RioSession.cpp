@@ -304,6 +304,11 @@ void CRioSession::UnregisterSendBuffer() noexcept
 //***************************************************************************
 void CRioSession::Disconnect(const TCHAR* cause)
 {
+    if( cause != nullptr )
+    {
+        LOG_INFO(_T("CRioSession::Disconnect forced close: %s"), cause);
+    }
+
     Close(Rio::CloseReason::ForcedClose);
 }
 
