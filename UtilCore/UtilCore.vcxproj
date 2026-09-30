@@ -87,6 +87,7 @@
     <ClInclude Include="Image\PngCodec.h" />
     <ClInclude Include="Image\Quantize.h" />
     <ClInclude Include="Image\Sprite.h" />
+    <ClInclude Include="Image\Win32Draw.h" />
     <ClInclude Include="Job\GlobalQueue.h" />
     <ClInclude Include="Job\Job.h" />
     <ClInclude Include="Job\JobCommon.h" />
@@ -200,9 +201,12 @@
     <ClInclude Include="Util\CalculatedElapsedTime.h" />
     <ClInclude Include="Util\CommonUtil.h" />
     <ClInclude Include="Util\ConsoleUtil.h" />
+    <ClInclude Include="Util\DelimitedRowFile.h" />
     <ClInclude Include="Util\DirectoryUtil.h" />
     <ClInclude Include="Util\EncodingConvert.h" />
     <ClInclude Include="Util\FileStream.h" />
+    <ClInclude Include="Util\KeyedTable.h" />
+    <ClInclude Include="Util\TextFieldParser.h" />
     <ClInclude Include="Util\TypeCast.h" />
     <ClInclude Include="Util\UniqNumGenerator.h" />
     <ClInclude Include="Util\WinCharsetConv.h" />
@@ -252,6 +256,7 @@
     <ClCompile Include="Image\PngCodec.cpp" />
     <ClCompile Include="Image\Quantize.cpp" />
     <ClCompile Include="Image\Sprite.cpp" />
+    <ClCompile Include="Image\Win32Draw.cpp" />
     <ClCompile Include="Job\GlobalQueue.cpp" />
     <ClCompile Include="Job\Job.cpp" />
     <ClCompile Include="Job\JobQueue.cpp" />

@@ -149,6 +149,9 @@ using namespace std;
 #include <Util/UniqNumGenerator.h>
 #include <Util/BitOperate.h>
 #include <Util/FileStream.h>
+#include <Util/KeyedTable.h>
+#include <Util/TextFieldParser.h>
+#include <Util/DelimitedRowFile.h> 
 
 #include <System/SystemBaseDefine.h>
 #include <System/PDHPerformanceObject.h>

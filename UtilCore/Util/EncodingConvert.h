@@ -1,6 +1,6 @@
 ﻿
 //***************************************************************************
-// EncodingConvert.h: interface for the EncodingConvert Function.
+// EncodingConvert.h : interface for the EncodingConvert Function.
 //
 //***************************************************************************
 

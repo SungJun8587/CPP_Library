@@ -27,8 +27,9 @@
 //		Define Common Value
 //Begin**********************************************************************
 
-#define MAX_BUFFER_SIZE								1024
-#define MAX_PACKET_SIZE								1024
+#define MAX_BUFFER_SIZE							1024
+#define MAX_PACKET_SIZE							1024
+#define MAX_TEMP_BUFFER_SIZE					(12*1024)
 
 #define NUMERIC_STRING_LEN							20
 

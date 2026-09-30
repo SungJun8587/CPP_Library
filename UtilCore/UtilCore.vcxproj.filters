@@ -650,6 +650,18 @@
       <Filter>Util</Filter>
     </ClInclude>
     <ClInclude Include="ServiceConfig.h" />
+    <ClInclude Include="Util\DelimitedRowFile.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\KeyedTable.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\TextFieldParser.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Image\Win32Draw.h">
+      <Filter>Image</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">
@@ -976,6 +988,9 @@
       <Filter>Util</Filter>
     </ClCompile>
     <ClCompile Include="ServiceConfig.cpp" />
+    <ClCompile Include="Image\Win32Draw.cpp">
+      <Filter>Image</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="DB\BaseODBC.inl">

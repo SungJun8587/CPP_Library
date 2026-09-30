@@ -1,6 +1,6 @@
 ﻿
 //***************************************************************************
-// Sprite.cpp: implementation of the CSprite class.
+// Sprite.cpp : implementation of the CSprite class.
 //
 //***************************************************************************
 
