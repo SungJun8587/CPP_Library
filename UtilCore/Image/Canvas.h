@@ -7,8 +7,9 @@
 #ifndef UC_CANVAS_H
 #define UC_CANVAS_H
 
-#include "ImageTypes.h"
-#include "Sprite.h"
+#include <Image/ImageTypes.h>
+#include <Image/ImageProcessor.h>
+#include <Image/Sprite.h>
 
 //***************************************************************************
 // @brief ImageBuffer를 내부 캔버스로 사용하는 Canvas 클래스
@@ -26,6 +27,15 @@ public:
 	//***************************************************************************
 	void Init(int nWidth, int nHeight);
 	void Close();
+
+	//***************************************************************************
+	// @brief 이미지 리샘플링(스케일링)으로 캔버스 크기 변경
+	// @param nWidth 새 가로 크기(픽셀)
+	// @param nHeight 새 세로 크기(픽셀)
+	// @param method 리샘플링 방식(기본값 Bilinear)
+	// @return 처리 성공 여부
+	//***************************************************************************
+	BOOL Resize(int nWidth, int nHeight, ResizeMethod method = ResizeMethod::Bilinear);
 
 	//***************************************************************************
 	// @brief 스프라이트를 캔버스에 드로잉 (컬러 및 알파 데이터 반영)

@@ -14,6 +14,7 @@
 #include <Image/Deflate.h>
 #include <Image/ColorSpace.h>
 #include <Image/BmpCodec.h>
+#include <Image/GifCodec.h>
 #include <Image/JpegCodec.h>
 #include <Image/PngCodec.h>
 #include <Image/ImageIO.h>
@@ -24,6 +25,5 @@
 #include <Image/Sprite.h>
 #include <Image/Quantize.h>
 #include <Image/Canvas.h>
-
 
 #endif // ndef UC_IMAGECOMMON_H

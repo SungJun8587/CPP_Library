@@ -62,6 +62,7 @@ ImageBuffer BmpCodec::Decode(const uint8_t* data, size_t size) const
 	if( compression != 0 ) throw ImageException("BMP: compressed BMP not supported");
 	if( bitsPerPixel != 24 && bitsPerPixel != 32 )
 		throw ImageException("BMP: only 24/32 bpp supported");
+	if( width <= 0 || heightRaw == 0 ) throw ImageException("BMP: invalid image dimensions");
 	(void)dibHeaderSize;
 
 	bool topDown = heightRaw < 0;

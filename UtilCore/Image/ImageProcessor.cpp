@@ -14,14 +14,25 @@ ImageProcessor& ImageProcessor::Load(const std::string& path)
 }
 
 //***************************************************************************
-// @brief [추가] 메모리 바이트로부터 로드하여 내부 이미지를 교체
-// @param data 이미지 파일 바이트 그대로
+// @brief 메모리 상의 바이트 버퍼를 디코드하여 내부 이미지를 교체
+// @param data 디코드할 이미지 바이트 버퍼
+// @param size 바이트 버퍼 길이
 // @return 체이닝을 위한 자기 자신에 대한 참조
 //***************************************************************************
-ImageProcessor& ImageProcessor::LoadFromMemory(const std::vector<uint8_t>& data)
+ImageProcessor& ImageProcessor::LoadFromMemory(const uint8_t* data, size_t size)
 {
-	image_ = ImageIO::LoadFromMemory(data);
+	image_ = ImageIO::LoadFromMemory(data, size);
 	return *this;
+}
+
+//***************************************************************************
+// @brief 지정한 포맷으로 현재 이미지를 인코드하여 메모리 버퍼로 반환
+// @param format 사용할 인코딩 포맷
+// @return 인코드된 바이트 버퍼
+//***************************************************************************
+std::vector<uint8_t> ImageProcessor::SaveToMemory(ImageFormat format) const
+{
+	return ImageIO::SaveToMemory(image_, format);
 }
 
 //***************************************************************************
@@ -47,16 +58,6 @@ const ImageProcessor& ImageProcessor::Save(const std::string& path, ImageFormat 
 {
 	ImageIO::Save(path, image_, format);
 	return *this;
-}
-
-//***************************************************************************
-// @brief [추가] 파일에 쓰는 대신 인코딩된 바이트를 그대로 돌려받는다
-// @param format 사용할 인코딩 포맷
-// @return 인코딩된 파일 바이트
-//***************************************************************************
-std::vector<uint8_t> ImageProcessor::SaveToMemory(ImageFormat format) const
-{
-	return ImageIO::SaveToMemory(image_, format);
 }
 
 //***************************************************************************

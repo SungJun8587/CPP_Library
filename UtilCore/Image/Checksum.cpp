@@ -8,10 +8,14 @@
 //***************************************************************************
 const uint32_t* Crc32::Table()
 {
-	static uint32_t table[256];
-	static bool initialized = false;
-	if( !initialized )
-	{
+	// 지역 static의 초기화는 C++11부터 스레드 안전함이 보장된다(최초 진입
+	// 스레드가 초기화를 마칠 때까지 다른 스레드는 대기). 과거의 별도 bool
+	// 플래그 수동 더블체크 패턴은 스레드 안전하지 않은 데이터 레이스였다
+	// (ThreadSanitizer로 재현/확인됨 — 여러 스레드가 동시에 Crc32::Compute를
+	// 처음 호출하는 경우 발생). 람다 1회 호출 초기화로 교체해 컴파일러가
+	// 생성하는 가드를 활용한다.
+	static const auto table = [] {
+		std::array<uint32_t, 256> t{};
 		for( uint32_t n = 0; n < 256; ++n )
 		{
 			uint32_t c = n;
@@ -19,11 +23,11 @@ const uint32_t* Crc32::Table()
 			{
 				c = (c & 1) ? (0xEDB88320u ^ (c >> 1)) : (c >> 1);
 			}
-			table[n] = c;
+			t[n] = c;
 		}
-		initialized = true;
-	}
-	return table;
+		return t;
+		}();
+	return table.data();
 }
 
 //***************************************************************************

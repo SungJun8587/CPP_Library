@@ -12,6 +12,7 @@ std::vector<std::unique_ptr<ICodec>>& ImageIO::Codecs()
 		std::vector<std::unique_ptr<ICodec>> v;
 		v.push_back(std::make_unique<PngCodec>());
 		v.push_back(std::make_unique<BmpCodec>());
+		v.push_back(std::make_unique<GifCodec>());
 		v.push_back(std::make_unique<JpegCodec>());
 		return v;
 		}();
@@ -59,35 +60,6 @@ void ImageIO::WriteFile(const std::string& path, const std::vector<uint8_t>& dat
 }
 
 //***************************************************************************
-// @brief [추가] 메모리 바이트로부터 시그니처로 포맷을 감지하고 알맞은
-//        코덱으로 디코드한다. Load()의 핵심 로직(파일 읽기 이후 부분)을
-//        그대로 옮긴 것 — Load()는 이제 이 함수를 그대로 호출한다.
-//***************************************************************************
-ImageBuffer ImageIO::LoadFromMemory(const std::vector<uint8_t>& data)
-{
-	for( auto& codec : Codecs() )
-	{
-		if( codec->CanDecode(data.data(), data.size()) )
-		{
-			return codec->Decode(data.data(), data.size());
-		}
-	}
-	throw ImageException("ImageIO: unrecognized file format (memory buffer)");
-}
-
-//***************************************************************************
-// @brief [추가] 지정한 포맷의 코덱으로 이미지를 인코드해 바이트로 반환한다
-//        (디스크에 쓰지 않음). Save()의 핵심 로직을 그대로 옮긴 것 — Save()는
-//        이제 이 함수를 그대로 호출한 뒤 파일에 쓰기만 한다.
-//***************************************************************************
-std::vector<uint8_t> ImageIO::SaveToMemory(const ImageBuffer& image, ImageFormat format)
-{
-	const ICodec* codec = FindCodec(format);
-	if( !codec ) throw ImageException("ImageIO: no codec registered for requested format");
-	return codec->Encode(image);
-}
-
-//***************************************************************************
 // @brief 파일을 읽어 시그니처로 포맷을 감지하고 알맞은 코덱으로 디코드
 // @param path 로드할 이미지 파일 경로
 // @return 디코드된 ImageBuffer
@@ -95,18 +67,45 @@ std::vector<uint8_t> ImageIO::SaveToMemory(const ImageBuffer& image, ImageFormat
 ImageBuffer ImageIO::Load(const std::string& path)
 {
 	std::vector<uint8_t> data = ReadFile(path);
-	// [수정] LoadFromMemory()로 위임 — 다만 에러 메시지에 파일 경로를
-	// 남겨야 어떤 파일이 문제인지 알 수 있으므로, "인식 못 한 포맷"
-	// 예외만 경로를 포함해 다시 던진다(그 외 예외는 ReadFile() 단계에서
-	// 이미 경로를 포함해서 던져지므로 여기까지 안 옴).
 	try
 	{
-		return LoadFromMemory(data);
+		return LoadFromMemory(data.data(), data.size());
 	}
 	catch( const ImageException& )
 	{
 		throw ImageException("ImageIO: unrecognized file format: " + path);
 	}
+}
+
+//***************************************************************************
+// @brief 메모리 상의 바이트 버퍼를 시그니처로 포맷을 감지해 알맞은 코덱으로 디코드
+// @param data 디코드할 이미지 바이트 버퍼
+// @param size 바이트 버퍼 길이
+// @return 디코드된 ImageBuffer
+//***************************************************************************
+ImageBuffer ImageIO::LoadFromMemory(const uint8_t* data, size_t size)
+{
+	for( auto& codec : Codecs() )
+	{
+		if( codec->CanDecode(data, size) )
+		{
+			return codec->Decode(data, size);
+		}
+	}
+	throw ImageException("ImageIO: unrecognized image data");
+}
+
+//***************************************************************************
+// @brief 지정한 포맷의 코덱으로 이미지를 인코드하여 메모리 버퍼로 반환
+// @param image 인코드할 이미지
+// @param format 사용할 인코딩 포맷
+// @return 인코드된 바이트 버퍼
+//***************************************************************************
+std::vector<uint8_t> ImageIO::SaveToMemory(const ImageBuffer& image, ImageFormat format)
+{
+	const ICodec* codec = FindCodec(format);
+	if( !codec ) throw ImageException("ImageIO: no codec registered for requested format");
+	return codec->Encode(image);
 }
 
 //***************************************************************************
@@ -117,7 +116,9 @@ ImageBuffer ImageIO::Load(const std::string& path)
 //***************************************************************************
 void ImageIO::Save(const std::string& path, const ImageBuffer& image, ImageFormat format)
 {
-	std::vector<uint8_t> encoded = SaveToMemory(image, format);
+	const ICodec* codec = FindCodec(format);
+	if( !codec ) throw ImageException("ImageIO: no codec registered for requested format");
+	std::vector<uint8_t> encoded = codec->Encode(image);
 	WriteFile(path, encoded);
 }
 
@@ -136,5 +137,6 @@ ImageFormat ImageIO::FormatFromExtension(const std::string& path)
 	if( ext == "bmp" ) return ImageFormat::BMP;
 	if( ext == "png" ) return ImageFormat::PNG;
 	if( ext == "jpg" || ext == "jpeg" ) return ImageFormat::JPEG;
+	if( ext == "gif" ) return ImageFormat::GIF;
 	return ImageFormat::Unknown;
 }

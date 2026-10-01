@@ -11,9 +11,11 @@
 #include <algorithm>
 
 //***************************************************************************
-// @brief JPEG(JFIF) baseline 이미지를 디코드하는 코덱(인코드는 미구현)
-// @details 마커/청크 파싱, 허프만 복호, IDCT, 색공간 변환, 크로마 업샘플링을
-//          전부 직접 구현한다. 프로그레시브 JPEG는 지원하지 않는다.
+// @brief JPEG(JFIF) baseline 이미지를 디코드/인코드하는 코덱
+// @details 디코드는 마커/청크 파싱, 허프만 복호, IDCT, 색공간 변환, 크로마
+//          업샘플링을 전부 직접 구현한다(프로그레시브 JPEG는 미지원).
+//          인코드는 4:4:4(서브샘플링 없음)로만 동작하며, 표준(Annex K)
+//          양자화/허프만 테이블을 품질값으로 스케일링해 사용한다.
 //***************************************************************************
 class JpegCodec : public ICodec
 {
@@ -28,14 +30,41 @@ public:
 	ImageBuffer Decode(const uint8_t* data, size_t size) const override;
 	std::vector<uint8_t> Encode(const ImageBuffer& image) const override;
 
+	std::vector<uint8_t> EncodeQuality(const ImageBuffer& image, int quality) const;
+
 private:
+	// JPEG 지그재그 스캔 순서 <-> 8x8 블록 자연(raster) 순서 변환 테이블.
+	// Decoder/Encoder가 공통으로 사용하므로 바깥 클래스(JpegCodec) 스코프에 둔다.
+	static constexpr int kZigZag[64] = {
+		0,1,8,16,9,2,3,10,17,24,32,25,18,11,4,5,12,19,26,33,40,48,41,34,27,20,13,6,7,14,21,28,
+		35,42,49,56,57,50,43,36,29,22,15,23,30,37,44,51,58,59,52,45,38,31,39,46,53,60,61,54,47,55,62,63
+	};
+
 	//***************************************************************************
-	// @brief 정규 허프만 코드 테이블(DC 또는 AC) 하나를 표현하는 룩업 테이블
-	// @details key = (코드 길이 << 16) | 코드 값, value = 심볼(바이트).
+	// @brief 정규 허프만 코드 테이블(DC 또는 AC) 하나를 표현하는 복호용 테이블
 	//***************************************************************************
 	struct HuffTable
 	{
-		std::unordered_map<uint32_t, uint8_t> lut; // (길이,코드) -> 심볼 룩업 테이블
+		// JPEG 표준(ITU T.81 Annex F, Figure F.15/F.16)이 그대로 설명하는 정규
+		// 허프만 증분 복호 방식: 코드 길이별 min/max 코드값과 심볼 배열 내
+		// 시작 오프셋만으로 해시 없이 O(1) 범위 비교로 심볼을 복원한다.
+		// (이전 unordered_map 기반 구현보다 비트당 비용이 훨씬 낮다.)
+		int minCode[17] = {};      // 길이 len(1~16)의 최소 코드값(인덱스 0 미사용)
+		int maxCode[17] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }; // 길이 len의 최대 코드값, 코드가 없으면 -1 (Build 전 기본값도 안전하게 -1)
+		int valPtr[17] = {};       // 길이 len의 코드들이 values_ 배열에서 시작하는 위치
+		std::vector<uint8_t> values_; // 코드 길이 순으로 정렬된 심볼 목록
+
+		void Build(const uint8_t counts[16], const std::vector<uint8_t>& symbols);
+	};
+
+	//***************************************************************************
+	// @brief 심볼별 정규 허프만 코드/길이를 담는 인코드용 테이블
+	// @details 디코드용 HuffTable과 반대 방향(심볼 -> 코드) 매핑이다.
+	//***************************************************************************
+	struct EncHuffTable
+	{
+		uint16_t code[256] = {};   // 심볼별 허프만 코드(우측 정렬)
+		uint8_t length[256] = {};  // 심볼별 코드 길이(비트, 0이면 미사용 심볼)
 
 		void Build(const uint8_t counts[16], const std::vector<uint8_t>& symbols);
 	};
@@ -59,7 +88,7 @@ private:
 
 	//***************************************************************************
 	// @brief 0xFF 0x00 바이트 스터핑을 제거하며 엔트로피 코딩 구간을 비트
-	//        단위로 읽는 스트림
+	//        단위로 읽는 스트림(디코드용, LSB가 아닌 MSB-first)
 	//***************************************************************************
 	class BitStream
 	{
@@ -119,12 +148,7 @@ private:
 		std::array<HuffTable, 4> acTables_;               // AC 허프만 테이블(0~3번 슬롯)
 		int restartInterval_ = 0;                         // DRI로 지정된 재시작 간격(MCU 단위)
 		std::vector<int> scanCompOrder_;                  // SOS에 나열된 컴포넌트 인덱스 순서
-
-		// JPEG 지그재그 스캔 순서 <-> 8x8 블록 자연 순서 변환 테이블
-		static constexpr int kZigZag[64] = {
-			0,1,8,16,9,2,3,10,17,24,32,25,18,11,4,5,12,19,26,33,40,48,41,34,27,20,13,6,7,14,21,28,
-			35,42,49,56,57,50,43,36,29,22,15,23,30,37,44,51,58,59,52,45,38,31,39,46,53,60,61,54,47,55,62,63
-		};
+		bool hasScanData_ = false;                        // SOS/엔트로피 스캔이 한 번이라도 처리되었는지 여부
 
 		static uint16_t ReadU16(const uint8_t* p);
 		static size_t FindNextMarker(const uint8_t* data, size_t size, size_t from);
@@ -140,6 +164,44 @@ private:
 		ImageBuffer ComposeImage();
 		uint8_t SamplePlane(const Component& c, int x, int y) const;
 		static uint8_t Clamp(int v);
+	};
+
+	//***************************************************************************
+	// @brief 표준(Annex K) 양자화/허프만 테이블 기반의 baseline(4:4:4) JPEG 인코더
+	// @details 크로마 서브샘플링 없이 컴포넌트마다 8x8 블록 1개씩(4:4:4)만
+	//          다루므로 MCU 구성이 단순하며, 별도의 최적화된(2-pass) 허프만
+	//          테이블 생성 없이 JPEG 표준이 권장하는 고정 테이블을 그대로 쓴다.
+	//***************************************************************************
+	class Encoder
+	{
+	public:
+		std::vector<uint8_t> Run(const ImageBuffer& image, int quality) const;
+
+	private:
+		//***************************************************************************
+		// @brief JPEG 엔트로피 코딩용 MSB-first 비트 라이터(0xFF 바이트 스터핑 포함)
+		//***************************************************************************
+		class BitWriter
+		{
+		public:
+			void PutBits(uint32_t value, int length);
+			void Flush();
+			std::vector<uint8_t> TakeBuffer();
+
+		private:
+			std::vector<uint8_t> out_; // 완성된 바이트를 누적하는 출력 버퍼
+			uint64_t acc_ = 0;         // 아직 출력되지 않은 비트를 담는 누적기
+			int nbits_ = 0;            // acc_에 쌓여 있는 유효 비트 수
+		};
+
+		static void BuildQuantTable(const uint8_t base[64], int quality, uint16_t out[64]);
+		static void WriteSegment(std::vector<uint8_t>& out, uint16_t marker, const uint8_t* data, size_t len);
+		static void FDCT8x8(const float in[64], float out[64]);
+		static int CalcCategory(int value);
+		static void EmitHuffman(BitWriter& bw, const EncHuffTable& table, int symbol);
+		static void EmitCategoryBits(BitWriter& bw, int value, int category);
+		static void EncodeBlock(BitWriter& bw, const float block[64], const uint16_t quantTable[64],
+			const EncHuffTable& dcTable, const EncHuffTable& acTable, int& dcPred);
 	};
 };
 

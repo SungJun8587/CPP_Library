@@ -223,13 +223,20 @@ ImageBuffer PngCodec::Decode(const uint8_t* data, size_t size) const
 	}
 
 	if( width == 0 || height == 0 ) throw ImageException("PNG: missing IHDR");
+	// 손상/조작된 IHDR로 인한 거대 할당 시도(메모리 고갈)를 방지하기 위한 상한선
+	// (JPEG/GIF 디코더에도 동일한 상한을 적용했다)
+	if( static_cast<uint64_t>(width) * static_cast<uint64_t>(height) > 100'000'000ULL )
+		throw ImageException("PNG: image dimensions too large");
 	if( bitDepth != 8 ) throw ImageException("PNG: only 8-bit depth supported");
 	if( interlace != 0 ) throw ImageException("PNG: interlaced PNG not supported");
 
 	int channels = ChannelsForColorType(colorType);
-	std::vector<uint8_t> raw = Inflate::Decompress(idat.data(), idat.size());
-
 	uint32_t stride = width * channels;
+	// 압축 해제 결과가 선언된 이미지 크기로 설명 가능한 양을 넘지 않도록 상한을
+	// 둔다 — 아주 작은 IDAT이 비정상적으로 큰 출력으로 부풀려지는 "압축 폭탄"
+	// 공격을 막는다(가로*세로 상한은 이미 위에서 검증했으므로 이 곱셈은 안전하다).
+	size_t maxRawSize = static_cast<size_t>(stride + 1) * height;
+	std::vector<uint8_t> raw = Inflate::Decompress(idat.data(), idat.size(), maxRawSize);
 	if( raw.size() < static_cast<size_t>(stride + 1) * height )
 		throw ImageException("PNG: decompressed data too short");
 

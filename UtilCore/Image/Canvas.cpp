@@ -27,12 +27,13 @@ void CCanvas::Init(int nWidth, int nHeight)
 
 	m_canvas.Resize(static_cast<uint32_t>(nWidth), static_cast<uint32_t>(nHeight));
 
-	// 기본 캔버스 배경색 설정 (RGBA: 172, 172, 172, 255)
+	// 기본 캔버스 배경색 설정 (RGBA: 172, 172, 172, 0)
+	// alpha 0 = 배경(투명) — DrawImage가 그린 픽셀만 alpha 255로 덮어써서 구분됨
 	for( uint32_t y = 0; y < m_canvas.Height(); ++y )
 	{
 		for( uint32_t x = 0; x < m_canvas.Width(); ++x )
 		{
-			m_canvas.SetPixel(x, y, 172, 172, 172, 255);
+			m_canvas.SetPixel(x, y, 172, 172, 172, 0);
 		}
 	}
 }
@@ -43,6 +44,23 @@ void CCanvas::Init(int nWidth, int nHeight)
 void CCanvas::Close()
 {
 	m_canvas.Resize(0, 0);
+}
+
+//***************************************************************************
+// @brief 이미지 리샘플링(스케일링)으로 캔버스 크기 변경
+// @param nWidth 새 가로 크기(픽셀)
+// @param nHeight 새 세로 크기(픽셀)
+// @param method 리샘플링 방식(기본값 Bilinear)
+// @return 처리 성공 여부
+//***************************************************************************
+BOOL CCanvas::Resize(int nWidth, int nHeight, ResizeMethod method)
+{
+	if( m_canvas.Empty() || nWidth <= 0 || nHeight <= 0 ) return FALSE;
+
+	ImageProcessor proc(std::move(m_canvas));
+	proc.Resize(static_cast<uint32_t>(nWidth), static_cast<uint32_t>(nHeight), method);
+	m_canvas = std::move(proc.Buffer());
+	return TRUE;
 }
 
 //***************************************************************************

@@ -17,31 +17,31 @@
 class BitReader
 {
 public:
-	BitReader(const uint8_t* data, size_t size) : data_(data), size_(size) {}
+    BitReader(const uint8_t* data, size_t size) : data_(data), size_(size) {}
 
-	uint32_t ReadBit();
-	uint32_t ReadBits(int count);
+    uint32_t ReadBit();
+    uint32_t ReadBits(int count);
 
-	//***************************************************************************
-	// @brief 다음 stored 블록을 읽기 위해 현재 바이트의 남은 비트를 버리고
-	//        바이트 경계로 정렬
-	//***************************************************************************
-	void AlignToByte() { bitPos_ = 0; }
+    //***************************************************************************
+    // @brief 다음 stored 블록을 읽기 위해 현재 바이트의 남은 비트를 버리고
+    //        바이트 경계로 정렬
+    //***************************************************************************
+    void AlignToByte() { bitPos_ = 0; }
 
-	uint8_t ReadRawByte();
+    uint8_t ReadRawByte();
 
-	//***************************************************************************
-	// @brief 현재까지 소비한 바이트 오프셋을 반환
-	// @return 다음에 읽을 바이트의 인덱스
-	//***************************************************************************
-	size_t BytePos() const { return bytePos_; }
+    //***************************************************************************
+    // @brief 현재까지 소비한 바이트 오프셋을 반환
+    // @return 다음에 읽을 바이트의 인덱스
+    //***************************************************************************
+    size_t BytePos() const { return bytePos_; }
 
 private:
-	const uint8_t* data_;    // 입력 스트림 시작 주소
-	size_t size_;            // 입력 스트림 전체 길이(바이트)
-	size_t bytePos_ = 0;     // 다음에 읽을 바이트 인덱스
-	uint8_t curByte_ = 0;    // 현재 처리 중인 바이트
-	int bitPos_ = 0;         // curByte_ 내에서 다음에 읽을 비트 위치
+    const uint8_t* data_;    // 입력 스트림 시작 주소
+    size_t size_;            // 입력 스트림 전체 길이(바이트)
+    size_t bytePos_ = 0;     // 다음에 읽을 바이트 인덱스
+    uint8_t curByte_ = 0;    // 현재 처리 중인 바이트
+    int bitPos_ = 0;         // curByte_ 내에서 다음에 읽을 비트 위치
 };
 
 //***************************************************************************
@@ -51,27 +51,27 @@ private:
 class HuffmanDecoder
 {
 public:
-	void Build(const std::vector<int>& codeLengths);
-	int Decode(BitReader& br) const;
+    void Build(const std::vector<int>& codeLengths);
+    int Decode(BitReader& br) const;
 
 private:
-	//***************************************************************************
-	// @brief (코드 길이, 코드 값) 쌍을 해시하기 위한 해시 함수 객체
-	//***************************************************************************
-	struct KeyHash
-	{
-		//***************************************************************************
-		// @brief (길이, 코드) 쌍에 대한 해시값을 계산
-		// @param k (코드 길이, 코드 값) 쌍
-		// @return 계산된 해시값
-		//***************************************************************************
-		size_t operator()(const std::pair<int, int>& k) const
-		{
-			return (static_cast<size_t>(k.first) << 20) ^ static_cast<size_t>(k.second);
-		}
-	};
-	std::unordered_map<std::pair<int, int>, int, KeyHash> symbolOfCode_; // (길이,코드) -> 심볼
-	int maxLen_ = 0; // 이 테이블에 등장하는 최대 코드 길이
+    //***************************************************************************
+    // @brief (코드 길이, 코드 값) 쌍을 해시하기 위한 해시 함수 객체
+    //***************************************************************************
+    struct KeyHash
+    {
+        //***************************************************************************
+        // @brief (길이, 코드) 쌍에 대한 해시값을 계산
+        // @param k (코드 길이, 코드 값) 쌍
+        // @return 계산된 해시값
+        //***************************************************************************
+        size_t operator()(const std::pair<int, int>& k) const
+        {
+            return (static_cast<size_t>(k.first) << 20) ^ static_cast<size_t>(k.second);
+        }
+    };
+    std::unordered_map<std::pair<int, int>, int, KeyHash> symbolOfCode_; // (길이,코드) -> 심볼
+    int maxLen_ = 0; // 이 테이블에 등장하는 최대 코드 길이
 };
 
 //***************************************************************************
@@ -82,14 +82,19 @@ private:
 class Inflate
 {
 public:
-	static std::vector<uint8_t> Decompress(const uint8_t* zlibData, size_t size);
+    // maxOutputSize: 압축 해제 결과가 이 바이트 수를 넘으면 즉시 예외를 던진다.
+    // 매우 작은 입력이 비정상적으로 큰 출력으로 부풀려지는 "압축 폭탄"(decompression
+    // bomb)으로부터 호출자를 보호하기 위한 안전장치이며, 기본값은 사실상 무제한이다.
+    static std::vector<uint8_t> Decompress(const uint8_t* zlibData, size_t size,
+        size_t maxOutputSize = (std::numeric_limits<size_t>::max)());
 
 private:
-	static void DecodeStoredBlock(BitReader& br, std::vector<uint8_t>& out);
-	static void BuildFixedTables(HuffmanDecoder& litDec, HuffmanDecoder& distDec);
-	static void BuildDynamicTables(BitReader& br, HuffmanDecoder& litDec, HuffmanDecoder& distDec);
-	static void DecodeCompressedBlock(BitReader& br, const HuffmanDecoder& litDec,
-		const HuffmanDecoder& distDec, std::vector<uint8_t>& out);
+    static void DecodeStoredBlock(BitReader& br, std::vector<uint8_t>& out, size_t maxOutputSize);
+    static void BuildFixedTables(HuffmanDecoder& litDec, HuffmanDecoder& distDec);
+    static void BuildDynamicTables(BitReader& br, HuffmanDecoder& litDec, HuffmanDecoder& distDec);
+    static void DecodeCompressedBlock(BitReader& br, const HuffmanDecoder& litDec,
+        const HuffmanDecoder& distDec, std::vector<uint8_t>& out,
+        size_t maxOutputSize);
 };
 
 #endif // ndef UC_INFLATE_H

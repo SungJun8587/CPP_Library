@@ -93,7 +93,7 @@ int HuffmanDecoder::Decode(BitReader& br) const
 // @param size 압축 데이터 전체 길이(바이트)
 // @return 압축 해제된 원본 바이트 시퀀스
 //***************************************************************************
-std::vector<uint8_t> Inflate::Decompress(const uint8_t* zlibData, size_t size)
+std::vector<uint8_t> Inflate::Decompress(const uint8_t* zlibData, size_t size, size_t maxOutputSize)
 {
 	if( size < 2 ) throw ImageException("Inflate: input too small");
 	const uint8_t* deflateData = zlibData + 2;
@@ -110,19 +110,19 @@ std::vector<uint8_t> Inflate::Decompress(const uint8_t* zlibData, size_t size)
 
 		if( blockType == 0 )
 		{
-			DecodeStoredBlock(br, out);
+			DecodeStoredBlock(br, out, maxOutputSize);
 		}
 		else if( blockType == 1 )
 		{
 			HuffmanDecoder litDec, distDec;
 			BuildFixedTables(litDec, distDec);
-			DecodeCompressedBlock(br, litDec, distDec, out);
+			DecodeCompressedBlock(br, litDec, distDec, out, maxOutputSize);
 		}
 		else if( blockType == 2 )
 		{
 			HuffmanDecoder litDec, distDec;
 			BuildDynamicTables(br, litDec, distDec);
-			DecodeCompressedBlock(br, litDec, distDec, out);
+			DecodeCompressedBlock(br, litDec, distDec, out, maxOutputSize);
 		}
 		else
 		{
@@ -136,8 +136,9 @@ std::vector<uint8_t> Inflate::Decompress(const uint8_t* zlibData, size_t size)
 // @brief BTYPE=00(stored, 무압축) 블록을 읽어 그대로 출력에 복사
 // @param br 비트를 읽어올 BitReader
 // @param out 결과를 누적할 출력 버퍼
+// @param maxOutputSize out의 크기가 이 값을 넘으면 예외를 던짐(압축 폭탄 방지)
 //***************************************************************************
-void Inflate::DecodeStoredBlock(BitReader& br, std::vector<uint8_t>& out)
+void Inflate::DecodeStoredBlock(BitReader& br, std::vector<uint8_t>& out, size_t maxOutputSize)
 {
 	br.AlignToByte();
 	uint8_t lenLo = br.ReadRawByte();
@@ -145,6 +146,8 @@ void Inflate::DecodeStoredBlock(BitReader& br, std::vector<uint8_t>& out)
 	br.ReadRawByte();
 	br.ReadRawByte();
 	uint32_t len = lenLo | (lenHi << 8);
+	if( out.size() + len > maxOutputSize )
+		throw ImageException("Inflate: decompressed data exceeds limit (possible decompression bomb)");
 	for( uint32_t i = 0; i < len; ++i ) out.push_back(br.ReadRawByte());
 }
 
@@ -225,9 +228,11 @@ void Inflate::BuildDynamicTables(BitReader& br, HuffmanDecoder& litDec, HuffmanD
 // @param litDec 리터럴/길이 허프만 복호기
 // @param distDec 거리 허프만 복호기
 // @param out 결과를 누적할 출력 버퍼
+// @param maxOutputSize out의 크기가 이 값을 넘으면 예외를 던짐(압축 폭탄 방지)
 //***************************************************************************
 void Inflate::DecodeCompressedBlock(BitReader& br, const HuffmanDecoder& litDec,
-	const HuffmanDecoder& distDec, std::vector<uint8_t>& out)
+	const HuffmanDecoder& distDec, std::vector<uint8_t>& out,
+	size_t maxOutputSize)
 {
 	static const int lengthBase[29] = { 3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,
 										67,83,99,115,131,163,195,227,258 };
@@ -238,6 +243,9 @@ void Inflate::DecodeCompressedBlock(BitReader& br, const HuffmanDecoder& litDec,
 
 	while( true )
 	{
+		if( out.size() > maxOutputSize )
+			throw ImageException("Inflate: decompressed data exceeds limit (possible decompression bomb)");
+
 		int sym = litDec.Decode(br);
 		if( sym < 256 )
 		{
@@ -259,6 +267,8 @@ void Inflate::DecodeCompressedBlock(BitReader& br, const HuffmanDecoder& litDec,
 
 			if( static_cast<size_t>(distance) > out.size() )
 				throw ImageException("Inflate: distance exceeds output size");
+			if( out.size() + static_cast<size_t>(length) > maxOutputSize )
+				throw ImageException("Inflate: decompressed data exceeds limit (possible decompression bomb)");
 
 			size_t start = out.size() - distance;
 			for( int i = 0; i < length; ++i ) out.push_back(out[start + i]);
