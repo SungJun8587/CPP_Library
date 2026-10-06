@@ -56,7 +56,7 @@ CRingBuffer::CRingBuffer(CRingBuffer&& other) noexcept
 }
 
 //***************************************************************************
-// @brief 이동 대입 연산자 구현 (BaseAllocator의 이동 대입 연산자 명시적 호출)
+// @brief 이동 대입 연산자 구현 (기존 버퍼를 해제하고 other의 포인터를 인수; BaseAllocator 서브오브젝트는 건드리지 않음)
 // @param other 이동할 대상 CRingBuffer 객체
 // @return 자기 자신에 대한 참조 (CRingBuffer&)
 //***************************************************************************

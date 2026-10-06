@@ -74,6 +74,7 @@ using namespace std;
 #include <Thread/SRWLock.h>
 #include <Thread/PlatformLock.h>
 #include <Thread/ThreadManager.h>
+#include <Thread/SyncValue.h>
 
 #include <Containers/Map/ClusterSpinMap.h>
 #include <Containers/Map/OrderedMap.h>
@@ -93,37 +94,6 @@ using namespace std;
 #include <Containers/Queue/MPMCLockFreeQueue.h>
 
 #include <Containers/Stack/LockFreeSlotStack.h>
-
-#include <Job/JobCommon.h>
-
-#include <Network/NetworkCommon.h>
-
-#include <Network/HTTP/TlsFilter.h>
-#include <Network/HTTP/HttpParseUtil.h>
-#include <Network/HTTP/HttpRequestParser.h>
-#include <Network/HTTP/HttpResponseParser.h>
-#include <Network/HTTP/FormUrlEncodedParser.h>
-#include <Network/HTTP/MultipartFormParser.h>
-#include <Network/HTTP/MultipartStreamParser.h>
-#include <Network/HTTP/HttpRange.h>
-#include <Network/HTTP/HttpPacketBuilder.h>
-#include <Network/HTTP/HttpClientCore.h>
-#include <Network/HTTP/HttpConnPoolCommon.h>
-#include <Network/HTTP/HttpConnPool.h>
-#include <Network/HTTP/HttpConnPoolManager.h>
-#include <Network/HTTP/HttpSessionIocp.h>
-#include <Network/HTTP/HttpSessionRio.h>
-#include <Network/HTTP/HttpConnPoolFactory.h>
-#include <Network/HTTP/HttpFormUtil.h>
-#include <Network/HTTP/HttpMultipartBuilder.h>
-#include <Network/HTTP/HttpClient.h>
-
-#include <GcpService/Base64UrlUtil.h>
-#include <GcpService/JsonFieldExtract.h>
-#include <GcpService/GcpServiceAccountAuth.h>
-
-#include <BaseGlobal.h>
-#include <BaseTLS.h>
 
 #include <JSON/RapidJSONUtil.h>
 #include <XML/RapidXMLUtil.h>
@@ -152,6 +122,40 @@ using namespace std;
 #include <Util/KeyedTable.h>
 #include <Util/TextFieldParser.h>
 #include <Util/DelimitedRowFile.h> 
+#include <Util/ScopeExit.h>
+
+#include <Job/JobCommon.h>
+
+#include <Network/NetworkCommon.h>
+
+#include <Network/HTTP/TlsFilter.h>
+#include <Network/HTTP/HttpParseUtil.h>
+#include <Network/HTTP/HttpMessageParser.h>
+#include <Network/HTTP/HttpRequestParser.h>
+#include <Network/HTTP/HttpResponseParser.h>
+#include <Network/HTTP/FormUrlEncodedParser.h>
+#include <Network/HTTP/MultipartFormParser.h>
+#include <Network/HTTP/MultipartStreamParser.h>
+#include <Network/HTTP/HttpRange.h>
+#include <Network/HTTP/HttpPacketBuilder.h>
+#include <Network/HTTP/HttpClientCore.h>
+#include <Network/HTTP/HttpConnPoolCommon.h>
+#include <Network/HTTP/HttpClientChannel.h>
+#include <Network/HTTP/HttpConnPool.h>
+#include <Network/HTTP/HttpConnPoolManager.h>
+#include <Network/HTTP/HttpSessionIocp.h>
+#include <Network/HTTP/HttpSessionRio.h>
+#include <Network/HTTP/HttpConnPoolFactory.h>
+#include <Network/HTTP/HttpFormUtil.h>
+#include <Network/HTTP/HttpMultipartBuilder.h>
+#include <Network/HTTP/HttpClient.h>
+
+#include <GcpService/Base64UrlUtil.h>
+#include <GcpService/JsonFieldExtract.h>
+#include <GcpService/GcpServiceAccountAuth.h>
+
+#include <BaseGlobal.h>
+#include <BaseTLS.h>
 
 #include <System/SystemBaseDefine.h>
 #include <System/PDHPerformanceObject.h>

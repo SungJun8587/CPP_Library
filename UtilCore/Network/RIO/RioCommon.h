@@ -21,6 +21,10 @@
 #define _WIN32_WINNT 0x0602
 #endif
 
+#include <winsock2.h>
+#include <BaseRedefineDataType.h>
+#include <chrono>
+
 namespace Rio
 {
     //**********************************************************************************************************************
@@ -164,49 +168,49 @@ namespace Rio
     //******************************************************************************************************************
     // @brief 한 번의 RIODequeueCompletion() 호출에서 수거할 최대 completion 수
     //******************************************************************************************************************
-    static constexpr ULONG kBatchSize = 64;
+    inline constexpr ULONG kBatchSize = 64;
 
     //***************************************************************************
     // @brief DispatchBatch 및 내부 처리 반환용 오류/상태 상숫값
     //***************************************************************************
-    static constexpr int32 kCorruptCq = -1;             // CQ 오염 발생 (RIO_CORRUPT_CQ)
-    static constexpr int32 kStopped = -2;               // Core 엔진 정지 완료
-    static constexpr int32 kNotifyError = -3;           // RIONotify 호출 실패
-    static constexpr int32 kIocpError = -4;             // GetQueuedCompletionStatus 오류 발생
-    static constexpr int32 kInvalidCompletion = -5;     // 유효하지 않은 완료 패킷 수신
+    inline constexpr int32 kCorruptCq = -1;             // CQ 오염 발생 (RIO_CORRUPT_CQ)
+    inline constexpr int32 kStopped = -2;               // Core 엔진 정지 완료
+    inline constexpr int32 kNotifyError = -3;           // RIONotify 호출 실패
+    inline constexpr int32 kIocpError = -4;             // GetQueuedCompletionStatus 오류 발생
+    inline constexpr int32 kInvalidCompletion = -5;     // 유효하지 않은 완료 패킷 수신
 
     //***************************************************************************
     // @brief IOCP CompletionKey 구분용 식별 비트 태그 (Tag Mask)
     //***************************************************************************
-    constexpr ULONG_PTR kReceiveCompletionTag = 0x01;   // 수신 Completion 이벤트 비트 태그
-    constexpr ULONG_PTR kSendCompletionTag = 0x02;      // 송신 Completion 이벤트 비트 태그
-    constexpr ULONG_PTR kCompletionTagMask = 0x03;      // Completion 태그 마스크
+    inline constexpr ULONG_PTR kReceiveCompletionTag = 0x01;   // 수신 Completion 이벤트 비트 태그
+    inline constexpr ULONG_PTR kSendCompletionTag = 0x02;      // 송신 Completion 이벤트 비트 태그
+    inline constexpr ULONG_PTR kCompletionTagMask = 0x03;      // Completion 태그 마스크
 
     //***************************************************************************
     // @brief 기본 Drain 대기 타임아웃 (5초)
     //***************************************************************************
-    static constexpr std::chrono::milliseconds kDefaultDrainTimeout{ 5000 };
+    inline constexpr std::chrono::milliseconds kDefaultDrainTimeout{ 5000 };
 
     //**********************************************************************************************************************
     // @brief 유효하지 않은 슬롯 인덱스를 나타내는 센티널(Sentinel) 상숫값
     // @details AllocSlot() 등의 함수가 슬롯 할당 실패 시 반환하거나, 초기화되지 않은 슬롯 인덱스를
     //          표시할 때 사용합니다. uint32의 최댓값(0xFFFFFFFFu, UINT32_MAX)을 가리킵니다.
     //**********************************************************************************************************************
-    static constexpr uint32 kInvalidSlotIndex = 0xFFFFFFFFu;
+    inline constexpr uint32 kInvalidSlotIndex = 0xFFFFFFFFu;
 
     //***************************************************************************
     // @brief Accept 폴링 주기
     // @details
     //      Accept 루프에서 클라이언트 접속이 없을 때 대기할 시간 간격을 정의합니다.
     //***************************************************************************
-    constexpr std::chrono::milliseconds kAcceptPollInterval(1);
+    inline constexpr std::chrono::milliseconds kAcceptPollInterval{ 1 };
 
     //***************************************************************************
     // @brief Listen 소켓 Backlog 최소 값
     // @details
     //      Listen 소켓 생성 시 설정 가능한 연결 대기 큐(Backlog)의 최소 허용치입니다.
     //***************************************************************************
-    constexpr int32 kListenBacklogMinimum = 1;
+    inline constexpr int32 kListenBacklogMinimum = 1;
 
     //***************************************************************************
     // @brief 세션 매니저에서 락 경합을 최소화하기 위해 분산 처리할 클러스터 개수.
@@ -218,7 +222,7 @@ namespace Rio
     // - 코어 구조와의 조화: 일반적인 8~16코어(하이퍼스레딩 포함 16~32스레드) 상용 서버 환경에서 
     //   워커 스레드들이 서로 다른 락을 참조할 확률을 높여 병목을 효과적으로 해소합니다.
     //***************************************************************************
-    static constexpr int32 kSessionClusterCnt = 16;
+    inline constexpr int32 kSessionClusterCnt = 16;
 
     //***************************************************************************
     // @brief 송신 링버퍼 크기 (65536 바이트 = 64KB)
@@ -230,7 +234,7 @@ namespace Rio
     //        2. 비트 연산 최적화: 
     //           2의 제곱수($2^{16}$)로 설계되어 포인터 링 랩어라운드 연산 시 고속 비트 마스킹 적용.
     //***************************************************************************
-    constexpr size_t kSendRingBufferSize = 65536;
+    inline constexpr size_t kSendRingBufferSize = 65536;
 
     //***************************************************************************
     // @brief 수신 링버퍼 크기 (65536 바이트 = 64KB)
@@ -240,7 +244,7 @@ namespace Rio
     //        1. TCP 스트림 분할/병합 처리: 불규칙한 네트워크 청크 데이터를 안정적으로 흡수.
     //        2. 메모리 사용량 균형: 수천 개 세션 환경에서 RAM 효율성과 패킷 디코딩 안정성 보장.
     //***************************************************************************
-    constexpr size_t kRecvRingBufferSize = 65536;
+    inline constexpr size_t kRecvRingBufferSize = 65536;
 
 
     // =========================================================================
@@ -255,7 +259,7 @@ namespace Rio
     //        1. 오버플로우 방지: 동시 다발적인 I/O 완료 이벤트 처리 시 풀 고갈 및 동적 재할당 방지.
     //        2. 리소스 균형: 대규모 동시 접속 환경에서 안정적인 대기열 유지.
     //***************************************************************************
-    constexpr size_t    kServiceEventPoolCapacity = 4096;
+    inline constexpr size_t    kServiceEventPoolCapacity = 4096;
 
     //***************************************************************************
     // @brief 배치 디스패치당 최대 수신 완료 이벤트 수 (64개)
@@ -264,7 +268,7 @@ namespace Rio
     //      - [최적화 및 용량 선정 이유]
     //        1. 시스템 콜 오버헤드 최소화: 디스패치 빈도와 CPU 캐시 효율/레이턴시를 최적으로 타협한 크기.
     //***************************************************************************
-    constexpr ULONG     kServiceMaxCompletionResults = 64;
+    inline constexpr ULONG     kServiceMaxCompletionResults = kBatchSize;
 
     //***************************************************************************
     // @brief 글로벌 수신 버퍼 풀 슬롯 개수 (1000개)
@@ -273,15 +277,15 @@ namespace Rio
     //      - [최적화 및 용량 선정 이유]
     //        1. 수신 대기 동시성 보장: 순간적인 대규모 트래픽 유입 시 버퍼 부족으로 인한 패킷 드랍 방지.
     //***************************************************************************
-    constexpr uint32  kServiceGlobalRecvSlotCount = 1000;
+    inline constexpr uint32  kServiceGlobalRecvSlotCount = 1000;
 
     //***************************************************************************
     // @brief 개별 수신 슬롯의 크기 (8192 바이트 = 8KB)
     // @details 
     //      - 글로벌 수신 버퍼 내에서 개별 패킷 데이터를 수신하기 위해 할당되는 각 슬롯의 바이트 용량입니다.
-    //      - [관계 설명] 위에서 정의한 `kRecvBufferSlotSize`, `kMaxPacketSize`와 동일한 8KB 규격을 공유하여 일관성 유지.
+    //      - 패킷 최대 크기와 동일한 8KB 규격을 사용하여 한 슬롯에 한 패킷이 담기도록 합니다.
     //***************************************************************************
-    constexpr uint32  kServiceGlobalRecvSlotSize = 8192;
+    inline constexpr uint32  kServiceGlobalRecvSlotSize = 8192;
 
     //***************************************************************************
     // @brief 서버 CQ(Completion Queue) 고유 식별자 (0x1000)
@@ -290,7 +294,7 @@ namespace Rio
     //      - [최적화 및 용량 선정 이유]
     //        1. 디버깅 및 가시성: 멀티 코어 환경에서 로그/덤프 분석 시 서버 측 CQ를 직관적으로 판별.
     //***************************************************************************
-    static constexpr ULONG_PTR kServerCqIdentifier = 0x1000;
+    inline constexpr ULONG_PTR kServerCqIdentifier = 0x1000;
 
     //***************************************************************************
     // @brief 클라이언트 CQ(Completion Queue) 고유 식별자 (0x2000)
@@ -299,16 +303,15 @@ namespace Rio
     //      - [최적화 및 용량 선정 이유]
     //        1. 디버깅 및 가시성: 서버 측 식별자와 명확히 구분하여 이벤트 트레이싱 정확성 향상.
     //***************************************************************************
-    static constexpr ULONG_PTR kClientCqIdentifier = 0x2000;
+    inline constexpr ULONG_PTR kClientCqIdentifier = 0x2000;
 
     //***************************************************************************
     // @brief RIO 요청 큐(RQ) 최대 대기 요청 수 (32개)
     // @details 
     //      - 개별 소켓의 요청 큐(Request Queue)에서 동시에 처리(Outstanding)될 수 있는 송수신 오버랩 작업의 최대 개수입니다.
-    //      - [관계 설명] 상단에 정의된 글로벌 한계값 `kMaxOutstandingIo`(64)보다 작거나 같게 설정되어 
-    //        개별 세션 RQ 자원이 전역 제한 범위 내에서 안전하게 관리되도록 설계되었습니다.
+    //      - 아래 Receive/Send별 상한(`kRequestQueueMaxReceiveOutstanding`, `kRequestQueueMaxSendOutstanding`)의 기준값입니다.
     //***************************************************************************
-    static constexpr ULONG      kRequestQueueMaxOutstanding = 32;
+    inline constexpr ULONG      kRequestQueueMaxOutstanding = 32;
 
 
     // =========================================================================
@@ -319,18 +322,17 @@ namespace Rio
     // @brief RIO 요청 큐 최대 수신(Receive) 대기 요청 수 (32개)
     // @details 
     //      - 클라이언트/서버 소켓의 요청 큐(RQ)에서 동시에 대기(Outstanding)할 수 있는 최대 Receive 오버랩 작업 수입니다.
-    //      - [관계 설명] 위 `kRequestQueueMaxOutstanding`과 동일한 레이어의 소켓별 RQ 파라미터이며, 
-    //        글로벌 상한값(`kMaxOutstandingIo`) 내에서 파이프라인 수신 동시성을 최적으로 보장합니다.
+    //      - `kRequestQueueMaxOutstanding`과 같은 값을 사용하는 소켓별 RQ 파라미터입니다.
     //***************************************************************************
-    constexpr ULONG kRequestQueueMaxReceiveOutstanding = 32;
+    inline constexpr ULONG kRequestQueueMaxReceiveOutstanding = kRequestQueueMaxOutstanding;
 
     //***************************************************************************
-    // @brief RIO 요청 큐 수신(Receive) 최대 발송자(Max Outstanding Service/Senders) 수 (1개)
+    // @brief RIO 요청 큐의 Receive 요청 1건당 최대 데이터 버퍼 수 (1개)
     // @details 
-    //      - 동시에 수신 요청을 발생시킬 수 있는 최대 스레드/컨텍스트 수입니다.
-    //      - [최적화 및 용량 선정 이유] 단일 스레드 수신 모델 최적화를 위해 1(`1UL`)로 고정하여 불필요한 동기화 오버헤드 방지.
+    //      - RIOReceive/RIOReceiveEx 한 번의 호출에 지정할 수 있는 RIO_BUF 개수의 상한입니다.
+    //      - 세션은 슬롯 하나(RIO_BUF 1개)로 수신하므로 1로 고정합니다.
     //***************************************************************************
-    constexpr ULONG kRequestQueueMaxReceiveDataBuffers = 1UL;
+    inline constexpr ULONG kRequestQueueMaxReceiveDataBuffers = 1UL;
 
     //***************************************************************************
     // @brief RIO 요청 큐 최대 송신(Send) 대기 요청 수 (32개)
@@ -338,31 +340,44 @@ namespace Rio
     //      - 소켓의 요청 큐(RQ)에서 동시에 대기(Outstanding)할 수 있는 최대 Send 오버랩 작업 수입니다.
     //      - [최적화 및 용량 선정 이유] 게임/실시간 서비스의 연속 송신(Burst Send) 시 블로킹 방지 및 여유 공간 확보.
     //***************************************************************************
-    constexpr ULONG kRequestQueueMaxSendOutstanding = 32;
+    inline constexpr ULONG kRequestQueueMaxSendOutstanding = kRequestQueueMaxOutstanding;
 
     //***************************************************************************
-    // @brief RIO 요청 큐 송신(Send) 최대 발송자(Max Outstanding Service/Senders) 수 (1개)
+    // @brief RIO 요청 큐의 Send 요청 1건당 최대 데이터 버퍼 수 (1개)
     // @details 
-    //      - 동시에 송신 요청을 발생시킬 수 있는 최대 스레드/컨텍스트 수입니다.
-    //      - [최적화 및 용량 선정 이유] 락 경합 방지 및 단일 전송 경로 유지를 위해 1(`1UL`)로 설정.
+    //      - RIOSend/RIOSendEx 한 번의 호출에 지정할 수 있는 RIO_BUF 개수의 상한입니다.
+    //      - 세션은 슬롯 하나(RIO_BUF 1개)로 송신하므로 1로 고정합니다.
     //***************************************************************************
-    constexpr ULONG kRequestQueueMaxSendDataBuffers = 1UL;
+    inline constexpr ULONG kRequestQueueMaxSendDataBuffers = 1UL;
 
     //***************************************************************************
     // @brief Accept Pool에 상시 유지할 AcceptContext(=outstanding AcceptEx) 개수 기본값.
-    //        CIocpListener의 기본 acceptCount(10)와 동일한 수준으로 맞췄다.
+    //        Iocp::kDefaultAcceptPoolSize와 같은 값을 사용합니다.
     //***************************************************************************
-    static constexpr uint32 kDefaultAcceptPoolSize = 10;
+    inline constexpr uint32 kDefaultAcceptPoolSize = 10;
 
     //***************************************************************************
     // @brief Accept 전용 IOCP를 소비할 워커 스레드 기본 개수.
-    //        연결 시도 자체는 CRioConnectDispatcher와 마찬가지로 상대적으로
-    //        빈도가 낮고(데이터 송수신과 달리), 완료 처리(SetUpdateAcceptContext
-    //        ~ Callback)도 짧은 논블로킹 호출 위주라 1개로도 충분하다고 판단했다.
-    //        대규모 동시 접속 스트레스 테스트 결과에 따라 늘릴 수 있도록 Start()
-    //        파라미터로 노출한다.
+    //        연결 수락은 데이터 송수신보다 빈도가 낮고 완료 처리도 짧은
+    //        논블로킹 호출 위주라 1개로 충분합니다. 필요하면 StartAccept()
+    //        파라미터로 늘릴 수 있습니다.
     //***************************************************************************
-    static constexpr uint32 kDefaultAcceptWorkerCount = 1;
+    inline constexpr uint32 kDefaultAcceptWorkerCount = 1;
+
+    //***************************************************************************
+    // @brief Accept 재게시 실패 시 지수 백오프 설정 (Iocp::kAcceptRetry*와 동일한 정책)
+    // @details 재시도 횟수는 제한하지 않으며, 지연은 base부터 두 배씩 늘어
+    //          max에서 멈춥니다. 로그는 첫 실패와 이후 kAcceptRetryLogInterval회마다 남깁니다.
+    //***************************************************************************
+    inline constexpr uint32 kAcceptRetryBaseDelayMs = 10;
+    inline constexpr uint32 kAcceptRetryMaxDelayMs = 1000;
+    inline constexpr uint32 kAcceptRetryLogInterval = 20;
+    inline constexpr uint32 kAcceptRetrySleepSliceMs = 10;
+
+    //***************************************************************************
+    // @brief 서버 서비스가 Closed 상태의 세션을 세션 매니저에서 정리하는 주기 (Iocp::kSessionReapInterval과 동일)
+    //***************************************************************************
+    inline constexpr std::chrono::seconds kSessionReapInterval{ 30 };
 }
 
 #endif // ndef UC_RIOCOMMON_H

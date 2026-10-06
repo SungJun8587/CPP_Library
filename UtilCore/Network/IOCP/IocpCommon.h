@@ -7,6 +7,11 @@
 #ifndef UC_IOCPCOMMON_H
 #define UC_IOCPCOMMON_H
 
+#include <winsock2.h>
+#include <BaseRedefineDataType.h>
+
+#include <chrono>
+
 namespace Iocp
 {
     //***************************************************************************
@@ -55,14 +60,14 @@ namespace Iocp
     // - 초고집적 서버 (수만 명+) : 4,096 B (4 KB)    - 동접자 증가에 따른 극도의 RAM 절감 필요 시
     // - 파일/패치/대용량 데이터 : 65,536 B 이상 (64 KB+) - Socket I/O 전송 효율 극대화
     //***************************************************************************
-    static constexpr int32 BUFFER_SIZE_DEFAULT = 10240;
+    inline constexpr int32 BUFFER_SIZE_DEFAULT = 10240;
 
     //***************************************************************************
     // @brief 한 번의 완료 큐(IOCP/CQ) 수거 작업 시 일괄 처리할 최대 이벤트 개수.
     // @details
     // GQCS(Ex) 또는 Dequeue 함수 호출 시 한 번에 배치로 수거할 최대 패킷/결과 수를 정의합니다.
     //***************************************************************************
-    static constexpr ULONG kBatchSize = 64;
+    inline constexpr ULONG kBatchSize = 64;
 
     //***************************************************************************
     // @brief 세션 매니저에서 락 경합을 최소화하기 위해 분산 처리할 클러스터 개수.
@@ -77,13 +82,13 @@ namespace Iocp
     //		- 대규모 하이엔드 서버 환경(32코어 이상, 수천 명 동접)의 경우 클러스터 개수를 32 또는 64로 늘려 부하를 분산하는 것을 권장
     //		- 소규모 서버 또는 테스트 환경(2 ~ 4코어)의 경우 클러스터 개수를 8 또는 16
     //***************************************************************************
-    static constexpr int32 kSessionClusterCnt = 16;
+    inline constexpr int32 kSessionClusterCnt = 16;
 
     //***************************************************************************
     // @brief 워커 스레드 종료 알림용 특수 완료 키(Completion Key)입니다.
     // @details ULONG_PTR의 최댓값(-1)을 사용하여 일반 completion key와 구분합니다.
     //***************************************************************************
-    static constexpr ULONG_PTR QUIT_KEY = static_cast<ULONG_PTR>(-1);
+    inline constexpr ULONG_PTR QUIT_KEY = static_cast<ULONG_PTR>(-1);
 
     //***************************************************************************
     // @brief CSendBufferChunk의 기본 메모리 청크 크기 (8KB / 8,192 Byte).
@@ -92,7 +97,7 @@ namespace Iocp
     // - 고정 크기 메모리 할당을 통해 동적 할당 오버헤드 및 단편화(Fragmentation) 최소화
     // - std::array의 템플릿 크기 인자 및 버퍼 남은 용량(FreeSize) 계산에 활용
     //***************************************************************************
-    static constexpr uint32 SEND_BUFFER_CHUNK_SIZE = 8192;
+    inline constexpr uint32 SEND_BUFFER_CHUNK_SIZE = 8192;
 
     //***************************************************************************
     // @brief Accept Pool에 상시 유지할 기본 AcceptContext 개수 (10개).
@@ -101,9 +106,73 @@ namespace Iocp
     // - CIocpListener의 기본 Accept 요청 수(acceptCount)와 동기화된 기본값
     // - 동시 접속 폭주(Connection Burst) 트래픽 환경에서는 수치를 늘려 대기열 병목 예방 권장
     //***************************************************************************
-    static constexpr uint32 kDefaultAcceptPoolSize = 10;
+    inline constexpr uint32 kDefaultAcceptPoolSize = 10;
+
+    //***************************************************************************
+    // @brief AcceptEvent::acceptBuffer의 크기 (128 Byte).
+    // @details
+    // AcceptEx가 로컬/원격 주소를 기록하는 버퍼입니다. dwReceiveDataLength = 0으로 호출하므로
+    // 로컬 주소 + 원격 주소(각 CSocketUtils::kAcceptExAddrLen) 두 칸만 있으면 되며,
+    // IPv6 주소 길이까지 담을 수 있는 여유를 둔 값입니다(IocpListener.cpp에서 static_assert로 검증).
+    //***************************************************************************
+    inline constexpr uint32 kAcceptBufferSize = 128;
+
+    //***************************************************************************
+    // @brief AcceptEx 재등록 실패 시 재시도 지연(백오프) 설정.
+    // @details
+    // - kAcceptRetryBaseDelayMs: 1회째 실패 후 지연(ms). 이후 연속 실패마다 두 배씩 늘어난다.
+    // - kAcceptRetryMaxDelayMs : 지연의 상한(ms). 이 값에서 멈추고 재시도는 포기하지 않는다.
+    // - kAcceptRetryLogInterval: 연속 실패 로그를 첫 실패와 이 횟수마다 남긴다(로그 폭주 방지).
+    //***************************************************************************
+    inline constexpr uint32 kAcceptRetryBaseDelayMs = 10;
+    inline constexpr uint32 kAcceptRetryMaxDelayMs = 1000;
+    inline constexpr int32  kAcceptRetryLogInterval = 20;
+
+    //***************************************************************************
+    // @brief CIocpSession::Send() 한 번에 보낼 수 있는 최대 바이트 수와, 그것을 담는 데 필요한
+    //        SendBuffer(청크 크기 단위) 최대 개수.
+    // @details Send()의 크기 인자가 uint16이므로 상한은 65535입니다.
+    //***************************************************************************
+    inline constexpr uint32 kMaxSendSize = 65535;
+    inline constexpr uint32 kMaxSendPieces = (kMaxSendSize + SEND_BUFFER_CHUNK_SIZE - 1) / SEND_BUFFER_CHUNK_SIZE;
+    static_assert(kMaxSendPieces* SEND_BUFFER_CHUNK_SIZE >= kMaxSendSize, "pieces must cover the maximum send size");
+
+    //***************************************************************************
+    // @brief CIocpCore::DispatchBatch() 반환값 규약 중 음수 값.
+    // @details 양수 = 처리한 완료 이벤트 수, 0 = 처리할 이벤트 없음(타임아웃 등),
+    //          음수 = 워커가 루프를 종료해야 한다는 신호.
+    // - kDispatchQuit : PostQuit() 패킷을 수거함
+    // - kDispatchFatal: IOCP 핸들 무효/폐쇄 등 복구 불가능한 수거 실패
+    //***************************************************************************
+    inline constexpr int32 kDispatchQuit = -1;
+    inline constexpr int32 kDispatchFatal = -2;
+
+    //***************************************************************************
+    // @brief 워커 스레드가 DispatchBatch()에서 한 번에 대기하는 시간(ms).
+    // @details 종료 플래그(IsShuttingDown)를 이 주기로 다시 확인할 수 있어, 종료 wake-up 패킷이
+    //          유실되더라도 워커가 이 시간 안에 루프를 빠져나옵니다.
+    //***************************************************************************
+    inline constexpr uint32 kWorkerPollTimeoutMs = 10;
+
+    //***************************************************************************
+    // @brief 완료 큐 수거 API 자체가 일시적으로 실패했을 때 워커가 양보하는 시간(ms).
+    // @details 같은 실패를 대기 없이 반복 호출하며 CPU를 점유(spin)하는 것을 막는다.
+    //***************************************************************************
+    inline constexpr uint32 kDequeueFailureBackoffMs = 10;
+
+    //***************************************************************************
+    // @brief 서비스 Close() 시 세션 해제 통지(OnDisconnected)를 기다리는 최대 시간.
+    // @details 이 시간 안에 끝나지 않는 세션(응답 없는 피어 등)은 CNetService::Close()가
+    //          Disconnect()의 강제 정리 경로로 마무리한다.
+    //***************************************************************************
+    inline constexpr std::chrono::seconds kCloseDrainTimeout{ 5 };
+
+    //***************************************************************************
+    // @brief 서버 세션 매니저의 닫힌 세션 정리(reap) 주기.
+    // @details 해제 통지 경로(OnSessionDisconnected)가 놓친 엔트리를 정리하는 안전망의 주기이며,
+    //          세션 처리량/서버 규모에 맞춰 조정할 수 있는 기본값입니다.
+    //***************************************************************************
+    inline constexpr std::chrono::seconds kSessionReapInterval{ 30 };
 }
 
 #endif // ndef UC_IOCPCOMMON_H
-
-

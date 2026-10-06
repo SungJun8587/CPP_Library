@@ -1163,9 +1163,8 @@ void CRioCore::DecrementIoCount() noexcept
 
         if( _outstandingIo.compare_exchange_weak(current, current - 1, std::memory_order_release, std::memory_order_relaxed) )
         {
-            // Shutdown()의 드레인 루프가 이 감소를 즉시 알아챌 필요는 없지만
-            // (폴링 방식), 대기 중인 다른 스레드가 있을 수 있으므로 통지합니다.
-            _shutdownCv.notify_all();
+            // Shutdown()의 드레인 루프는 _outstandingIo를 폴링하고, _shutdownCv는
+            // Shutdown() 중복 호출 대기에만 쓰이므로 여기서는 통지하지 않습니다.
             return;
         }
     }

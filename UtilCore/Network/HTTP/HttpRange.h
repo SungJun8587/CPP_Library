@@ -17,14 +17,31 @@
 #ifndef UC_HTTPRANGE_H
 #define UC_HTTPRANGE_H
 
+#include <Network/HTTP/HttpParseUtil.h>
+
 #include <string>
 #include <string_view>
 #include <optional>
 #include <cstdint>
-#include <charconv>
+#include <limits>
 
 namespace HTTP
 {
+	namespace detail
+	{
+		//***************************************************************************
+		// @brief 10진수만으로 이뤄진 문자열을 0 이상의 int64_t로 엄격하게 파싱합니다(부호/꼬리 문자 불허).
+		//***************************************************************************
+		inline bool ParseRangeNumber(std::string_view sv, int64_t& out) noexcept
+		{
+			size_t value = 0;
+			if( !ParseUnsigned(sv, value) || value > static_cast<size_t>((std::numeric_limits<int64_t>::max)()) )
+				return false;
+			out = static_cast<int64_t>(value);
+			return true;
+		}
+	}
+
 	//***************************************************************************
 	// @struct SByteRange
 	// @brief 파싱 및 검증이 끝난, 실제 파일 크기 기준으로 확정된 바이트 범위.
@@ -94,8 +111,7 @@ namespace HTTP
 				return std::nullopt; // "bytes=-" 같은 완전히 빈 형태
 
 			int64_t suffixLen = 0;
-			auto result = std::from_chars(endPart.data(), endPart.data() + endPart.size(), suffixLen);
-			if( result.ec != std::errc() || suffixLen <= 0 )
+			if( !detail::ParseRangeNumber(endPart, suffixLen) || suffixLen <= 0 )
 				return std::nullopt;
 
 			// 요청한 suffix 길이가 파일 전체보다 크면 파일 전체로 잘라낸다
@@ -105,8 +121,7 @@ namespace HTTP
 		}
 		else
 		{
-			auto startResult = std::from_chars(startPart.data(), startPart.data() + startPart.size(), start);
-			if( startResult.ec != std::errc() || start < 0 )
+			if( !detail::ParseRangeNumber(startPart, start) )
 				return std::nullopt;
 
 			if( endPart.empty() )
@@ -116,8 +131,7 @@ namespace HTTP
 			}
 			else
 			{
-				auto endResult = std::from_chars(endPart.data(), endPart.data() + endPart.size(), end);
-				if( endResult.ec != std::errc() )
+				if( !detail::ParseRangeNumber(endPart, end) )
 					return std::nullopt;
 
 				// 요청한 end가 파일 크기를 넘으면 파일 끝으로 잘라낸다

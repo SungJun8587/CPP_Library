@@ -36,6 +36,7 @@
 #include <Network/IOCP/IocpListener.h>
 #include <Network/IOCP/IocpSession.h>
 #include <Network/IOCP/IocpSessionManager.h>
+#include <Network/IOCP/IocpWorkerPool.h>
 #include <Network/IOCP/IocpService.h>
 #endif
 
@@ -52,6 +53,7 @@
 #include <Network/RIO/RioListener.h>
 #include <Network/RIO/RioSession.h>
 #include <Network/RIO/RioSessionManager.h>
+#include <Network/RIO/RioServiceHelper.h>
 #include <Network/RIO/RioService.h>
 #include <Network/RIO/RioConnectEvent.h>
 #include <Network/RIO/RioConnectDispatcher.h>

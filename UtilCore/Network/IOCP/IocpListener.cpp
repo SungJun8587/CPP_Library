@@ -7,7 +7,12 @@
 #include "pch.h"
 #include "IocpListener.h"
 
+#include <algorithm>
+#include <chrono>
 #include <thread>
+
+static_assert(sizeof(AcceptEvent::acceptBuffer) >= 2 * CSocketUtils::kAcceptExAddrLen,
+    "acceptBuffer must hold the local and remote address blocks written by AcceptEx");
 
 //***************************************************************************
 // @brief CIocpListener 생성자
@@ -58,24 +63,17 @@ bool CIocpListener::StartAccept(CIocpCoreRef iocpCore, CNetAddress netAddr, Iocp
 
     _listenSocket.store(listenSocket, std::memory_order_release);
 
-    // 2. 소켓 옵션 설정 (주소 재사용, Linger 설정)
-    if( CSocketUtils::SetReuseAddress(listenSocket, true) == false )
+    // 2~5. 소켓 옵션(주소 바인딩 방식, Linger) → Bind → Listen → IOCP 코어 등록.
+    //      하나라도 실패하면 이미 저장한 Listen 소켓을 닫고 실패를 반환한다.
+    if( CSocketUtils::ApplyListenAddressMode(listenSocket, _addressMode) == false ||
+        CSocketUtils::SetLinger(listenSocket, 0, 0) == false ||
+        CSocketUtils::Bind(listenSocket, netAddr) == false ||
+        CSocketUtils::Listen(listenSocket, SOMAXCONN) == false ||
+        _iocpCore->Register(GetIocpObjectPtr()) == false )
+    {
+        CloseSocket();
         return false;
-
-    if( CSocketUtils::SetLinger(listenSocket, 0, 0) == false )
-        return false;
-
-    // 3. 주소 바인딩 (Bind)
-    if( CSocketUtils::Bind(listenSocket, netAddr) == false )
-        return false;
-
-    // 4. 연결 대기 상태 전환 (Listen)
-    if( CSocketUtils::Listen(listenSocket, SOMAXCONN) == false )
-        return false;
-
-    // 5. Listen 소켓을 IOCP 코어에 등록
-    if( _iocpCore->Register(GetIocpObjectPtr()) == false )
-        return false;
+    }
 
     // 6. 설정된 개수만큼 AcceptEvent 생성 및 AcceptEx 사전 등록 (Accept Pool)
     _acceptEvents.reserve(static_cast<size_t>(acceptPoolSize));
@@ -92,9 +90,9 @@ bool CIocpListener::StartAccept(CIocpCoreRef iocpCore, CNetAddress netAddr, Iocp
 
 //***************************************************************************
 // @brief Listen 소켓 닫기 (재시도 스레드는 기다리지 않음 — 완전 종료는 Stop() 사용)
-// @note [수정] exchange로 핸들을 원자적으로 INVALID_SOCKET으로 바꾼 뒤 그
-//       "이전 값"만 닫는다. 동시에 CloseSocket()이 여러 스레드에서 호출돼도
-//       closesocket()이 중복 호출되지 않는다(idempotent).
+// @note exchange로 핸들을 원자적으로 INVALID_SOCKET으로 바꾼 뒤 그 "이전 값"만 닫는다.
+//       동시에 CloseSocket()이 여러 스레드에서 호출돼도 closesocket()이 중복
+//       호출되지 않는다(idempotent).
 //***************************************************************************
 void CIocpListener::CloseSocket()
 {
@@ -108,20 +106,25 @@ void CIocpListener::CloseSocket()
 //***************************************************************************
 // @brief 리스너를 완전히 정지합니다.
 // @details 순서:
-//          1. _closing = true — 이 시점 이후 RegisterAccept()/ScheduleRetry()의
-//             모든 진입점이 새 재시도를 시작하지 않고 즉시 포기한다.
+//          1. _closing = true 후 대기 중인 재시도 스레드를 깨운다 — 이 시점 이후
+//             RegisterAccept()/ScheduleRetry()의 모든 진입점이 새 재시도를 시작하지 않고
+//             즉시 포기하며, 지연 대기 중이던 재시도 스레드는 바로 종료한다.
 //          2. CloseSocket() — pending 상태였던 AcceptEx들이 취소되며, 그
 //             완료 통지가 IOCP로 들어와도 ProcessAccept()가 _closing을 보고
 //             더 이상 RegisterAccept()를 재호출하지 않는다.
-//          3. _pendingRetries가 0이 될 때까지 대기 — 이미 Sleep(10) 중이던
-//             detached 스레드들이 깨어나 _closing을 확인하고 즉시 반환할
-//             때까지 결정론적으로 기다린다(최대 대기 시간은 사실상 10ms 남짓).
+//          3. _pendingRetries가 0이 될 때까지 대기 — 깨어난 재시도 스레드들이
+//             _closing을 확인하고 즉시 반환할 때까지 결정론적으로 기다린다.
 //          이미 정지된 상태에서 재호출해도 안전하다(idempotent) — 두 번째
 //          호출은 _closing이 이미 true이므로 대기만 하고 즉시 반환한다.
 //***************************************************************************
 void CIocpListener::Stop()
 {
-    _closing.store(true, std::memory_order_release);
+    {
+        // 재시도 스레드의 wait_for 조건 검사와 직렬화해 깨우기 신호를 놓치지 않게 한다.
+        std::lock_guard<std::mutex> lock(_retryDrainMutex);
+        _closing.store(true, std::memory_order_release);
+    }
+    _retryDrainCv.notify_all();
 
     CloseSocket();
 
@@ -150,9 +153,9 @@ void CIocpListener::Dispatch(CIocpEvent* iocpEvent, int32 numOfBytes)
 // @note Stop() 진행 중(_closing==true)이면 세션 생성이나 AcceptEx 게시를
 //       전혀 시도하지 않고 즉시 반환한다 — 이미 닫힌 _listenSocket에 대고
 //       무의미한 재시도를 반복하며 세션을 만들었다 버리는 낭비를 막는다.
-//       [수정] _listenSocket을 지역 변수로 한 번만 load()해서 사용한다 —
-//       Stop()이 동시에 CloseSocket()을 호출해도(atomic exchange) 이 함수
-//       안에서는 항상 일관된 스냅샷 값을 쓰게 된다.
+//       _listenSocket은 지역 변수로 한 번만 load()해서 사용한다 — Stop()이 동시에
+//       CloseSocket()을 호출해도(atomic exchange) 이 함수 안에서는 항상 일관된
+//       스냅샷 값을 쓴다.
 //***************************************************************************
 void CIocpListener::RegisterAccept(AcceptEvent* acceptEvent)
 {
@@ -163,21 +166,12 @@ void CIocpListener::RegisterAccept(AcceptEvent* acceptEvent)
     if( listenSocket == INVALID_SOCKET )
         return;
 
-    // 1. 세션 생성 팩터리 호출
-    // [수정] 팩토리가 nullptr을 반환하는 경우(예: 세션 풀 순간 고갈)도 이
-    // 함수가 공유하는 4가지 실패 경로 중 하나로 취급해야 한다. 기존에는
-    // retryCount 증가/ScheduleRetry() 없이 그냥 반환해, 이 AcceptEvent
-    // 슬롯이 재등록되지 않고 영구히 죽었다 — 여러 슬롯에서 누적되면 Accept
-    // Pool이 조용히 줄어들다 결국 신규 연결을 못 받는 상태로 갈 수 있었다.
+    // 1. 세션 생성 팩터리 호출. 팩토리가 nullptr을 반환하는 경우(예: 세션 풀 순간 고갈)도
+    //    실패 경로로 취급해 재시도한다 — 재시도 없이 반환하면 이 슬롯이 영구히 죽는다.
     CIocpObjectRef session = _sessionFactory();
     if( session == nullptr )
     {
-        if( ++acceptEvent->retryCount > kMaxAcceptRetry )
-        {
-            // TODO: 로그 - 세션 팩토리 반복 실패, Accept 재등록 포기
-            return;
-        }
-        ScheduleRetry(acceptEvent);
+        HandleAcceptFailure(acceptEvent, _T("SessionFactory"), 0);
         return;
     }
 
@@ -186,17 +180,12 @@ void CIocpListener::RegisterAccept(AcceptEvent* acceptEvent)
     if( sessionSocket == INVALID_SOCKET )
     {
         // session은 이 스코프를 벗어나며 자체 소멸자에게 정리를 위임한다.
-        if( ++acceptEvent->retryCount > kMaxAcceptRetry )
-        {
-            // TODO: 로그 - 세션 소켓 생성 반복 실패, Accept 재등록 포기
-            return;
-        }
-        ScheduleRetry(acceptEvent);
+        HandleAcceptFailure(acceptEvent, _T("SessionSocket"), 0);
         return;
     }
 
     // 3. AcceptEvent 초기화 및 소유권 설정
-    //    주의: Init()은 OVERLAPPED 필드만 0으로 되돌리고 retryCount는 건드리지
+    //    주의: Init()은 OVERLAPPED 필드(와 errorCode)만 되돌리고 retryCount는 건드리지
     //    않는다 — retryCount는 실패 경로 간 공유 상태이므로 여기서 리셋되면 안 된다.
     acceptEvent->Init();
     acceptEvent->owner = shared_from_this(); // I/O 완료 시까지 Listener 수명 보장 (ref count +1)
@@ -228,23 +217,62 @@ void CIocpListener::RegisterAccept(AcceptEvent* acceptEvent)
             acceptEvent->owner = nullptr;
             acceptEvent->session = nullptr;
 
-            if( ++acceptEvent->retryCount > kMaxAcceptRetry )
-            {
-                // TODO: 로그 - AcceptEx 반복 실패, Accept 재등록 포기
-                return;
-            }
-            ScheduleRetry(acceptEvent);
+            HandleAcceptFailure(acceptEvent, _T("AcceptEx"), errorCode);
             return;
         }
     }
 
     // WSA_IO_PENDING(정상 대기) 또는 즉시 성공 → 종료
-    // (retryCount 리셋은 Accept가 실제로 완료·성공했을 때인 ProcessAccept()의
-    // 4단계에서 수행한다 — 여기는 아직 "게시"만 됐을 뿐 성공을 의미하지 않는다.)
+    // (retryCount 리셋은 Accept가 실제로 완료·성공했을 때인 ProcessAccept()에서
+    // 수행한다 — 여기는 아직 "게시"만 됐을 뿐 성공을 의미하지 않는다.)
 }
 
 //***************************************************************************
-// @brief IOCP 워커 스레드를 블로킹하지 않도록, 재시도를 짧은 지연 후
+// @brief Accept 실패 경로 공통 처리: retryCount 증가, 샘플링 로그, 백오프 재시도 위임.
+//***************************************************************************
+void CIocpListener::HandleAcceptFailure(AcceptEvent* acceptEvent, const TCHAR* stage, int32 errorCode)
+{
+    const int32 failures = ++acceptEvent->retryCount;
+
+    if( failures == 1 || failures % Iocp::kAcceptRetryLogInterval == 0 )
+    {
+        LOG_WARNING(_T("[CIocpListener] accept failure: stage=%s, error=%d, consecutive=%d - retrying with backoff"),
+            stage, errorCode, failures);
+    }
+
+    ScheduleRetry(acceptEvent);
+}
+
+//***************************************************************************
+// @brief 연속 실패 횟수에 대한 재시도 지연(ms)을 계산합니다.
+// @return 1회째 Iocp::kAcceptRetryBaseDelayMs, 이후 두 배씩 늘어 Iocp::kAcceptRetryMaxDelayMs에서 멈춥니다.
+//***************************************************************************
+uint32 CIocpListener::CalcRetryDelayMs(int32 retryCount) noexcept
+{
+    uint32 delay = Iocp::kAcceptRetryBaseDelayMs;
+    for( int32 i = 1; i < retryCount && delay < Iocp::kAcceptRetryMaxDelayMs; ++i )
+        delay *= 2;
+
+    return (std::min)(delay, Iocp::kAcceptRetryMaxDelayMs);
+}
+
+//***************************************************************************
+// @brief 재시도 스레드 종료 처리: _pendingRetries를 감소시키고 마지막이면 Stop()을 깨웁니다.
+// @details 감소와 notify를 _retryDrainMutex 아래에서 수행한다. Stop()의 대기 조건 검사도
+//          같은 뮤텍스 아래에서 이뤄지므로, Stop()은 이 함수가 뮤텍스를 놓은 뒤에야 0을
+//          관측하고 반환한다. 호출 스레드는 이 함수 반환 후 멤버를 건드리지 않는다.
+//***************************************************************************
+void CIocpListener::FinishRetry() noexcept
+{
+    std::lock_guard<std::mutex> lock(_retryDrainMutex);
+    if( _pendingRetries.fetch_sub(1, std::memory_order_acq_rel) == 1 )
+    {
+        _retryDrainCv.notify_all();
+    }
+}
+
+//***************************************************************************
+// @brief IOCP 워커 스레드를 블로킹하지 않도록, 재시도를 백오프 지연 후
 //        별도의 detached 스레드에서 1회 수행합니다.
 // @param acceptEvent 재시도할 AcceptEvent 포인터. retryCount는 이벤트 자신이
 //        보유하고 있으므로 별도로 전달하지 않는다.
@@ -253,39 +281,39 @@ void CIocpListener::RegisterAccept(AcceptEvent* acceptEvent)
 //          캡처하여, 지연 대기 중 Listener가 먼저 소멸되어도 안전하게(lock()
 //          실패로) 재시도를 건너뛴다.
 // @note _pendingRetries를 스레드 시작 시 증가시키고, 어떤 경로로 빠져나가든
-//       종료 시 반드시 감소시킨 뒤 Stop()이 대기 중인 조건 변수를 notify한다.
+//       종료 시 FinishRetry()로 반드시 감소시킨다. 스레드는 'self' 참조를 쥔 채
+//       FinishRetry()를 호출하므로, 마지막 소유자라서 ~CIocpListener()가 이 스레드에서
+//       실행되더라도 소멸자의 Stop()은 이미 0이 된 카운트를 보고 즉시 반환한다.
 //***************************************************************************
 void CIocpListener::ScheduleRetry(AcceptEvent* acceptEvent)
 {
+    if( _closing.load(std::memory_order_acquire) )
+        return;
+
+    const uint32 delayMs = CalcRetryDelayMs(acceptEvent->retryCount);
     std::weak_ptr<CIocpListener> weakSelf = weak_from_this();
 
     _pendingRetries.fetch_add(1, std::memory_order_acq_rel);
 
     try
     {
-        std::thread([weakSelf, acceptEvent, this]()
+        std::thread([weakSelf, acceptEvent, this, delayMs]()
             {
-                // Stop()이 이미 진행 중이면 즉시 포기(불필요한 Sleep도 생략).
-                if( !_closing.load(std::memory_order_acquire) )
+                // 지연은 Sleep이 아니라 조건 변수로 대기한다 — Stop()이 _closing을 세우고
+                // notify하면 남은 지연과 무관하게 즉시 깨어난다.
                 {
-                    ::Sleep(10);
-
-                    if( !_closing.load(std::memory_order_acquire) )
-                    {
-                        if( CIocpListenerRef self = weakSelf.lock() )
-                        {
-                            self->RegisterAccept(acceptEvent);
-                        }
-                    }
+                    std::unique_lock<std::mutex> lock(_retryDrainMutex);
+                    _retryDrainCv.wait_for(lock, std::chrono::milliseconds(delayMs),
+                        [this]() { return _closing.load(std::memory_order_acquire); });
                 }
 
-                if( _pendingRetries.fetch_sub(1, std::memory_order_acq_rel) == 1 )
+                CIocpListenerRef self = weakSelf.lock();
+                if( self && !_closing.load(std::memory_order_acquire) )
                 {
-                    // 마지막 pending retry였다면 Stop()에서 대기 중일 수 있는
-                    // 조건 변수를 깨운다.
-                    std::lock_guard<std::mutex> lock(_retryDrainMutex);
-                    _retryDrainCv.notify_all();
+                    self->RegisterAccept(acceptEvent);
                 }
+
+                FinishRetry(); // 'self'는 이 호출 뒤, 람다가 끝날 때 해제된다.
             }).detach();
     }
     catch( ... )
@@ -293,29 +321,27 @@ void CIocpListener::ScheduleRetry(AcceptEvent* acceptEvent)
         // std::thread 생성 자체가 실패한 경우(리소스 고갈 등) — IOCP 워커
         // 스레드로 예외가 전파되어 std::terminate()로 이어지는 것을 막기
         // 위해 여기서 흡수하고, 증가시켰던 카운트를 되돌린다.
-        if( _pendingRetries.fetch_sub(1, std::memory_order_acq_rel) == 1 )
-        {
-            std::lock_guard<std::mutex> lock(_retryDrainMutex);
-            _retryDrainCv.notify_all();
-        }
-        // TODO: 로그 - 재시도 스레드 생성 실패, 이 슬롯의 Accept 재등록 포기
+        FinishRetry();
+        LOG_ERROR(_T("[CIocpListener] failed to start accept retry thread - this accept slot is not re-armed"));
     }
 }
 
 //***************************************************************************
 // @brief AcceptEx 완료 처리
 // @param acceptEvent 완료 통지된 AcceptEvent 포인터
-// @note SetUpdateAcceptContext / IOCP Register 실패 경로도 성공적인 AcceptEx
-//       게시 이후의 실패이므로 동일하게 acceptEvent->retryCount를 증가시키고
-//       kMaxAcceptRetry를 넘기면 재등록을 포기한다.
+// @note AcceptEx가 실패로 완료된 경우(acceptEvent->errorCode != 0)에는 수락된 연결이
+//       없으므로 SetUpdateAcceptContext가 실패하고, 그 경로에서 실패 원인으로
+//       acceptEvent->errorCode가 로그에 남는다. SetUpdateAcceptContext / IOCP Register
+//       실패도 AcceptEx 게시 이후의 실패이므로 동일하게 HandleAcceptFailure()로 처리한다.
 //       Stop() 진행 중(_closing==true)이면 session 정리만 하고 어떤
 //       재시도/재등록도 하지 않는다 — CloseSocket() 이후 도착하는 취소
 //       완료 통지에 대한 정상적인 처리 경로다.
-//       [수정] _listenSocket을 지역 변수로 한 번만 load()해서 사용한다.
+//       성공 시에는 사용자 콜백을 호출하기 전에 이 슬롯의 AcceptEx를 먼저 재게시한다.
 //***************************************************************************
 void CIocpListener::ProcessAccept(AcceptEvent* acceptEvent)
 {
     CIocpObjectRef session = acceptEvent->session;
+    const DWORD completionError = acceptEvent->errorCode;
 
     // 수명 관리 해제 (Ref Count -1)
     acceptEvent->owner = nullptr;
@@ -329,6 +355,12 @@ void CIocpListener::ProcessAccept(AcceptEvent* acceptEvent)
         return;
     }
 
+    if( session == nullptr )
+    {
+        HandleAcceptFailure(acceptEvent, _T("NullSession"), 0);
+        return;
+    }
+
     const SOCKET listenSocket = _listenSocket.load(std::memory_order_acquire);
     SOCKET sessionSocket = static_cast<SOCKET>(reinterpret_cast<ULONG_PTR>(session->GetHandle()));
 
@@ -336,18 +368,13 @@ void CIocpListener::ProcessAccept(AcceptEvent* acceptEvent)
     if( listenSocket == INVALID_SOCKET || CSocketUtils::SetUpdateAcceptContext(sessionSocket, listenSocket) == false )
     {
         // session이 함수를 벗어나며 자체 소멸자에서 소켓을 정리하도록 위임
-        // (직접 Close 시 session 자체 정리 로직과 이중 Close될 위험이 있었음)
-        if( ++acceptEvent->retryCount > kMaxAcceptRetry )
-        {
-            // TODO: 로그 - SetUpdateAcceptContext 반복 실패, Accept 재등록 포기
-            return;
-        }
-        // [수정] RegisterAccept() 즉시 재귀 대신 ScheduleRetry()로 지연 오프로딩.
-        // 이 실패가 지속되면(리소스 고갈 등) 워커 스레드가 세션 생성까지 포함한
-        // 무거운 재시도를 백오프 없이 그 자리에서 kMaxAcceptRetry회 반복하며
-        // 다른 완료 이벤트 처리를 지연시킬 수 있다 — RegisterAccept() 자신의
-        // 실패 경로와 동일한 정책으로 통일한다.
-        ScheduleRetry(acceptEvent);
+        // (직접 Close 시 session 자체 정리 로직과 이중 Close될 위험이 있다)
+        const int32 errorCode = (completionError != 0) ? static_cast<int32>(completionError) : ::WSAGetLastError();
+
+        // RegisterAccept() 즉시 재귀 대신 ScheduleRetry()로 지연 오프로딩 — 실패가
+        // 지속돼도(리소스 고갈 등) 워커가 세션 생성까지 포함한 무거운 재시도를 백오프 없이
+        // 반복하며 다른 완료 이벤트 처리를 지연시키지 않는다.
+        HandleAcceptFailure(acceptEvent, _T("SetUpdateAcceptContext"), errorCode);
         return;
     }
 
@@ -363,25 +390,20 @@ void CIocpListener::ProcessAccept(AcceptEvent* acceptEvent)
     if( _iocpCore->Register(session) == false )
     {
         // 동일하게 직접 Close하지 않고 session 소멸에 위임
-        if( ++acceptEvent->retryCount > kMaxAcceptRetry )
-        {
-            // TODO: 로그 - IOCP Register 반복 실패, Accept 재등록 포기
-            return;
-        }
-        // [수정] 위와 동일한 이유로 ScheduleRetry()로 통일.
-        ScheduleRetry(acceptEvent);
+        HandleAcceptFailure(acceptEvent, _T("RegisterIocp"), static_cast<int32>(::GetLastError()));
         return;
     }
 
-    // 4. 콜백 호출 (외부에서 CSession 캐스팅 후 SetNetAddress/ProcessConnect 실행)
+    // 4. Accept 최종 성공 — 누적 실패 카운트를 리셋하고, 사용자 콜백보다 먼저 이 슬롯의
+    //    AcceptEx를 재게시한다. 콜백(ProcessConnect()/OnConnected() 포함)이 느려도
+    //    그동안 Accept Pool 슬롯이 비지 않는다. acceptEvent는 위에서 이미 비워졌고
+    //    콜백은 지역 session만 사용하므로 재게시와 겹쳐도 안전하다.
+    acceptEvent->retryCount = 0;
+    RegisterAccept(acceptEvent);
+
+    // 5. 콜백 호출 (외부에서 CSession 캐스팅 후 SetNetAddress/ProcessConnect 실행)
     if( _onAcceptCallback )
     {
         _onAcceptCallback(session, netAddr);
     }
-
-    // Accept가 여기까지 도달하면 최종 성공이므로 누적 실패 카운트를 리셋한다.
-    acceptEvent->retryCount = 0;
-
-    // 5. 다음 클라이언트를 받기 위해 AcceptEvent 재등록
-    RegisterAccept(acceptEvent);
 }

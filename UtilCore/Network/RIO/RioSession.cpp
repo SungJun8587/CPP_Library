@@ -7,9 +7,6 @@
 #include "pch.h"
 #include "RioSession.h"
 
-#include <cassert>
-#include <limits>
-
 //***************************************************************************
 // @brief CRioSession 생성자
 //***************************************************************************
@@ -145,6 +142,13 @@ bool CRioSession::ConnectAsync(CRioConnectDispatcher& dispatcher, uint64 session
 //***************************************************************************
 void CRioSession::RegisterConnect(const CNetAddress& remoteAddr)
 {
+    // 게시 전에 이미 종료가 요청되었다면 연결을 시도하지 않는다.
+    if( _connectCanceled.load(std::memory_order_acquire) )
+    {
+        FailConnect(Rio::CloseReason::ForcedClose);
+        return;
+    }
+
     _connectEvent.Init();
 
     // 완료 통지까지 세션 수명을 보장 (IOCP RecvEvent/SendEvent의 owner와 동일한
@@ -177,6 +181,13 @@ void CRioSession::RegisterConnect(const CNetAddress& remoteAddr)
 //***************************************************************************
 void CRioSession::ProcessConnectEx()
 {
+    // 연결 완료 전에 종료가 요청되었다면(CancelPendingConnect) 성공 여부와 무관하게 정리한다.
+    if( _connectCanceled.load(std::memory_order_acquire) )
+    {
+        FailConnect(Rio::CloseReason::ForcedClose);
+        return;
+    }
+
     SOCKET socket = GetSocket();
 
     int32 sockError = 0;
@@ -224,6 +235,13 @@ void CRioSession::ProcessConnectEx()
     if( !Init(_sessionId, _core, _globalRecvBufferPool, socket, requestQueue) )
     {
         FailConnect(Rio::CloseReason::InternalError);
+        return;
+    }
+
+    // 위 검사와 Init() 사이에 종료가 요청된 경우: 이미 Active이므로 일반 종료 경로로 정리한다.
+    if( _connectCanceled.load(std::memory_order_acquire) )
+    {
+        Close(Rio::CloseReason::ForcedClose);
         return;
     }
 
@@ -315,27 +333,22 @@ void CRioSession::Disconnect(const TCHAR* cause)
 //***************************************************************************
 // @brief 지정된 사유로 세션 종료를 요청합니다 (락 내부에서 상태 전이 후 필요시 락 밖에서 실행).
 // @param reason 세션 종료 사유
-// @note [수정 — outstanding I/O drain 후 소켓을 닫도록 변경]
-//       예전 버전은 진행 중인 RIO 요청(outstanding I/O)을 기다리지 않고 즉시
-//       FinalizeClose()로 넘어가 소켓을 닫았다. RIO 공식 문서(RIOCloseCompletionQueue,
-//       LPFN_RIOCREATEREQUESTQUEUE)와 실제 사례(MS Q&A에 보고된, 이미 진행 중이던
-//       요청의 RQ가 담긴 소켓이 다른 스레드에서 closesocket()될 때 mswsock.dll이
-//       크래시하는 사례)를 확인한 결과 — "이미 게시되어 진행 중이던 요청이 소켓
-//       close 이후에도 CQ로 에러 completion을 정상 반환한다"는 보장은 문서 어디에도
-//       없었다. CRioCore::Shutdown() 자체는 이미 "outstanding이 0이 될 때까지
-//       CQ/IOCP를 안 닫는" 훨씬 보수적인 패턴을 쓰는데, 개별 세션 레벨(Close())만
-//       그 원칙을 안 지키고 있던 것 — 이제 동일한 원칙을 세션 단위로도 적용한다.
+// @details 소켓은 진행 중인 RIO 요청(outstanding I/O)이 모두 끝난 뒤에 닫습니다.
+//          RIO는 이미 게시된 요청의 취소 API가 없고, 해당 RQ가 담긴 소켓을 먼저
+//          닫았을 때 요청이 에러 completion으로 돌아온다는 보장이 문서에 없기
+//          때문입니다. CRioCore::Shutdown()이 outstanding이 0이 될 때까지 CQ를
+//          닫지 않는 것과 같은 원칙을 세션 단위로 적용합니다.
 //
-//       [비블로킹 구현] outstanding I/O가 없으면(가장 흔한 경로 — 유휴 세션 종료)
-//       즉시 FinalizeClose()로 넘어간다. outstanding이 있으면 여기서는 소켓
-//       shutdown()만 해두고 아무것도 기다리지 않은 채 반환한다 — 남은 completion들이
-//       도착할 때마다 CRioCore::ProcessRioResult()의 ObjectIoCountGuard가
-//       DecrementIoCount() 이후 OnIoCountReachedZero()를 호출해주고, 그 훅이
-//       Closing 상태를 보고 대신 FinalizeClose()를 호출한다(아래 OnIoCountReachedZero()
-//       참고). 이 방식이면 RIO 워커 스레드가 다른 세션의 completion 처리를
-//       기다리며 블로킹되는 일이 없다 — CRioCore::Shutdown()처럼 poll 루프를
-//       세션 레벨에 두면 그 폴링을 처리할 워커 자신이 다른 completion을 기다리며
-//       멈춰버리는 데드락 위험이 있어 그 방식은 채택하지 않았다.
+//          Close()는 블로킹하지 않습니다. outstanding I/O가 없으면 곧바로
+//          FinalizeClose()를 수행하고, 있으면 소켓 shutdown()만 한 뒤 반환합니다.
+//          남은 completion이 도착할 때마다 CRioCore::ProcessRioResult()의
+//          ObjectIoCountGuard가 DecrementIoCount() 이후 OnIoCountReachedZero()를
+//          호출하고, 이 훅이 Closing 상태를 보고 FinalizeClose()를 대신 호출합니다.
+//          세션 레벨에서 poll 루프를 돌리면 그 completion을 처리할 워커 자신이
+//          대기에 묶여 데드락이 날 수 있어 이 구조를 씁니다.
+//
+//          Active가 된 적 없는 세션(연결 진행 중 포함)은 CancelPendingConnect()로
+//          연결 시도만 취소합니다.
 //***************************************************************************
 void CRioSession::Close(Rio::CloseReason reason) noexcept
 {
@@ -348,6 +361,10 @@ void CRioSession::Close(Rio::CloseReason reason) noexcept
 
         if( !_state.compare_exchange_strong(expected, Rio::SessionState::Closing, std::memory_order_acq_rel, std::memory_order_acquire) )
         {
+            if( expected == Rio::SessionState::Created )
+            {
+                CancelPendingConnect();
+            }
             return;
         }
 
@@ -357,13 +374,9 @@ void CRioSession::Close(Rio::CloseReason reason) noexcept
         // 그대로 진행 중 — closesocket()은 여기서 하지 않는다)
         ShutdownSocketInternal();
 
-        // outstanding I/O가 이미 없으면(가장 흔함) 곧바로 최종 정리해도 안전하다.
-        // 있으면 여기서 아무것도 하지 않는다 — PostReceiveInternal()/
-        // FlushSendInternal()도 이 함수와 동일하게 _ioSubmitLock을 잡고 나서야
-        // 신규 제출 전 상태를 확인하므로(위 CAS로 이미 Closing이 된 이후에는
-        // 그쪽에서 새로 IncrementIoCount()가 절대 끼어들 수 없다 — 락으로
-        // 직렬화됨), 지금 관측한 이 카운트가 앞으로 남은 completion 수의
-        // 정확한 상한이다.
+        // 신규 제출(PostReceiveInternal/FlushSendInternal)은 같은 _ioSubmitLock을
+        // 잡고 Active 상태를 확인하므로, 위 CAS 이후에는 새 IncrementIoCount()가
+        // 끼어들 수 없다. 지금 관측한 카운트가 남은 completion 수의 상한이다.
         shouldFinalizeNow = !HasOutstandingIo();
     }
 
@@ -372,6 +385,23 @@ void CRioSession::Close(Rio::CloseReason reason) noexcept
         FinalizeClose();
     }
     // else: 마지막 남은 completion의 OnIoCountReachedZero() 훅이 대신 정리한다.
+}
+
+//***************************************************************************
+// @brief 아직 Active가 된 적 없는 세션의 종료 요청을 처리합니다.
+//***************************************************************************
+void CRioSession::CancelPendingConnect() noexcept
+{
+    _connectCanceled.store(true, std::memory_order_release);
+
+    // 진행 중인 ConnectEx가 있으면 취소해 완료 통지가 곧바로 오게 한다.
+    // 아직 게시 전이거나 이미 끝났다면 ERROR_NOT_FOUND로 무시되고, 이후의
+    // ProcessConnectEx()/RegisterConnect()가 _connectCanceled를 보고 정리한다.
+    const SOCKET socket = GetSocket();
+    if( socket != INVALID_SOCKET )
+    {
+        ::CancelIoEx(reinterpret_cast<HANDLE>(socket), static_cast<LPOVERLAPPED>(&_connectEvent));
+    }
 }
 
 //***************************************************************************
@@ -417,10 +447,9 @@ void CRioSession::FinalizeClose() noexcept
         // 2. 소켓 핸들 완전 정리
         CloseSocketInternal();
 
-        // 3. 이 세션이 등록했던 송신 버퍼 해제. Microsoft 문서상 outstanding
-        //    send/receive가 남아있는 동안 deregister하지 말라는 권고가 있으나,
-        //    바로 위 CloseSocketInternal()과 같은 이유로 여기서는 즉시 처리합니다
-        //    (Close() 주석 참고 — 아직 확인이 필요한 부분).
+        // 3. 이 세션이 등록했던 송신 버퍼 해제. FinalizeClose()는 outstanding I/O가
+        //    0일 때만 실행되므로(Close()/OnIoCountReachedZero() 참고) 이 시점에는
+        //    등록 버퍼를 참조하는 요청이 남아 있지 않다.
         UnregisterSendBuffer();
     }
 
@@ -574,13 +603,8 @@ void CRioSession::Dispatch(CRioEvent* rioEvent, ULONG bytesTransferred, LONG sta
         return;
     }
 
-    // [수정] rioEvent->GetBufferBindings().empty()로 Send/Receive를 구분하던
-    // 방식은, CRioSend::Send()(단일 버퍼 버전)가 BindBufferSlot()을 호출해
-    // Send 이벤트에도 바인딩이 생길 수 있는 경로가 열려 있어 그 경로가 실제로
-    // 쓰이면 Send를 Receive로 오분류하는 잠재 버그였다. CRioEvent가 Initialize()
-    // 시점에 Rio::EventType(Send/Receive)을 명시적으로 기록해두므로, 그 값을
-    // 직접 조회하는 GetEventType()으로 교체해 바인딩 유무와 무관하게 항상
-    // 정확히 구분한다.
+    // Send/Receive는 바인딩 유무가 아니라 CRioEvent가 Initialize() 시점에 기록한
+    // Rio::EventType으로 구분한다(단일 버퍼 Send도 슬롯을 바인딩할 수 있으므로).
     switch( rioEvent->GetEventType() )
     {
     case Rio::EventType::Receive:
@@ -679,6 +703,7 @@ bool CRioSession::Send(const void* data, uint16 size) noexcept
     if( !IsActive() ) return false;
 
     bool needStartSend = false;
+    bool overflowAllocFailed = false;
 
     {
         PRWriteLockGuard lockGuard(_sendLock, __FUNCTION__);
@@ -686,33 +711,55 @@ bool CRioSession::Send(const void* data, uint16 size) noexcept
         // 락 획득 직후 세션 상태를 재확인 (IsActive() 체크와의 사이에 Close()가 끼어들 수 있음)
         if( _state.load(std::memory_order_acquire) != Rio::SessionState::Active ) return false;
 
-        int64 enqueuedBytes = 0;
+        // 오버플로 큐에 앞선 청크가 남아 있으면 링버퍼에 여유가 있어도 그 뒤에 붙인다.
+        // 그렇지 않으면 이 데이터가 앞선 청크를 앞질러 송신 순서가 뒤바뀐다.
+        bool enqueued = false;
 
-        const bool enqueueSuccess = _sendBuffer.Enqueue(
-            static_cast<const char*>(data),
-            static_cast<int64>(size),
-            &enqueuedBytes,
-            false);
-
-        if( !enqueueSuccess || enqueuedBytes != static_cast<int64>(size) )
+        if( _sendOverflowQueue.empty() )
         {
-            // 링버퍼(64KB)가 꽉 찼다. 과거에는 여기서 곧바로 Close(SendBufferOverflow)
-            // 했으나, 그러면 body가 조금만 커도(예: 대량 POST) 연결이 끊겨버린다.
-            // IOCP 세션(CVector<CSendBufferRef> 큐, 오브젝트 풀 기반이라 사실상
-            // 무제한 큐잉)과 동작을 맞추기 위해, 여기서는 연결을 죽이지 않고
-            // 오버플로 큐에 보관한다 — OnSendCompleted()가 공간을 비울 때마다
-            // DrainOverflowIntoSendBufferLocked()로 이어서 채운다.
-            const char* bytes = static_cast<const char*>(data);
-            _sendOverflowQueue.emplace_back(bytes, bytes + size);
+            int64 enqueuedBytes = 0;
+
+            enqueued = _sendBuffer.Enqueue(
+                static_cast<const char*>(data),
+                static_cast<int64>(size),
+                &enqueuedBytes,
+                false) && enqueuedBytes == static_cast<int64>(size);
         }
 
-        if( _isSending )
+        if( !enqueued )
         {
-            return true; // 이미 전송 루프 진행 중이므로 큐잉만 완료 (링버퍼든 오버플로든)
+            // 링버퍼(64KB)가 가득 찼거나 앞선 청크가 대기 중이다. 연결을 끊지 않고 오버플로
+            // 큐에 보관하며, OnSendCompleted()가 공간을 비울 때마다
+            // DrainOverflowIntoSendBufferLocked()로 이어서 채운다(IOCP 세션의 큐잉과 같은 동작).
+            // 이 함수는 noexcept라 할당 실패(메모리 부족)가 예외로 새면 프로세스가 종료된다.
+            // 실패하면 데이터가 유실되어 스트림이 깨지므로 연결을 종료한다.
+            try
+            {
+                const char* bytes = static_cast<const char*>(data);
+                _sendOverflowQueue.emplace_back(bytes, bytes + size);
+            }
+            catch( ... )
+            {
+                overflowAllocFailed = true;
+            }
         }
 
-        _isSending = true;
-        needStartSend = true;
+        if( !overflowAllocFailed )
+        {
+            if( _isSending )
+            {
+                return true; // 이미 전송 루프 진행 중이므로 큐잉만 완료 (링버퍼든 오버플로든)
+            }
+
+            _isSending = true;
+            needStartSend = true;
+        }
+    }
+
+    if( overflowAllocFailed )
+    {
+        Close(Rio::CloseReason::InternalError);
+        return false;
     }
 
     if( !needStartSend ) return true;

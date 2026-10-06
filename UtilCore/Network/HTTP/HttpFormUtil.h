@@ -7,17 +7,17 @@
 #ifndef UC_HTTPFORMUTIL_H
 #define UC_HTTPFORMUTIL_H
 
+#include <Network/HTTP/HttpParseUtil.h>
+
 #include <string>
 #include <string_view>
 #include <vector>
 #include <utility>
-#include <cstdio>
 
 //***************************************************************************
 // @namespace HTTP
-// @brief 쿼리스트링/폼 인코딩 유틸리티. HttpParseUtil.h의 http 네임스페이스와
-//        같은 네임스페이스를 쓰지만 별개 파일이라 서로 몰라도 된다(서로 겹치는
-//        함수 이름이 없어 같은 TU에서 함께 include해도 재정의 충돌 없음).
+// @brief 쿼리스트링/폼 인코딩 유틸리티. 디코딩은 HttpParseUtil.h의 HTTP::PercentDecode()를
+//        그대로 쓰고, 이 파일은 인코딩과 쿼리스트링/폼 본문 조립을 담당한다.
 //***************************************************************************
 namespace HTTP
 {
@@ -33,12 +33,14 @@ namespace HTTP
 	//***************************************************************************
 	inline std::string UrlEncode(std::string_view input)
 	{
+		static constexpr char kHex[] = "0123456789ABCDEF";
+
 		std::string result;
-		result.reserve(input.size() * 3); // 최악의 경우(전부 인코딩) 대비 예약
+		result.reserve(input.size() + input.size() / 2); // 인코딩이 일부만 필요한 일반적인 경우를 가정, 모자라면 자란다
 
 		for( unsigned char c : input )
 		{
-			bool isUnreserved =
+			const bool isUnreserved =
 				(c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
 				c == '-' || c == '_' || c == '.' || c == '~';
 
@@ -48,9 +50,9 @@ namespace HTTP
 			}
 			else
 			{
-				char buf[4];
-				std::snprintf(buf, sizeof(buf), "%%%02X", c);
-				result.append(buf, 3);
+				result.push_back('%');
+				result.push_back(kHex[c >> 4]);
+				result.push_back(kHex[c & 0x0F]);
 			}
 		}
 
@@ -65,37 +67,12 @@ namespace HTTP
 	//          쿼리 파라미터 값에만 해당하는 관례고, URL 경로(path) 세그먼트에서는
 	//          '+'가 그냥 리터럴 '+' 문자다(RFC 3986). 잘못된 %XX 시퀀스(뒤에 hex가
 	//          아닌 문자가 오는 등)는 원본 그대로 통과시킨다(엄격 실패 대신 관대하게 처리).
+	//          실제 구현은 HTTP::PercentDecode()이며, '+'를 공백으로 바꾸는 폼 값 디코딩은
+	//          FormUrlEncodedParser.h의 DecodeFormUrlEncodedValue()가 담당한다.
 	//***************************************************************************
 	inline std::string UrlDecode(std::string_view input)
 	{
-		auto hexVal = [](char c) -> int
-			{
-				if( c >= '0' && c <= '9' ) return c - '0';
-				if( c >= 'A' && c <= 'F' ) return c - 'A' + 10;
-				if( c >= 'a' && c <= 'f' ) return c - 'a' + 10;
-				return -1;
-			};
-
-		std::string result;
-		result.reserve(input.size());
-
-		for( size_t i = 0; i < input.size(); ++i )
-		{
-			if( input[i] == '%' && i + 2 < input.size() )
-			{
-				int hi = hexVal(input[i + 1]);
-				int lo = hexVal(input[i + 2]);
-				if( hi >= 0 && lo >= 0 )
-				{
-					result.push_back(static_cast<char>((hi << 4) | lo));
-					i += 2;
-					continue;
-				}
-			}
-			result.push_back(input[i]);
-		}
-
-		return result;
+		return PercentDecode(input);
 	}
 
 	//***************************************************************************
@@ -109,7 +86,7 @@ namespace HTTP
 	//          살아있어야 함(제로카피 빌더의 일반 규칙과 동일).
 	//
 	//          [사용 예 — GET 쿼리스트링]
-	//          std::string qs = http::BuildQueryString({{"id","42"},{"q","c++ tls"}});
+	//          std::string qs = HTTP::BuildQueryString({{"id","42"},{"q","c++ tls"}});
 	//          std::string path = "/search?" + qs;   // path도 Build() 시점까지 살아있어야 함
 	//          CHttpRequestBuilder req;
 	//          req.SetMethod("GET").SetPath(path);
@@ -137,7 +114,7 @@ namespace HTTP
 	//         동일하다(별도 함수로 나눈 이유는 "폼 바디"라는 의도를 코드에서
 	//         명시적으로 드러내기 위함).
 	// @details [사용 예 — 폼 POST]
-	//          std::string body = http::BuildFormUrlEncodedBody({{"username","alice"},{"password","p@ss"}});
+	//          std::string body = HTTP::BuildFormUrlEncodedBody({{"username","alice"},{"password","p@ss"}});
 	//          CHttpRequestBuilder req;
 	//          req.SetMethod("POST").SetPath("/login")
 	//             .AddHeader("Content-Type", "application/x-www-form-urlencoded")

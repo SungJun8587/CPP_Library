@@ -7,6 +7,8 @@
 #include "pch.h"
 #include "SendBuffer.h"
 
+#include <utility>
+
 thread_local CSendBufferChunkRef	LSendBufferChunk;
 
 //***************************************************************************
@@ -16,7 +18,7 @@ thread_local CSendBufferChunkRef	LSendBufferChunk;
 // @param allocSize 할당된 크기
 //***************************************************************************
 CSendBuffer::CSendBuffer(CSendBufferChunkRef owner, BYTE* buffer, uint32 allocSize)
-	: _owner(owner), _buffer(buffer), _allocSize(allocSize)
+	: _owner(std::move(owner)), _buffer(buffer), _allocSize(allocSize)
 {
 }
 

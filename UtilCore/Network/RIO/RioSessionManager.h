@@ -32,8 +32,8 @@ public:
 	CRioSessionManager(const CRioSessionManager&) = delete;
 	CRioSessionManager& operator=(const CRioSessionManager&) = delete;
 
-	CRioSessionManager(CRioSessionManager&&) noexcept = default;
-	CRioSessionManager& operator=(CRioSessionManager&&) noexcept = default;
+	CRioSessionManager(CRioSessionManager&&) = delete;
+	CRioSessionManager& operator=(CRioSessionManager&&) = delete;
 
 public:
 	uint64 GenerateSessionId();
@@ -50,8 +50,10 @@ public:
 	void RemoveClosedSessions();
 
 private:
-	CClusterSpinUnorderedMap<uint64, CRioSessionRef, Rio::kSessionClusterCnt, true> _sessions;	// SessionId를 키로 하고, 클러스터별로 분산 처리하여 락 경합을 최소화하는 고성능 해시맵
-	std::atomic<uint64> _nextSessionId{ 1 };													// 세션 ID 자동 증가 카운터
+	using SessionMap = CClusterSpinUnorderedMap<uint64, CRioSessionRef, Rio::kSessionClusterCnt, true>;
+
+	mutable SessionMap _sessions;			// SessionId를 키로 하고, 클러스터별로 분산 처리하여 락 경합을 최소화하는 고성능 해시맵
+	std::atomic<uint64> _nextSessionId{ 1 };	// 세션 ID 자동 증가 카운터 (0은 무효 ID로 예약되어 1부터 발급)
 };
 
 #endif // ndef UC_RIOSESSIONMANAGER_H

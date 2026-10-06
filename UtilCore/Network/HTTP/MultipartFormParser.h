@@ -3,11 +3,12 @@
 // MultipartFormParser.h : multipart/form-data 본문 파싱 유틸리티.
 //
 // [설계] CHttpRequestParser는 body를 그대로(GetBody()) 돌려줄 뿐 그 내용을
-// 해석하지 않는다 — Content-Type이 뭐든 상관없이 body는 body이기 때문이다
-// (HttpRequestParser.h 클래스 설명 참고). multipart/form-data는 그 body의
-// 여러 인코딩 중 하나일 뿐이라, 별도 파일로 분리해서 여기서만 다룬다.
-// HttpParseUtil.h(HTTP::EqualsIgnoreCaseAscii/HTTP::Trim)를 그대로 재사용해
-// CHttpRequestParser와 동일한 "char 전용" 원칙을 따른다.
+// 해석하지 않는다 — Content-Type이 뭐든 상관없이 body는 body이기 때문이다.
+// multipart/form-data는 그 body의 여러 인코딩 중 하나일 뿐이라, 별도 파일로
+// 분리해서 여기서만 다룬다. HttpParseUtil.h(HTTP::EqualsIgnoreCaseAscii/
+// HTTP::Trim/HTTP::PercentDecode)를 그대로 재사용해 파서들과 동일한 "char 전용"
+// 원칙을 따른다. 완성된 body를 한 번에 스캔하므로 짧은 필드에 적합하고,
+// 대용량 업로드는 MultipartStreamParser.h의 스트리밍 파서를 쓴다.
 //***************************************************************************
 
 #ifndef UC_MULTIPARTFORMPARSER_H
@@ -18,7 +19,6 @@
 #include <string>
 #include <string_view>
 #include <vector>
-#include <algorithm>
 
 namespace HTTP
 {
@@ -65,90 +65,124 @@ namespace HTTP
 		return !outBoundary.empty();
 	}
 
-	//***************************************************************************
-	// @brief Content-Disposition 헤더 값에서 name="..."/filename="..."을 추출합니다.
-	//***************************************************************************
-	//***************************************************************************
-	// @brief RFC 3986 퍼센트 인코딩("%XX") 디코딩은 HttpParseUtil.h의
-	//        HTTP::PercentDecode()를 그대로 쓴다(FormUrlEncodedParser.h와
-	//        공유하는 공용 유틸로 옮겨감 — 이 파일엔 더 이상 자체 정의가 없다).
-	//***************************************************************************
+	namespace detail
+	{
+		//***************************************************************************
+		// @brief 헤더 파라미터 값의 바깥 큰따옴표를 벗기고 `\"`를 `"`로 되돌립니다.
+		// @details 백슬래시를 나머지 문자 앞에서도 풀어 버리면 오래된 브라우저가 보내던
+		//          "C:\dir\file.txt" 같은 값이 깨지므로 `\"`만 처리한다.
+		//***************************************************************************
+		inline std::string UnquoteParamValue(std::string_view v)
+		{
+			if( v.size() < 2 || v.front() != '"' || v.back() != '"' )
+				return std::string(v);
+
+			v = v.substr(1, v.size() - 2);
+
+			std::string result;
+			result.reserve(v.size());
+			for( size_t i = 0; i < v.size(); ++i )
+			{
+				if( v[i] == '\\' && i + 1 < v.size() && v[i + 1] == '"' )
+					++i;
+				result.push_back(v[i]);
+			}
+			return result;
+		}
+	}
 
 	//***************************************************************************
 	// @brief Content-Disposition 헤더 값에서 name="..."/filename="..."을 추출합니다.
-	// @details [추가] filename*=<charset>'<language>'<percent-encoded> 형식
-	//          (RFC 5987, RFC 6266 §4.3)도 처리한다 — 최신 브라우저/클라이언트가
-	//          비-ASCII(한글 등) 파일명을 실어 보낼 때 흔히 쓰는 방식이다.
-	//          RFC 6266에 따라 filename*가 있으면 일반 filename보다 우선하므로,
-	//          평범한 filename="..."을 먼저 채운 뒤 filename*가 있으면 그 값으로
-	//          덮어쓴다. charset이 UTF-8이 아닌 경우(드묾, 예: ISO-8859-1)의
-	//          코드셋 변환까지는 하지 않는다 — UTF-8 바이트를 그대로 쓴다는
-	//          가정 하에 퍼센트 디코딩만 수행한다.
+	// @details 헤더 값을 큰따옴표 밖의 ';'로만 나눠 파라미터를 하나씩 이름으로 비교한다 —
+	//          그래서 파라미터 순서(filename이 name보다 먼저 오는 .NET HttpClient의 전송 방식
+	//          등)나 값 안의 ';'(filename="a;b.txt")에 영향받지 않고, "filename" 안에 부분
+	//          문자열로 들어 있는 "name"을 name으로 오인하지도 않는다.
+	//
+	//          RFC 5987/6266 §4.3의 filename*=<charset>'<language>'<percent-encoded> 형식은
+	//          비-ASCII(한글 등) 파일명을 실어 보낼 때 쓰며, 있으면 일반 filename보다 우선한다
+	//          (순서와 무관). charset 변환은 하지 않고 UTF-8 바이트를 가정해 퍼센트 디코딩만 한다.
 	//***************************************************************************
 	inline void ParseContentDisposition(std::string_view value, std::string& outName, std::string& outFilename)
 	{
-		// [수정] 예전엔 value.find("name=\"")로 헤더 값 전체에서 무작정
-		// 찾았는데, "filename=\"..." 문자열 안에 "name=\""가 우연히 부분
-		// 문자열로 포함돼 있어서(fileNAME=") 파라미터 순서가
-		// "filename=...; name=..."처럼 filename이 name보다 먼저 오면(실제로
-		// .NET의 HttpClient가 비-ASCII 파일명에서 이렇게 보내는 걸 확인함)
-		// filename 안의 값을 name으로 잘못 채가는 버그가 있었다.
-		//
-		// 이제 ';'로 파라미터를 하나씩 잘라서, 각 조각이 "name="/"filename="로
-		// 정확히 시작하는지(부분 문자열 매치가 아니라 접두사 매치)만 확인한다
-		// — 그래서 값 순서가 어떻든 안전하다.
-		size_t pos = 0;
-		while( pos <= value.size() )
-		{
-			const size_t semi = value.find(';', pos);
-			std::string_view param = (semi == std::string_view::npos) ? value.substr(pos) : value.substr(pos, semi - pos);
-			param = HTTP::Trim(param);
+		bool haveExtendedFilename = false;
 
-			if( param.size() > 5 && HTTP::EqualsIgnoreCaseAscii(param.substr(0, 5), "name=") )
+		auto handleParam = [&](std::string_view param)
 			{
-				std::string_view v = param.substr(5);
-				if( v.size() >= 2 && v.front() == '"' && v.back() == '"' )
-					v = v.substr(1, v.size() - 2);
-				outName = std::string(v);
-			}
-			// "filename*="는 아래 9글자 접두사("filename=")와 안 겹친다 —
-			// 9번째 글자가 '*'라 "filename="(정확히 =로 끝남)과 다르므로
-			// 이 분기에 안 걸린다. RFC 5987 확장은 별도로 마지막에 처리.
-			else if( param.size() > 9 && HTTP::EqualsIgnoreCaseAscii(param.substr(0, 9), "filename=") )
-			{
-				std::string_view v = param.substr(9);
-				if( v.size() >= 2 && v.front() == '"' && v.back() == '"' )
-					v = v.substr(1, v.size() - 2);
-				outFilename = std::string(v);
-			}
+				param = HTTP::Trim(param);
+				const size_t eq = param.find('=');
+				if( eq == std::string_view::npos )
+					return;
 
-			if( semi == std::string_view::npos )
-				break;
-			pos = semi + 1;
-		}
+				const std::string_view key = HTTP::Trim(param.substr(0, eq));
+				const std::string_view val = HTTP::Trim(param.substr(eq + 1));
 
-		// RFC 5987 확장 파라미터(filename*=UTF-8''퍼센트인코딩) — 있으면
-		// 위에서 채운 일반 filename을 덮어쓴다(더 정확한 표현이므로 우선).
-		size_t extFilePos = value.find("filename*=");
-		if( extFilePos != std::string_view::npos )
-		{
-			std::string_view rest = value.substr(extFilePos + 10); // strlen("filename*=")
-			const size_t firstQuote = rest.find('\'');
-			if( firstQuote != std::string_view::npos )
-			{
-				const size_t secondQuote = rest.find('\'', firstQuote + 1);
-				if( secondQuote != std::string_view::npos )
+				if( HTTP::EqualsIgnoreCaseAscii(key, "name") )
 				{
-					std::string_view encodedPart = rest.substr(secondQuote + 1);
-
-					// 값 끝(다음 파라미터 구분자 ';' 또는 헤더 줄 끝)까지만 취한다.
-					const size_t endPos = encodedPart.find(';');
-					if( endPos != std::string_view::npos )
-						encodedPart = encodedPart.substr(0, endPos);
-
-					outFilename = PercentDecode(HTTP::Trim(encodedPart));
+					outName = detail::UnquoteParamValue(val);
 				}
+				else if( HTTP::EqualsIgnoreCaseAscii(key, "filename") )
+				{
+					if( !haveExtendedFilename )
+						outFilename = detail::UnquoteParamValue(val);
+				}
+				else if( HTTP::EqualsIgnoreCaseAscii(key, "filename*") )
+				{
+					const std::string ext = detail::UnquoteParamValue(val);
+					const size_t firstQuote = ext.find('\'');
+					const size_t secondQuote = (firstQuote == std::string::npos) ? std::string::npos : ext.find('\'', firstQuote + 1);
+					if( secondQuote != std::string::npos )
+					{
+						outFilename = PercentDecode(std::string_view(ext).substr(secondQuote + 1));
+						haveExtendedFilename = true;
+					}
+				}
+			};
+
+		size_t start = 0;
+		bool inQuote = false;
+		for( size_t i = 0; i <= value.size(); ++i )
+		{
+			if( i == value.size() || (!inQuote && value[i] == ';') )
+			{
+				handleParam(value.substr(start, i - start));
+				start = i + 1;
+				continue;
 			}
+
+			if( inQuote && value[i] == '\\' && i + 1 < value.size() )
+				++i; // 따옴표 안의 이스케이프(\")는 따옴표 상태를 바꾸지 않는다
+			else if( value[i] == '"' )
+				inQuote = !inQuote;
+		}
+	}
+
+	//***************************************************************************
+	// @brief 파트 헤더 섹션(빈 줄 이전까지)에서 Content-Disposition/Content-Type을 뽑아냅니다.
+	// @details MultipartStreamParser.h도 이 함수를 쓴다.
+	//***************************************************************************
+	inline void ParseMultipartPartHeaders(std::string_view headerSection, std::string& outName, std::string& outFilename, std::string& outContentType)
+	{
+		size_t lineStart = 0;
+		while( lineStart < headerSection.size() )
+		{
+			size_t lineEnd = headerSection.find("\r\n", lineStart);
+			if( lineEnd == std::string_view::npos )
+				lineEnd = headerSection.size();
+
+			const std::string_view line = headerSection.substr(lineStart, lineEnd - lineStart);
+			const size_t colon = line.find(':');
+			if( colon != std::string_view::npos )
+			{
+				const std::string_view headerName = HTTP::Trim(line.substr(0, colon));
+				const std::string_view headerValue = HTTP::Trim(line.substr(colon + 1));
+
+				if( HTTP::EqualsIgnoreCaseAscii(headerName, "Content-Disposition") )
+					ParseContentDisposition(headerValue, outName, outFilename);
+				else if( HTTP::EqualsIgnoreCaseAscii(headerName, "Content-Type") )
+					outContentType = std::string(headerValue);
+			}
+
+			lineStart = (lineEnd < headerSection.size()) ? lineEnd + 2 : lineEnd;
 		}
 	}
 
@@ -159,76 +193,56 @@ namespace HTTP
 	// @param boundary ExtractBoundary()로 뽑아낸 값(앞의 "--"는 이 함수가 붙임).
 	// @param outFields [out] 파싱된 필드 목록(순서 보존).
 	// @return 형식이 심하게 깨져 있으면 false(호출부는 400 Bad Request로 응답).
+	// @details 파트 데이터의 끝은 "\r\n--boundary"로 판정한다(줄 시작에 오는 경계선만 경계로
+	//          인정) — 데이터 한가운데에 "--boundary" 문자열이 우연히 들어 있어도 파트가
+	//          잘리지 않는다.
 	//***************************************************************************
 	inline bool ParseMultipartFormData(std::string_view body, const std::string& boundary, std::vector<SMultipartField>& outFields)
 	{
 		const std::string delimiter = "--" + boundary;
+		const std::string bodyDelimiter = "\r\n" + delimiter;
 
 		size_t pos = body.find(delimiter);
 		if( pos == std::string_view::npos )
 			return false;
 		pos += delimiter.size();
 
-		while( true )
+		for( ;; )
 		{
-			// 이 지점이 종료 마커("--")인지 먼저 확인.
-			if( pos + 2 <= body.size() && body.compare(pos, 2, "--") == 0 )
-				break;
-
-			// 파트 사이의 CRLF 스킵.
-			if( pos + 2 <= body.size() && body.compare(pos, 2, "\r\n") == 0 )
-				pos += 2;
-
-			size_t nextBoundary = body.find(delimiter, pos);
-			if( nextBoundary == std::string_view::npos )
-				return false; // 닫는 boundary를 못 찾음 — 잘린/깨진 본문
-
-			std::string_view partData = body.substr(pos, nextBoundary - pos);
-
-			// partData 형식: "헤더줄들\r\n\r\n실제값\r\n" — 헤더/값 경계(빈 줄) 탐색.
-			size_t headerEnd = partData.find("\r\n\r\n");
-			if( headerEnd == std::string_view::npos )
+			// 경계 직후: "--"(종료) 또는 CRLF(다음 파트)
+			if( body.compare(pos, 2, "--") == 0 )
+				return true;
+			if( body.compare(pos, 2, "\r\n") != 0 )
 				return false;
+			pos += 2;
 
-			std::string_view headerSection = partData.substr(0, headerEnd);
-			std::string_view valueSection = partData.substr(headerEnd + 4);
-
-			// 다음 boundary 직전에 항상 붙어있는 CRLF 하나를 값에서 떼어낸다.
-			if( valueSection.size() >= 2 && valueSection.substr(valueSection.size() - 2) == "\r\n" )
-				valueSection.remove_suffix(2);
-
-			SMultipartField field;
-
-			size_t lineStart = 0;
-			while( lineStart < headerSection.size() )
+			// 파트 헤더 섹션: 빈 줄("\r\n\r\n")까지. 헤더가 하나도 없으면 바로 빈 줄이 온다.
+			std::string_view headerSection;
+			size_t valueStart;
+			if( body.compare(pos, 2, "\r\n") == 0 )
 			{
-				size_t lineEnd = headerSection.find("\r\n", lineStart);
-				if( lineEnd == std::string_view::npos )
-					lineEnd = headerSection.size();
-
-				std::string_view line = headerSection.substr(lineStart, lineEnd - lineStart);
-				size_t colon = line.find(':');
-				if( colon != std::string_view::npos )
-				{
-					std::string_view headerName = line.substr(0, colon);
-					std::string_view headerValue = HTTP::Trim(line.substr(colon + 1));
-
-					if( HTTP::EqualsIgnoreCaseAscii(headerName, "Content-Disposition") )
-						ParseContentDisposition(headerValue, field.name, field.filename);
-					else if( HTTP::EqualsIgnoreCaseAscii(headerName, "Content-Type") )
-						field.contentType = std::string(headerValue);
-				}
-
-				lineStart = (lineEnd < headerSection.size()) ? lineEnd + 2 : lineEnd;
+				valueStart = pos + 2;
+			}
+			else
+			{
+				const size_t headerEnd = body.find("\r\n\r\n", pos);
+				if( headerEnd == std::string_view::npos )
+					return false;
+				headerSection = body.substr(pos, headerEnd - pos);
+				valueStart = headerEnd + 4;
 			}
 
-			field.data = std::string(valueSection);
+			const size_t valueEnd = body.find(bodyDelimiter, valueStart);
+			if( valueEnd == std::string_view::npos )
+				return false; // 닫는 boundary를 못 찾음 — 잘린/깨진 본문
+
+			SMultipartField field;
+			ParseMultipartPartHeaders(headerSection, field.name, field.filename, field.contentType);
+			field.data.assign(body.data() + valueStart, valueEnd - valueStart);
 			outFields.push_back(std::move(field));
 
-			pos = nextBoundary + delimiter.size();
+			pos = valueEnd + bodyDelimiter.size();
 		}
-
-		return true;
 	}
 
 	//***************************************************************************

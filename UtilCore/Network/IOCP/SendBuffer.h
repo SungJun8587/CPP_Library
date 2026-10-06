@@ -35,13 +35,13 @@ public:
 	CSendBuffer(CSendBufferChunkRef owner, BYTE* buffer, uint32 allocSize);
 	~CSendBuffer();
 
-	BYTE*		Buffer() { return _buffer; }
-	uint32		AllocSize() { return _allocSize; }
-	uint32		WriteSize() { return _writeSize; }
+	BYTE* Buffer() { return _buffer; }
+	uint32		AllocSize() const { return _allocSize; }
+	uint32		WriteSize() const { return _writeSize; }
 	void		Close(uint32 writeSize);
 
 private:
-	BYTE*				_buffer;			// 버퍼 시작 주소
+	BYTE* _buffer;			// 버퍼 시작 주소
 	uint32				_allocSize = 0;		// 할당된 크기
 	uint32				_writeSize = 0;		// 실제 기록된 크기
 	bool                _closed = false;	// 중복 Close 방지 플래그
@@ -72,12 +72,12 @@ public:
 	CSendBufferRef		Open(uint32 allocSize);
 	void				Close(uint32 writeSize);
 
-	bool				IsOpen() { return _open; }
-	BYTE*				Buffer() { return &_buffer[_usedSize]; }
-	uint32				FreeSize() { return static_cast<uint32>(_buffer.size()) - _usedSize; }
+	bool				IsOpen() const { return _open; }
+	BYTE* Buffer() { return &_buffer[_usedSize]; }
+	uint32				FreeSize() const { return static_cast<uint32>(_buffer.size()) - _usedSize; }
 
 private:
-	std::array<BYTE, Iocp::SEND_BUFFER_CHUNK_SIZE>	_buffer = {};		// 청크 메모리 버퍼
+	std::array<BYTE, Iocp::SEND_BUFFER_CHUNK_SIZE>	_buffer;			// 청크 메모리 버퍼 (의도적으로 초기화하지 않음 — SendBuffer가 쓴 구간(WriteSize)만 읽으므로 청크마다 8KB를 0으로 채울 필요가 없다)
 	bool											_open = false;		// 오픈 상태 여부
 	uint32											_usedSize = 0;		// 사용된 메모리 크기
 };

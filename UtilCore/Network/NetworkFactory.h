@@ -110,8 +110,8 @@ public:
 	//         USE_NETWORK_RIO)에서 꺼져 있으면 nullptr)
 	//***************************************************************************
 	static CNetServiceRef CreateServerService(
-		EngineCoreRef engineCore,
-		CNetAddress address,
+		const EngineCoreRef& engineCore,
+		const CNetAddress& address,
 		SessionFactory factory,
 		int32 maxSessionCount = 1,
 		uint32 workerThreadCount = 0
@@ -128,8 +128,8 @@ public:
 	// @return CNetServiceRef 생성된 클라이언트 네트워크 서비스 (실패 시 nullptr)
 	//***************************************************************************
 	static CNetServiceRef CreateClientService(
-		EngineCoreRef engineCore,
-		CNetAddress address,
+		const EngineCoreRef& engineCore,
+		const CNetAddress& address,
 		SessionFactory factory,
 		int32 maxSessionCount = 1,
 		uint32 workerThreadCount = 0

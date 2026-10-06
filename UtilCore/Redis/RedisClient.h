@@ -194,12 +194,12 @@ private:
 	void        OnReceiptResponse(const RedisValue& value);
 
 	//***************************************************************************
-	// @brief _pendingSendBuffer의 _sendOffset 위치부터 나머지를 WSASend로 등록함
+	// @brief _pendingSendBuffers의 _sendOffset 위치부터 나머지를 WSASend(Scatter-Gather)로 등록함
 	// @details 한 번의 WSASend 완료가 요청한 바이트를 전부 보냈다는 보장은
 	//          없으므로(부분 전송), Dispatch()의 송신 완료 처리에서 아직 남은
 	//          바이트가 있으면 이 함수를 다시 호출해 이어서 전송한다.
 	// @details [추가] 호출자는 반드시 _commandLock을 획득한 상태에서
-	//          호출해야 한다 — _pendingSendBuffer/_sendOffset/_sendTotalSize
+	//          호출해야 한다 — _pendingSendBuffers/_sendOffset/_sendTotalSize
 	//          및 _sendEvent를 직접 참조/수정하기 때문이다. 현재 호출부는
 	//          SendCommand()(자체적으로 _commandLock을 쥐고 호출)와
 	//          Dispatch()의 송신 완료 처리(마찬가지로 _commandLock을 쥔
@@ -268,12 +268,12 @@ private:
 	// (SendCommand)과 "콜백 회수"(Disconnect)를 같은 임계구역으로 묶는다 —
 	// 클래스 문서 상단의 "콜백 0회 실행 경합" 설명 참고. 큐가 아니라 단일
 	// 필드인 이유도 같은 설명 참고(한 시점에 미완료 SendCommand는 하나뿐).
-	std::mutex              _commandLock;			// _pendingCallback/_pendingSendBuffer/_sendOffset/_sendTotalSize 동기화
+	std::mutex              _commandLock;			// _pendingCallback/_pendingSendBuffers/_sendOffset/_sendTotalSize 동기화
 	RedisCallback			_pendingCallback;		// 응답을 기다리는 중인 콜백 (한 시점에 최대 1개)
 
-	CSendBufferRef			_pendingSendBuffer;		// 현재 전송 중인 명령의 송신 버퍼 (부분 전송 이어 보내기용) — _commandLock으로 보호
-	uint32					_sendOffset = 0;		// _pendingSendBuffer 중 이미 보낸 바이트 수 — _commandLock으로 보호
-	uint32					_sendTotalSize = 0;		// _pendingSendBuffer의 전체 바이트 수 — _commandLock으로 보호
+	CVector<CSendBufferRef>	_pendingSendBuffers;	// 현재 전송 중인 명령의 송신 버퍼들 (순서대로 이어 붙인 전체가 명령 하나, 부분 전송 이어 보내기용) — _commandLock으로 보호
+	uint32					_sendOffset = 0;		// _pendingSendBuffers 전체(명령 하나) 중 이미 보낸 바이트 수 — _commandLock으로 보호
+	uint32					_sendTotalSize = 0;		// _pendingSendBuffers의 전체 바이트 수 — _commandLock으로 보호
 
 	// [수정] _recvLock으로 파서 접근(ProcessRecv())과 파서 리셋(Disconnect())을
 	// 직렬화한다 — 클래스 문서 상단의 "파서 동시 접근" 설명 참고.

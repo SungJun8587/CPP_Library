@@ -7,6 +7,8 @@
 #include "pch.h"
 #include "NetworkFactory.h"
 
+#include <utility>
+
 //***************************************************************************
 // @brief 지정된 엔진 코어에 맞는 서버 서비스 객체를 동적으로 생성합니다.
 // @param engineCore IOCP 또는 RIO 코어 참조(variant) — 담긴 대안이 곧 엔진 타입
@@ -22,8 +24,8 @@
 //          엉뚱한 타입을 static_cast하는 버그 클래스가 통째로 제거됨.
 //***************************************************************************
 CNetServiceRef CNetworkFactory::CreateServerService(
-	EngineCoreRef engineCore,
-	CNetAddress address,
+	const EngineCoreRef& engineCore,
+	const CNetAddress& address,
 	SessionFactory factory,
 	int32 maxSessionCount,
 	uint32 workerThreadCount)
@@ -38,7 +40,7 @@ CNetServiceRef CNetworkFactory::CreateServerService(
 			if constexpr( std::is_same_v<TCoreRef, CIocpCoreRef> )
 			{
 #if defined(USE_NETWORK_IOCP)
-				return std::make_shared<CIocpServerService>(address, core, factory, maxSessionCount, workerThreadCount);
+				return std::make_shared<CIocpServerService>(address, core, std::move(factory), maxSessionCount, workerThreadCount);
 #else
 				return nullptr; // 이 빌드 구성에서는 IOCP 엔진이 꺼져 있음
 #endif
@@ -46,10 +48,14 @@ CNetServiceRef CNetworkFactory::CreateServerService(
 			else if constexpr( std::is_same_v<TCoreRef, CRioCoreRef> )
 			{
 #if defined(USE_NETWORK_RIO)
-				return std::make_shared<CRioServerService>(address, core, factory, maxSessionCount, workerThreadCount);
+				return std::make_shared<CRioServerService>(address, core, std::move(factory), maxSessionCount, workerThreadCount);
 #else
 				return nullptr; // 이 빌드 구성에서는 RIO 엔진이 꺼져 있음
 #endif
+			}
+			else
+			{
+				static_assert(!sizeof(TCoreRef), "EngineCoreRef에 추가된 엔진 타입의 분기가 없습니다");
 			}
 		}, engineCore);
 }
@@ -64,8 +70,8 @@ CNetServiceRef CNetworkFactory::CreateServerService(
 // @return CNetServiceRef 생성된 서비스 객체 포인터 (실패 시 nullptr)
 //***************************************************************************
 CNetServiceRef CNetworkFactory::CreateClientService(
-	EngineCoreRef engineCore,
-	CNetAddress address,
+	const EngineCoreRef& engineCore,
+	const CNetAddress& address,
 	SessionFactory factory,
 	int32 maxSessionCount,
 	uint32 workerThreadCount)
@@ -80,7 +86,7 @@ CNetServiceRef CNetworkFactory::CreateClientService(
 			if constexpr( std::is_same_v<TCoreRef, CIocpCoreRef> )
 			{
 #if defined(USE_NETWORK_IOCP)
-				return std::make_shared<CIocpClientService>(address, core, factory, maxSessionCount, workerThreadCount);
+				return std::make_shared<CIocpClientService>(address, core, std::move(factory), maxSessionCount, workerThreadCount);
 #else
 				return nullptr;
 #endif
@@ -88,10 +94,14 @@ CNetServiceRef CNetworkFactory::CreateClientService(
 			else if constexpr( std::is_same_v<TCoreRef, CRioCoreRef> )
 			{
 #if defined(USE_NETWORK_RIO)
-				return std::make_shared<CRioClientService>(address, core, factory, maxSessionCount, workerThreadCount);
+				return std::make_shared<CRioClientService>(address, core, std::move(factory), maxSessionCount, workerThreadCount);
 #else
 				return nullptr;
 #endif
+			}
+			else
+			{
+				static_assert(!sizeof(TCoreRef), "EngineCoreRef에 추가된 엔진 타입의 분기가 없습니다");
 			}
 		}, engineCore);
 }

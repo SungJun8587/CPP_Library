@@ -7,6 +7,8 @@
 #ifndef UC_TLSFILTER_H
 #define UC_TLSFILTER_H
 
+#include <BaseRedefineDataType.h>
+
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <functional>
@@ -16,6 +18,7 @@
 #include <atomic>
 #include <cstdint>
 #include <algorithm>
+#include <utility>
 
 #pragma comment(lib, LIB_NAME("libssl"))
 #pragma comment(lib, LIB_NAME("libcrypto"))
@@ -32,13 +35,17 @@ using TlsRawSendFn = std::function<bool(const void*, uint16)>;
 // 버퍼를 가리키므로, 호출부가 더 오래 보관해야 한다면 콜백 안에서 복사해야 함.
 using TlsPlaintextRecvHandler = std::function<void(const char* data, size_t len)>;
 
-// 핸드셰이크 완료(성공) 또는 실패를 통지. success==false면 호출부는 세션을
-// 폐기해야 한다(인증서 검증 실패, 프로토콜 오류 등 복구 불가능한 상태).
+// 핸드셰이크 완료(success==true) 또는 복구 불가능한 TLS 오류(success==false)를 통지.
+// success==false면 호출부는 세션을 폐기해야 한다 — 핸드셰이크 중의 인증서 검증 실패/프로토콜
+// 오류뿐 아니라, 핸드셰이크 이후 레코드 복호화 실패(MAC 오류 등)도 같은 경로로 알린다.
 using TlsHandshakeCompleteHandler = std::function<void(bool success)>;
 
 //***************************************************************************
-// @brief 기본 클라이언트 SSL_CTX를 생성합니다 (TLS 1.2 이상, 피어 인증서 검증
-//        활성화, OS 기본 신뢰 저장소 사용).
+// @brief 기본 클라이언트 SSL_CTX를 생성합니다 (TLS 1.2 이상, 피어 인증서 검증 활성화).
+// @details 신뢰할 CA는 OpenSSL의 기본 검증 경로(SSL_CTX_set_default_verify_paths)에서 읽는다.
+//          Windows에서 OpenSSL 3.2 이상이면 OS 인증서 저장소(winstore)도 함께 신뢰한다 —
+//          Windows의 OpenSSL은 기본 경로에 CA 번들이 없는 경우가 많아 저장소를 읽지 않으면
+//          모든 HTTPS 서버 인증서 검증이 실패하기 때문이다.
 // @return SSL_CTX* 생성된 컨텍스트(실패 시 nullptr). SSL_CTX는 생성 비용이
 //         커서 세션마다 새로 만들지 않고, 이 함수로 한 번 만든 뒤 여러
 //         CTlsFilter 인스턴스(=여러 커넥션)가 공유하는 게 정석이다 —
@@ -53,6 +60,11 @@ inline SSL_CTX* CreateDefaultClientSslCtx()
 
 	SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
 	SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, nullptr);
+
+#if defined(_WIN32) && OPENSSL_VERSION_NUMBER >= 0x30200000L
+	if( SSL_CTX_load_verify_store(ctx, "org.openssl.winstore://") != 1 )
+		ERR_clear_error(); // OS 저장소를 못 읽어도 기본 경로로 계속 시도한다
+#endif
 
 	if( SSL_CTX_set_default_verify_paths(ctx) != 1 )
 	{
@@ -94,6 +106,17 @@ inline SSL_CTX* CreateDefaultClientSslCtx()
 //      SendPlaintext()를 부르는 경우)이 일어나도 자기 자신을 락으로 교착시키지
 //      않기 위함이다(std::mutex는 재귀 획득을 지원하지 않음).
 //
+//      [송신 순서] TLS 레코드는 암호화된 순서 그대로 소켓에 나가야 한다(순서가 바뀌면 상대의
+//      MAC 검증이 실패한다). 암호문은 락 안에서 _sendQueue에 쌓고, 락 밖에서는 한 번에 한
+//      스레드(_sending)만 큐를 비우며 rawSend를 호출한다 — 다른 스레드는 큐에 쌓기만 하고
+//      돌아가고, 먼저 온 스레드가 그 데이터까지 순서대로 내보낸다. 별도의 송신 락이 없어
+//      rawSend 안에서 재진입해도 교착되지 않는다.
+//
+//      [OpenSSL 에러 큐] OpenSSL의 에러 큐는 스레드별이고 I/O 워커 스레드는 여러 커넥션이
+//      공유한다. SSL_get_error()는 큐에 남은 오류가 있으면 그것을 이번 호출의 실패로 보고하므로,
+//      다른 커넥션이 남긴 오류가 이 커넥션의 정상적인 WANT_READ를 치명적 오류로 바꿀 수 있다.
+//      그래서 모든 SSL_do_handshake/SSL_read/SSL_write 직전에 ERR_clear_error()를 호출한다.
+//
 //      [클라이언트 전용] SNI(SSL_set_tlsext_host_name)와 호스트네임 기반
 //      인증서 검증(SSL_set1_host)을 설정하므로 클라이언트 모드 전용이다.
 //      서버 모드가 필요해지면 별도 초기화 경로가 필요하다.
@@ -132,6 +155,17 @@ public:
 		_onPlaintext = std::move(onPlaintext);
 		_onHandshakeDone = std::move(onHandshakeDone);
 
+		if( _ssl != nullptr )
+		{
+			SSL_free(_ssl); // 재초기화 — 이전 SSL 객체(와 연결된 BIO)를 해제한다
+			_ssl = nullptr;
+		}
+		_handshakeComplete = false;
+		_failed = false;
+		_sending = false;
+		_sendQueue.clear();
+
+		ERR_clear_error();
 		_ssl = SSL_new(ctx);
 		if( _ssl == nullptr )
 			return false;
@@ -169,19 +203,23 @@ public:
 	//***************************************************************************
 	// @brief 핸드셰이크를 시작합니다. TCP 연결 완료 직후(세션의 OnConnected())
 	//        1회 호출해야 합니다.
+	// @details Initialize()가 실패한(또는 호출되지 않은) 필터면 핸드셰이크 실패로 통지한다.
 	//***************************************************************************
 	void StartHandshake()
 	{
-		std::vector<char> outgoing;
 		bool completed = false;
 		bool failed = false;
 
 		{
 			std::lock_guard<std::mutex> guard(_lock);
-			ProcessSslLocked(outgoing, completed, failed);
+			if( _ssl == nullptr )
+				failed = true;
+			else
+				ProcessSslLocked(completed, failed);
 		}
 
-		FlushAndNotify(outgoing, completed, failed);
+		PumpSend();
+		Notify(completed, std::string(), failed);
 	}
 
 	//***************************************************************************
@@ -191,7 +229,6 @@ public:
 	//***************************************************************************
 	void FeedNetworkData(const char* data, size_t len)
 	{
-		std::vector<char> outgoing;
 		std::string plaintext;
 		bool completed = false;
 		bool failed = false;
@@ -199,19 +236,31 @@ public:
 		{
 			std::lock_guard<std::mutex> guard(_lock);
 
-			BIO* rbio = SSL_get_rbio(_ssl);
-			BIO_write(rbio, data, static_cast<int>(len));
+			if( _ssl == nullptr )
+			{
+				failed = true; // Initialize()가 실패한 필터 — 세션을 폐기하게 한다
+			}
+			else if( _failed )
+			{
+				return; // 이미 실패를 통지했다 — 이후 데이터는 버린다
+			}
+			else
+			{
+				BIO_write(SSL_get_rbio(_ssl), data, static_cast<int>(len));
 
-			ProcessSslLocked(outgoing, completed, failed);
+				ProcessSslLocked(completed, failed);
 
-			if( !failed && _handshakeComplete )
-				DrainPlaintextLocked(plaintext);
+				if( !failed && _handshakeComplete )
+				{
+					DrainPlaintextLocked(plaintext, failed);
+					// SSL_read가 TLS 1.3 KeyUpdate 응답 같은 post-handshake 메시지를 wbio에 쌓았을 수 있다.
+					DrainCiphertextLocked();
+				}
+			}
 		}
 
-		FlushAndNotify(outgoing, completed, failed);
-
-		if( !plaintext.empty() && _onPlaintext )
-			_onPlaintext(plaintext.data(), plaintext.size());
+		PumpSend();
+		Notify(completed, plaintext, failed);
 	}
 
 	//***************************************************************************
@@ -219,31 +268,29 @@ public:
 	// @param data 전송할 평문 버퍼
 	// @param size data의 길이
 	// @return bool 성공 여부. 핸드셰이크가 아직 안 끝났거나 SSL_write 자체가
-	//         실패하면 false — 호출부(세션)가 커넥션을 폐기해야 한다.
+	//         실패하면 false — 호출부(세션)가 커넥션을 폐기해야 한다. true는 암호화와 송신 큐
+	//         적재까지 성공했다는 뜻이며, 실제 소켓 송신 실패는 세션 종료 통지로 알려진다.
 	//***************************************************************************
 	bool SendPlaintext(const void* data, uint16 size)
 	{
-		std::vector<char> outgoing;
 		bool writeOk = false;
 
 		{
 			std::lock_guard<std::mutex> guard(_lock);
 
-			if( !_handshakeComplete )
+			if( _ssl == nullptr || !_handshakeComplete || _failed )
 				return false;
 
-			int written = SSL_write(_ssl, data, static_cast<int>(size));
-			if( written == static_cast<int>(size) )
-				writeOk = true;
+			ERR_clear_error();
+			const int written = SSL_write(_ssl, data, static_cast<int>(size));
+			writeOk = (written == static_cast<int>(size));
 			// 메모리 BIO는 절대 가득 차지 않으므로(WANT_WRITE 없음) SSL_write는
 			// 이 구성에서 부분 쓰기 없이 전체 성공 또는 실패(<=0)만 일어난다.
 
-			DrainCiphertextLocked(outgoing);
+			DrainCiphertextLocked();
 		}
 
-		if( !outgoing.empty() )
-			SendChunked(outgoing.data(), outgoing.size());
-
+		PumpSend();
 		return writeOk;
 	}
 
@@ -254,13 +301,12 @@ public:
 
 private:
 	//***************************************************************************
-	// @brief SSL_do_handshake()를 진행하고, 이번 호출로 나온 암호문/완료/실패
-	//        상태를 로컬 변수에 담아 반환합니다 (락 보유 중에만 호출).
-	// @param outgoing [OUT] 이번 호출로 wbio에 쌓인 암호문 (아직 전송 안 됨)
+	// @brief SSL_do_handshake()를 진행하고, 이번 호출로 나온 암호문은 _sendQueue에 쌓습니다
+	//        (락 보유 중에만 호출).
 	// @param completed [OUT] 이번 호출로 핸드셰이크가 막 완료됐는지 여부
 	// @param failed [OUT] 핸드셰이크가 복구 불가능하게 실패했는지 여부
 	//***************************************************************************
-	void ProcessSslLocked(std::vector<char>& outgoing, bool& completed, bool& failed)
+	void ProcessSslLocked(bool& completed, bool& failed)
 	{
 		completed = false;
 		failed = false;
@@ -268,8 +314,9 @@ private:
 		if( _handshakeComplete )
 			return;
 
-		int ret = SSL_do_handshake(_ssl);
-		DrainCiphertextLocked(outgoing);
+		ERR_clear_error();
+		const int ret = SSL_do_handshake(_ssl);
+		DrainCiphertextLocked();
 
 		if( ret == 1 )
 		{
@@ -278,14 +325,15 @@ private:
 			return;
 		}
 
-		int err = SSL_get_error(_ssl, ret);
+		const int err = SSL_get_error(_ssl, ret);
 		if( err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE )
 		{
-			// 더 받아야(또는 방금 만든 outgoing을 내보내야) 진행 가능 — 정상 대기.
+			// 더 받아야(또는 방금 만든 암호문을 내보내야) 진행 가능 — 정상 대기.
 			return;
 		}
 
 		// SSL_ERROR_SSL(프로토콜/인증서 오류) 등 복구 불가능한 실패.
+		_failed = true;
 		failed = true;
 	}
 
@@ -295,50 +343,101 @@ private:
 	// @param plaintext [OUT] 이번 호출로 복호화된 평문 전체 (여러 TLS 레코드에
 	//        걸쳐 있어도 하나로 합쳐서 반환 — 상위 HTTP 파서는 바이트 경계에
 	//        의존하지 않으므로 문제없음)
+	// @param failed [OUT] 복호화가 복구 불가능하게 실패했는지 여부 (MAC 오류, 프로토콜 위반 등)
 	//***************************************************************************
-	void DrainPlaintextLocked(std::string& plaintext)
+	void DrainPlaintextLocked(std::string& plaintext, bool& failed)
 	{
 		char buf[16384];
-		for( ;;)
+		for( ;; )
 		{
-			int n = SSL_read(_ssl, buf, sizeof(buf));
+			ERR_clear_error();
+			const int n = SSL_read(_ssl, buf, sizeof(buf));
 			if( n > 0 )
 			{
 				plaintext.append(buf, static_cast<size_t>(n));
 				continue;
 			}
 
-			// WANT_READ: 더 받아야 함(정상). ZERO_RETURN: 상대가 TLS
-			// close_notify를 보냄(정상 종료) — 두 경우 다 여기서는 조용히
-			// 루프를 빠져나간다. 소켓 자체의 종료 감지는 세션 계층(recv 0바이트
-			// 등)이 별도로 처리하므로 이 필터가 추가로 통지할 필요는 없다.
+			// WANT_READ: 더 받아야 함(정상). ZERO_RETURN: 상대가 TLS close_notify를 보냄(정상
+			// 종료) — 두 경우 다 조용히 루프를 빠져나간다. 소켓 자체의 종료 감지는 세션 계층이
+			// 별도로 처리하므로 이 필터가 추가로 통지할 필요는 없다. 그 밖의 오류는 레코드가
+			// 깨진 것이라 이 커넥션으로는 더 진행할 수 없다.
+			const int err = SSL_get_error(_ssl, n);
+			if( err != SSL_ERROR_WANT_READ && err != SSL_ERROR_WANT_WRITE && err != SSL_ERROR_ZERO_RETURN )
+			{
+				_failed = true;
+				failed = true;
+			}
 			break;
 		}
 	}
 
 	//***************************************************************************
-	// @brief wbio에 쌓인 암호문을 전부 꺼내 outgoing에 추가합니다 (락 보유 중에만 호출).
+	// @brief wbio에 쌓인 암호문을 전부 꺼내 _sendQueue에 추가합니다 (락 보유 중에만 호출).
 	//***************************************************************************
-	void DrainCiphertextLocked(std::vector<char>& outgoing)
+	void DrainCiphertextLocked()
 	{
 		BIO* wbio = SSL_get_wbio(_ssl);
 		char buf[16384];
 		int n;
 		while( (n = BIO_read(wbio, buf, sizeof(buf))) > 0 )
-			outgoing.insert(outgoing.end(), buf, buf + n);
+			_sendQueue.insert(_sendQueue.end(), buf, buf + n);
 	}
 
 	//***************************************************************************
-	// @brief 락 밖에서 암호문 전송 + 핸드셰이크 완료/실패 콜백을 호출합니다.
+	// @brief _sendQueue에 쌓인 암호문을 순서대로 rawSend로 내보냅니다 (락 밖에서 호출).
+	// @details 이미 다른 스레드가 큐를 비우는 중(_sending)이면 그 스레드가 이번에 쌓인 데이터까지
+	//          내보내므로 그냥 돌아간다 — 큐에 쌓인 순서가 곧 소켓으로 나가는 순서다.
 	//***************************************************************************
-	void FlushAndNotify(const std::vector<char>& outgoing, bool completed, bool failed)
+	void PumpSend()
 	{
-		if( !outgoing.empty() )
-			SendChunked(outgoing.data(), outgoing.size());
+		std::vector<char> batch;
+		{
+			std::lock_guard<std::mutex> guard(_lock);
+			if( _sending || _sendQueue.empty() )
+				return;
+			_sending = true;
+			batch.swap(_sendQueue);
+		}
 
+		try
+		{
+			for( ;; )
+			{
+				SendChunked(batch.data(), batch.size());
+				batch.clear();
+
+				std::lock_guard<std::mutex> guard(_lock);
+				if( _sendQueue.empty() )
+				{
+					_sending = false;
+					return;
+				}
+				batch.swap(_sendQueue); // 비워진 batch의 버퍼가 _sendQueue로 돌아가 재사용된다
+			}
+		}
+		catch( ... )
+		{
+			std::lock_guard<std::mutex> guard(_lock);
+			_sending = false;
+			throw;
+		}
+	}
+
+	//***************************************************************************
+	// @brief 락 밖에서 핸드셰이크 완료 / 평문 도착 / 실패 콜백을 순서대로 호출합니다.
+	// @details 완료 -> 평문 -> 실패 순서다. 핸드셰이크가 끝난 같은 수신에서 평문이 함께 도착하고
+	//          그 직후 복호화가 실패한 경우에도 받은 데이터를 먼저 전달한다.
+	//***************************************************************************
+	void Notify(bool completed, const std::string& plaintext, bool failed)
+	{
 		if( completed && _onHandshakeDone )
 			_onHandshakeDone(true);
-		else if( failed && _onHandshakeDone )
+
+		if( !plaintext.empty() && _onPlaintext )
+			_onPlaintext(plaintext.data(), plaintext.size());
+
+		if( failed && _onHandshakeDone )
 			_onHandshakeDone(false);
 	}
 
@@ -353,7 +452,7 @@ private:
 		size_t offset = 0;
 		while( offset < len )
 		{
-			size_t chunk = (std::min)(len - offset, static_cast<size_t>(65535));
+			const size_t chunk = (std::min)(len - offset, static_cast<size_t>(65535));
 			if( !_rawSend(data + offset, static_cast<uint16>(chunk)) )
 				return; // 전송 실패 — 세션이 곧 끊길 것이므로 나머지는 포기
 			offset += chunk;
@@ -367,9 +466,12 @@ private:
 	TlsPlaintextRecvHandler _onPlaintext;          // 복호화된 평문 도착 통지 콜백
 	TlsHandshakeCompleteHandler _onHandshakeDone;  // 핸드셰이크 완료/실패 통지 콜백
 
-	std::mutex _lock;                  // SSL/BIO 조작 보호 (콜백 호출 중에는 놓음 — 클래스 설명 참고)
+	std::mutex _lock;                  // SSL/BIO 조작과 아래 송신 큐 상태 보호 (콜백 호출 중에는 놓음 — 클래스 설명 참고)
 	std::atomic<bool> _handshakeComplete{ false }; // 핸드셰이크 완료 여부. IsHandshakeComplete()가
 	// 락 없이(다른 스레드에서) 읽을 수 있어 atomic — 쓰기는 여전히 _lock 보유 중(ProcessSslLocked)에만 일어남.
+	bool _failed = false;              // 복구 불가능한 TLS 오류가 발생했는지 (이후 수신 데이터는 버리고 송신은 거부)
+	std::vector<char> _sendQueue;      // 암호화됐지만 아직 rawSend로 내보내지 않은 암호문 (암호화 순서 = 송신 순서)
+	bool _sending = false;             // 어떤 스레드가 _sendQueue를 비우는 중인지 (PumpSend() 참고)
 };
 
 #endif // ndef UC_TLSFILTER_H

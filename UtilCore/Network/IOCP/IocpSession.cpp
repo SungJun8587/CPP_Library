@@ -69,36 +69,36 @@ void CIocpSession::Dispatch(CIocpEvent* iocpEvent, int32 numOfBytes)
 //***************************************************************************
 void CIocpSession::ProcessConnect()
 {
-	_connected.store(true);
+	// 연결이 완료되기 전에 Disconnect()/FailConnect()가 이미 종료를 통지한 세션(서비스 종료와 겹친 경우)은
+	// 소켓이 닫혀 있으므로 연결 처리를 하지 않는다. 세션은 연결 사이클을 한 번만 겪는다 — Accept/Connect마다
+	// 팩토리가 새 세션을 만들고 DisconnectEx는 소켓을 재사용하지 않으므로(dwFlags = 0), 통지 가드를
+	// 되돌려 세션을 다시 살릴 필요가 없다.
+	if( _disconnectNotified.load(std::memory_order_seq_cst) )
+		return;
+
 	_closeReason.store(Iocp::CloseReason::None, std::memory_order_release);
+	_gracefulClose.store(false, std::memory_order_release);
 
-	// 세션 재사용(AcceptEx) 시 이전 연결의 잔여 데이터 오염 방지
+	// 수신 버퍼와 종료 추적/송신 상태를 연결 시작 상태로 맞춘다.
 	_recvBuffer.Clear();
-
-	// [수정] 세션 객체가 재사용되는 경로(위 주석 참고)에서, 이전 연결 사이클의
-	// TryFinalizeDisconnect() 관련 상태가 남아있으면 안 된다 — 특히
-	// _disconnectNotified가 true로 남아있으면 이번 연결이 끊길 때
-	// OnDisconnected()가 "이미 통지함" 가드에 막혀 영원히 호출되지 않는다.
-	// 새 연결 사이클은 항상 이 셋이 초기 상태(0/false)여야 한다.
 	_pendingIoCount.store(0, std::memory_order_seq_cst);
 	_disconnectCompleted.store(false, std::memory_order_seq_cst);
-	_disconnectNotified.store(false, std::memory_order_seq_cst);
 
-	// [수정] 송신 상태도 동일한 이유로 리셋 필요. ProcessSend()의
-	// numOfBytes==0(WSASend 취소/실패 완료) 분기는 Disconnect()만 호출하고
-	// _sendRegistered/_sendQueue를 정리하지 않은 채 반환하므로, 이전 연결이
-	// Send 대기 중(또는 in-flight) 상태로 끊긴 뒤 이 세션 객체가 재사용되면
-	// (1) _sendRegistered가 true로 남아 Send()가 영원히 RegisterSend()를
-	//     트리거하지 못해(exchange(true)==false를 통과 못함) 송신이 마비되고,
-	// (2) _sendQueue에 남아있던 이전 연결의 미전송 버퍼가 이후 어떤 경로로든
-	//     RegisterSend()가 걸릴 때 새 클라이언트에게 그대로 전송되는
-	//     세션 간 데이터 혼선이 발생한다. RegisterSend()의 즉시 실패 분기가
-	//     동일하게 정리하는 것과 대칭되도록 여기서도 락 하에 정리한다.
 	{
 		std::lock_guard<std::mutex> guard(_lock);
 		_sendQueue.clear();
+		_sendQueueBytes = 0;
 		_sendRegistered.store(false);
 	}
+
+	// 소켓 옵션(TCP_NODELAY, keep-alive)은 상위 레이어가 연결 완료를 통지받기 전에 적용한다.
+	ApplySocketOptions();
+
+	// 연결 상태 전환은 위의 상태 초기화와 소켓 옵션 적용이 모두 끝난 뒤에 한다. 이 세션은 서비스/세션
+	// 매니저에 이미 등록돼 있어, 먼저 true로 바꾸면 Broadcast() 등 다른 스레드의 Send()가 초기화
+	// 구간에 끼어들어 _sendRegistered/_pendingIoCount를 되돌려 버리거나(WSASend 중복 게시, 카운트 불일치),
+	// 큐에 넣은 데이터가 지워질 수 있다.
+	_connected.store(true);
 
 	// 상위 레이어 이벤트 호출
 	OnConnected();
@@ -108,56 +108,185 @@ void CIocpSession::ProcessConnect()
 }
 
 //***************************************************************************
-// @brief 바이트 데이터 전송 요청 (RIO 인터페이스 호환)
+// @brief 지정된 TCP 소켓 옵션(TCP_NODELAY, keep-alive)을 적용합니다. 실패해도 연결은 계속한다(경고만 기록).
+//***************************************************************************
+void CIocpSession::ApplySocketOptions() noexcept
+{
+	if( _socket == INVALID_SOCKET )
+		return;
+
+	if( _socketOptions.noDelay && CSocketUtils::SetNoDelay(_socket, true) == false )
+		LOG_WARNING(_T("[CIocpSession] TCP_NODELAY failed: sessionId=%llu, error=%d"), _sessionId, ::WSAGetLastError());
+
+	if( _socketOptions.keepAlive &&
+		CSocketUtils::SetKeepAlive(_socket, true, _socketOptions.keepAliveIdleMs, _socketOptions.keepAliveIntervalMs) == false )
+		LOG_WARNING(_T("[CIocpSession] SO_KEEPALIVE failed: sessionId=%llu, error=%d"), _sessionId, ::WSAGetLastError());
+}
+
+//***************************************************************************
+// @brief 바이트 데이터를 송신 큐에 넣고 전송을 요청합니다 (RIO 인터페이스 호환, Thread-safe).
 // @param data 전송할 데이터 포인터
 // @param size 전송할 바이트 크기 (uint16)
-// @return bool 전송 요청 성공 여부
+// @return bool 큐잉 성공 여부
+// @details 데이터를 PrepareSend()로 SendBuffer들에 복사한 뒤 EnqueueSend()에서 한 번에 큐에 넣는다.
+//          HTTP/TLS 계층은 이 함수를 최대 65535바이트 단위로 호출한다.
+//          큐/WSABUF 할당 중 예외(메모리 부족 등)가 나면 송신 상태(_sendRegistered 등)가 어긋나
+//          이후 송신이 멈출 수 있으므로, noexcept 함수 밖으로 예외가 새어 프로세스가 종료되지
+//          않도록 여기서 받아 연결을 종료한다.
 //***************************************************************************
 bool CIocpSession::Send(const void* data, uint16 size) noexcept
 {
-	if( IsConnected() == false || data == nullptr || size == 0 )
+	if( IsConnected() == false )
 		return false;
 
-	CSendBufferRef sendBuffer = CSendBufferManager::Open(size);
-	if( sendBuffer == nullptr || sendBuffer->AllocSize() < size )
+	try
+	{
+		SendPieces pieces;
+		if( PrepareSend(data, size, pieces) == false )
+			return false;
+
+		return EnqueueSend(pieces.buffers, pieces.count, pieces.totalBytes);
+	}
+	catch( ... )
+	{
+		LOG_ERROR(_T("[CIocpSession] Send failed with exception: sessionId=%llu"), _sessionId);
+		Disconnect(Iocp::CloseReason::InternalError);
+		return false;
+	}
+}
+
+//***************************************************************************
+// @brief 데이터를 SendBuffer들로 복사해 SendPieces를 만듭니다 (호출 스레드의 thread_local 청크 사용).
+// @param data 전송할 데이터 포인터
+// @param size 전송할 바이트 수 (1 ~ 65535)
+// @param out 결과를 받을 SendPieces
+// @return bool 성공 여부
+// @details 한 SendBuffer는 청크(Iocp::SEND_BUFFER_CHUNK_SIZE)를 넘을 수 없으므로, 그보다 큰 데이터는
+//          여러 SendBuffer로 나눈다. 실패하면 이미 만든 조각은 out이 해제될 때 함께 풀로 반환된다.
+//***************************************************************************
+bool CIocpSession::PrepareSend(const void* data, uint16 size, SendPieces& out) noexcept
+{
+	out.count = 0;
+	out.totalBytes = 0;
+
+	if( data == nullptr || size == 0 )
 		return false;
 
-	// 2. 버퍼에 데이터 복사 및 실제 기록된 크기 마감(Close)
-	std::memcpy(sendBuffer->Buffer(), data, size);
-	sendBuffer->Close(size);
+	const BYTE* src = static_cast<const BYTE*>(data);
+	uint32 remaining = size;
 
-	// 3. 기존의 내부 private Send(CSendBufferRef) 호출
-	Send(sendBuffer);
+	try
+	{
+		while( remaining > 0 )
+		{
+			const uint32 pieceSize = (std::min)(remaining, Iocp::SEND_BUFFER_CHUNK_SIZE);
 
+			CSendBufferRef sendBuffer = CSendBufferManager::Open(pieceSize);
+			if( sendBuffer == nullptr || sendBuffer->AllocSize() < pieceSize )
+				return false;
+
+			// 버퍼에 데이터 복사 및 실제 기록된 크기 마감(Close)
+			std::memcpy(sendBuffer->Buffer(), src, pieceSize);
+			sendBuffer->Close(pieceSize);
+
+			out.buffers[out.count++] = std::move(sendBuffer);
+			src += pieceSize;
+			remaining -= pieceSize;
+		}
+	}
+	catch( ... )
+	{
+		// 메모리 부족 등 — noexcept 함수 밖으로 예외가 새지 않게 실패로 돌려준다.
+		return false;
+	}
+
+	out.totalBytes = size;
 	return true;
 }
 
 //***************************************************************************
-// @brief 패킷 전송 요청 (Thread-safe)
-// @param sendBuffer 전송할 패킷 버퍼
+// @brief PrepareSend()로 만든 SendBuffer 묶음을 이 세션의 송신 큐에 넣습니다 (Thread-safe).
+// @param pieces 전송할 묶음 (참조만 복사하므로 다른 세션에 다시 쓸 수 있다)
+// @return bool 큐잉 성공 여부
 //***************************************************************************
-void CIocpSession::Send(CSendBufferRef sendBuffer)
+bool CIocpSession::SendPrepared(const SendPieces& pieces) noexcept
 {
-	if( IsConnected() == false || sendBuffer == nullptr )
-		return;
+	if( IsConnected() == false || pieces.count == 0 )
+		return false;
+
+	try
+	{
+		CSendBufferRef queued[Iocp::kMaxSendPieces];
+		for( size_t i = 0; i < pieces.count; ++i )
+			queued[i] = pieces.buffers[i];
+
+		return EnqueueSend(queued, pieces.count, pieces.totalBytes);
+	}
+	catch( ... )
+	{
+		// Send()와 같은 이유로, 큐 할당 중 예외가 나면 송신 상태가 어긋나므로 연결을 종료한다.
+		LOG_ERROR(_T("[CIocpSession] SendPrepared failed with exception: sessionId=%llu"), _sessionId);
+		Disconnect(Iocp::CloseReason::InternalError);
+		return false;
+	}
+}
+
+//***************************************************************************
+// @brief Close()된 SendBuffer들을 하나의 단위로 송신 큐에 넣습니다 (Thread-safe).
+// @param buffers SendBuffer 배열 (큐로 이동됨)
+// @param count 배열 원소 수
+// @param totalBytes 배열이 담고 있는 데이터의 총 바이트 수
+// @return bool 큐잉 성공 여부 (미연결 또는 송신 큐 상한 초과 시 false)
+// @details 한 번의 락 구간에서 모든 조각을 넣어 다른 스레드의 Send()와 섞이지 않게 한다.
+//          상한(_maxSendQueueBytes) 초과 시 데이터는 큐에 넣지 않고 연결을 종료한다.
+//***************************************************************************
+bool CIocpSession::EnqueueSend(CSendBufferRef* buffers, size_t count, uint64 totalBytes)
+{
+	if( IsConnected() == false || buffers == nullptr || count == 0 )
+		return false;
 
 	bool registerSend = false;
+	bool overflow = false;
+	uint64 queuedBytes = 0;
+	const uint64 limit = _maxSendQueueBytes.load(std::memory_order_relaxed);
 
 	{
 		std::lock_guard<std::mutex> guard(_lock);
-		_sendQueue.push_back(sendBuffer);
 
-		// 현재 진행 중인 WSASend가 없다면 등록 수행
-		if( _sendRegistered.exchange(true) == false )
+		queuedBytes = _sendQueueBytes;
+		if( limit != 0 && queuedBytes + totalBytes > limit )
 		{
-			registerSend = true;
+			overflow = true;
 		}
+		else
+		{
+			for( size_t i = 0; i < count; ++i )
+				_sendQueue.push_back(std::move(buffers[i]));
+
+			_sendQueueBytes += totalBytes;
+
+			// 현재 진행 중인 WSASend가 없다면 등록 수행
+			if( _sendRegistered.exchange(true) == false )
+			{
+				registerSend = true;
+			}
+		}
+	}
+
+	if( overflow )
+	{
+		LOG_WARNING(_T("[CIocpSession] send queue overflow: sessionId=%llu, queued=%llu, request=%llu, limit=%llu"),
+			_sessionId, queuedBytes, totalBytes, limit);
+		Disconnect(Iocp::CloseReason::SendBufferOverflow);
+		return false;
 	}
 
 	if( registerSend )
 	{
 		RegisterSend();
 	}
+
+	return true;
 }
 
 //***************************************************************************
@@ -203,8 +332,17 @@ void CIocpSession::RegisterRecv()
 }
 
 //***************************************************************************
+// @brief completion 하나분의 outstanding I/O 카운트를 내리고 종료 통지 조건을 재확인합니다.
+//***************************************************************************
+void CIocpSession::ReleaseIo() noexcept
+{
+	_pendingIoCount.fetch_sub(1, std::memory_order_seq_cst);
+	TryFinalizeDisconnect();
+}
+
+//***************************************************************************
 // @brief 수신 완료 처리 (WSARecv 완료 통지 시 호출)
-// @param numOfBytes 수신된 데이터 바이트 수 (o인 경우 정상 연결 끊김)
+// @param numOfBytes 수신된 데이터 바이트 수 (0인 경우 정상 연결 끊김)
 // @note 링버퍼 경계 래핑(Wrap-around) 처리: 사용 중인 데이터가 버퍼 끝을
 //       넘어 두 조각으로 나뉘어 있으면(write < read) OnRecv()가 조각 하나만
 //       보고는 경계에 걸친 패킷을 영원히 완성할 수 없다(첫 조각은 항상
@@ -216,18 +354,41 @@ void CIocpSession::RegisterRecv()
 //***************************************************************************
 void CIocpSession::ProcessRecv(int32 numOfBytes)
 {
-	// [수정] 이 completion 하나에 대응하는 outstanding 카운트를 함수 최상단에서
-	// 즉시 감소시킨다 — 아래 여러 갈래의 early-return 경로 전부에서 정확히
-	// 1회씩만 실행되도록 보장하는 가장 단순한 위치. TryFinalizeDisconnect()는
-	// _disconnectCompleted/카운트 조건을 스스로 재확인하므로, 매 completion마다
-	// 무조건 호출해도 안전하다(조건 미충족이면 즉시 반환).
-	_pendingIoCount.fetch_sub(1, std::memory_order_seq_cst);
-	TryFinalizeDisconnect();
+	// 이 completion 하나에 대응하는 outstanding 카운트는 함수가 끝날 때(OnRecv()와 다음 WSARecv
+	// 게시까지 마친 뒤) 감소시키고 TryFinalizeDisconnect()를 호출한다. 스코프 가드라서 아래 여러
+	// 갈래의 early-return 경로 전부에서 정확히 1회씩 실행된다. 이 completion을 처리하는 동안은
+	// outstanding으로 남아 있으므로 다른 스레드가 OnDisconnected()를 통지하지 못하고, 다음
+	// WSARecv는 RegisterRecv()가 이 카운트를 내리기 전에 증가시키므로 카운트가 순간적으로 0이
+	// 되지 않는다. TryFinalizeDisconnect()는 조건을 스스로 재확인하므로 매번 호출해도 안전하다.
+	// 내부 오류 경로의 Disconnect()는 IsConnected()일 때만 호출한다 — 이미 종료가 시작된 세션에서
+	// 다시 호출하면 강제 정리 경로로 들어가 종료 사유를 덮어쓰고 조기 통지된다.
+	auto releaseIo = CScopeExit([this]() { ReleaseIo(); });
 
 	if( numOfBytes == 0 )
 	{
 		_recvEvent.owner = nullptr;
-		Disconnect(Iocp::CloseReason::RemoteClosed);
+
+		// 이미 종료가 시작된 세션(Disconnect() 이후)에서 취소된 recv가 0바이트로 완료된 경우에는
+		// Disconnect()를 다시 호출하지 않는다. 종료는 진행 중이고 OnDisconnected() 통지는 위의
+		// TryFinalizeDisconnect()가 담당한다. 다시 호출하면 _connected가 이미 false라 강제 정리
+		// 경로로 들어가 종료 사유를 덮어쓰고, DisconnectEx 완료 전에 소켓을 닫으며, outstanding
+		// I/O가 남은 채 OnDisconnected()를 통지하게 된다.
+		if( IsConnected() )
+		{
+			// 오류 없이 0바이트로 완료됐다면 상대가 연결을 정상 종료(FIN)한 것이다 (리셋 등은 errorCode가 채워진다).
+			if( _recvEvent.errorCode == 0 )
+				_gracefulClose.store(true, std::memory_order_release);
+
+			Disconnect(Iocp::CloseReason::RemoteClosed);
+		}
+		return;
+	}
+
+	// Disconnect()가 이미 호출된 종료 진행 중 세션 — 수신 데이터를 상위 레이어로 올리지 않고
+	// 새 WSARecv도 게시하지 않는다.
+	if( IsConnected() == false )
+	{
+		_recvEvent.owner = nullptr;
 		return;
 	}
 
@@ -235,13 +396,19 @@ void CIocpSession::ProcessRecv(int32 numOfBytes)
 	if( _recvBuffer.MoveWriteBuffer(numOfBytes) == false )
 	{
 		_recvEvent.owner = nullptr;
-		Disconnect(Iocp::CloseReason::RingBufferOverflow);
+		if( IsConnected() )
+			Disconnect(Iocp::CloseReason::RingBufferOverflow);
 		return;
 	}
 
 	// 2. 수신 버퍼 처리 루프 (누적된 패킷 소진)
 	while( true )
 	{
+		// 이전 OnRecv()(또는 다른 스레드)가 Disconnect()를 호출했다면 버퍼에 남은 데이터를
+		// 상위 레이어로 더 올리지 않는다. 이 시점 이후 새 WSARecv도 게시되지 않는다.
+		if( IsConnected() == false )
+			break;
+
 		int64 dataSize = _recvBuffer.GetSizeUsed();
 		if( dataSize <= 0 )
 			break;
@@ -264,7 +431,8 @@ void CIocpSession::ProcessRecv(int32 numOfBytes)
 			if( !_recvBuffer.Peek(reinterpret_cast<char*>(linearBuffer.data()), dataSize, &peekedSize) || peekedSize != dataSize )
 			{
 				_recvEvent.owner = nullptr;
-				Disconnect(Iocp::CloseReason::InternalError);
+				if( IsConnected() )
+					Disconnect(Iocp::CloseReason::InternalError);
 				return;
 			}
 
@@ -280,7 +448,8 @@ void CIocpSession::ProcessRecv(int32 numOfBytes)
 		if( processLen < 0 || availableSize < processLen )
 		{
 			_recvEvent.owner = nullptr;
-			Disconnect(Iocp::CloseReason::InternalError);
+			if( IsConnected() )
+				Disconnect(Iocp::CloseReason::InternalError);
 			return;
 		}
 
@@ -292,7 +461,8 @@ void CIocpSession::ProcessRecv(int32 numOfBytes)
 		if( _recvBuffer.MoveReadBuffer(processLen) == false )
 		{
 			_recvEvent.owner = nullptr;
-			Disconnect(Iocp::CloseReason::InternalError);
+			if( IsConnected() )
+				Disconnect(Iocp::CloseReason::InternalError);
 			return;
 		}
 	}
@@ -320,23 +490,48 @@ void CIocpSession::RegisterSend()
 	{
 		std::lock_guard<std::mutex> guard(_lock);
 		_sendEvent.sendBuffers.swap(_sendQueue); // 원본 ref count 보장용 백업
+		_sendQueueBytes = 0;
+
+		if( _sendEvent.sendBuffers.empty() )
+		{
+			// 전송할 데이터가 없다(종료/재초기화 경로와 겹친 경우) — 게시하지 않고 등록 상태를 해제한다.
+			_sendEvent.owner = nullptr;
+			_sendRegistered.store(false);
+			return;
+		}
 	}
 
-	CVector<WSABUF> wsaBufs;
+	// WSABUF 배열은 SendEvent가 보유한다. 다음 RegisterSend()는 이 WSASend의 완료 통지
+	// (ProcessSend) 이후에만 실행되므로 완료 전에는 변경되지 않으며, 매 전송마다 지역
+	// 배열을 할당하지 않는다.
+	CVector<WSABUF>& wsaBufs = _sendEvent.wsaBufs;
+	wsaBufs.clear();
 	wsaBufs.reserve(_sendEvent.sendBuffers.size());
 
 	for( CSendBufferRef& sendBuffer : _sendEvent.sendBuffers )
 	{
+		char* const buf = reinterpret_cast<char*>(sendBuffer->Buffer());
+		const ULONG len = static_cast<ULONG>(sendBuffer->WriteSize());
+
+		// 같은 스레드가 연달아 Send()한 조각은 thread_local 청크에서 이어 붙여 할당되므로 메모리가
+		// 연속이다. 앞 WSABUF의 끝이 이번 버퍼의 시작과 맞닿으면 하나로 합쳐 WSASend의 버퍼 개수를
+		// 줄인다. 두 버퍼 모두 sendBuffers가 완료까지 붙들고 있어 합쳐진 구간이 해제될 일은 없다.
+		if( !wsaBufs.empty() && wsaBufs.back().buf + wsaBufs.back().len == buf && wsaBufs.back().len <= (std::numeric_limits<ULONG>::max)() - len )
+		{
+			wsaBufs.back().len += len;
+			continue;
+		}
+
 		WSABUF wsaBuf;
-		wsaBuf.buf = reinterpret_cast<char*>(sendBuffer->Buffer());
-		wsaBuf.len = static_cast<ULONG>(sendBuffer->WriteSize());
+		wsaBuf.buf = buf;
+		wsaBuf.len = len;
 		wsaBufs.push_back(wsaBuf);
 	}
 
 	DWORD numOfBytes = 0;
 
-	// [수정] 실제 게시 직전에 증가시키고, 게시 자체가 즉시 실패하면(completion이
-	// 절대 안 옴) 바로 롤백한다 — TryFinalizeDisconnect()의 설명 참고.
+	// 실제 게시 직전에 증가시키고, 게시 자체가 즉시 실패하면(completion이 절대 안 옴)
+	// 바로 롤백한다 — TryFinalizeDisconnect()의 설명 참고.
 	_pendingIoCount.fetch_add(1, std::memory_order_seq_cst);
 
 	if( ::WSASend(_socket, wsaBufs.data(), static_cast<DWORD>(wsaBufs.size()), OUT & numOfBytes, 0, static_cast<LPOVERLAPPED>(&_sendEvent), nullptr) == SOCKET_ERROR )
@@ -346,20 +541,17 @@ void CIocpSession::RegisterSend()
 		{
 			_pendingIoCount.fetch_sub(1, std::memory_order_seq_cst); // 게시 실패 롤백 — completion이 안 옴
 
-			// [수정] Disconnect()를 가장 먼저 호출해 _connected를 즉시 false로
-			// 전환한다. 이렇게 해야 이 지점과 아래 정리 코드 사이의 시간 창에서
-			// 다른 스레드가 Send()를 호출해 IsConnected()==true를 관측하고
-			// _sendRegistered.exchange(true)==false를 통과해 같은 _sendEvent에
-			// 대해 RegisterSend()를 동시에 재진입하는 Race Condition을 막을 수
-			// 있다(기존에는 _sendRegistered를 Disconnect()보다 먼저 false로
-			// 되돌려, 그 창에서 다른 스레드가 새 WSASend를 거는 동시에 이
-			// 스레드가 Disconnect()로 DisconnectEx를 거는 문제가 있었다).
+			// Disconnect()를 먼저 호출해 _connected를 즉시 false로 전환한다. 그래야 아래 정리
+			// 코드와의 사이에 다른 스레드가 Send()에서 IsConnected()==true를 보고
+			// _sendRegistered.exchange(true)를 통과해 같은 _sendEvent로 RegisterSend()를
+			// 재진입하는 것을 막을 수 있다.
 			Disconnect(Iocp::CloseReason::SocketError);
 
 			std::lock_guard<std::mutex> guard(_lock);
 			_sendEvent.owner = nullptr;
-			_sendEvent.sendBuffers.clear();
+			_sendEvent.Reset();
 			_sendQueue.clear();
+			_sendQueueBytes = 0;
 			_sendRegistered.store(false);
 		}
 	}
@@ -390,16 +582,29 @@ void CIocpSession::RegisterDisconnect()
 //***************************************************************************
 void CIocpSession::ProcessSend(int32 numOfBytes)
 {
-	// [수정] ProcessRecv()와 동일한 이유로 함수 최상단에서 즉시 감소시킨다.
-	_pendingIoCount.fetch_sub(1, std::memory_order_seq_cst);
-	TryFinalizeDisconnect();
+	// ProcessRecv()와 동일한 이유로, 이 completion의 outstanding 카운트는 함수가 끝날 때(OnSend()와
+	// 다음 WSASend 게시까지 마친 뒤) 감소시키고 TryFinalizeDisconnect()를 호출한다.
+	auto releaseIo = CScopeExit([this]() { ReleaseIo(); });
 
 	_sendEvent.owner = nullptr; // Ref -1
-	_sendEvent.sendBuffers.clear(); // 전송 끝난 SendBuffer 수명 해제
+	_sendEvent.Reset(); // 전송 끝난 SendBuffer 수명 해제
 
 	if( numOfBytes == 0 )
 	{
-		Disconnect(Iocp::CloseReason::SocketError);
+		// ProcessRecv()와 동일한 이유로, 이미 종료가 시작된 세션이면 Disconnect()를 다시 호출하지 않는다.
+		if( IsConnected() )
+			Disconnect(Iocp::CloseReason::SocketError);
+		return;
+	}
+
+	// Disconnect()가 이미 호출된 종료 진행 중 세션 — OnSend()/재전송 없이, 아직 큐에 남아있는
+	// 송신 데이터만 정리한다(_sendRegistered는 true로 두어 더 이상 RegisterSend()가 트리거되지
+	// 않게 하며, 새 연결 사이클은 ProcessConnect()가 초기화한다).
+	if( IsConnected() == false )
+	{
+		std::lock_guard<std::mutex> guard(_lock);
+		_sendQueue.clear();
+		_sendQueueBytes = 0;
 		return;
 	}
 
@@ -468,44 +673,35 @@ void CIocpSession::TryFinalizeDisconnect() noexcept
 //***************************************************************************
 // @brief 지정된 사유로 세션 종료 요청
 // @param reason 세션 종료 사유
-// @details
-// [수정] 기존에는 `_connected.exchange(false) == false`면(즉 한 번도 연결
-// 완료 전이던 상태 — Accept/ConnectEx가 아직 진행 중인 세션) 완전히 no-op으로
-// 반환했다. 그런데 CNetService::Close()는 세션 생성 직후(연결 완료 전)부터
-// AddSession()으로 _sessions에 등록된 세션에 대해서도 이 Disconnect()를
-// 호출하므로, 그 세션이 실제로 연결 완료/실패해 스스로 OnDisconnected()를
-// 통지하기 전까지 _sessionsEmptyCv가 영원히 깨어나지 않아 Close() 호출
-// 스레드가 무한 대기(hang)하는 문제가 있었다.
-//
-// 이제는 미연결 상태에서도 FailConnect()와 동일하게 소켓을 직접 닫아
-// pending AcceptEx/ConnectEx를 취소시키고, 즉시 OnDisconnected() 통지까지
-// 완료한다. _disconnectNotified CAS로 최초 1회만 통지되도록 가드하며,
-// FailConnect()도 동일한 가드를 거치도록 통일해(아래 참고) — 취소된 I/O의
-// 완료 통지가 나중에 도착해 FailConnect()를 다시 태워도 중복 통지되지 않는다.
+// @details 상태에 따라 두 경로로 나뉜다.
+//   - 연결 완료 상태(_connected == true): DisconnectEx를 게시한다. outstanding recv/send와
+//     DisconnectEx의 완료가 모두 처리된 뒤 TryFinalizeDisconnect()가 OnDisconnected()를 통지한다.
+//   - 그 외(_connected == false): Accept/ConnectEx가 진행 중이던 미연결 세션이거나 이미
+//     종료가 시작된 세션이다. _disconnectNotified가 아직 false이면 FailConnect()와 같이
+//     소켓을 직접 닫아 pending AcceptEx/ConnectEx를 취소시키고 OnDisconnected() 통지까지
+//     즉시 완료한다. CNetService::Close()가 연결 완료 전에 등록된 세션에도 Disconnect()를
+//     호출하므로, 이 경로가 있어야 그 세션 때문에 Close()가 무한 대기하지 않는다.
+//     통지는 _disconnectNotified CAS로 최초 1회만 나가며 FailConnect()와 같은 가드를 공유한다.
+//     (이미 종료가 시작된 세션에서 이 경로가 실행되면 outstanding I/O 완료 전에 통지될 수
+//     있다. ProcessRecv/ProcessSend의 0바이트 완료는 IsConnected()일 때만 Disconnect()를
+//     호출하므로 일반적인 종료 경로는 여기로 오지 않는다. 남는 경우는 CNetService::Close(),
+//     Register* 실패 롤백, 사용자 코드의 중복 Disconnect() 호출이다 — 연결 상태를 명시적으로
+//     구분하는 개선은 보류, TryFinalizeDisconnect() 설명 참고.)
 //***************************************************************************
 void CIocpSession::Disconnect(Iocp::CloseReason reason)
 {
 	if( _connected.exchange(false) == false )
 	{
-		// 아직 연결 완료 전(Accept/ConnectEx 진행 중) — FailConnect()와 동일한
-		// 강제 정리 경로. _disconnectNotified가 이미 true면(FailConnect()가
-		// 먼저 통지를 마쳤거나 이 경로가 이미 실행됨) 아무 것도 하지 않는다.
-		if( _disconnectNotified.exchange(true, std::memory_order_seq_cst) )
-			return;
-
-		_closeReason.store(reason, std::memory_order_release);
-
-		CSocketUtils::Close(_socket); // pending AcceptEx/ConnectEx 취소 유도
-		_socket = INVALID_SOCKET;
-
-		OnDisconnected();
-		CSession::OnDisconnected();
+		// 미연결(Accept/ConnectEx 진행 중) 또는 이미 종료가 시작된 세션 — 소켓을 닫아 pending
+		// AcceptEx/ConnectEx 취소를 유도하고 통지까지 즉시 마치는 강제 정리 경로(FailConnect()와 동일).
+		FailConnect(reason);
 		return;
 	}
 
 	_closeReason.store(reason, std::memory_order_release);
 
-	// DisconnectEx 호출로 소켓 재사용 상태(TF_REUSE_SOCKET) 유도
+	// DisconnectEx(dwFlags = 0)로 연결을 종료한다. 소켓 핸들은 재사용하지 않고
+	// 세션 소멸자가 닫는다.
 	RegisterDisconnect();
 }
 
@@ -536,16 +732,10 @@ void CIocpSession::Disconnect(const TCHAR* cause)
 //***************************************************************************
 bool CIocpSession::ConnectAsync(const CNetAddress& remoteAddr)
 {
-	// [수정] 새 연결 시도 사이클 시작 — 이전 시도(재사용된 세션 객체의 과거
-	// 실패한 connect 등)에서 _disconnectNotified가 true로 남아있으면 이번
-	// 시도의 FailConnect()/Disconnect() 강제종료 경로가 가드에 막혀 아예
-	// 통지되지 않는다(ProcessConnect()는 "성공"한 연결에서만 리셋하므로 실패로
-	// 끝난 이전 시도 뒤에는 이 리셋을 거치지 못함). ConnectOneMoreSession()이
-	// AddSession()을 이 함수 호출보다 먼저 수행하므로, 그 좁은 창에서 Close()가
-	// 끼어들면 여전히 스테일 가드를 볼 수 있는 잔여 레이스가 있으나(클라이언트
-	// 세션 객체가 실패 직후 재사용되는 경우에 한정), ProcessConnect() 리셋과
-	// 대칭을 맞추는 것으로 실질적인 케이스는 대부분 닫힌다.
-	_disconnectNotified.store(false, std::memory_order_seq_cst);
+	// 서비스에 등록된 뒤 이 함수가 호출되기 전에 Close()가 Disconnect()로 이 세션을 이미 종료·통지했다면
+	// (소켓은 닫혀 있다) 연결을 게시하지 않는다. 통지는 끝났으므로 호출부가 정리할 것은 없다.
+	if( _disconnectNotified.load(std::memory_order_seq_cst) )
+		return false;
 
 	if( _socket == INVALID_SOCKET )
 	{

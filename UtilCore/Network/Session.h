@@ -11,6 +11,8 @@
 #include <memory>
 #include <WinSock2.h>
 
+#include <Network/NetworkRedefineDataType.h>	// CSessionRef, uint16 등
+
 using SessionFactory = std::function<CSessionRef()>;
 using DisconnectHandler = std::function<void(CSessionRef)>;
 

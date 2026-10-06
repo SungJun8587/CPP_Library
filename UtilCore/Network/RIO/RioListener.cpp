@@ -7,6 +7,29 @@
 #include "pch.h"
 #include "RioListener.h"
 
+#include <algorithm>
+
+namespace
+{
+    //***************************************************************************
+    // @brief 연속 실패 횟수에 대한 재게시 지연(밀리초)을 반환합니다. base에서 시작해
+    //        두 배씩 늘어나며 max에서 멈춥니다.
+    //***************************************************************************
+    uint32 ComputeAcceptBackoffMs(uint32 retryCount) noexcept
+    {
+        const uint32 shift = (std::min)(retryCount > 0 ? retryCount - 1 : 0u, 7u);
+        return (std::min)(Rio::kAcceptRetryBaseDelayMs << shift, Rio::kAcceptRetryMaxDelayMs);
+    }
+
+    //***************************************************************************
+    // @brief 첫 실패와 이후 kAcceptRetryLogInterval회마다 true를 반환합니다.
+    //***************************************************************************
+    bool ShouldLogAcceptRetry(uint32 retryCount) noexcept
+    {
+        return retryCount == 1 || (retryCount % Rio::kAcceptRetryLogInterval) == 0;
+    }
+}
+
 //***************************************************************************
 // @brief CRioListener 생성자
 //***************************************************************************
@@ -45,6 +68,9 @@ bool CRioListener::StartAccept(CRioCoreRef rioCore, CNetAddress netAddr, RioSess
     if( acceptPoolSize == 0 ) acceptPoolSize = 1;
     if( acceptWorkerCount == 0 ) acceptWorkerCount = 1;
 
+    // 이전 Start/Stop 주기에서 남은 컨텍스트는 재시작 시 Pool 크기가 누적되지 않도록 비웁니다.
+    _acceptContexts.clear();
+
     _rioCore = std::move(rioCore);
     _sessionFactory = std::move(sessionFactory);
     _onAcceptCallback = std::move(onAccept);
@@ -60,7 +86,7 @@ bool CRioListener::StartAccept(CRioCoreRef rioCore, CNetAddress netAddr, RioSess
     }
 
     // 2. 소켓 옵션 설정 (주소 재사용 및 Linger 설정)
-    if( CSocketUtils::SetReuseAddress(listenSocket, true) == false ||
+    if( CSocketUtils::ApplyListenAddressMode(listenSocket, _addressMode) == false ||
         CSocketUtils::SetLinger(listenSocket, 0, 0) == false )
     {
         CSocketUtils::Close(listenSocket);
@@ -127,7 +153,12 @@ bool CRioListener::StartAccept(CRioCoreRef rioCore, CNetAddress netAddr, RioSess
             RioAcceptContext* rawContext = context.get();
             _acceptContexts.push_back(std::move(context));
 
-            PostAccept(rawContext);
+            if( !TryPostAccept(rawContext) )
+            {
+                LOG_ERROR(_T("[RioListener] Initial AcceptEx post failed! WSAError: %d"), ::WSAGetLastError());
+                Stop();
+                return false;
+            }
         }
     }
     catch( ... )
@@ -200,9 +231,19 @@ void CRioListener::Stop()
 
     for( auto& worker : _acceptWorkers )
     {
-        if( worker.joinable() && worker.get_id() != currentId )
+        if( !worker.joinable() )
+            continue;
+
+        if( worker.get_id() != currentId )
         {
             worker.join();
+        }
+        else
+        {
+            // joinable 상태의 std::thread를 파괴하면 std::terminate()가 호출되므로
+            // 자기 자신은 detach합니다. 이 워커는 ProcessAccept() 반환 직후
+            // _isListening을 확인하고 곧바로 종료합니다.
+            worker.detach();
         }
     }
     _acceptWorkers.clear();
@@ -228,76 +269,120 @@ void CRioListener::Stop()
 }
 
 //***************************************************************************
-// @brief 지정된 AcceptContext에 대해 신규 클라이언트 소켓을 만들고 AcceptEx를 게시합니다.
+// @brief 새 클라이언트 소켓을 만들어 AcceptEx를 한 번 게시합니다(재시도 없음).
 // @param context 게시할 AcceptContext
 // @return bool 게시(또는 즉시 성공) 성공 여부
 //***************************************************************************
-bool CRioListener::PostAccept(RioAcceptContext* context)
+bool CRioListener::TryPostAccept(RioAcceptContext* context)
 {
     if( context == nullptr )
         return false;
 
+    const SOCKET listenSocket = _listenSocket.load(std::memory_order_acquire);
+    if( listenSocket == INVALID_SOCKET )
+        return false;
+
+    // AcceptEx는 클라이언트 소켓이 미리 생성되어 있어야 하며, RIO 전용
+    // 플래그가 필수다(이후 RIOCreateRequestQueue의 대상이 되므로).
+    SOCKET clientSocket = CSocketUtils::CreateRioSocket();
+    if( clientSocket == INVALID_SOCKET )
+        return false;
+
+    context->Init();
+    context->acceptSocket = clientSocket;
+
+    DWORD bytesReceived = 0;
+
+    const BOOL result = CSocketUtils::AcceptEx(
+        listenSocket,
+        clientSocket,
+        context->acceptBuffer,
+        0, // 첫 데이터 수신 안 함 (0바이트)
+        RioAcceptContext::kAddrLen,
+        RioAcceptContext::kAddrLen,
+        &bytesReceived,
+        static_cast<LPOVERLAPPED>(context)
+    );
+
+    if( result == FALSE )
+    {
+        const int32 errorCode = ::WSAGetLastError();
+        if( errorCode != WSA_IO_PENDING )
+        {
+            context->acceptSocket = INVALID_SOCKET;
+            CSocketUtils::Close(clientSocket);
+            ::WSASetLastError(errorCode);
+            return false;
+        }
+    }
+
+    // WSA_IO_PENDING(정상 대기) 또는 즉시 성공 → 게시 완료(즉시 성공도 IOCP로 완료 통지가 온다)
+    return true;
+}
+
+//***************************************************************************
+// @brief AcceptEx 게시에 성공할 때까지 지수 백오프로 재시도합니다.
+// @param context 게시할 AcceptContext
+// @return bool 게시 성공 여부 (false는 리스너가 정지되었다는 뜻)
+//***************************************************************************
+bool CRioListener::PostAccept(RioAcceptContext* context)
+{
     for( ;; )
     {
         if( !_isListening.load(std::memory_order_acquire) )
             return false;
 
-        const SOCKET listenSocket = _listenSocket.load(std::memory_order_acquire);
-        if( listenSocket == INVALID_SOCKET )
+        if( TryPostAccept(context) )
+            return true;
+
+        if( !_isListening.load(std::memory_order_acquire) )
             return false;
 
-        // AcceptEx는 클라이언트 소켓이 미리 생성되어 있어야 하며, RIO 전용
-        // 플래그가 필수다(이후 RIOCreateRequestQueue의 대상이 되므로).
-        SOCKET clientSocket = CSocketUtils::CreateRioSocket();
-        if( clientSocket == INVALID_SOCKET )
+        ++context->retryCount;
+
+        if( ShouldLogAcceptRetry(context->retryCount) )
         {
-            if( ++context->retryCount > kMaxAcceptRetry )
-            {
-                // TODO: 로그 - 클라이언트 소켓 생성 반복 실패, 이 슬롯의 Accept 재등록 포기
-                return false;
-            }
-            // Accept 전용 워커 스레드이므로(RIO 데이터 경로와 분리됨) 짧은
-            // 블로킹은 처리량에 영향을 주지 않는다.
-            ::Sleep(10);
-            continue;
+            LOG_WARNING(_T("[RioListener] AcceptEx post failed (consecutive failures: %u). WSAError: %d"), context->retryCount, ::WSAGetLastError());
         }
 
-        context->Init();
-        context->acceptSocket = clientSocket;
+        // 재시도 상한 없이 지연만 늘려 슬롯이 영구히 사라지지 않게 합니다.
+        SleepWhileListening(ComputeAcceptBackoffMs(context->retryCount));
+    }
+}
 
-        DWORD bytesReceived = 0;
+//***************************************************************************
+// @brief 실패 횟수를 올리고 백오프 대기 후 같은 컨텍스트로 재게시합니다.
+// @param context 재게시할 AcceptContext
+// @param reason 로그에 남길 실패 원인
+//***************************************************************************
+void CRioListener::RepostAfterFailure(RioAcceptContext* context, const TCHAR* reason)
+{
+    if( !_isListening.load(std::memory_order_acquire) )
+        return;
 
-        BOOL result = CSocketUtils::AcceptEx(
-            listenSocket,
-            clientSocket,
-            context->acceptBuffer,
-            0, // 첫 데이터 수신 안 함 (0바이트)
-            RioAcceptContext::kAddrLen,
-            RioAcceptContext::kAddrLen,
-            &bytesReceived,
-            static_cast<LPOVERLAPPED>(context)
-        );
+    ++context->retryCount;
 
-        if( result == FALSE )
-        {
-            const int32 errorCode = ::WSAGetLastError();
-            if( errorCode != WSA_IO_PENDING )
-            {
-                context->acceptSocket = INVALID_SOCKET;
-                CSocketUtils::Close(clientSocket);
+    if( ShouldLogAcceptRetry(context->retryCount) )
+    {
+        LOG_WARNING(_T("[RioListener] %s (consecutive failures: %u)"), reason, context->retryCount);
+    }
 
-                if( ++context->retryCount > kMaxAcceptRetry )
-                {
-                    // TODO: 로그 - AcceptEx 반복 실패, 이 슬롯의 Accept 재등록 포기
-                    return false;
-                }
-                ::Sleep(10);
-                continue;
-            }
-        }
+    SleepWhileListening(ComputeAcceptBackoffMs(context->retryCount));
 
-        // WSA_IO_PENDING(정상 대기) 또는 즉시 성공 → 게시 완료
-        return true;
+    PostAccept(context);
+}
+
+//***************************************************************************
+// @brief 리스닝 중인 동안에만 지정 시간을 대기합니다.
+// @param delayMs 대기 시간(밀리초)
+//***************************************************************************
+void CRioListener::SleepWhileListening(uint32 delayMs) const
+{
+    while( delayMs > 0 && _isListening.load(std::memory_order_acquire) )
+    {
+        const uint32 slice = (std::min)(delayMs, Rio::kAcceptRetrySleepSliceMs);
+        ::Sleep(slice);
+        delayMs -= slice;
     }
 }
 
@@ -362,13 +447,7 @@ void CRioListener::ProcessAccept(RioAcceptContext* context, bool succeeded)
         if( !_isListening.load(std::memory_order_acquire) )
             return; // Stop() 진행 중 — 이 슬롯은 더 이상 재게시하지 않는다.
 
-        if( ++context->retryCount > kMaxAcceptRetry )
-        {
-            // TODO: 로그 - AcceptEx 완료 실패 반복, 이 슬롯의 Accept 재등록 포기
-            return;
-        }
-
-        PostAccept(context);
+        RepostAfterFailure(context, _T("AcceptEx completed with failure"));
         return;
     }
 
@@ -387,13 +466,7 @@ void CRioListener::ProcessAccept(RioAcceptContext* context, bool succeeded)
     {
         LOG_ERROR(_T("[Error] SetUpdateAcceptContext failed! WSAError: %d"), ::WSAGetLastError());
         CSocketUtils::Close(clientSocket);
-
-        if( ++context->retryCount > kMaxAcceptRetry )
-        {
-            // TODO: 로그 - SetUpdateAcceptContext 반복 실패, 이 슬롯의 Accept 재등록 포기
-            return;
-        }
-        PostAccept(context);
+        RepostAfterFailure(context, _T("SetUpdateAcceptContext failed"));
         return;
     }
 
@@ -427,13 +500,7 @@ void CRioListener::ProcessAccept(RioAcceptContext* context, bool succeeded)
     {
         LOG_ERROR(_T("[Error] CreateRequestQueueForSocket failed! WSAError: %d"), ::WSAGetLastError());
         CSocketUtils::Close(clientSocket);
-
-        if( ++context->retryCount > kMaxAcceptRetry )
-        {
-            // TODO: 로그 - CreateRequestQueueForSocket 반복 실패, 이 슬롯의 Accept 재등록 포기
-            return;
-        }
-        PostAccept(context);
+        RepostAfterFailure(context, _T("CreateRequestQueueForSocket failed"));
         return;
     }
 
@@ -450,16 +517,14 @@ void CRioListener::ProcessAccept(RioAcceptContext* context, bool succeeded)
     {
         CSocketUtils::Close(clientSocket);
         // RQ는 clientSocket이 closesocket()되면서 커널이 함께 정리한다.
-        context->retryCount = 0; // 세션 팩토리 자체의 일시적 예외로 이 슬롯을 계속 소모하지 않도록 리셋
-        PostAccept(context);
+        RepostAfterFailure(context, _T("Session factory threw an exception"));
         return;
     }
 
     if( session == nullptr )
     {
         CSocketUtils::Close(clientSocket);
-        context->retryCount = 0;
-        PostAccept(context);
+        RepostAfterFailure(context, _T("Session factory returned null"));
         return;
     }
 
@@ -483,8 +548,8 @@ void CRioListener::ProcessAccept(RioAcceptContext* context, bool succeeded)
         CSocketUtils::Close(clientSocket);
     }
 
-    // 이번 연결은 (성공/실패와 무관하게 콜백까지) 완전히 처리되었으므로
-    // 누적 실패 카운트를 리셋하고, 같은 슬롯으로 다음 AcceptEx를 재게시한다.
+    // 이번 연결은 콜백까지 완전히 처리되었으므로 연속 실패 횟수를 리셋하고,
+    // 같은 슬롯으로 다음 AcceptEx를 재게시한다.
     context->retryCount = 0;
     PostAccept(context);
 }

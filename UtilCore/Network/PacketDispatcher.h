@@ -28,7 +28,7 @@ enum class EPacketDispatchResult
 {
 	Handled,		// 정상 처리됨
 	UnknownType,	// 등록되지 않은 패킷 타입
-	SizeViolation,	// header->size가 minSize보다 작거나, bufferSize를 넘어감(프로토콜 위반)
+	SizeViolation,	// header->size가 헤더/minSize보다 작거나, bufferSize를 넘어감(프로토콜 위반)
 };
 
 //***************************************************************************

@@ -12,6 +12,104 @@
 // 등을 이미 이 파일에서 쓰고 있으므로).
 #include <mstcpip.h>
 
+#include <algorithm>
+#include <cstring>
+#include <vector>
+
+namespace
+{
+	// 대형 명령을 한 번 인코딩할 때 쓰는 스레드 로컬 임시 버퍼가 이 크기를 넘게 커지면 사용 후 해제한다.
+	constexpr size_t kScratchRetainLimit = 1u << 20;
+
+	//***************************************************************************
+	// @brief RESP로 인코딩한 명령 하나를 송신 버퍼 하나 이상에 담습니다.
+	// @param vecArgs Redis 명령어 인자 목록
+	// @param nCmdSize CRedisCommandBuilder::CalcEncodedSize(vecArgs) 결과
+	// @param outBuffers 명령 전체를 순서대로 이어 붙인 송신 버퍼들
+	// @return 성공 여부 (송신 버퍼를 확보하지 못하면 false이고 outBuffers는 비워진다)
+	// @details SendBuffer 하나는 청크(Iocp::SEND_BUFFER_CHUNK_SIZE)를 넘을 수 없다.
+	//          명령이 그 이하이면 송신 버퍼에 바로 인코딩해 복사를 한 번 줄인다. 그보다 크면
+	//          연속 메모리에 한 번 인코딩한 뒤 청크 크기 단위로 나눠 여러 SendBuffer에 담고,
+	//          DoSend()가 Scatter-Gather로 한 번에 전송한다.
+	//***************************************************************************
+	bool BuildSendBuffers(const CVector<std::string>& vecArgs, uint32 nCmdSize, CVector<CSendBufferRef>& outBuffers)
+	{
+		outBuffers.clear();
+
+		if( nCmdSize <= Iocp::SEND_BUFFER_CHUNK_SIZE )
+		{
+			CSendBufferRef sendBuffer = CSendBufferManager::Open(nCmdSize);
+			if( sendBuffer == nullptr )
+				return false;
+
+			CRedisCommandBuilder::Encode(vecArgs, reinterpret_cast<char*>(sendBuffer->Buffer()));
+			sendBuffer->Close(nCmdSize);
+			outBuffers.push_back(std::move(sendBuffer));
+			return true;
+		}
+
+		thread_local std::vector<char> scratch;
+		scratch.resize(nCmdSize);
+		CRedisCommandBuilder::Encode(vecArgs, scratch.data());
+
+		bool success = true;
+		uint32 offset = 0;
+		while( offset < nCmdSize )
+		{
+			const uint32 pieceSize = (std::min)(nCmdSize - offset, Iocp::SEND_BUFFER_CHUNK_SIZE);
+
+			CSendBufferRef sendBuffer = CSendBufferManager::Open(pieceSize);
+			if( sendBuffer == nullptr )
+			{
+				success = false;
+				break;
+			}
+
+			std::memcpy(sendBuffer->Buffer(), scratch.data() + offset, pieceSize);
+			sendBuffer->Close(pieceSize);
+			outBuffers.push_back(std::move(sendBuffer));
+			offset += pieceSize;
+		}
+
+		if( scratch.capacity() > kScratchRetainLimit )
+			std::vector<char>().swap(scratch);
+
+		if( !success )
+			outBuffers.clear();
+
+		return success;
+	}
+
+	//***************************************************************************
+	// @brief 송신 버퍼들 중 이미 보낸 offset 바이트를 건너뛴 나머지를 WSABUF 배열로 만듭니다.
+	// @param buffers 명령 전체를 순서대로 이어 붙인 송신 버퍼들
+	// @param offset 이미 보낸 바이트 수
+	// @param outWsaBufs 결과 (offset 이후의 데이터를 가리키는 WSABUF들, 이전 내용은 지워진다)
+	//***************************************************************************
+	void BuildWsaBuffers(const CVector<CSendBufferRef>& buffers, uint32 offset, CVector<WSABUF>& outWsaBufs)
+	{
+		outWsaBufs.clear();
+		outWsaBufs.reserve(buffers.size());
+
+		uint32 skip = offset;
+		for( const CSendBufferRef& buffer : buffers )
+		{
+			const uint32 len = buffer->WriteSize();
+			if( skip >= len )
+			{
+				skip -= len;
+				continue;
+			}
+
+			WSABUF wsaBuf;
+			wsaBuf.buf = reinterpret_cast<char*>(buffer->Buffer()) + skip;
+			wsaBuf.len = len - skip;
+			skip = 0;
+			outWsaBufs.push_back(wsaBuf);
+		}
+	}
+}
+
 //***************************************************************************
 // Construction/Destruction
 //***************************************************************************
@@ -256,7 +354,7 @@ bool CRedisClient::Disconnect(ERedisDisconnectReason reason)
 		std::lock_guard<std::mutex> lock(_commandLock);
 		fnPendingCallback = std::move(_pendingCallback);
 		_pendingCallback = nullptr;
-		_pendingSendBuffer.reset();
+		_pendingSendBuffers.clear();
 		_sendOffset = 0;
 		_sendTotalSize = 0;
 	}
@@ -308,7 +406,7 @@ bool CRedisClient::SendCommand(const CVector<std::string>& vecArgs, RedisCallbac
 			// 정상적으로 CRedisConnectionPool을 거치면(커넥션을 대여한
 			// 뒤 응답을 받을 때까지 재대여 안 함) 절대 발생하지 않아야
 			// 하지만, 여기서 명시적으로 막아둬야 실수로 이 계약을 어기는
-			// 호출이 생겼을 때 기존 명령의 _pendingSendBuffer/_sendOffset
+			// 호출이 생겼을 때 기존 명령의 _pendingSendBuffers/_sendOffset
 			// 등을 조용히 덮어쓰는 대신 바로 드러난다.
 			LOG_ERROR(_T("CRedisClient::SendCommand: 이미 미완료 명령이 있는 상태에서 재호출됨 — 계약 위반"));
 			pszErrorMsg = "ERR command already in flight";
@@ -317,38 +415,45 @@ bool CRedisClient::SendCommand(const CVector<std::string>& vecArgs, RedisCallbac
 		{
 			// RESP 문자열을 std::string으로 조립한 뒤 송신 버퍼로 다시
 			// 복사하는 대신, 정확한 크기를 먼저 계산해 송신 버퍼에 바로
-			// 인코딩해 넣어 복사를 한 번 줄인다.
+			// 인코딩해 넣어 복사를 한 번 줄인다. 한 SendBuffer는 청크 크기
+			// (Iocp::SEND_BUFFER_CHUNK_SIZE)를 넘을 수 없으므로, 그보다 큰
+			// 명령은 BuildSendBuffers()가 여러 SendBuffer로 나눠 담는다.
 			uint32 nCmdSize = CRedisCommandBuilder::CalcEncodedSize(vecArgs);
-			CSendBufferRef sendBuffer = CSendBufferManager::Open(nCmdSize);
-			CRedisCommandBuilder::Encode(vecArgs, reinterpret_cast<char*>(sendBuffer->Buffer()));
-			sendBuffer->Close(nCmdSize);
+			CVector<CSendBufferRef> sendBuffers;
+			if( !BuildSendBuffers(vecArgs, nCmdSize, sendBuffers) )
+			{
+				// 송신 버퍼를 확보하지 못했다 — 콜백을 등록하지 않았으므로 락 밖에서 직접 에러로 호출한다.
+				pszErrorMsg = "ERR send buffer allocation failed";
+			}
+			else
+			{
+				_pendingCallback = fnCallback;
+				_pendingSendBuffers = std::move(sendBuffers);
+				_sendOffset = 0;
+				_sendTotalSize = nCmdSize;
 
-			_pendingCallback = fnCallback;
-			_pendingSendBuffer = sendBuffer;
-			_sendOffset = 0;
-			_sendTotalSize = nCmdSize;
+				if( DoSend() )
+					return true; // 정상 등록 완료 — 콜백은 응답 수신 또는 Disconnect() 경로에서 정확히 한 번 호출됨
 
-			if( DoSend() )
-				return true; // 정상 등록 완료 — 콜백은 응답 수신 또는 Disconnect() 경로에서 정확히 한 번 호출됨
+				// DoSend() 실패 — 방금 등록한 콜백을 이 락 안에서 직접
+				// 회수해 스스로 정리한다(아직 _commandLock 안이므로
+				// Disconnect()가 끼어들어 이 콜백을 가져갈 수 없다).
+				_pendingCallback = nullptr;
+				_pendingSendBuffers.clear();
+				_sendOffset = 0;
+				_sendTotalSize = 0;
 
-			// DoSend() 실패 — 방금 등록한 콜백을 이 락 안에서 직접
-			// 회수해 스스로 정리한다(아직 _commandLock 안이므로
-			// Disconnect()가 끼어들어 이 콜백을 가져갈 수 없다).
-			_pendingCallback = nullptr;
-			_pendingSendBuffer.reset();
-			_sendOffset = 0;
-			_sendTotalSize = 0;
+				// 소켓이 실제로 깨졌을 가능성이 높으니 직접 회수/정리한다.
+				// Disconnect()를 그대로 다시 호출하면 이미 쥐고 있는
+				// _commandLock을 그 함수가 또 잡으려다 데드락이 나므로,
+				// 필요한 부분(소켓 회수 + 파서 리셋)만 CleanupSocketAndParser()로
+				// 인라인 수행한다. 이미 다른 스레드가 먼저 끊었다면(hOldSocket
+				// 이 INVALID_SOCKET) 아무 것도 하지 않는다.
+				SOCKET hOldSocket = _socket.exchange(INVALID_SOCKET, std::memory_order_acq_rel);
+				CleanupSocketAndParser(hOldSocket);
 
-			// 소켓이 실제로 깨졌을 가능성이 높으니 직접 회수/정리한다.
-			// Disconnect()를 그대로 다시 호출하면 이미 쥐고 있는
-			// _commandLock을 그 함수가 또 잡으려다 데드락이 나므로,
-			// 필요한 부분(소켓 회수 + 파서 리셋)만 CleanupSocketAndParser()로
-			// 인라인 수행한다. 이미 다른 스레드가 먼저 끊었다면(hOldSocket
-			// 이 INVALID_SOCKET) 아무 것도 하지 않는다.
-			SOCKET hOldSocket = _socket.exchange(INVALID_SOCKET, std::memory_order_acq_rel);
-			CleanupSocketAndParser(hOldSocket);
-
-			pszErrorMsg = "ERR connection closed";
+				pszErrorMsg = "ERR connection closed";
+			}
 		}
 	}
 
@@ -364,35 +469,40 @@ bool CRedisClient::SendCommand(const CVector<std::string>& vecArgs, RedisCallbac
 }
 
 //***************************************************************************
-// @brief _pendingSendBuffer의 _sendOffset 위치부터 나머지를 WSASend로 등록함
+// @brief _pendingSendBuffers의 _sendOffset 위치부터 나머지를 WSASend(Scatter-Gather)로 등록함
 //***************************************************************************
 bool CRedisClient::DoSend()
 {
 	_sendEvent.Init();
 	_sendEvent.owner = shared_from_this();
 
-	// SendEvent 구조체의 sendBuffers CVector 적용
-	_sendEvent.sendBuffers.clear();
-	_sendEvent.sendBuffers.push_back(_pendingSendBuffer);
+	// WSASend가 pending인 동안 버퍼 수명을 보장하기 위해 사본을 이벤트에 보관한다 —
+	// 완료 통지 전에 Disconnect()가 _pendingSendBuffers를 회수해도 이 사본이 유지한다.
+	_sendEvent.sendBuffers = _pendingSendBuffers;
 
-	WSABUF wsaBuf;
-	wsaBuf.buf = reinterpret_cast<char*>(_pendingSendBuffer->Buffer()) + _sendOffset;
-	wsaBuf.len = _sendTotalSize - _sendOffset;
+	// 이미 보낸 _sendOffset 바이트를 건너뛴 나머지를 Scatter-Gather로 구성한다.
+	// WSABUF 배열은 이벤트가 보유하며 이 WSASend의 완료 통지 전에는 변경되지 않는다.
+	BuildWsaBuffers(_pendingSendBuffers, _sendOffset, _sendEvent.wsaBufs);
+	if( _sendEvent.wsaBufs.empty() )
+	{
+		// 보낼 데이터가 없다 — 호출 계약(_sendOffset < _sendTotalSize) 위반이므로 실패로 취급한다.
+		_sendEvent.owner = nullptr;
+		_sendEvent.Reset();
+		return false;
+	}
 
 	SOCKET hSocket = _socket.load(std::memory_order_acquire);
 	DWORD dwNumOfBytes = 0;
 
-	// [추가 — 버그 수정: 재연결 시 stale completion] RegisterRecv()와 동일한
-	// 이유로 게시 직전에 증가, 즉시 실패 시 롤백한다.
 	_pendingIoCount.fetch_add(1, std::memory_order_seq_cst);
 
-	if( ::WSASend(hSocket, &wsaBuf, 1, &dwNumOfBytes, 0, &_sendEvent, NULL) == SOCKET_ERROR )
+	if( ::WSASend(hSocket, _sendEvent.wsaBufs.data(), static_cast<DWORD>(_sendEvent.wsaBufs.size()), &dwNumOfBytes, 0, &_sendEvent, NULL) == SOCKET_ERROR )
 	{
 		if( ::WSAGetLastError() != WSA_IO_PENDING )
 		{
 			_pendingIoCount.fetch_sub(1, std::memory_order_seq_cst); // 게시 실패 롤백 — completion이 안 옴
 			_sendEvent.owner = nullptr;
-			_sendEvent.sendBuffers.clear();
+			_sendEvent.Reset();
 			return false;
 		}
 	}
@@ -467,13 +577,13 @@ bool CRedisClient::RegisterRecv()
 //          owner를 비워도 this가 무효화되지 않는다 -- 기존 SendEvent
 //          성공 경로가 이미 이 패턴을 쓰고 있었다.
 // @details [수정 -- 버그 수정: Send 경로 락 누락] 외부 리뷰로 발견된 문제 --
-//          RedisClient.h는 _commandLock이 _pendingSendBuffer/_sendOffset/
+//          RedisClient.h는 _commandLock이 _pendingSendBuffers/_sendOffset/
 //          _sendTotalSize를 보호한다고 명시하는데, 실제로는 이 함수의
 //          송신 완료 처리(부분 전송 이어 보내기 포함)가 그 필드들을 락
 //          없이 직접 건드리고 있었다 -- Disconnect()가 같은 필드들을
 //          _commandLock 안에서 리셋하는 것과 data race였다. 이제 송신
 //          완료 처리 전체를 _commandLock으로 감싼다. Disconnect()가 이미
-//          이 상태를 회수해간 경우(_pendingSendBuffer가 비어있음)는
+//          이 상태를 회수해간 경우(_pendingSendBuffers가 비어있음)는
 //          조용히 무시한다 -- 늦게 도착한 완료 통지가 이미 정리된 상태를
 //          다시 건드리지 않도록. DoSend() 실패 시에는 락을 놓은 뒤에
 //          Disconnect()를 호출한다(Disconnect()가 같은 _commandLock을
@@ -543,7 +653,7 @@ void CRedisClient::Dispatch(CIocpEvent* iocpEvent, int32 numOfBytes)
 		// 완료 통지가 도착하기 직전 다른 스레드가 먼저 끊은 경우) -- 더
 		// 이상 건드릴 상태가 없으므로 조용히 무시한다. 이 경우도 이번
 		// completion 자체는 확실히 끝난 것이므로 카운트는 감소시킨다.
-		if( !_pendingSendBuffer || _sendTotalSize == 0 )
+		if( _pendingSendBuffers.empty() || _sendTotalSize == 0 )
 		{
 			_pendingIoCount.fetch_sub(1, std::memory_order_seq_cst);
 			return;
@@ -556,7 +666,7 @@ void CRedisClient::Dispatch(CIocpEvent* iocpEvent, int32 numOfBytes)
 			// 부분 전송 -- WSASend 완료가 요청한 바이트를 전부 보냈다는
 			// 보장은 없으므로, 아직 안 보낸 나머지를 이어서 전송한다.
 			// DoSend()는 호출자가 _commandLock을 쥔 상태를 요구한다
-			// (_pendingSendBuffer/_sendOffset/_sendTotalSize/_sendEvent를
+			// (_pendingSendBuffers/_sendOffset/_sendTotalSize/_sendEvent를
 			// 직접 참조하므로) -- 지금 이 지점이 바로 그 조건을 만족한다.
 			// [순서 중요] 다음 WSASend(DoSend() 내부에서 먼저 +1)를 걸고
 			// 나서 이번 completion의 -1을 수행한다 -- 그래야 두 completion
@@ -570,8 +680,8 @@ void CRedisClient::Dispatch(CIocpEvent* iocpEvent, int32 numOfBytes)
 		else
 		{
 			_sendEvent.owner = nullptr;
-			_sendEvent.sendBuffers.clear();
-			_pendingSendBuffer.reset();
+			_sendEvent.Reset();
+			_pendingSendBuffers.clear();
 			_sendOffset = 0;
 			_sendTotalSize = 0;
 			_pendingIoCount.fetch_sub(1, std::memory_order_seq_cst);

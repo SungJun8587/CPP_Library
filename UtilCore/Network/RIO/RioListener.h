@@ -111,6 +111,9 @@ public:
     // @return bool 소켓 생성/바인드/리슨, Accept IOCP 생성, 워커 시작, 초기 Pool 게시까지
     //         전부 성공하면 true
     //***************************************************************************
+    // @brief Listen 소켓의 주소 바인딩 방식을 지정합니다 (기본값: ReuseAddress). StartAccept() 이전에 호출해야 합니다.
+    void SetAddressMode(ListenAddressMode mode) noexcept { _addressMode = mode; }
+
     bool StartAccept(CRioCoreRef rioCore, CNetAddress netAddr, RioSessionFactory sessionFactory, OnRioAcceptCallback onAccept = nullptr,
         uint32 acceptPoolSize = Rio::kDefaultAcceptPoolSize, uint32 acceptWorkerCount = Rio::kDefaultAcceptWorkerCount);
 
@@ -156,25 +159,41 @@ private:
         SOCKET acceptSocket{ INVALID_SOCKET };     // AcceptEx가 채울 클라이언트 소켓 (사전 생성)
         BYTE   acceptBuffer[kAddrLen * 2]{};       // GetAcceptExSockaddrs 파싱용 로컬/원격 주소 버퍼
 
-        // RegisterAccept/ProcessAccept 실패 경로가 공유하는 누적 연속 실패 횟수.
-        // kMaxAcceptRetry 초과 시 이 슬롯은 재게시를 포기한다(Pool 크기가
-        // 영구적으로 줄어들 수 있음 — 매우 드문 상황이며 로그로 남긴다).
-        int32  retryCount{ 0 };
+        // 이 슬롯의 연속 실패 횟수. 실패마다 증가해 재게시 지연(지수 백오프)을
+        // 정하고, 연결 하나를 정상 처리하면 0으로 되돌립니다.
+        uint32 retryCount{ 0 };
     };
-
-    static constexpr int32 kMaxAcceptRetry = 5;
 
     bool InitializeAcceptIocp(uint32 workerCount);
 
     //***************************************************************************
-    // @brief 지정된 AcceptContext에 대해 신규 클라이언트 소켓을 만들고 AcceptEx를
-    //        게시합니다. 즉시 실패 시 재시도 상한 내에서 짧게 대기 후 재시도합니다
-    //        (이 스레드는 RIO 데이터 경로와 완전히 분리된 Accept 전용 워커이므로,
-    //        여기서의 짧은 블로킹은 RIO 처리량에 영향을 주지 않는다).
-    // @return bool 게시(또는 즉시 성공) 성공 여부. false는 재시도 상한 초과로
-    //         이 슬롯의 outstanding AcceptEx가 더 이상 없다는 뜻이다.
+    // @brief 새 클라이언트 소켓을 만들어 AcceptEx를 한 번 게시합니다(재시도 없음).
+    //        실패하면 생성한 소켓을 닫고 false를 반환합니다.
+    // @return bool 게시(또는 즉시 성공) 성공 여부
+    //***************************************************************************
+    bool TryPostAccept(RioAcceptContext* context);
+
+    //***************************************************************************
+    // @brief AcceptEx 게시에 성공할 때까지 지수 백오프로 재시도합니다.
+    //        재시도 횟수는 제한하지 않아 슬롯이 영구히 사라지지 않으며,
+    //        리스너가 정지되면 false를 반환합니다. 이 스레드는 RIO 데이터
+    //        경로와 분리된 Accept 전용 워커이므로 대기가 RIO 처리량에는
+    //        영향을 주지 않습니다.
+    // @return bool 게시 성공 여부. false는 리스너가 정지되었다는 뜻입니다.
     //***************************************************************************
     bool PostAccept(RioAcceptContext* context);
+
+    //***************************************************************************
+    // @brief 실패 횟수를 올리고 백오프 대기 후 같은 컨텍스트로 재게시합니다.
+    // @param reason 로그에 남길 실패 원인
+    //***************************************************************************
+    void RepostAfterFailure(RioAcceptContext* context, const TCHAR* reason);
+
+    //***************************************************************************
+    // @brief 리스닝 중인 동안에만 지정 시간을 대기합니다(Stop() 응답성 유지를 위해
+    //        짧은 단위로 나눠 잠듭니다).
+    //***************************************************************************
+    void SleepWhileListening(uint32 delayMs) const;
 
     //***************************************************************************
     // @brief Accept 전용 IOCP를 소비하는 워커 루프.
@@ -198,6 +217,7 @@ private:
     RIO_RQ CreateRequestQueueForSocket(SOCKET clientSocket);
 
 private:
+    ListenAddressMode			_addressMode = ListenAddressMode::ReuseAddress; // 주소 바인딩 옵션 (StartAccept() 이전에 설정)
     std::atomic<SOCKET>     _listenSocket{ INVALID_SOCKET };    // 리스닝 소켓 핸들 (Accept Worker와 Stop() 호출 스레드가 동시 접근)
     CRioCoreRef              _rioCore = nullptr;                 // 연동할 RIO 코어 참조 (RIOCreateRequestQueue 호출용, completion 경로는 무관)
     RioSessionFactory        _sessionFactory = nullptr;          // 세션 생성 팩터리

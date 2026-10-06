@@ -23,7 +23,7 @@
 //        hardware_concurrency()/2로 자동 산정)
 //***************************************************************************
 CRioServerService::CRioServerService(CNetAddress address, CRioCoreRef rioCore, SessionFactory factory, int32 maxSessionCount, uint32 workerThreadCount)
-	: CNetService(NetServiceType::Server, address, factory, maxSessionCount), _rioCore(rioCore), _workerThreadCount(workerThreadCount)
+	: CNetService(NetServiceType::Server, address, std::move(factory), maxSessionCount), _rioCore(std::move(rioCore)), _workerThreadCount(workerThreadCount)
 {
 }
 
@@ -33,81 +33,28 @@ CRioServerService::CRioServerService(CNetAddress address, CRioCoreRef rioCore, S
 //       weak_ptr<CRioServerService>를 캡처합니다(순환 참조 방지).
 //       송신 버퍼는 이 서비스가 등록하지 않습니다 — 세션 자신의
 //       CRioSession::Init()이 자기 소유 CRingBuffer를 직접 RIORegisterBuffer()합니다.
-//       StartWorkers(0, ...)로 워커 개수는 CRioCore가 자동 산정합니다
-//       (hardware_concurrency()/2). 특정 개수를 강제하고 싶으면(예: 스트레스
-//       테스트) 0 대신 원하는 수를 직접 넘기면 됩니다.
+//       워커 개수 0은 CRioCore가 자동 산정합니다(hardware_concurrency()/2).
 //***************************************************************************
 bool CRioServerService::Start()
 {
 	if( CanStart() == false || _rioCore == nullptr )
 		return false;
 
-	// 1. 서버 전용 이벤트 풀 초기화
-	if( !_eventPool.Initialize(Rio::kServiceEventPoolCapacity) )
-	{
-		LOG_ERROR(_T("[Error] CRioEventPool Initialize failed!"));
-		return false;
-	}
-
-	// RIO 함수 테이블을 얻기 위한 용도의 소켓 생성 (실제 accept용 리슨 소켓은
-	// CRioListener가 내부에서 별도로 새로 만듭니다 — 이건 오직 WSAIoctl 조회용).
-	SOCKET listenSocket = CSocketUtils::CreateRioSocket();
-	if( listenSocket == INVALID_SOCKET )
+	// 1. 이벤트 풀 / RIO 코어 / 워커 스레드 그룹 / 글로벌 수신 버퍼 준비
+	if( !CRioServiceHelper::StartCore(*_rioCore, _eventPool, _globalRecvBuffer, Rio::kServerCqIdentifier, _workerThreadCount) )
 		return false;
 
-	ULONG maxCompletionResults = Rio::kServiceMaxCompletionResults;
-	ULONG_PTR cqIdentifier = Rio::kServerCqIdentifier;
-
-	// 2. 생성자에서 주입받은 _rioCore를 초기화
-	if( !_rioCore->Initialize(listenSocket, maxCompletionResults, cqIdentifier, &_eventPool) )
-	{
-		CSocketUtils::Close(listenSocket);
-		return false;
-	}
-
-	// 3. 멀티 워커 스레드 그룹 구동. 0을 넘기면 CRioCore가 hardware_concurrency()/2로
-	//    자동 산정합니다.
-	bool workerStarted = _rioCore->StartWorkers(_workerThreadCount, [this]() {
-		while( _rioCore->GetState() == Rio::State::Running )
-		{
-			_rioCore->DispatchBatch(Rio::DispatchMode::Wait);
-		}
-		});
-
-	if( !workerStarted )
-	{
-		LOG_ERROR(_T("[Error] CRioCore StartWorkers failed!"));
-		_rioCore->RequestStop();
-		_rioCore->Shutdown();
-		CSocketUtils::Close(listenSocket);
-		return false;
-	}
-
-	const RIO_EXTENSION_FUNCTION_TABLE& rioTable = _rioCore->GetRioTable();
-
-	// 4. 수신용 글로벌 CRioBuffer 초기화
-	_globalRecvBuffer = MakeShared<CRioBuffer>();
-	if( _globalRecvBuffer->Initialize(&rioTable, Rio::kServiceGlobalRecvSlotCount, Rio::kServiceGlobalRecvSlotSize) == false )
-	{
-		_rioCore->RequestStop();
-		_rioCore->Shutdown();
-		CSocketUtils::Close(listenSocket);
-		return false;
-	}
-
-	// 5. Listener 생성
-	// [주의] MakeShared(std::allocate_shared 기반)는 실패 시 예외를 던지지
-	// nullptr을 반환하지 않으므로, 아래 null 체크는 절대 참이 될 수 없는
-	// 죽은 코드였습니다(_globalRecvBuffer 쪽엔 애초에 이 체크가 없는 것과도
-	// 일관성이 안 맞았습니다). 제거했습니다 — 생성 실패는 예외로 전파됩니다.
+	// 2. Listener 생성. MakeShared는 실패 시 nullptr이 아니라 예외를 던진다.
 	_listener = MakeShared<CRioListener>();
-
-	CSocketUtils::Close(listenSocket);
 
 	std::weak_ptr<CRioServerService> weakService = std::static_pointer_cast<CRioServerService>(shared_from_this());
 
-	// 6. Listener 구동 시작 (Accept IOCP + AcceptContext Pool 기반 — CRioListener 참고)
-	bool result = _listener->StartAccept(
+	_listener->SetAddressMode(_listenAddressMode);
+
+	// 3. Listener 구동 시작 (Accept IOCP + AcceptContext Pool 기반 — CRioListener 참고)
+	//    acceptPoolSize/acceptWorkerCount는 기본값(Rio::kDefaultAcceptPoolSize/
+	//    kDefaultAcceptWorkerCount)을 쓴다. 대량 동시 접속 환경이라면 명시적으로 늘려 호출한다.
+	const bool result = _listener->StartAccept(
 		_rioCore,
 		_address,
 		//***********************************************************************
@@ -137,52 +84,44 @@ bool CRioServerService::Start()
 				return;
 			}
 
-			if( session )
-			{
-				CRioSessionRef rioSession = std::static_pointer_cast<CRioSession>(session);
-
-				uint64 sessionId = service->GetSessionManager().GenerateSessionId();
-				CRioCore* rioCore = service->GetRioCore().get();
-				CRioBuffer* globalRecvBuffer = service->GetGlobalRecvBuffer();
-
-				if( !rioSession->Init(sessionId, rioCore, globalRecvBuffer, clientSocket, requestQueue) )
-				{
-					LOG_ERROR(_T("[Error] CRioSession::Init failed (send buffer registration)!"));
-					CSocketUtils::Close(clientSocket);
-					return;
-				}
-
-				rioSession->SetNetAddress(netAddr);
-				service->AddSession(rioSession);
-				service->GetSessionManager().AddSession(sessionId, rioSession);
-
-				rioSession->PostInitialReceive();
-			}
-			else
+			if( session == nullptr )
 			{
 				LOG_ERROR(_T("[Error] Session is nullptr inside accept callback!"));
 				CSocketUtils::Close(clientSocket);
+				return;
 			}
+
+			const uint64 sessionId = service->GetSessionManager().GenerateSessionId();
+
+			if( !session->Init(sessionId, service->GetRioCore().get(), service->GetGlobalRecvBuffer(), clientSocket, requestQueue) )
+			{
+				LOG_ERROR(_T("[Error] CRioSession::Init failed (send buffer registration)!"));
+				CSocketUtils::Close(clientSocket);
+				return;
+			}
+
+			session->SetNetAddress(netAddr);
+
+			// 서비스가 종료 중이면 등록이 거부되고, 거부된 세션은 AddSession()이 이미 Disconnect했다.
+			if( !service->AddSession(session) )
+				return;
+
+			service->GetSessionManager().AddSession(sessionId, session);
+
+			session->PostInitialReceive();
 		}
-		// acceptPoolSize/acceptWorkerCount는 기본값(CRioListener::kDefaultAcceptPoolSize/
-		// kDefaultAcceptWorkerCount) 사용. 대량 동시 접속 환경이라면 이 두 값을
-		// 명시적으로 늘려 호출하는 것을 고려할 것.
 	);
 
 	if( !result )
 	{
 		_listener.reset();
-		_globalRecvBuffer.reset();
-		_rioCore->RequestStop();
-		_rioCore->Shutdown();
+		CRioServiceHelper::StopCore(_rioCore, _globalRecvBuffer, _eventPool);
 		return false;
 	}
 
-	// 7. 세션 reap 스레드 시작 — Running 중 자연 종료된 세션의 _sessionManager
-	//    엔트리를 kSessionReapInterval마다 정리한다(예전에는 Close() 시점에만
-	//    정리돼 서버가 오래 떠 있을수록 map이 무한정 커질 수 있었음).
-	//    Listener/워커가 이미 정상 구동 중인 이 시점 이후에 시작해야, reap
-	//    스레드가 도는 동안 세션이 실제로 늘어나는 정상 상태와 겹쳐도 안전하다.
+	// 4. 세션 reap 스레드 시작 — Running 중 자연 종료된 세션의 _sessionManager 엔트리를
+	//    Rio::kSessionReapInterval마다 정리한다. Listener/워커가 정상 구동 중인 이 시점
+	//    이후에 시작해야, 세션이 실제로 늘어나는 정상 상태와 겹쳐도 안전하다.
 	_sessionReapThread = std::thread([this]() { _sessionReapQueue.ProcessExpiredTasks(); });
 	ScheduleSessionReap();
 
@@ -194,7 +133,7 @@ bool CRioServerService::Start()
 //***************************************************************************
 void CRioServerService::ScheduleSessionReap()
 {
-	_sessionReapQueue.Reserve(kSessionReapInterval, [this]()
+	_sessionReapQueue.Reserve(Rio::kSessionReapInterval, [this]()
 		{
 			_sessionManager.RemoveClosedSessions();
 			ScheduleSessionReap(); // 다음 tick 재예약. Close() 이후엔 Reserve()가 false를 반환하며 조용히 멈춤.
@@ -203,24 +142,19 @@ void CRioServerService::ScheduleSessionReap()
 
 //***************************************************************************
 // @brief 서버 종료 처리
-// @note [수정] 순서를 "세션 종료 -> Listener 정지"에서 "Listener 정지 -> 세션
-//       종료"로 바꿨다. Listener를 먼저 멈춰 신규 연결(및 그로부터 생성될
-//       새 세션)을 차단한 뒤에 기존 세션들을 정리해야, 세션 종료 도중에도
-//       계속 새 세션이 들어와 BeginCloseAllSessions()의 스냅샷에서 누락되는
-//       상황을 원천적으로 막을 수 있다(CRioListener 재설계 문서의 11번 항목
-//       권장 순서를 반영).
-// @note [수정] _rioCore->Shutdown()이 outstanding I/O를 전부 drain하고
-//       반환한다는 계약을 만족한 뒤에는(그 시점에 _eventPool._inUseCount==0)
-//       _eventPool도 명시적으로 Release()합니다. 클래스 상단 doc 주석은
-//       원래부터 "버퍼/이벤트풀 해제"를 함께 명시했는데 실제 코드는 버퍼만
-//       처리하고 있었습니다(문서-코드 불일치) — 이제 일치시켰습니다.
+// @details Listener를 먼저 멈춰 신규 연결(및 그로부터 생성될 새 세션)을 차단한 뒤에
+//          기존 세션을 정리해야, 세션 종료 도중 들어온 세션이 BeginCloseAllSessions()
+//          스냅샷에서 빠지는 일이 없다. 세션은 CNetService::_sessions에도 등록되어
+//          있으므로(Start()의 accept 콜백), 모든 세션의 OnDisconnected() 이후
+//          ReleaseSession()까지 끝나 _sessions가 빌 때까지 기다린다.
+//          그 뒤 _rioCore->Shutdown()이 outstanding I/O drain을 보장하고 나면
+//          수신 버퍼와 이벤트 풀도 해제한다.
 //***************************************************************************
 void CRioServerService::Close()
 {
-	// 0. reap 스레드부터 정지 — 아래에서 _sessionManager를 직접 조작하는(
-	//    BeginCloseAllSessions/RemoveClosedSessions) 동안 reap 스레드가 동시에
-	//    같은 맵을 건드리지 않도록 가장 먼저 멈춘다. Stop()은 신호만 보내고
-	//    반환하므로 반드시 join까지 해야 한다(CDelayedTaskQueue의 Lifetime 계약).
+	// 0. reap 스레드부터 정지 — 아래에서 _sessionManager를 직접 조작하는 동안 같은 맵을
+	//    동시에 건드리지 않도록 가장 먼저 멈춘다. Stop()은 신호만 보내고 반환하므로
+	//    반드시 join까지 해야 한다(CDelayedTaskQueue의 Lifetime 계약).
 	_sessionReapQueue.Stop();
 	if( _sessionReapThread.joinable() )
 		_sessionReapThread.join();
@@ -233,23 +167,15 @@ void CRioServerService::Close()
 
 	_sessionManager.BeginCloseAllSessions();
 
-	// _sessionManager의 세션들이 실제로 다 닫힐 때까지 대기 (CNetService::Close()는
-	// 여기서 도움이 안 됨 — _sessionManager와는 별개의, 서버 경로에서 안 쓰이는
-	// 컨테이너를 대상으로 동작하기 때문)
-	while( !_sessionManager.AreAllSessionsClosed() )
+	if( !WaitForSessionsEmpty(Rio::kDefaultDrainTimeout) )
 	{
-		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+		LOG_ERROR(_T("[CRioServerService] Close timeout: %d session(s) remaining"), GetCurrentSessionCount());
 	}
 	_sessionManager.RemoveClosedSessions();
 
-	if( _rioCore )
-	{
-		_rioCore->RequestStop();
-		_rioCore->Shutdown(); // outstanding I/O drain 완료 보장 -> 이 시점 이후 _eventPool은 전부 InUse==0
-	}
-	_globalRecvBuffer.reset();
-	_eventPool.Release();
-	CNetService::Close(); // _sessionManager 대기와 무관 — 순서 상관없이 맨 뒤에 둬도 무해
+	CRioServiceHelper::StopCore(_rioCore, _globalRecvBuffer, _eventPool);
+
+	CNetService::Close();
 }
 
 
@@ -267,28 +193,24 @@ void CRioServerService::Close()
 // @param workerThreadCount RIO 완료 처리용 워커 스레드 개수 (기본값 0 = 자동 산정)
 //***************************************************************************
 CRioClientService::CRioClientService(CNetAddress address, CRioCoreRef rioCore, SessionFactory factory, int32 maxSessionCount, uint32 workerThreadCount)
-	: CNetService(NetServiceType::Client, address, factory, maxSessionCount), _rioCore(rioCore), _workerThreadCount(workerThreadCount)
+	: CNetService(NetServiceType::Client, address, std::move(factory), maxSessionCount), _rioCore(std::move(rioCore)), _workerThreadCount(workerThreadCount)
 {
+	_remoteAddress.Set(address);
 }
 
 //***************************************************************************
 // @brief 이미 구동 중인 서비스에 세션 하나를 추가로 연결 "게시"합니다.
-// @details 세션 생성 → 서비스/세션매니저 즉시 등록 → CRioSession::ConnectAsync()로
-//          ConnectEx 비동기 게시. RIOCreateRequestQueue/Init()/PostInitialReceive()는
-//          더 이상 여기서 하지 않고 CRioSession::ProcessConnectEx()가 연결 완료
-//          통지(_connectDispatcher 워커 스레드)를 받은 뒤 이어서 수행합니다.
+// @details 세션 생성 → 서비스 등록 → CRioSession::ConnectAsync()로 ConnectEx 비동기
+//          게시 순서로 진행합니다. RIOCreateRequestQueue/Init()/PostInitialReceive()는
+//          연결 완료 통지(_connectDispatcher 워커 스레드)를 받은 CRioSession::
+//          ProcessConnectEx()가 이어서 수행합니다. 반환값의 의미는 헤더의
+//          ConnectOneMoreSession() 주석을 참고하세요.
 //
-//          [비동기 전환] 과거 버전은 CSocketUtils::Connect()(완전 블로킹)를 사용해
-//          이 함수가 "연결까지 끝난 세션"을 그 자리에서 반환했습니다. 이는 세션
-//          N개를 완전 직렬로, RTT만큼씩 순서대로 연결하는 성능 특성을 가졌습니다.
-//          지금은 CRioSession::ConnectAsync()가 ConnectEx 기반 진짜 비동기라 그
-//          문제가 사라졌습니다 — 대신 이 함수의 반환값 의미가 바뀌었습니다(헤더의
-//          ConnectOneMoreSession() 주석 참고).
-//
-//          CreateSession() 실패 시 로컬 shared_ptr(session/rioSession)이 스코프를
-//          벗어나며 소멸자가 소켓을 정리하므로 별도 정리가 필요 없습니다.
-//          ConnectAsync() 자신의 모든 실패 경로는 내부에서 FailConnect()를 호출해
-//          정리 및 OnDisconnected(reason) 통지까지 완료합니다.
+//          서비스가 종료 중이라 AddSession()이 거부하면 연결을 게시하지 않고 nullptr을
+//          반환합니다. 이 세션은 아직 Active가 된 적이 없어 별도 정리할 자원이 없고,
+//          로컬 shared_ptr이 스코프를 벗어나며 소멸자가 정리합니다.
+//          ConnectAsync()의 모든 실패 경로는 내부에서 FailConnect()를 호출해 정리 및
+//          OnDisconnected(reason) 통지까지 완료합니다.
 // @return CRioSessionRef 세션 생성 + 서비스 등록 + ConnectEx 게시까지 성공하면
 //         세션 참조(연결 완료 보장 아님), 그 전 단계 실패 시 nullptr.
 //***************************************************************************
@@ -305,20 +227,22 @@ CRioSessionRef CRioClientService::ConnectOneMoreSession()
 	if( rioSession == nullptr )
 		return nullptr;
 
-	rioSession->SetNetAddress(_address);
+	// 접속 대상은 SetRemoteAddress()로 바뀔 수 있으므로 한 번 읽어 이 연결 전체에 같은 주소를 쓴다.
+	const CNetAddress remote = GetRemoteAddress();
+	rioSession->SetNetAddress(remote);
 
 	// 연결 완료를 기다리지 않고 즉시 추적 목록에 등록합니다. 연결이 실패하면
 	// CRioSession::FailConnect()가 호출하는 CSession::OnDisconnected()가
-	// DisconnectHandler(ReleaseSession 콜백)를 통해 자동으로 제거하므로,
-	// "연결 시도 중" 세션이 목록에 남는 leak은 없습니다.
-	AddSession(rioSession);
+	// DisconnectHandler(ReleaseSession 콜백)를 통해 자동으로 제거하므로
+	// "연결 시도 중" 세션이 목록에 남지 않습니다.
+	if( !AddSession(rioSession) )
+		return nullptr;
 
-	uint64 sessionId = GenerateSessionId();
+	const uint64 sessionId = GenerateSessionId();
 
-	// ConnectAsync()의 반환값은 "게시 시도" 성공 여부일 뿐입니다 — false든 true든
-	// 최종 연결 결과는 세션의 OnConnected()/OnDisconnected(reason)으로 비동기
-	// 통지됩니다. 여기서는 게시 자체의 성공 여부만 보고합니다.
-	if( !rioSession->ConnectAsync(_connectDispatcher, sessionId, _rioCore.get(), _globalRecvBuffer.get(), _address) )
+	// ConnectAsync()의 반환값은 "게시 시도" 성공 여부일 뿐입니다 — 최종 연결 결과는
+	// 세션의 OnConnected()/OnDisconnected(reason)으로 비동기 통지됩니다.
+	if( !rioSession->ConnectAsync(_connectDispatcher, sessionId, _rioCore.get(), _globalRecvBuffer.get(), remote) )
 		return nullptr;
 
 	return rioSession;
@@ -328,87 +252,35 @@ CRioSessionRef CRioClientService::ConnectOneMoreSession()
 // @brief 클라이언트 구동, 이벤트 풀/코어/워커/수신 버퍼/ConnectEx 디스패처 초기화
 //        및 세션 연결 게시
 // @return bool 성공 여부. [중요] true를 반환해도 각 세션의 실제 TCP 연결이
-//         완료됐다는 뜻이 아닙니다 — Start()의 doc 주석 참고.
+//         완료됐다는 뜻이 아닙니다 — 헤더의 Start() 주석 참고.
 // @details
-// - 1. 클라이언트 전용 이벤트 풀을 초기화합니다.
-// - 2. RIO 함수 테이블 조회용 더미 소켓으로 _rioCore를 초기화합니다.
-// - 3. 멀티 워커 스레드 그룹을 구동합니다(세션 등록 전에 코어가 Running 상태여야
-//      PostInitialReceive()가 정상 동작합니다).
-// - 4. 글로벌 수신 버퍼를 초기화합니다.
-// - 5. ConnectEx 완료 통지 전용 디스패처(_connectDispatcher)를 시작합니다
-//      (CRioCore와 완전히 분리된 자기 소유 IOCP + 워커 스레드 1개 — 진단 이력 참고).
-// - 6. _maxSessionCount 개수만큼 ConnectOneMoreSession()을 호출해 세션을 생성하고
-//      ConnectEx 비동기 연결을 게시합니다. 세션 하나라도 "게시 시도" 자체가
-//      실패하면(세션 생성 실패 등) 즉시 Close()로 전체를 정리하고 false를
-//      반환합니다. 개별 연결 실패에 대한 배치 롤백은 더 이상 이 함수의 책임이
-//      아닙니다(각 세션이 비동기로 스스로 정리됨 — IOCP Start()와 동일한 설계).
+// - 1. 이벤트 풀/RIO 코어/워커/글로벌 수신 버퍼를 준비합니다(CRioServiceHelper).
+//      세션 등록 전에 코어가 Running 상태여야 PostInitialReceive()가 정상 동작합니다.
+// - 2. ConnectEx 완료 통지 전용 디스패처(_connectDispatcher)를 시작합니다
+//      (CRioCore와 완전히 분리된 자기 소유 IOCP + 워커 스레드 1개).
+// - 3. _maxSessionCount 개수만큼 ConnectOneMoreSession()을 호출해 세션을 생성하고
+//      ConnectEx 비동기 연결을 게시합니다. 게시 시도 자체가 하나라도 실패하면
+//      Close()로 전체를 정리하고 false를 반환합니다. 개별 연결 실패는 각 세션이
+//      비동기로 스스로 정리합니다(IOCP Start()와 동일한 설계).
 //***************************************************************************
 bool CRioClientService::Start()
 {
 	if( CanStart() == false || _rioCore == nullptr )
 		return false;
 
-	// 1. 클라이언트 전용 이벤트 풀 초기화
-	if( !_eventPool.Initialize(Rio::kServiceEventPoolCapacity) )
-	{
-		LOG_ERROR(_T("[Error] Client CRioEventPool Initialize failed!"));
-		return false;
-	}
-
-	SOCKET dummySocket = CSocketUtils::CreateRioSocket();
-	if( dummySocket == INVALID_SOCKET )
+	// 1. 이벤트 풀 / RIO 코어 / 워커 스레드 그룹 / 글로벌 수신 버퍼 준비
+	if( !CRioServiceHelper::StartCore(*_rioCore, _eventPool, _globalRecvBuffer, Rio::kClientCqIdentifier, _workerThreadCount) )
 		return false;
 
-	ULONG maxCompletionResults = Rio::kServiceMaxCompletionResults;
-	ULONG_PTR cqIdentifier = Rio::kClientCqIdentifier;
-
-	// 2. 생성자에서 주입받은 _rioCore를 초기화
-	if( !_rioCore->Initialize(dummySocket, maxCompletionResults, cqIdentifier, &_eventPool) )
-	{
-		CSocketUtils::Close(dummySocket);
-		return false;
-	}
-
-	CSocketUtils::Close(dummySocket);
-
-	// 3. 멀티 워커 스레드 그룹 구동. 세션과 수신 대기를 등록하기 전에 코어를
-	//    Running 상태로 만들어야 PostInitialReceive()가 정상 동작합니다.
-	bool workerStarted = _rioCore->StartWorkers(_workerThreadCount, [this]() {
-		while( _rioCore->GetState() == Rio::State::Running )
-		{
-			_rioCore->DispatchBatch(Rio::DispatchMode::Wait);
-		}
-		});
-
-	if( !workerStarted )
-	{
-		LOG_ERROR(_T("[Error] Client CRioCore StartWorkers failed!"));
-		_rioCore->RequestStop();
-		_rioCore->Shutdown();
-		return false;
-	}
-
-	const RIO_EXTENSION_FUNCTION_TABLE& rioTable = _rioCore->GetRioTable();
-
-	// 4. 글로벌 수신 버퍼 초기화
-	_globalRecvBuffer = MakeShared<CRioBuffer>();
-	if( _globalRecvBuffer->Initialize(&rioTable, Rio::kServiceGlobalRecvSlotCount, Rio::kServiceGlobalRecvSlotSize) == false )
-	{
-		_rioCore->RequestStop();
-		_rioCore->Shutdown();
-		return false;
-	}
-
-	// 5. ConnectEx 완료 통지 전용 디스패처 시작 (CRioCore와 무관한 별도 IOCP)
+	// 2. ConnectEx 완료 통지 전용 디스패처 시작 (CRioCore와 무관한 별도 IOCP)
 	if( !_connectDispatcher.Start() )
 	{
 		LOG_ERROR(_T("[Error] CRioConnectDispatcher Start failed!"));
-		_rioCore->RequestStop();
-		_rioCore->Shutdown();
+		CRioServiceHelper::StopCore(_rioCore, _globalRecvBuffer, _eventPool);
 		return false;
 	}
 
-	// 6. 세션 연결 게시 (실제 절차는 ConnectOneMoreSession()에 위임)
+	// 3. 세션 연결 게시 (실제 절차는 ConnectOneMoreSession()에 위임)
 	for( int32 i = 0; i < _maxSessionCount; i++ )
 	{
 		if( ConnectOneMoreSession() == nullptr )
@@ -424,45 +296,19 @@ bool CRioClientService::Start()
 
 //***************************************************************************
 // @brief 클라이언트 서비스 종료 처리
-// @note [수정] _connectDispatcher/_rioCore 정지 이후 _eventPool도 명시적으로
-//       Release()합니다(CRioServerService::Close()와 동일한 사유 — 클래스
-//       doc 주석과 실제 코드가 그동안 어긋나 있었습니다).
+// @details 먼저 CNetService::Close()로 모든 세션을 종료하고 _sessions가 빌 때까지
+//          기다립니다. 이 시점에는 _rioCore/_connectDispatcher가 아직 살아 있어
+//          disconnect 완료 통지와 진행 중이던 ConnectEx 완료 통지를 계속 처리할 수
+//          있습니다(연결 진행 중인 세션은 CRioSession::Close()가 ConnectEx를 취소해
+//          완료 통지가 오게 합니다). 이를 먼저 멈추면 세션 정리가 끝나지 않습니다.
+//          그다음 디스패처(자체 IOCP라 _rioCore와 정지 순서 의존성 없음), RIO 코어,
+//          수신 버퍼와 이벤트 풀 순으로 정지/해제합니다.
 //***************************************************************************
 void CRioClientService::Close()
 {
-	// 0. reap 스레드부터 정지 (서버 쪽과 동일한 이유 — CRioServerService::Close() 참고)
-	// 1. 세션 정리를 게시하고, 실제로 세션이 0개가 될 때까지 블로킹 대기한다.
-	//    이 시점엔 아직 _rioCore/_connectDispatcher가 살아있어서 disconnect
-	//    완료 통지(및 진행 중이던 ConnectEx 완료 통지)를 계속 처리해줄 수
-	//    있다 — 그래서 여기서 먼저 기다려야 한다. 2번(디스패처/코어 정지)을
-	//    먼저 해버리면, 게시된 세션 정리들이 완료 통지를 처리해줄 워커가
-	//    없어져서 영원히 안 끝나는 문제가 생긴다(CIocpClientService::Close()와
-	//    동일한 이유 — RIO 클라이언트도 IOCP 클라이언트와 마찬가지로
-	//    세션 매니저 없이 CNetService::_sessions만 쓰므로 같은 패턴이 그대로
-	//    적용됨).
-	CNetService::Close(); // 세션이 실제로 0개 될 때까지 블로킹 대기(_connectDispatcher/_rioCore를 멈추기 전에 _sessions가 실제로 비워질 때까지 기다려야 함)
+	CNetService::Close();
 
-	// 2. 세션 정리가 다 끝났으니, ConnectEx 게시/완료 통지 처리를 담당하던
-	//    디스패처부터 정지한다.
-	// 2-1. _connectDispatcher는 _rioCore와 완전히 독립된 리소스(자체 IOCP)라
-	//      _rioCore보다 먼저 멈춰도 서로의 정지 순서에 의존성이 없어 안전하다.
 	_connectDispatcher.Shutdown();
 
-	// 3. 이어서 RIO 코어(데이터 송수신 완료 통지 처리 워커)를 정지한다.
-	if( _rioCore )
-	{
-		// 3-1. 신규 등록/게시를 더 이상 받지 않도록 먼저 정지 요청.
-		_rioCore->RequestStop();
-		// 3-2. 실제 리소스(워커 스레드 등) 해제까지 확실하게 완료.
-		_rioCore->Shutdown(); // outstanding I/O drain 완료 보장 -> 이 시점 이후 _eventPool은 전부 InUse==0
-	}
-
-	// 4. 전역 수신 버퍼를 해제한다 (위 1~3번으로 모든 세션/워커가 정리된
-	//    뒤라 더 이상 이 버퍼를 참조하는 진행 중인 I/O가 없음이 보장된 상태).
-	_globalRecvBuffer.reset();
-
-	// 5. 이벤트 풀도 명시적으로 해제한다. _rioCore->Shutdown()이 위에서 이미
-	//    outstanding I/O를 전부 drain했으므로 이 시점엔 _eventPool의 모든
-	//    이벤트가 InUse==0 상태임이 보장된다.
-	_eventPool.Release();
+	CRioServiceHelper::StopCore(_rioCore, _globalRecvBuffer, _eventPool);
 }

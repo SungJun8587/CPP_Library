@@ -12,10 +12,14 @@
 #include <Network/RIO/RioListener.h>
 #include <Network/RIO/RioConnectDispatcher.h>
 #include <Network/RIO/RioSessionManager.h>
+#include <Network/RIO/RioServiceHelper.h>
 #include <Containers/Queue/DelayedTaskQueue.h>
+#include <Thread/SyncValue.h>
 
 #include <thread>
 #include <atomic>
+#include <mutex>
+#include <utility>
 
 class CRioBuffer;
 
@@ -36,14 +40,13 @@ class CRioBuffer;
 //      자기 소유의 송신 링버퍼(CRingBuffer)를 갖고 있고, 그 실제 메모리를
 //      CRioSession::Init() 내부에서 스스로 RIORegisterBuffer()로 등록합니다.
 //
-//      [종료 순서]
-//      Close()는 세션 종료 통지 → Listener 정지 → _rioCore의 정식
-//      RequestStop()+Shutdown()(outstanding I/O drain) → 버퍼/이벤트풀 해제
-//      순서를 명시적으로 강제합니다. 멤버 소멸자 순서에 맡기지 않는 이유는,
-//      멤버 선언 순서(역순 소멸)상 _globalRecvBuffer/_eventPool이 _rioCore보다
-//      먼저 파괴되어 아직 drain되지 않은 outstanding I/O가 있는 상태로
-//      CRioBuffer::~CRioBuffer()/CRioEventPool 소멸자가 호출될 수 있기
-//      때문입니다(둘 다 outstanding 자원이 남아있으면 assert+terminate).
+//      [시작/종료 순서]
+//      Start()의 이벤트 풀/코어/워커/수신 버퍼 준비와 Close()의 코어 정지/버퍼·이벤트풀
+//      해제는 CRioServiceHelper가 서버/클라이언트 공통으로 수행합니다(자세한 이유는
+//      RioServiceHelper.h 참고).
+//      Close()는 reap 스레드 정지 → Listener 정지(신규 연결 차단) → 모든 세션 종료
+//      통지 및 해제 대기 → _rioCore RequestStop()+Shutdown()(outstanding I/O drain)
+//      → 버퍼/이벤트풀 해제 → CNetService::Close() 순서를 명시적으로 강제합니다.
 //***************************************************************************
 class CRioServerService : public CNetService
 {
@@ -78,9 +81,9 @@ public:
 
 	//***************************************************************************
 	// @brief RIO 서버 서비스 종료
-	// @details 순서: 모든 세션에 종료 통지 → Listener 정지 → _rioCore
-	//          RequestStop()+Shutdown()(outstanding I/O drain 완료 보장) →
-	//          _globalRecvBuffer 해제 → 부모 CNetService::Close().
+	// @details 순서: reap 스레드 정지 → Listener 정지 → 모든 세션 종료 통지 및 해제 대기 →
+	//          _rioCore RequestStop()+Shutdown()(outstanding I/O drain 완료 보장) →
+	//          _globalRecvBuffer/_eventPool 해제 → 부모 CNetService::Close().
 	//***************************************************************************
 	virtual void	Close() override;
 
@@ -95,6 +98,11 @@ public:
 	// @return CRioCoreRef RIO Core 참조 객체
 	//***************************************************************************
 	CRioCoreRef		GetRioCore() const { return _rioCore; }
+
+	//***************************************************************************
+	// @brief Listen 소켓의 주소 바인딩 방식을 지정합니다 (기본값: ReuseAddress, 기존 동작). Start() 이전에만 유효합니다.
+	//***************************************************************************
+	void			SetListenAddressMode(ListenAddressMode mode) noexcept { if( _listener == nullptr ) _listenAddressMode = mode; }
 
 	//***************************************************************************
 	// @brief 소속된 RIO 세션 매니저 참조를 반환합니다.
@@ -114,17 +122,15 @@ private:
 	//***************************************************************************
 	void ScheduleSessionReap();
 
-	// Running 중 자연 종료된(원격 종료/에러 등) 세션의 _sessionManager 엔트리를
-	// 방치하면 서버가 오래 떠 있을수록 map이 무한정 커진다 — 예전에는
-	// RemoveClosedSessions()가 Close()(종료 시점)에서만 호출됐다. 이제
-	// ScheduleSessionReap()이 kSessionReapInterval마다 주기적으로 호출한다.
-	static constexpr std::chrono::seconds kSessionReapInterval{ 30 }; // 임의로 잡은 기본값 — 세션 처리량/서버 규모에 맞춰 조정 가능
+	// Running 중 자연 종료된(원격 종료/에러 등) 세션의 _sessionManager 엔트리는
+	// ScheduleSessionReap()이 Rio::kSessionReapInterval마다 RemoveClosedSessions()로 정리한다.
 	CDelayedTaskQueue	_sessionReapQueue;						// reap tick 예약 큐 (스스로 워커 스레드를 안 가짐)
 	std::thread			_sessionReapThread;						// _sessionReapQueue.ProcessExpiredTasks()를 실행하는 전용 스레드
 
 private:
 	CRioCoreRef			_rioCore = nullptr;					// 연동된 RIO 코어 참조 (생성자에서 주입받음)
 	CRioListenerRef		_listener = nullptr;				// RIO 접속 수락 리스너
+	ListenAddressMode		_listenAddressMode = ListenAddressMode::ReuseAddress;	// Listen 소켓 주소 바인딩 방식 (SetListenAddressMode() 참고)
 	CRioSessionManager	_sessionManager;					// 서버 서비스가 소유하는 RIO 세션 매니저
 	CRioEventPool		_eventPool;							// 이 서비스 소속 세션들이 공유하는 RIO 이벤트 풀
 	CRioBufferRef		_globalRecvBuffer;					// 클라이언트 비동기 수신(RIOReceive)용 글로벌 CRioBuffer 객체
@@ -176,10 +182,9 @@ public:
 
 	//***************************************************************************
 	// @brief RIO 클라이언트 서비스를 종료합니다.
-	// @details 순서: 모든 세션에 종료 통지 → _connectDispatcher 정지(진행 중이던
-	//          ConnectEx 게시들을 더 이상 처리하지 않음) → _rioCore RequestStop()+
-	//          Shutdown()(outstanding I/O drain 완료 보장) → _globalRecvBuffer
-	//          해제 → 부모 CNetService::Close().
+	// @details 순서: 모든 세션 종료 통지 및 해제 대기(CNetService::Close()) →
+	//          _connectDispatcher 정지 → _rioCore RequestStop()+Shutdown()
+	//          (outstanding I/O drain 완료 보장) → _globalRecvBuffer/_eventPool 해제.
 	//***************************************************************************
 	virtual void	Close() override;
 
@@ -216,36 +221,38 @@ public:
 	//          CNetService::ReleaseSession() 경로로 자동 제거되므로, 실패한 세션이
 	//          목록에 남는 leak은 없습니다.
 	//
-	//          _maxSessionCount 상한 체크는 호출자 책임입니다(이전 버전에 있던
-	//          "여러 건의 배치 롤백" 개념은 사라졌습니다 — 개별 세션 실패가 이제
-	//          비동기이고 자체적으로 정리되므로, Start() 루프도 더 이상 일괄
-	//          롤백을 수행하지 않습니다. IOCP Start()와 동일한 설계 변화).
+	//          _maxSessionCount 상한 체크는 호출자 책임입니다. 개별 세션 실패는 비동기로
+	//          각 세션이 스스로 정리하므로 Start() 루프도 일괄 롤백을 하지 않습니다
+	//          (IOCP Start()와 동일한 설계).
 	// @return CRioSessionRef 세션 생성 + 서비스 등록 + ConnectEx 게시 "시도" 자체가
-	//         전부 성공하면 세션 참조(연결 완료 보장 아님), 그 전 단계 실패 시 nullptr.
+	//         전부 성공하면 세션 참조(연결 완료 보장 아님), 그 전 단계 실패(서비스 종료 중이라
+	//         등록이 거부된 경우 포함) 시 nullptr.
 	//***************************************************************************
 	CRioSessionRef	ConnectOneMoreSession();
 
+	//***************************************************************************
+	// @brief 앞으로 만드는 연결이 접속할 원격 주소를 바꿉니다 (스레드 안전).
+	// @details CIocpClientService::SetRemoteAddress()와 같은 계약입니다. 이미 연결됐거나 연결 중인 세션은
+	//          영향받지 않고 이후의 ConnectOneMoreSession()부터 새 주소를 씁니다.
+	//***************************************************************************
+	void			SetRemoteAddress(const CNetAddress& address) { _remoteAddress.Set(address); }
+
+	CNetAddress		GetRemoteAddress() const { return _remoteAddress.Get(); }
+
 private:
 	//***************************************************************************
-	// @brief 새 세션에 부여할 고유 SessionId를 원자적으로 발급합니다.
-	// @details [수정 — CRioSessionManager 멤버 자체를 제거] 이전에는 이
-	//          클래스가 CRioSessionManager(클러스터 해시맵 전체)를 멤버로 갖고
-	//          있었는데, 실제로 쓰는 기능은 GenerateSessionId()/AddSession()
-	//          뿐이었다. SessionId로 세션을 조회하거나(FindSession) 전체에
-	//          브로드캐스트해야(Broadcast) 하는 건 "외부에서 특정 세션을 ID로
-	//          찾아야 하는" 서버 역할에 필요한 기능이지, 커넥션 풀처럼 스스로
-	//          연결을 만들고 관리하는 클라이언트 역할에는 필요 없다 —
-	//          CIocpClientService가 애초에 CIocpSessionManager를 아예 안 갖고
-	//          CNetService::_sessions만 쓰는 것과 동일한 이유. 무거운 클러스터
-	//          맵 전체 대신 원자적 카운터 하나로 충분하다(이 카운터 자체가
-	//          reap이 필요한 상태를 아예 안 만드므로, 이전에 추가했던 이
-	//          클래스의 세션 reap 스레드/큐도 함께 제거함).
+	// @brief 새 세션에 부여할 고유 SessionId를 원자적으로 발급합니다(1부터 발급).
+	// @details 클라이언트 서비스는 SessionId로 세션을 조회하거나 전체에 브로드캐스트할
+	//          일이 없고 필요한 것은 고유 ID뿐이라, CRioSessionManager(클러스터 해시맵)
+	//          대신 원자적 카운터 하나만 둡니다. 세션 추적은 CNetService::_sessions가
+	//          담당하므로 별도의 reap 스레드도 필요 없습니다(CIocpClientService와 동일).
 	//***************************************************************************
 	uint64 GenerateSessionId() noexcept { return _nextSessionId.fetch_add(1, std::memory_order_relaxed); }
 
 private:
 	CRioCoreRef				_rioCore = nullptr;						// 연동된 RIO 코어 참조 (생성자에서 주입받음)
-	std::atomic<uint64>		_nextSessionId{ 0 };					// GenerateSessionId() 전용 카운터 (CRioSessionManager 대체)
+	CSyncValue<CNetAddress>	_remoteAddress;							// 새 연결이 접속할 원격 주소 (SetRemoteAddress()는 다른 스레드에서 호출될 수 있음)
+	std::atomic<uint64>		_nextSessionId{ 1 };					// GenerateSessionId() 전용 카운터
 	CRioEventPool			_eventPool;								// 이 서비스 소속 세션들이 공유하는 RIO 이벤트 풀
 	CRioBufferRef			_globalRecvBuffer;						// 클라이언트 비동기 수신(RIOReceive)용 글로벌 CRioBuffer 객체
 	CRioConnectDispatcher	_connectDispatcher;						// ConnectEx 완료 통지 전용 디스패처 (CRioCore와 무관, 이 서비스가 소유)

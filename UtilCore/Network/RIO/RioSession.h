@@ -51,6 +51,8 @@ class CRioConnectDispatcher;
 //          DrainOverflowIntoSendBufferLocked()로 이어서 채워 넣습니다 — IOCP
 //          세션(CVector<CSendBufferRef> 큐, 오브젝트 풀 기반이라 사실상 무제한
 //          큐잉)과 "초과분은 메모리에 버퍼링" 동작을 일관되게 맞춘 것입니다.
+//          큐에 청크가 남아 있는 동안에는 새 Send()도 링버퍼에 바로 넣지 않고 큐 뒤에
+//          붙여, 송신 순서가 항상 호출 순서와 같게 유지합니다.
 //          진행 정지(deadlock) 걱정이 없는 이유: 청크 하나는 Send()의 uint16
 //          제약상 최대 65535바이트이고 _sendBuffer 용량은 정확히 65536바이트라,
 //          링버퍼가 완전히 비면 오버플로 큐의 다음 청크는 반드시 들어갈 수
@@ -309,6 +311,14 @@ private:
 	void CloseSocketInternal() noexcept;
 
 	//***************************************************************************
+	// @brief 아직 Active가 된 적 없는 세션(연결 진행 중 포함)에 대한 종료 요청을 처리합니다.
+	// @details _connectCanceled를 세우고, 진행 중인 ConnectEx가 있으면 CancelIoEx로
+	//          취소해 완료 통지(ProcessConnectEx)가 곧바로 오게 합니다. 세션 정리는
+	//          그 완료 통지 경로(FailConnect 또는 Init 직후의 Close)가 수행합니다.
+	//***************************************************************************
+	void CancelPendingConnect() noexcept;
+
+	//***************************************************************************
 	// @brief 이 세션 소유의 _sendBuffer 메모리를 RIORegisterBuffer()로 등록합니다.
 	// @details Init() 1회 호출에서만 실질적으로 등록이 일어납니다(세션은 재사용되지
 	//          않으므로 _sendBufferId가 이미 유효하면 그대로 true 반환).
@@ -397,6 +407,7 @@ private:
 	CRingBuffer _recvBuffer{ Rio::kRecvRingBufferSize };    // 64KB 수신 링버퍼
 
 	RioConnectEvent _connectEvent;                      // ConnectEx 요청 및 완료 처리를 위한 OVERLAPPED 이벤트 객체 (클라이언트 전용)
+	std::atomic<bool> _connectCanceled{ false };        // 연결 완료 전에 종료가 요청되었는지 여부 (클라이언트 전용)
 };
 
 #endif // ndef UC_RIOSESSION_H

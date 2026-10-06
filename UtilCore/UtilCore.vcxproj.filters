@@ -662,6 +662,27 @@
     <ClInclude Include="Image\Win32Draw.h">
       <Filter>Image</Filter>
     </ClInclude>
+    <ClInclude Include="Thread\SyncValue.h">
+      <Filter>Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\ScopeExit.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\IOCP\IocpWorkerPool.h">
+      <Filter>Network\IOCP</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\RIO\RioServiceHelper.h">
+      <Filter>Network\RIO</Filter>
+    </ClInclude>
+    <ClInclude Include="Image\GifCodec.h">
+      <Filter>Image</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\HTTP\HttpClientChannel.h">
+      <Filter>Network\HTTP</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\HTTP\HttpMessageParser.h">
+      <Filter>Network\HTTP</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">
@@ -989,6 +1010,15 @@
     </ClCompile>
     <ClCompile Include="ServiceConfig.cpp" />
     <ClCompile Include="Image\Win32Draw.cpp">
+      <Filter>Image</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\IOCP\IocpWorkerPool.cpp">
+      <Filter>Network\IOCP</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\RIO\RioServiceHelper.cpp">
+      <Filter>Network\RIO</Filter>
+    </ClCompile>
+    <ClCompile Include="Image\GifCodec.cpp">
       <Filter>Image</Filter>
     </ClCompile>
   </ItemGroup>

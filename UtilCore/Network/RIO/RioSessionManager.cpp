@@ -6,12 +6,14 @@
 
 #include "pch.h"
 #include "RioSessionManager.h"
+#include "RioSession.h"
+
+#include <utility>
 
 //***************************************************************************
 // @brief CRioSessionManager 생성자
 //***************************************************************************
 CRioSessionManager::CRioSessionManager()
-	: _nextSessionId(1)
 {
 }
 
@@ -68,8 +70,7 @@ CRioSessionRef CRioSessionManager::FindSession(uint64 sessionId) const
 	if( sessionId == 0 )
 		return nullptr;
 
-	auto& mutableSessions = const_cast<decltype(_sessions)&>(_sessions);
-	return mutableSessions.FindObject(sessionId);
+	return _sessions.FindObject(sessionId);
 }
 
 //***************************************************************************
@@ -78,8 +79,7 @@ CRioSessionRef CRioSessionManager::FindSession(uint64 sessionId) const
 //***************************************************************************
 size_t CRioSessionManager::GetSessionCount() const
 {
-	auto& mutableSessions = const_cast<decltype(_sessions)&>(_sessions);
-	return static_cast<size_t>(mutableSessions.getSize());
+	return static_cast<size_t>(_sessions.getSize());
 }
 
 //***************************************************************************
@@ -97,10 +97,9 @@ void CRioSessionManager::Broadcast(const void* data, uint16 size)
 	CVector<CRioSessionRef> sessionsToSend;
 
 	// 1. 모든 클러스터를 인덱스로 순회하며 활성 세션들의 스냅샷 수집
-	__int32 clusterCnt = _sessions.GetClusterCnt();
-	for( __int32 i = 0; i < clusterCnt; ++i )
+	for( int32 i = 0; i < _sessions.GetClusterCnt(); ++i )
 	{
-		_sessions.ReadLockByIdx(i, __FUNCTION__);
+		SessionMap::ReadLockGuardByIdx guard(_sessions, i, __FUNCTION__);
 
 		auto& map = _sessions.GetClusterMapByIdx(i);
 		for( const auto& pair : map )
@@ -110,8 +109,6 @@ void CRioSessionManager::Broadcast(const void* data, uint16 size)
 				sessionsToSend.push_back(pair.second);
 			}
 		}
-
-		_sessions.ReadUnlockByIdx(i, __FUNCTION__);
 	}
 
 	// 2. 락 외부에서 각 세션의 Send 호출 (세션 내부에서 큐잉 및 Flush 진행, 데드락 방지)
@@ -131,10 +128,9 @@ void CRioSessionManager::BeginCloseAllSessions()
 {
 	CVector<CRioSessionRef> sessionsToClose;
 
-	__int32 clusterCnt = _sessions.GetClusterCnt();
-	for( __int32 i = 0; i < clusterCnt; ++i )
+	for( int32 i = 0; i < _sessions.GetClusterCnt(); ++i )
 	{
-		_sessions.ReadLockByIdx(i, __FUNCTION__);
+		SessionMap::ReadLockGuardByIdx guard(_sessions, i, __FUNCTION__);
 
 		auto& map = _sessions.GetClusterMapByIdx(i);
 		for( const auto& pair : map )
@@ -144,8 +140,6 @@ void CRioSessionManager::BeginCloseAllSessions()
 				sessionsToClose.push_back(pair.second);
 			}
 		}
-
-		_sessions.ReadUnlockByIdx(i, __FUNCTION__);
 	}
 
 	for( const auto& session : sessionsToClose )
@@ -163,24 +157,16 @@ void CRioSessionManager::BeginCloseAllSessions()
 //***************************************************************************
 bool CRioSessionManager::AreAllSessionsClosed() const
 {
-	auto& mutableSessions = const_cast<decltype(_sessions)&>(_sessions);
-	__int32 clusterCnt = mutableSessions.GetClusterCnt();
-
-	for( __int32 i = 0; i < clusterCnt; ++i )
+	for( int32 i = 0; i < _sessions.GetClusterCnt(); ++i )
 	{
-		mutableSessions.ReadLockByIdx(i, __FUNCTION__);
+		SessionMap::ReadLockGuardByIdx guard(_sessions, i, __FUNCTION__);
 
-		auto& map = mutableSessions.GetClusterMapByIdx(i);
+		auto& map = _sessions.GetClusterMapByIdx(i);
 		for( const auto& pair : map )
 		{
 			if( pair.second && !pair.second->IsClosed() )
-			{
-				mutableSessions.ReadUnlockByIdx(i, __FUNCTION__);
 				return false;
-			}
 		}
-
-		mutableSessions.ReadUnlockByIdx(i, __FUNCTION__);
 	}
 
 	return true;
@@ -188,21 +174,26 @@ bool CRioSessionManager::AreAllSessionsClosed() const
 
 //***************************************************************************
 // @brief 맵 내부에 누적된 Closed 상태의 세션들을 안전하게 일괄 제거합니다.
+// @details 락을 쥔 채 세션 참조를 놓으면 마지막 참조일 때 세션 소멸자(버퍼 해제 등)가
+//          스핀락 구간에서 실행됩니다. 제거한 참조는 모아 두었다가 모든 락이 풀린 뒤에 놓습니다.
 //***************************************************************************
 void CRioSessionManager::RemoveClosedSessions()
 {
-	__int32 clusterCnt = _sessions.GetClusterCnt();
+	CVector<CRioSessionRef> removedSessions;
 
-	for( __int32 i = 0; i < clusterCnt; ++i )
+	for( int32 i = 0; i < _sessions.GetClusterCnt(); ++i )
 	{
-		_sessions.WriteLockByIdx(i, __FUNCTION__);
+		SessionMap::WriteLockGuardByIdx guard(_sessions, i, __FUNCTION__);
 
 		auto& map = _sessions.GetClusterMapByIdx(i);
 		for( auto it = map.begin(); it != map.end(); )
 		{
-			const auto& session = it->second;
+			auto& session = it->second;
 			if( !session || session->IsClosed() )
 			{
+				if( session )
+					removedSessions.push_back(std::move(session));
+
 				it = map.erase(it);
 			}
 			else
@@ -210,7 +201,5 @@ void CRioSessionManager::RemoveClosedSessions()
 				++it;
 			}
 		}
-
-		_sessions.WriteUnlockByIdx(i, __FUNCTION__);
 	}
 }

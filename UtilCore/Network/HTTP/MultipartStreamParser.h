@@ -6,11 +6,11 @@
 // [설계 배경] MultipartFormParser.h(HTTP::ParseMultipartFormData())는 완성된
 // body 전체를 std::string_view 하나로 받아 한 번에 스캔한다 — 짧은 필드
 // (닉네임, 토큰 등)에는 충분하지만, 1GB급 파일이 통째로 메모리에(그것도
-// CHttpRequestParser::m_body에 한 번, 이 파서가 또 한 번 복사하며) 올라가
-// 있어야 한다는 전제 자체가 대용량 업로드와 맞지 않는다.
+// CHttpRequestParser::m_body에 한 번, 필드 복사로 또 한 번) 올라가 있어야
+// 한다는 전제 자체가 대용량 업로드와 맞지 않는다.
 //
-// 이 클래스는 HttpRequestParser.h에 새로 생긴 SetBodyStreamCallback()과
-// 짝을 이룬다 — CHttpRequestParser가 본문을 청크 단위로 흘려줄 때마다
+// 이 클래스는 CHttpRequestParser::SetBodyStreamCallback()과 짝을 이룬다 —
+// CHttpRequestParser가 본문을 청크 단위로 흘려줄 때마다
 // Feed()를 호출해주면, 이 파서가 boundary를 기준으로 "지금 어느 파트를
 // 읽고 있는지"만 상태로 들고 있으면서, 파트 데이터가 나오는 대로 즉시
 // OnPartData 콜백으로 넘긴다 — 파일 파트라면 그 콜백 안에서 디스크에
@@ -31,7 +31,7 @@
 #define UC_MULTIPARTSTREAMPARSER_H
 
 #include <Network/HTTP/HttpParseUtil.h>
-#include <Network/HTTP/MultipartFormParser.h>	// ParseContentDisposition() 재사용
+#include <Network/HTTP/MultipartFormParser.h>	// ParseMultipartPartHeaders() 재사용
 
 #include <string>
 #include <string_view>
@@ -100,6 +100,12 @@ namespace HTTP
 		//***************************************************************************
 		bool Feed(const char* data, size_t len)
 		{
+			// 종료 경계("--boundary--") 뒤의 에필로그나 오류 상태에서 온 바이트는 보관하지 않는다.
+			if( m_state == EState::Done )
+				return true;
+			if( m_state == EState::Error )
+				return false;
+
 			m_pending.append(data, len);
 
 			// 한 번의 Feed() 안에서 여러 파트/상태 전이가 연속으로 끝날 수 있으므로
@@ -173,8 +179,7 @@ namespace HTTP
 
 			if( m_pending.compare(0, 2, "--") == 0 )
 			{
-				if( m_currentPartOpen && m_onEnd ) { m_onEnd(); }
-				m_currentPartOpen = false;
+				m_pending.clear();
 				m_state = EState::Done;
 				return true;
 			}
@@ -196,6 +201,16 @@ namespace HTTP
 		//***************************************************************************
 		bool StepPartHeaders()
 		{
+			// 헤더가 하나도 없는 파트는 바로 빈 줄("\r\n")이 온다.
+			if( m_pending.size() >= 2 && m_pending.compare(0, 2, "\r\n") == 0 )
+			{
+				m_pending.erase(0, 2);
+				if( m_onBegin )
+					m_onBegin(SMultipartPartInfo{});
+				m_state = EState::PartBody;
+				return true;
+			}
+
 			size_t headerEnd = m_pending.find("\r\n\r\n");
 			if( headerEnd == std::string::npos )
 			{
@@ -208,10 +223,9 @@ namespace HTTP
 			}
 
 			SMultipartPartInfo info;
-			ParseHeaderLines(std::string_view(m_pending.data(), headerEnd), info);
+			ParseMultipartPartHeaders(std::string_view(m_pending.data(), headerEnd), info.name, info.filename, info.contentType);
 			m_pending.erase(0, headerEnd + 4);
 
-			m_currentPartOpen = true;
 			if( m_onBegin )
 				m_onBegin(info);
 
@@ -250,42 +264,10 @@ namespace HTTP
 
 			if( m_onEnd )
 				m_onEnd();
-			m_currentPartOpen = false;
 
 			m_pending.erase(0, pos + m_bodyDelimiter.size());
 			m_state = EState::AfterDelimiter;
 			return true;
-		}
-
-		//***************************************************************************
-		// @brief 헤더 섹션(빈 줄 이전까지)을 한 줄씩 나눠 Content-Disposition/
-		//        Content-Type만 뽑아낸다. MultipartFormParser.h의
-		//        ParseContentDisposition()을 그대로 재사용한다.
-		//***************************************************************************
-		static void ParseHeaderLines(std::string_view headerSection, SMultipartPartInfo& info)
-		{
-			size_t lineStart = 0;
-			while( lineStart < headerSection.size() )
-			{
-				size_t lineEnd = headerSection.find("\r\n", lineStart);
-				if( lineEnd == std::string_view::npos )
-					lineEnd = headerSection.size();
-
-				std::string_view line = headerSection.substr(lineStart, lineEnd - lineStart);
-				size_t colon = line.find(':');
-				if( colon != std::string_view::npos )
-				{
-					std::string_view headerName = line.substr(0, colon);
-					std::string_view headerValue = HTTP::Trim(line.substr(colon + 1));
-
-					if( HTTP::EqualsIgnoreCaseAscii(headerName, "Content-Disposition") )
-						ParseContentDisposition(headerValue, info.name, info.filename);
-					else if( HTTP::EqualsIgnoreCaseAscii(headerName, "Content-Type") )
-						info.contentType = std::string(headerValue);
-				}
-
-				lineStart = (lineEnd < headerSection.size()) ? lineEnd + 2 : lineEnd;
-			}
 		}
 
 	private:
@@ -294,7 +276,6 @@ namespace HTTP
 		std::string	m_pending;			// 아직 처리 못 했거나 경계 판정을 위해 보류 중인 바이트(파일 전체가 아니라 항상 작은 꼬리만 유지됨)
 
 		EState	m_state = EState::Preamble;
-		bool	m_currentPartOpen = false;
 
 		OnPartBeginFn	m_onBegin;
 		OnPartDataFn	m_onData;

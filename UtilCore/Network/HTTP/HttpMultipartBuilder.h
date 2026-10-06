@@ -11,7 +11,6 @@
 #include <string_view>
 #include <vector>
 #include <random>
-#include <cstdio>
 
 //***************************************************************************
 // @class CMultipartFormBuilder
@@ -28,10 +27,15 @@
 //      만든다 — 요청 본문 안에 우연히 경계 문자열과 같은 바이트열이 등장할
 //      확률을 실질적으로 0으로 만들기 위함(RFC 7578 권장 관례).
 //
-//      [필드/파일 이름 이스케이프] Content-Disposition 헤더의 name/filename
-//      값에서 큰따옴표(")만 백슬래시로 이스케이프한다(RFC 7578 기준 최소한의
-//      처리). 파일명에 non-ASCII 문자가 들어가는 경우의 RFC 2231/5987 확장
-//      인코딩은 지원하지 않는다 — 필요해지면 별도로 추가해야 한다.
+//      [필드/파일 이름 이스케이프] Content-Disposition 헤더의 name/filename 값에서
+//      큰따옴표(")와 CR/LF를 각각 %22/%0D/%0A로 퍼센트 인코딩한다(RFC 7578 §4.2,
+//      HTML 폼 전송 규칙과 동일). 값 안의 CR/LF가 헤더 줄을 끊고 임의의 파트 헤더를
+//      끼워 넣는 것을 막기 위함이다. 파일명에 non-ASCII 문자가 들어가는 경우의
+//      RFC 2231/5987 확장 인코딩(filename*=)은 만들지 않는다 — UTF-8 바이트를 그대로 쓴다.
+//
+//      [Build() 이후의 추가] Build()로 닫는 경계선까지 붙인 뒤 AddField()/AddFile()을
+//      다시 부르면 닫는 경계선을 걷어내고 이어서 추가한다 — 닫는 경계선 뒤에 파트가
+//      붙어 본문이 깨지는 일이 없다.
 //
 //      [사용 예]
 //      CMultipartFormBuilder form;
@@ -68,6 +72,7 @@ public:
 	//***************************************************************************
 	CMultipartFormBuilder& AddField(std::string_view name, std::string_view value)
 	{
+		ReopenIfFinalized();
 		AppendBoundaryLine();
 		AppendRaw("Content-Disposition: form-data; name=\"");
 		AppendEscaped(name);
@@ -89,6 +94,7 @@ public:
 	CMultipartFormBuilder& AddFile(std::string_view fieldName, std::string_view filename,
 		std::string_view contentType, std::string_view fileData)
 	{
+		ReopenIfFinalized();
 		AppendBoundaryLine();
 		AppendRaw("Content-Disposition: form-data; name=\"");
 		AppendEscaped(fieldName);
@@ -155,17 +161,32 @@ private:
 	//***************************************************************************
 	static std::string GenerateBoundary()
 	{
+		static constexpr char kHex[] = "0123456789abcdef";
 		thread_local std::mt19937 gen{ std::random_device{}() };
 		std::uniform_int_distribution<int> dist(0, 255);
 
 		std::string boundary = "----CppFormBoundary";
-		char buf[3];
+		boundary.reserve(boundary.size() + 32);
 		for( int i = 0; i < 16; ++i )
 		{
-			std::snprintf(buf, sizeof(buf), "%02x", dist(gen));
-			boundary.append(buf, 2);
+			const int byte = dist(gen);
+			boundary.push_back(kHex[byte >> 4]);
+			boundary.push_back(kHex[byte & 0x0F]);
 		}
 		return boundary;
+	}
+
+	//***************************************************************************
+	// @brief Build()로 닫는 경계선("--boundary--\r\n")까지 붙은 상태면 그것을 걷어내고 다시 열어 둡니다.
+	//***************************************************************************
+	void ReopenIfFinalized()
+	{
+		if( !_finalized )
+			return;
+
+		const size_t closingSize = 2 + _boundary.size() + 2 + 2; // "--" + boundary + "--" + CRLF
+		_buffer.resize(_buffer.size() - closingSize);
+		_finalized = false;
 	}
 
 	void AppendRaw(std::string_view sv)
@@ -190,15 +211,19 @@ private:
 	}
 
 	//***************************************************************************
-	// @brief Content-Disposition의 name/filename 값에서 큰따옴표만 이스케이프해 추가합니다.
+	// @brief Content-Disposition의 name/filename 값에서 큰따옴표와 CR/LF를 퍼센트 인코딩해 추가합니다.
 	//***************************************************************************
 	void AppendEscaped(std::string_view sv)
 	{
 		for( char c : sv )
 		{
-			if( c == '"' )
-				_buffer.push_back('\\');
-			_buffer.push_back(c);
+			switch( c )
+			{
+			case '"':  AppendRaw("%22"); break;
+			case '\r': AppendRaw("%0D"); break;
+			case '\n': AppendRaw("%0A"); break;
+			default:   _buffer.push_back(c); break;
+			}
 		}
 	}
 

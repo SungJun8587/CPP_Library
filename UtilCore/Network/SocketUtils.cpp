@@ -133,12 +133,22 @@ bool CSocketUtils::Init()
 	WSADATA wsaData;
 
 	int32 result = ::WSAStartup(wVersion, &wsaData);
-	if( result != 0 || LOBYTE(wsaData.wVersion) != 2 || HIBYTE(wsaData.wVersion) != 2 )
+	if( result != 0 )
 		return false;
 
+	if( LOBYTE(wsaData.wVersion) != 2 || HIBYTE(wsaData.wVersion) != 2 )
+	{
+		::WSACleanup();
+		return false;
+	}
+
+	// 이후 단계에서 실패하면 WSACleanup()으로 WSAStartup 참조 카운트를 되돌린다.
 	SOCKET dummySocket = ::WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED);
 	if( dummySocket == INVALID_SOCKET )
+	{
+		::WSACleanup();
 		return false;
+	}
 
 	bool success = true;
 	success &= BindExtensionFunction(dummySocket, WSAID_ACCEPTEX, reinterpret_cast<void**>(&_acceptEx));
@@ -147,6 +157,10 @@ bool CSocketUtils::Init()
 	success &= BindExtensionFunction(dummySocket, WSAID_DISCONNECTEX, reinterpret_cast<void**>(&_disconnectEx));
 
 	::closesocket(dummySocket);
+
+	if( !success )
+		::WSACleanup();
+
 	return success;
 }
 
@@ -271,6 +285,40 @@ bool CSocketUtils::SetReuseAddress(SOCKET socket, bool flag)
 }
 
 //***************************************************************************
+// @brief SO_EXCLUSIVEADDRUSE 옵션을 설정하여 같은 주소/포트에 다른 소켓이 바인드하지 못하게 합니다.
+// @param socket 대상 소켓 핸들 (Bind() 이전에 설정해야 한다)
+// @param flag 활성화 여부
+// @return 성공 시 true, 실패 시 false
+// @note 이 옵션을 쓴 소켓은 닫기 전에 제대로 shutdown해야 한다는 MS 문서의 주의가 있어, 재시작 동작을
+//       운영 환경에서 확인한 뒤 사용한다.
+//***************************************************************************
+bool CSocketUtils::SetExclusiveAddrUse(SOCKET socket, bool flag)
+{
+	int32 value = flag ? 1 : 0;
+	return ::setsockopt(socket, SOL_SOCKET, SO_EXCLUSIVEADDRUSE,
+		reinterpret_cast<char*>(&value), sizeof(value)) != SOCKET_ERROR;
+}
+
+//***************************************************************************
+// @brief ListenAddressMode에 맞는 주소 바인딩 옵션을 Listen 소켓에 설정합니다 (Bind() 이전에 호출).
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
+bool CSocketUtils::ApplyListenAddressMode(SOCKET socket, ListenAddressMode mode)
+{
+	switch( mode )
+	{
+	case ListenAddressMode::ReuseAddress:
+		return SetReuseAddress(socket, true);
+	case ListenAddressMode::ExclusiveAddrUse:
+		return SetExclusiveAddrUse(socket, true);
+	case ListenAddressMode::None:
+		return true;
+	}
+
+	return false;
+}
+
+//***************************************************************************
 // @brief SO_LINGER 옵션을 설정하여 소켓 종료 시 잔여 데이터 처리 방식을 지정합니다.
 // @param socket 대상 소켓 핸들
 // @param onOff Linger 옵션 활성화 여부 (1: 활성화, 0: 비활성화)
@@ -329,7 +377,8 @@ bool CSocketUtils::SetSendBufferSize(SOCKET socket, int32 size)
 // @param enable Keep-Alive 활성화 여부
 // @param idleMs 첫 프로브를 보내기 전까지의 유휴 시간(밀리초). 0이면 OS 기본값 사용
 //        (SIO_KEEPALIVE_VALS를 호출하지 않고 SO_KEEPALIVE만 켬).
-// @param intervalMs 프로브 재전송 간격(밀리초). idleMs가 0이면 무시됨.
+// @param intervalMs 프로브 재전송 간격(밀리초). idleMs가 0이면 무시됨. idleMs가 0이 아닌데
+//        intervalMs가 0이면 0이 그대로 OS에 전달되므로, 의도한 값을 명시할 것.
 // @return 성공 시 true, 실패 시 false. enable==false인 경우 idleMs/intervalMs는 무시됩니다.
 // @details idleMs/intervalMs를 지정하면 WSAIoctl(SIO_KEEPALIVE_VALS)로
 //          per-socket 세부 튜닝을 적용합니다(전역 레지스트리 설정과 무관).
@@ -413,13 +462,20 @@ bool CSocketUtils::GetSocketError(SOCKET socket, int32& outError)
 //      - 연결 실패 시 내부적으로 `ReportError`를 통해 Winsock 에러 코드를 로그로 기록합니다.
 //      - RIO(Registered I/O) 환경에서 소켓 연결 완료 후 RIO_RQ를 생성하기 전 단계에 활용됩니다.
 //***************************************************************************
-bool CSocketUtils::Connect(SOCKET socket, CNetAddress netAddr)
+bool CSocketUtils::Connect(SOCKET socket, const CNetAddress& netAddr)
 {
 	if( socket == INVALID_SOCKET )
 		return false;
 
-	SOCKADDR_IN serverAddr = netAddr.GetSockAddr();
-	int result = ::connect(socket, reinterpret_cast<SOCKADDR*>(&serverAddr), sizeof(serverAddr));
+	// IP 문자열 파싱에 실패한 주소(0.0.0.0)로 접속을 시도하지 않는다.
+	if( netAddr.IsValid() == false )
+	{
+		LOG_ERROR(_T("[CSocketUtils] Connect rejected: invalid address"));
+		return false;
+	}
+
+	const SOCKADDR_IN& serverAddr = netAddr.GetSockAddr();
+	int result = ::connect(socket, reinterpret_cast<const SOCKADDR*>(&serverAddr), sizeof(serverAddr));
 
 	if( result == SOCKET_ERROR )
 	{
@@ -436,10 +492,18 @@ bool CSocketUtils::Connect(SOCKET socket, CNetAddress netAddr)
 // @param netAddr 바인딩할 주소 정보를 담은 CNetAddress 객체
 // @return 성공 시 true, 실패 시 false
 //***************************************************************************
-bool CSocketUtils::Bind(SOCKET socket, CNetAddress netAddr)
+bool CSocketUtils::Bind(SOCKET socket, const CNetAddress& netAddr)
 {
-	SOCKADDR_IN sockAddr = netAddr.GetSockAddr();
-	return ::bind(socket, reinterpret_cast<SOCKADDR*>(&sockAddr), sizeof(sockAddr)) != SOCKET_ERROR;
+	// IP 문자열 파싱에 실패한 주소는 0.0.0.0으로 남아 있어, 그대로 바인드하면
+	// 의도와 달리 모든 인터페이스에 열리게 된다 — 명시적으로 거부한다.
+	if( netAddr.IsValid() == false )
+	{
+		LOG_ERROR(_T("[CSocketUtils] Bind rejected: invalid address"));
+		return false;
+	}
+
+	const SOCKADDR_IN& sockAddr = netAddr.GetSockAddr();
+	return ::bind(socket, reinterpret_cast<const SOCKADDR*>(&sockAddr), sizeof(sockAddr)) != SOCKET_ERROR;
 }
 
 //***************************************************************************
@@ -573,6 +637,14 @@ SOCKET CSocketUtils::Accept(SOCKET listenSocket, sockaddr_in& outClientAddress)
 //***************************************************************************
 bool CSocketUtils::IPToAddr(const int af, const TCHAR* hostAddress, void* dest)
 {
+	if( hostAddress == nullptr || dest == nullptr )
+		return false;
+
+	// 지원하지 않는 주소 체계는 변환 전에 거른다(성공을 반환하면서 dest에 아무것도
+	// 쓰지 않는 경로 방지).
+	if( af != AF_INET && af != AF_INET6 )
+		return false;
+
 	int nLen = sizeof(sockaddr_storage);
 	struct sockaddr_storage ss;
 	TCHAR tszHostAddress[IP6_STRLEN + 1];
@@ -583,25 +655,14 @@ bool CSocketUtils::IPToAddr(const int af, const TCHAR* hostAddress, void* dest)
 	int nRet = ::WSAStringToAddress(tszHostAddress, af, NULL,
 		reinterpret_cast<SOCKADDR*>(&ss), &nLen);
 	if( nRet != 0 )
-		return FALSE;
+		return false;
 
-	switch( af )
-	{
-	case AF_INET:
-	{
-		struct in_addr inAddr = reinterpret_cast<sockaddr_in*>(&ss)->sin_addr;
-		::memcpy(dest, &inAddr, sizeof(struct in_addr));
-		break;
-	}
-	case AF_INET6:
-	{
-		struct in6_addr inAddr6 = reinterpret_cast<sockaddr_in6*>(&ss)->sin6_addr;
-		::memcpy(dest, &inAddr6, sizeof(struct in6_addr));
-		break;
-	}
-	}
+	if( af == AF_INET )
+		::memcpy(dest, &reinterpret_cast<sockaddr_in*>(&ss)->sin_addr, sizeof(struct in_addr));
+	else
+		::memcpy(dest, &reinterpret_cast<sockaddr_in6*>(&ss)->sin6_addr, sizeof(struct in6_addr));
 
-	return TRUE;
+	return true;
 }
 
 //***************************************************************************
@@ -659,9 +720,14 @@ void CSocketUtils::IPv4ToIPv6(const struct in_addr ipv4, struct in6_addr& ipv6)
 // @param hostName 도메인 이름 또는 IP 문자열
 // @param port 포트 번호
 // @param sockAddrList 조회된 addrinfo 목록이 저장될 std::list 참조
+// @param family 조회할 주소 체계 (기본값 AF_INET — 이 스택의 소켓 생성 함수가 모두
+//        AF_INET 소켓만 만들므로 IPv6 결과가 섞이면 후속 connect/bind가 실패한다.
+//        IPv6까지 필요하면 AF_UNSPEC을 명시)
 // @return 성공 시 TRUE, 실패 시 FALSE
+// @note 리스트 원소의 ai_addr은 이 함수가 malloc한 사본이다. 반복 호출되는 경로에서
+//       누수를 막으려면 사용 후 FreeSockAddrIn()으로 해제할 것.
 //***************************************************************************
-bool CSocketUtils::GetSockAddrIn(const TCHAR* hostName, const int port, std::list<addrinfo>& sockAddrList)
+bool CSocketUtils::GetSockAddrIn(const TCHAR* hostName, const int port, std::list<addrinfo>& sockAddrList, const int family)
 {
 	char    szHostName[PC_NAME_STRLEN];
 	char    szPort[PORT_STRLEN];
@@ -671,25 +737,34 @@ bool CSocketUtils::GetSockAddrIn(const TCHAR* hostName, const int port, std::lis
 
 	::memset(&hints, 0, sizeof(addrinfo));
 	hints.ai_flags = AI_PASSIVE;
-	hints.ai_family = AF_UNSPEC;
+	hints.ai_family = family;
 	hints.ai_socktype = SOCK_STREAM;
 
 	if( hostName )
 	{
 #ifdef _UNICODE
-		::WideCharToMultiByte(CP_ACP, 0, hostName, -1, szHostName, _countof(szHostName), NULL, NULL);
+		// 변환 실패(버퍼 부족 등) 시 szHostName은 초기화되지 않은 상태이므로 그대로 쓰면 안 된다.
+		if( ::WideCharToMultiByte(CP_ACP, 0, hostName, -1, szHostName, _countof(szHostName), NULL, NULL) == 0 )
+		{
+			LOG_ERROR(_T("[CSocketUtils] GetSockAddrIn: host name conversion failed (error=%lu)"), ::GetLastError());
+			return false;
+		}
 		pszHostName = szHostName;
 #else
 		pszHostName = const_cast<char*>(hostName);
 #endif
 	}
 
-	_itoa_s(port, szPort, _countof(szPort), 10);
+	if( _itoa_s(port, szPort, _countof(szPort), 10) != 0 )
+		return false;
 
-	if( ::getaddrinfo(pszHostName, szPort, &hints, &pResult) != 0 )
+	// DNS 조회 실패는 런타임에 충분히 일어날 수 있는 상황이므로 _ASSERT 대신
+	// 로그를 남기고 실패를 반환한다(getaddrinfo는 에러 코드를 직접 반환한다).
+	const int gaiResult = ::getaddrinfo(pszHostName, szPort, &hints, &pResult);
+	if( gaiResult != 0 )
 	{
-		_ASSERT(0);
-		return FALSE;
+		ReportError(_T("CSocketUtils::GetSockAddrIn(getaddrinfo)"), gaiResult);
+		return false;
 	}
 
 	for( addrinfo* pAddrInfo = pResult; pAddrInfo != NULL; pAddrInfo = pAddrInfo->ai_next )
@@ -700,9 +775,9 @@ bool CSocketUtils::GetSockAddrIn(const TCHAR* hostName, const int port, std::lis
 		// [수정] 얕은 복사(memcpy)만 하면 ai_addr/ai_canonname이 freeaddrinfo()로
 		// 해제될 pResult 내부 메모리를 계속 가리키는 댕글링 포인터가 된다.
 		// ai_addr이 가리키는 sockaddr 내용을 별도 힙 버퍼로 deep-copy해서
-		// 리스트 원소가 자체 소유 메모리를 갖도록 한다. 이 버퍼는 프로세스/리스트
-		// 수명과 함께 가는 일회성 DNS 조회 결과이므로 의도적으로 해제하지 않는다
-		// (호출 빈도가 낮고 개수가 addrinfo 결과 수로 제한되어 있어 누수 영향 미미).
+		// 리스트 원소가 자체 소유 메모리를 갖도록 한다. 이 사본은 호출자가
+		// FreeSockAddrIn()으로 해제해야 한다(해제하지 않으면 호출당 addrinfo 결과
+		// 수만큼 누수 — 재연결 등 반복 경로에서는 반드시 해제할 것).
 		if( pAddrInfo->ai_addr != nullptr && pAddrInfo->ai_addrlen > 0 )
 		{
 			sockaddr* pAddrCopy = static_cast<sockaddr*>(::malloc(pAddrInfo->ai_addrlen));
@@ -730,7 +805,22 @@ bool CSocketUtils::GetSockAddrIn(const TCHAR* hostName, const int port, std::lis
 	}
 
 	::freeaddrinfo(pResult);
-	return TRUE;
+	return true;
+}
+
+//***************************************************************************
+// @brief GetSockAddrIn()이 할당한 ai_addr 사본을 해제하고 리스트를 비웁니다.
+// @param sockAddrList GetSockAddrIn()으로 채워진 리스트
+//***************************************************************************
+void CSocketUtils::FreeSockAddrIn(std::list<addrinfo>& sockAddrList)
+{
+	for( addrinfo& info : sockAddrList )
+	{
+		::free(info.ai_addr);
+		info.ai_addr = nullptr;
+		info.ai_addrlen = 0;
+	}
+	sockAddrList.clear();
 }
 
 //***************************************************************************
@@ -815,8 +905,23 @@ void CSocketUtils::ReportError(const TCHAR* operationDesc, const int errorCode)
 	}
 #endif
 
-	_stprintf_s(tszBuffer, _countof(tszBuffer), _T("%s: %d- %s"),
-		operationDesc, errorCode, ptszMsgBuffer);
+	// 테이블에 없는 코드이거나 FormatMessage가 실패하면 ptszMsgBuffer가 NULL이다.
+	if( ptszMsgBuffer == nullptr )
+		ptszMsgBuffer = _T("(unknown)");
+
+	// 시스템 메시지는 길 수 있으므로 버퍼 초과 시 크래시하지 않도록 _TRUNCATE를 쓴다.
+	_sntprintf_s(tszBuffer, _countof(tszBuffer), _TRUNCATE, _T("%s: %d- %s"),
+		(operationDesc != nullptr) ? operationDesc : _T("(null)"), errorCode, ptszMsgBuffer);
+
+	// FormatMessage 시스템 메시지 끝의 개행/공백을 제거한다.
+	for( size_t len = _tcslen(tszBuffer); len > 0; --len )
+	{
+		const TCHAR ch = tszBuffer[len - 1];
+		if( ch != _T('\r') && ch != _T('\n') && ch != _T(' ') )
+			break;
+		tszBuffer[len - 1] = _T('\0');
+	}
+
 	LOG_INFO(_T("Error : %s"), tszBuffer);
 
 	// FormatMessage 시스템 할당 메모리 해제

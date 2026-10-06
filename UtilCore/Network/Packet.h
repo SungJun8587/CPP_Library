@@ -7,6 +7,8 @@
 #ifndef UC_PACKET_H
 #define UC_PACKET_H
 
+#include <BaseRedefineDataType.h>	// uint16
+
 #pragma pack(push, 1)
 
 //***************************************************************************

@@ -11,7 +11,7 @@
 #include <Network/NetworkRedefineDataType.h>
 #include <Network/Session.h>
 #include <Network/IOCP/IocpService.h>
-#include <Network/Rio/RioService.h>
+#include <Network/RIO/RioService.h>
 #include <Network/HTTP/HttpConnPool.h>
 #include <Network/HTTP/HttpConnPoolManager.h>
 #include <Network/HTTP/HttpSessionIocp.h>
@@ -25,17 +25,12 @@
 // CIocpCoreRef/CRioCoreRef, SessionFactory, maxSessionCount, workerThreadCount)를
 // 여기서만 알고, CHttpConnPoolT 자신은 이 시그니처를 몰라도 되게 분리한다.
 //
-// [SessionType 템플릿 파라미터] 아래 Create* 함수들은 전부 SessionType을
-// 템플릿 파라미터로 받는다(기본값 CHttpSessionIocp/CHttpSessionRio) — 호출부가
-// CHttpSessionIocp/CHttpSessionRio를 상속한 커스텀 세션(예: OnConnected()/
-// OnRecv()를 오버라이드해 로깅을 추가하거나 멤버를 더 갖는 세션)을 대신 꽂아
-// 넣을 수 있게 하기 위함이다(HttpSessionIocp.h/HttpSessionRio.h가 더 이상
-// final이 아닌 이유도 이것). 커스텀 SessionType은 CHttpSessionIocp/Rio와 같은
-// 인터페이스(SetConnStateHandler/SendRequest/IsConnectionCloseRequested/
-// GetHttpState, HTTPS 풀을 쓰려면 SetTlsConfig까지)를 가져야 한다 — 덕타이핑이라
-// 만족하지 못하면 템플릿 인스턴스화 시점에 컴파일 에러로 드러난다.
-// 기본값을 지정해뒀으므로 기존 호출부(SessionType을 명시하지 않는 코드)는
-// 전부 그대로 동작한다.
+// [SessionType 템플릿 파라미터] 아래 Create* 함수들은 SessionType을 템플릿 파라미터로 받는다
+// (기본값 CHttpSessionIocp/CHttpSessionRio). CHttpSessionIocp/Rio를 상속한 커스텀 세션(예:
+// OnConnected()/OnRecv()를 오버라이드해 로깅을 붙이거나 멤버를 더 갖는 세션)을 대신 꽂을 수 있다.
+// 커스텀 SessionType은 CHttpSessionIocp/Rio와 같은 인터페이스(SetConnStateHandler/SendRequest/
+// IsConnectionCloseRequested/IsConnected/CheckRequestTimeout/Disconnect, HTTPS 풀이면 SetTlsConfig까지)를
+// 가져야 한다 — 덕타이핑이라 만족하지 못하면 템플릿 인스턴스화 시점에 컴파일 에러로 드러난다.
 using CHttpConnPoolIocp = CHttpConnPoolT<CHttpSessionIocp, CHttpSessionIocpRef, CIocpClientService, CIocpClientServiceRef>;
 using CHttpConnPoolIocpRef = std::shared_ptr<CHttpConnPoolIocp>;
 
@@ -162,8 +157,9 @@ inline IHttpConnPoolRef CreateHttpsConnPoolIocp(CNetAddress hostAddr, const std:
 		},
 		[sslCtx, sniHostname](std::shared_ptr<SessionType> session)
 		{
-			// CHttpConnPoolT::Create()의 initSession 훅 — 세션 생성 직후,
-			// 연결 시도(SetConnStateHandler 등록보다도 먼저) 전에 TLS 설정을 주입한다.
+			// CHttpConnPoolT::Create()의 initSession 훅 — 세션 생성 직후, 연결 시도 전에 TLS 설정을
+			// 주입한다. 설정(SSL 객체 생성)이 실패해도 세션은 HTTPS 모드로 남아 핸드셰이크 실패로
+			// 끊기므로 평문으로 떨어지지 않는다.
 			session->SetTlsConfig(sslCtx, sniHostname);
 		});
 }

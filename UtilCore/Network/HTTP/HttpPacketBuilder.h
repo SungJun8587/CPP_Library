@@ -9,38 +9,13 @@
 
 #include <BaseRedefineDataType.h>
 #include <Network/NetworkRedefineDataType.h>
+#include <Network/HTTP/HttpParseUtil.h>
 
 #include <string_view>
 #include <vector>
 #include <utility>
 #include <charconv>
 #include <cstring>
-
-//***************************************************************************
-// 내부 유틸리티 (대소문자 비교)
-//***************************************************************************
-namespace http
-{
-	//***************************************************************************
-	// @brief 대소문자 무시 비교 (헤더 이름은 RFC 7230 기준 대소문자 무관, ASCII 범위만 처리).
-	// @param a 비교할 문자열 A
-	// @param b 비교할 문자열 B
-	// @return bool 대소문자 무시 시 같으면 true
-	//***************************************************************************
-	inline bool EqualsIgnoreCase(std::string_view a, std::string_view b) noexcept
-	{
-		if( a.size() != b.size() )
-			return false;
-		for( size_t i = 0; i < a.size(); ++i )
-		{
-			char ca = a[i], cb = b[i];
-			if( ca >= 'A' && ca <= 'Z' ) ca += 32;
-			if( cb >= 'A' && cb <= 'Z' ) cb += 32;
-			if( ca != cb ) return false;
-		}
-		return true;
-	}
-}
 
 //***************************************************************************
 // @class CHttpBuilderBase
@@ -158,16 +133,33 @@ protected:
 	}
 
 	//***************************************************************************
-	// @brief body가 있고 사용자가 Content-Length를 직접 넣지 않았다면 자동 계산해 추가합니다.
+	// @brief 사용자가 Content-Length를 직접 넣지 않았다면 자동 계산해 추가합니다.
+	// @param alwaysWhenAbsent true면 본문이 비어 있어도 "Content-Length: 0"을 추가한다 — 본문을
+	//        가질 수 있는 메시지가 길이 헤더 없이 나가면 수신 측이 본문의 끝을 알 수 없기 때문이다
+	//        (POST/PUT/PATCH 요청, 본문이 허용되는 응답). false면 본문이 있을 때만 추가한다.
 	//***************************************************************************
-	void AppendContentLengthIfNeeded()
+	void AppendContentLengthIfNeeded(bool alwaysWhenAbsent)
 	{
-		if( !m_body.empty() && !m_hasContentLength )
-		{
-			char numBuf[20];
-			auto res = std::to_chars(numBuf, numBuf + sizeof(numBuf), m_body.size());
-			AppendHeaderLine("Content-Length", std::string_view(numBuf, res.ptr - numBuf));
-		}
+		if( m_hasContentLength )
+			return;
+		if( m_body.empty() && !alwaysWhenAbsent )
+			return;
+
+		char numBuf[20];
+		auto res = std::to_chars(numBuf, numBuf + sizeof(numBuf), m_body.size());
+		AppendHeaderLine("Content-Length", std::string_view(numBuf, res.ptr - numBuf));
+	}
+
+	//***************************************************************************
+	// @brief Build() 한 번에 필요한 버퍼 크기를 어림해 미리 잡습니다 (재할당 횟수를 줄임).
+	// @param startLineSize 시작 줄(요청 라인/상태 라인)의 대략적인 크기
+	//***************************************************************************
+	void ReserveForBuild(size_t startLineSize)
+	{
+		size_t needed = startLineSize + 2 + 40 + 2 + m_body.size(); // 시작 줄 + CRLF + 자동 Content-Length 줄 + 빈 줄 + 본문
+		for( const auto& [k, v] : m_headers )
+			needed += k.size() + v.size() + 4;
+		m_buffer.reserve(needed);
 	}
 
 	//***************************************************************************
@@ -176,7 +168,7 @@ protected:
 	//***************************************************************************
 	void AddHeaderImpl(std::string_view key, std::string_view value)
 	{
-		if( http::EqualsIgnoreCase(key, "Content-Length") )
+		if( HTTP::EqualsIgnoreCaseAscii(key, "Content-Length") )
 			m_hasContentLength = true;
 		m_headers.emplace_back(key, value);
 	}
@@ -200,7 +192,8 @@ public:
 	// @param reserveSize 내부 버퍼의 초기 예약 크기 (기본 512바이트)
 	//***************************************************************************
 	explicit CHttpRequestBuilder(size_t reserveSize = 512)
-		: CHttpBuilderBase(reserveSize) {
+		: CHttpBuilderBase(reserveSize)
+	{
 	}
 
 	//***************************************************************************
@@ -239,10 +232,15 @@ public:
 	//***************************************************************************
 	// @brief 요청 라인 + 헤더 + 빈 줄 + body 순으로 조립합니다.
 	// @return std::pair<const char*, size_t> 내부 버퍼 뷰(GetData()와 동일)
+	// @details 사용자가 Content-Length를 넣지 않았으면 자동으로 채운다. 본문이 비어 있어도
+	//          본문을 갖는 메서드(POST/PUT/PATCH)는 "Content-Length: 0"을 보낸다 — 없으면 일부
+	//          서버가 411(Length Required)로 거부하거나 본문을 기다린다.
 	//***************************************************************************
 	std::pair<const char*, size_t> Build()
 	{
 		m_buffer.clear();
+		ReserveForBuild(m_method.size() + m_path.size() + m_version.size() + 2);
+
 		AppendRaw(m_method);
 		AppendRaw(" ");
 		AppendRaw(m_path);
@@ -251,13 +249,24 @@ public:
 		AppendCRLF();
 
 		AppendAllHeaders();
-		AppendContentLengthIfNeeded();
+		AppendContentLengthIfNeeded(m_method == "POST" || m_method == "PUT" || m_method == "PATCH");
 		AppendCRLF(); // 헤더 종료 빈 줄
 
 		if( !m_body.empty() )
 			AppendRaw(m_body);
 
 		return GetData();
+	}
+
+	//***************************************************************************
+	// @brief 버퍼 용량은 유지하고 내용과 요청 라인 설정(메서드/경로/버전)을 기본값으로 되돌립니다.
+	//***************************************************************************
+	void Reset()
+	{
+		CHttpBuilderBase::Reset();
+		m_method = "GET";
+		m_path = "/";
+		m_version = "HTTP/1.1";
 	}
 
 private:
@@ -278,7 +287,8 @@ public:
 	// @param reserveSize 내부 버퍼의 초기 예약 크기 (기본 512바이트)
 	//***************************************************************************
 	explicit CHttpResponseBuilder(size_t reserveSize = 512)
-		: CHttpBuilderBase(reserveSize) {
+		: CHttpBuilderBase(reserveSize)
+	{
 	}
 
 	//***************************************************************************
@@ -317,10 +327,17 @@ public:
 	//***************************************************************************
 	// @brief 상태 라인 + 헤더 + 빈 줄 + body 순으로 조립합니다.
 	// @return std::pair<const char*, size_t> 내부 버퍼 뷰(GetData()와 동일)
+	// @details 사용자가 Content-Length를 넣지 않았으면 자동으로 채운다. 본문이 허용되는 응답
+	//          (1xx/204/304 제외)은 본문이 비어 있어도 "Content-Length: 0"을 보낸다 — 길이 헤더가
+	//          없으면 클라이언트는 본문을 "연결 종료까지"로 해석해 keep-alive 연결에서 응답이
+	//          끝나지 않는다. HEAD 응답처럼 본문 없이 GET의 길이를 알려야 하면 AddHeader()로
+	//          Content-Length를 직접 지정한다.
 	//***************************************************************************
 	std::pair<const char*, size_t> Build()
 	{
 		m_buffer.clear();
+		ReserveForBuild(m_version.size() + 4 + m_reason.size() + 2);
+
 		AppendRaw(m_version);
 		AppendRaw(" ");
 
@@ -333,13 +350,24 @@ public:
 		AppendCRLF();
 
 		AppendAllHeaders();
-		AppendContentLengthIfNeeded();
+		AppendContentLengthIfNeeded(m_statusCode >= 200 && m_statusCode != 204 && m_statusCode != 304);
 		AppendCRLF();
 
 		if( !m_body.empty() )
 			AppendRaw(m_body);
 
 		return GetData();
+	}
+
+	//***************************************************************************
+	// @brief 버퍼 용량은 유지하고 내용과 상태 라인 설정(버전/상태 코드/메시지)을 기본값으로 되돌립니다.
+	//***************************************************************************
+	void Reset()
+	{
+		CHttpBuilderBase::Reset();
+		m_version = "HTTP/1.1";
+		m_statusCode = 200;
+		m_reason = "OK";
 	}
 
 private:

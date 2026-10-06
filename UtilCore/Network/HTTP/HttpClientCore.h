@@ -7,11 +7,16 @@
 #ifndef UC_HTTPCLIENTCORE_H
 #define UC_HTTPCLIENTCORE_H
 
+#include <BaseRedefineDataType.h>
 #include <Network/HTTP/HttpResponseParser.h>
 
+#include <atomic>
+#include <chrono>
 #include <functional>
 #include <cstdint>
 #include <algorithm>
+#include <cstring>
+#include <mutex>
 #include <utility>
 
 // 요청 완료 통지. success=false면 파서가 Error 상태(프로토콜 위반 등)로 멈춘 것 —
@@ -33,12 +38,13 @@ enum class EHttpClientState
 // @brief 엔진(IOCP/RIO) 비의존 HTTP 요청/응답 오케스트레이션 로직
 //
 // @details
-//      CSession(IOCP/RIO 공통 베이스)의 Send(const void*, uint16) 인터페이스에만
+//      세션의 Send(const void*, uint16) 인터페이스(호출부가 sender 콜백으로 넘김)에만
 //      의존한다. CIocpSession과 CRioSession은 OnRecv()/OnDataReceived() 수신
 //      훅의 계약이 서로 달라(전자는 반환값으로 처리 바이트 수 통지, 후자는
 //      파라미터 없이 호출되고 스스로 GetRecvBuffer()를 소비) 상속으로 공유할 수
 //      없다. 그래서 상속이 아니라 "멤버로 보유(합성)"하는 방식으로 두 세션
-//      클래스(CHttpSessionIocp/CHttpSessionRio) 양쪽에서 재사용한다.
+//      클래스(CHttpSessionIocp/CHttpSessionRio) 양쪽에서 재사용한다 — 평문/TLS 분기와
+//      연결 상태 통지까지 묶은 CHttpClientChannel(HttpClientChannel.h)이 이 클래스를 보유한다.
 //
 //      [책임 분리]
 //      - 이 클래스: 요청 송신(65535바이트 단위 자동 분할) + 응답 파싱 상태 관리 +
@@ -51,10 +57,23 @@ enum class EHttpClientState
 //      하므로 의도적 선택). BeginRequest()는 이전 요청이 AwaitingResponse
 //      상태면 false를 반환하니, 동시 요청은 상위 풀에서 커넥션을 여러 개 굴려서
 //      병렬화해야 한다.
+//
+//      [스레드 안전성] BeginRequest()(요청을 보내는 스레드)와 FeedRecv()/
+//      OnSessionDisconnected()(IOCP 워커 등 I/O 스레드)는 서로 다른 스레드에서
+//      호출될 수 있으므로 상태(m_state/m_onComplete/m_parser)를 m_lock으로
+//      보호한다. 완료 콜백은 항상 락 밖에서 호출한다 — 콜백이 BeginRequest()를
+//      재진입하거나(풀의 DispatchToSession()) 세션을 폐기(Disconnect → 
+//      OnSessionDisconnected())할 수 있기 때문이다.
+//
+//      [호출 계약] BeginRequest()가 true를 반환하면 onComplete는 정확히 한 번
+//      호출되고(응답 완결, 파싱 에러, 또는 세션 끊김 중 하나), false를 반환하면
+//      onComplete는 호출되지 않는다.
 //***************************************************************************
 class CHttpClientCore
 {
 public:
+	using Clock = std::chrono::steady_clock;
+
 	//***************************************************************************
 	// @brief 완성된 요청 패킷을 전송하고 응답 대기 상태로 전이합니다.
 	// @tparam SendFn 실제 바이트 전송 콜백 타입, 시그니처는
@@ -67,25 +86,83 @@ public:
 	//         다른 요청이 진행 중)
 	//***************************************************************************
 	template<typename SendFn>
-	bool BeginRequest(SendFn&& sender, const char* data, size_t len, HttpRequestCompletionHandler onComplete)
+	bool BeginRequest(SendFn&& sender, const char* data, size_t len, HttpRequestCompletionHandler onComplete,
+		std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(), Clock::time_point submitTime = Clock::now())
 	{
-		if( m_state != EHttpClientState::Idle )
-			return false;
+		// 응답 대기 상태로 먼저 전이한 뒤 전송한다. 서버가 아주 빨리 응답해서 전송 직후
+		// I/O 스레드가 FeedRecv()를 호출해도 그 응답을 받을 수 있어야 한다 — 전송 "후에"
+		// 전이하면 그 응답은 "요청도 안 했는데 온 데이터"로 버려지고 요청이 영원히
+		// 완료되지 않는다.
+		{
+			std::lock_guard<std::mutex> guard(m_lock);
+			if( m_state.load(std::memory_order_relaxed) != EHttpClientState::Idle )
+				return false;
 
-		m_parser.Reset();
+			m_parser.Reset();
+			// HEAD 요청의 응답은 헤더만 오므로 파서에 알린다 — 요청 첫 단어가 메서드다.
+			m_parser.SetHeadResponse(len >= 5 && std::memcmp(data, "HEAD ", 5) == 0);
+			m_onComplete = std::move(onComplete);
+			m_timeout = timeout;           // 0 이하면 이 요청에는 타임아웃이 없다
+			m_submitTime = submitTime;     // 타임아웃 기준 시각 (풀 대기 시간 포함해서 호출부가 넘긴다)
+			m_lastActivityNs.store(0, std::memory_order_relaxed);
+			m_sendInProgress = true;
+			m_hasDeferredResult = false;
+			m_state.store(EHttpClientState::AwaitingResponse, std::memory_order_release);
+		}
 
+		// 전송은 락 밖에서 한다 — sender(세션의 Send())가 실패하면 Disconnect()가
+		// 동기적으로 OnSessionDisconnected()를 부를 수 있기 때문이다.
+		bool sendOk = true;
 		size_t offset = 0;
 		while( offset < len )
 		{
 			size_t chunk = std::min<size_t>(len - offset, 65535);
 			if( !sender(data + offset, static_cast<uint16>(chunk)) )
-				return false; // 부분 전송된 상태로 실패 — 호출부가 커넥션을 폐기해야 함
+			{
+				sendOk = false; // 부분 전송된 상태로 실패 — 호출부가 커넥션을 폐기해야 함
+				break;
+			}
 			offset += chunk;
 		}
 
-		m_onComplete = std::move(onComplete);
-		m_state = EHttpClientState::AwaitingResponse;
-		return true;
+		HttpRequestCompletionHandler cb;
+		bool deferredSuccess = false;
+		bool result = true;
+		{
+			std::lock_guard<std::mutex> guard(m_lock);
+			m_sendInProgress = false;
+
+			if( m_hasDeferredResult && m_onComplete )
+			{
+				// 전송 중에 응답이 완결됐다(서버의 조기 응답, 예: 큰 본문에 대한 413 후 연결 종료). 전송이
+				// 끝났든 중간에 실패했든 이미 받은 완결된 응답이 있으므로 그것을 통지한다 — 전송 실패로
+				// 덮어쓰면 서버가 보낸 응답이 사라진다.
+				m_hasDeferredResult = false;
+				deferredSuccess = m_deferredSuccess;
+				cb = std::move(m_onComplete);
+				m_onComplete = nullptr;
+				m_state.store(EHttpClientState::Idle, std::memory_order_release);
+			}
+			else if( !sendOk )
+			{
+				m_hasDeferredResult = false;
+				if( m_onComplete )
+				{
+					// 아직 통지되지 않았다 — 요청을 취소하고 호출부가 실패를 직접 처리하게 한다
+					// (이 경우 onComplete는 호출되지 않는다).
+					m_onComplete = nullptr;
+					m_state.store(EHttpClientState::Idle, std::memory_order_release);
+					result = false;
+				}
+				// 그렇지 않으면 전송 중 세션이 끊겨 OnSessionDisconnected()가 이미 실패를 통지했다.
+				// 콜백이 정확히 한 번 호출됐으므로 true를 반환해 호출부의 이중 처리를 막는다.
+			}
+		}
+
+		if( cb )
+			cb(deferredSuccess, m_parser);
+
+		return result;
 	}
 
 	//***************************************************************************
@@ -97,26 +174,102 @@ public:
 	//***************************************************************************
 	bool FeedRecv(const char* data, size_t len)
 	{
-		if( m_state != EHttpClientState::AwaitingResponse )
-			return false; // 요청도 안 했는데 온 데이터 — 프로토콜 위반, 상위에서 별도 처리
-
-		HTTP::EParseState st = m_parser.Feed(data, len);
-		if( st != HTTP::EParseState::Complete && st != HTTP::EParseState::Error )
-			return false; // 아직 더 필요
-
-		bool success = (st == HTTP::EParseState::Complete);
-		m_state = EHttpClientState::Idle;
-
-		if( m_onComplete )
+		HttpRequestCompletionHandler cb;
+		bool success = false;
 		{
-			HttpRequestCompletionHandler cb = std::move(m_onComplete);
+			std::lock_guard<std::mutex> guard(m_lock);
+
+			if( m_state.load(std::memory_order_relaxed) != EHttpClientState::AwaitingResponse )
+				return false; // 요청도 안 했는데 온 데이터 — 프로토콜 위반, 상위에서 별도 처리
+
+			if( m_hasDeferredResult )
+				return false; // 이미 응답이 완결돼 통지를 기다리는 중 — 추가 데이터는 무시
+
+			NoteActivity(); // 응답 데이터가 도착했다 — 무응답 타임아웃 기준 시각을 갱신한다
+
+			HTTP::EParseState st = m_parser.Feed(data, len);
+			if( st != HTTP::EParseState::Complete && st != HTTP::EParseState::Error )
+				return false; // 아직 더 필요
+
+			success = (st == HTTP::EParseState::Complete);
+
+			if( m_sendInProgress )
+			{
+				// 요청 전송이 아직 끝나지 않았는데 응답이 완결됐다(서버의 조기 응답). 지금 통지하면
+				// 풀이 이 세션을 다른 요청에 재사용해 아직 전송 중인 이 요청과 바이트가 섞이므로,
+				// BeginRequest()가 전송을 마친 뒤 통지하도록 미룬다.
+				m_hasDeferredResult = true;
+				m_deferredSuccess = success;
+				return true;
+			}
+
+			m_state.store(EHttpClientState::Idle, std::memory_order_release);
+			cb = std::move(m_onComplete);
 			m_onComplete = nullptr;
-			cb(success, m_parser); // 콜백 안에서 다음 BeginRequest()를 걸 수도 있으므로 Idle 전이 이후 호출
 		}
+
+		if( cb )
+			cb(success, m_parser); // 락 밖에서 호출 — 콜백 안에서 다음 BeginRequest()를 걸 수도 있으므로 Idle 전이 이후 호출
 		return true;
 	}
 
-	EHttpClientState GetState() const noexcept { return m_state; }
+	//***************************************************************************
+	// @brief 연결이 살아있다는 신호(응답 수신, 요청 송신 진행)를 기록해 무응답 타임아웃 기준을 갱신합니다.
+	// @details 락 없이 호출할 수 있다. 큰 요청 본문을 느린 회선으로 올리는 동안 응답이 없다는 이유로
+	//          요청이 끊기지 않도록 세션이 송신 완료 시점에도 호출한다.
+	//***************************************************************************
+	void NoteActivity() noexcept
+	{
+		m_lastActivityNs.store(Clock::now().time_since_epoch().count(), std::memory_order_relaxed);
+	}
+
+	//***************************************************************************
+	// @brief 진행 중인 요청이 무응답 타임아웃을 넘겼으면 실패(false)로 통지하고 중단합니다.
+	// @param now 현재 시각
+	// @return 이번 호출로 요청을 타임아웃 처리했으면 true
+	// @details 판단과 중단을 m_lock 안에서 "현재 요청"에 대해 한 번에 하므로, 호출 스레드가 세션을 읽는
+	//          사이 세션이 다른 요청에 재사용됐더라도 엉뚱한 요청을 끊지 않는다. 기준 시각은
+	//          max(제출 시각, 마지막 활동 시각)이다. 완료 콜백은 락 밖에서 정확히 한 번 호출되며
+	//          파서에 타임아웃 표시(IsTimedOut())가 붙는다. 호출 계약(BeginRequest()가 true면
+	//          콜백은 정확히 한 번)을 지킨다.
+	//***************************************************************************
+	bool CheckTimeout(Clock::time_point now)
+	{
+		HttpRequestCompletionHandler cb;
+		{
+			std::lock_guard<std::mutex> guard(m_lock);
+
+			if( m_timeout <= std::chrono::milliseconds::zero() )
+				return false;
+			if( m_state.load(std::memory_order_relaxed) != EHttpClientState::AwaitingResponse )
+				return false;
+			if( m_hasDeferredResult )
+				return false; // 응답이 이미 완결돼 통지를 기다리는 중 — 정상 완료가 우선한다
+
+			Clock::time_point base = m_submitTime;
+			const int64_t lastNs = m_lastActivityNs.load(std::memory_order_relaxed);
+			if( lastNs != 0 )
+			{
+				Clock::time_point last{ Clock::duration(lastNs) };
+				if( last > base )
+					base = last;
+			}
+
+			if( now - base < m_timeout )
+				return false;
+
+			m_parser.MarkTimedOut();
+			m_state.store(EHttpClientState::Idle, std::memory_order_release);
+			cb = std::move(m_onComplete);
+			m_onComplete = nullptr;
+		}
+
+		if( cb )
+			cb(false, m_parser);
+		return true;
+	}
+
+	EHttpClientState GetState() const noexcept { return m_state.load(std::memory_order_acquire); }
 
 	//***************************************************************************
 	// @brief 직전 응답이 "Connection: close"를 명시했는지 반환합니다.
@@ -135,36 +288,59 @@ public:
 	//          진행 중이던 요청이 있으면 m_onComplete를 로컬 변수로 옮겨 담고
 	//          멤버는 즉시 nullptr로 비운 뒤에 호출한다 — 콜백을 호출하기
 	//          "전에" 먼저 비우는 순서가 중요하다. 이 콜백(주로 CHttpConnPoolT::
-	//          DispatchToSession()이 넘긴 것) 자신이 이 세션을 참조하고 있을 수
-	//          있는데, m_onComplete를 비우지 않은 채로 콜백을 호출하면 콜백
-	//          실행 도중 재진입(예: 콜백이 즉시 다음 요청을 이 세션에 다시
-	//          걸려고 시도하는 경우)이 일어났을 때 아직 남아있는 이전
-	//          m_onComplete와 상태가 꼬일 수 있고, 무엇보다 콜백이 붙잡고 있는
-	//          참조가 세션 자신을 향하는 자기 참조 순환(self-cycle)으로 이어질
-	//          경우 그 순환을 최대한 빨리 끊어주기 위함이다(HttpConnPool.h의
-	//          DispatchToSession() 순환 참조 수정 이력 참고).
+	//          DispatchToSession()이 넘긴 것)은 이 세션을 참조할 수 있어, 비우지 않은 채
+	//          호출하면 콜백 안의 재진입(예: 즉시 다음 요청을 이 세션에 거는 경우)에서 이전
+	//          m_onComplete와 상태가 꼬이고, 콜백이 붙잡은 참조가 세션 자신을 향하는 순환이
+	//          오래 남는다(풀은 세션을 원시 포인터로만 캡처해 순환을 만들지 않는다).
 	//
-	//          success=false로 통지하므로, 이 콜백을 받는 쪽(풀)은 이 세션을
-	//          재사용하지 말고 폐기해야 한다.
+	//          통지 결과: 이미 완결된 응답이 있었거나(전송 중 조기 응답), "연결 종료까지" 본문을
+	//          읽던 중 서버가 정상 종료한 경우는 success=true, 그 밖에는 false다. 어느 쪽이든
+	//          연결이 끊긴 세션이므로 받는 쪽(풀)은 재사용하지 말고 폐기해야 한다.
 	//***************************************************************************
-	void OnSessionDisconnected()
+	void OnSessionDisconnected(bool graceful = false)
 	{
-		if( m_state != EHttpClientState::AwaitingResponse )
-			return;
-
-		m_state = EHttpClientState::Idle;
-		if( m_onComplete )
+		HttpRequestCompletionHandler cb;
+		bool success = false;
 		{
-			HttpRequestCompletionHandler cb = std::move(m_onComplete);
+			std::lock_guard<std::mutex> guard(m_lock);
+
+			if( m_state.load(std::memory_order_relaxed) != EHttpClientState::AwaitingResponse )
+				return;
+
+			if( m_hasDeferredResult )
+			{
+				// 전송 중에 이미 완결된 응답이 있었다 — 그 뒤에 연결이 끊겼어도 응답 자체는 유효하다.
+				success = m_deferredSuccess;
+			}
+			else if( graceful && !m_sendInProgress && m_parser.IsReadingUntilClose() )
+			{
+				// 본문이 "연결 종료까지"인 응답을 읽던 중 서버가 연결을 정상 종료(FIN)했다면 그것이 본문의
+				// 끝이다. 리셋/로컬 종료(graceful == false)로 끊긴 경우는 본문이 잘렸을 수 있으므로 실패로 둔다.
+				m_parser.FinishAtConnectionClose();
+				success = true;
+			}
+
+			m_state.store(EHttpClientState::Idle, std::memory_order_release);
+			m_hasDeferredResult = false;
+			cb = std::move(m_onComplete);
 			m_onComplete = nullptr;               // 호출 전에 비워서 self-cycle을 즉시 끊음
-			cb(false, m_parser);                  // success=false로 실패 통지
 		}
+
+		if( cb )
+			cb(success, m_parser);                // 실패(또는 연결 종료로 완결된 응답) 통지 (락 밖에서 호출)
 	}
 
 private:
-	EHttpClientState m_state = EHttpClientState::Idle; // 요청/응답 진행 상태
+	std::mutex m_lock;                                   // 아래 상태 전체를 보호 (완료 콜백은 락 밖에서 호출)
+	std::atomic<EHttpClientState> m_state{ EHttpClientState::Idle }; // 요청/응답 진행 상태 (쓰기는 m_lock 안에서만)
 	CHttpResponseParser m_parser;                      // 응답 파서 (Idle 전이 시 재사용)
 	HttpRequestCompletionHandler m_onComplete;          // 진행 중인 요청의 완료 콜백
+	std::chrono::milliseconds m_timeout{ 0 };           // 진행 중인 요청의 무응답 타임아웃 (0 이하면 없음)
+	Clock::time_point m_submitTime{};                   // 진행 중인 요청의 제출 시각 (타임아웃 기준)
+	std::atomic<int64_t> m_lastActivityNs{ 0 };         // 마지막 활동(응답 수신/송신 진행) 시각, 0이면 아직 없음 (락 없이 갱신)
+	bool m_sendInProgress = false;                      // BeginRequest()가 요청을 전송하는 중인지
+	bool m_hasDeferredResult = false;                   // 전송 중에 응답이 완결돼 통지가 미뤄졌는지
+	bool m_deferredSuccess = false;                     // 미뤄진 통지의 성공 여부
 };
 
 #endif // ndef UC_HTTPCLIENTCORE_H

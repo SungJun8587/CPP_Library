@@ -27,6 +27,10 @@ void CPacketDispatcher::Register(uint16 type, uint16 minSize, PacketHandler hand
 {
 	ASSERT_CRASH(handler != nullptr);
 
+	// minSize가 헤더보다 작으면 header->size가 0~3인 패킷도 핸들러까지 도달해, 호출부의
+	// 프레이밍 루프가 size 0에서 전진하지 못하는 등의 문제로 이어진다.
+	ASSERT_CRASH(minSize >= sizeof(PacketHeader));
+
 	auto& table = GetTable();
 
 	// 같은 타입이 중복 등록되면(복붙 실수 등) 조용히 덮어쓰지 않고 바로
@@ -51,7 +55,8 @@ EPacketDispatchResult CPacketDispatcher::Dispatch(void* context, const PacketHea
 	// header->size가 실제로 받아둔 버퍼 범위를 넘어서면, 호출부가 프레이밍
 	// 검증을 빠뜨렸거나 실수했다는 뜻이다 — 공용 컴포넌트인 이상 호출부를
 	// 전적으로 믿지 않고 여기서 한 번 더 막는다.
-	if( bufferSize < sizeof(PacketHeader) || header->size > bufferSize )
+	// header->size가 헤더 크기보다 작은 패킷도 프로토콜 위반이다(타입 조회 전에 거른다).
+	if( bufferSize < sizeof(PacketHeader) || header->size < sizeof(PacketHeader) || header->size > bufferSize )
 		return EPacketDispatchResult::SizeViolation;
 
 	auto& table = GetTable();

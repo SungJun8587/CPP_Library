@@ -76,6 +76,7 @@
     <ClInclude Include="Image\ColorSpace.h" />
     <ClInclude Include="Image\Deflate.h" />
     <ClInclude Include="Image\FileManager.h" />
+    <ClInclude Include="Image\GifCodec.h" />
     <ClInclude Include="Image\ICodec.h" />
     <ClInclude Include="Image\ImageCommon.h" />
     <ClInclude Include="Image\ImageFilters.h" />
@@ -106,12 +107,14 @@
     <ClInclude Include="Memory\Singleton.h" />
     <ClInclude Include="Network\HTTP\FormUrlEncodedParser.h" />
     <ClInclude Include="Network\HTTP\HttpClient.h" />
+    <ClInclude Include="Network\HTTP\HttpClientChannel.h" />
     <ClInclude Include="Network\HTTP\HttpClientCore.h" />
     <ClInclude Include="Network\HTTP\HttpConnPool.h" />
     <ClInclude Include="Network\HTTP\HttpConnPoolCommon.h" />
     <ClInclude Include="Network\HTTP\HttpConnPoolFactory.h" />
     <ClInclude Include="Network\HTTP\HttpConnPoolManager.h" />
     <ClInclude Include="Network\HTTP\HttpFormUtil.h" />
+    <ClInclude Include="Network\HTTP\HttpMessageParser.h" />
     <ClInclude Include="Network\HTTP\HttpMultipartBuilder.h" />
     <ClInclude Include="Network\HTTP\HttpPacketBuilder.h" />
     <ClInclude Include="Network\HTTP\HttpParseUtil.h" />
@@ -131,6 +134,7 @@
     <ClInclude Include="Network\IOCP\IocpService.h" />
     <ClInclude Include="Network\IOCP\IocpSession.h" />
     <ClInclude Include="Network\IOCP\IocpSessionManager.h" />
+    <ClInclude Include="Network\IOCP\IocpWorkerPool.h" />
     <ClInclude Include="Network\IOCP\RecvBuffer.h" />
     <ClInclude Include="Network\IOCP\SendBuffer.h" />
     <ClInclude Include="Network\NetAddress.h" />
@@ -153,6 +157,7 @@
     <ClInclude Include="Network\RIO\RioReceive.h" />
     <ClInclude Include="Network\RIO\RioSend.h" />
     <ClInclude Include="Network\RIO\RioService.h" />
+    <ClInclude Include="Network\RIO\RioServiceHelper.h" />
     <ClInclude Include="Network\RIO\RioSession.h" />
     <ClInclude Include="Network\RIO\RioSessionManager.h" />
     <ClInclude Include="Network\RIO\RioSubmissionHelper.h" />
@@ -191,6 +196,7 @@
     <ClInclude Include="Thread\PlatformLock.h" />
     <ClInclude Include="Thread\SpinLock.h" />
     <ClInclude Include="Thread\SRWLock.h" />
+    <ClInclude Include="Thread\SyncValue.h" />
     <ClInclude Include="Thread\ThreadManager.h" />
     <ClInclude Include="UtilCore.h" />
     <ClInclude Include="Util\BaseFile.h" />
@@ -206,6 +212,7 @@
     <ClInclude Include="Util\EncodingConvert.h" />
     <ClInclude Include="Util\FileStream.h" />
     <ClInclude Include="Util\KeyedTable.h" />
+    <ClInclude Include="Util\ScopeExit.h" />
     <ClInclude Include="Util\TextFieldParser.h" />
     <ClInclude Include="Util\TypeCast.h" />
     <ClInclude Include="Util\UniqNumGenerator.h" />
@@ -247,6 +254,7 @@
     <ClCompile Include="Image\ColorSpace.cpp" />
     <ClCompile Include="Image\Deflate.cpp" />
     <ClCompile Include="Image\FileManager.cpp" />
+    <ClCompile Include="Image\GifCodec.cpp" />
     <ClCompile Include="Image\ImageFilters.cpp" />
     <ClCompile Include="Image\ImageIO.cpp" />
     <ClCompile Include="Image\ImageProcessor.cpp" />
@@ -272,6 +280,7 @@
     <ClCompile Include="Network\IOCP\IocpService.cpp" />
     <ClCompile Include="Network\IOCP\IocpSession.cpp" />
     <ClCompile Include="Network\IOCP\IocpSessionManager.cpp" />
+    <ClCompile Include="Network\IOCP\IocpWorkerPool.cpp" />
     <ClCompile Include="Network\IOCP\RecvBuffer.cpp" />
     <ClCompile Include="Network\IOCP\SendBuffer.cpp" />
     <ClCompile Include="Network\NetAddress.cpp" />
@@ -289,6 +298,7 @@
     <ClCompile Include="Network\RIO\RioReceive.cpp" />
     <ClCompile Include="Network\RIO\RioSend.cpp" />
     <ClCompile Include="Network\RIO\RioService.cpp" />
+    <ClCompile Include="Network\RIO\RioServiceHelper.cpp" />
     <ClCompile Include="Network\RIO\RioSession.cpp" />
     <ClCompile Include="Network\RIO\RioSessionManager.cpp" />
     <ClCompile Include="Network\RIO\RioSubmissionHelper.cpp" />

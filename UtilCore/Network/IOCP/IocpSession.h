@@ -11,9 +11,12 @@
 #include <Network/IOCP/IocpEvent.h>
 #include <Network/RingBuffer.h>
 #include <Network/SocketUtils.h>
+#include <Util/ScopeExit.h>
 
+#include <algorithm>
 #include <atomic>
 #include <mutex>
+#include <limits>
 
 //***************************************************************************
 // @class CIocpSession
@@ -21,8 +24,10 @@
 // @details
 // 역할:
 //      1. 소켓 관리, WSARecv/WSASend/DisconnectEx 호출 및 완료 이벤트 처리
-//      2. Scatter-Gather Send 지원 (여러 패킷을 1회 WSASend로 일괄 전송,
-//         부분 전송(Partial WSASend) 발생 시 SendEvent의 커서로 이어서 전송)
+//      2. Scatter-Gather Send 지원 (큐에 쌓인 여러 패킷을 1회 WSASend로 일괄 전송).
+//         Send() 한 번의 데이터가 SendBuffer 청크(Iocp::SEND_BUFFER_CHUNK_SIZE)보다
+//         크면 여러 SendBuffer로 나눠 하나의 단위로 큐에 넣는다(최대 uint16 = 65535바이트).
+//         송신 큐 누적 상한은 SetMaxSendQueueBytes()로 선택 지정한다(기본 0 = 무제한).
 //      3. CRingBuffer를 통한 제로카피 비동기 데이터 수신 관리 (WSARecv)
 //      4. 상위 응용 레이어(GameSession 등)로 가상 함수 이벤트(OnConnected 등) 전달
 //      5. ConnectEx를 통한 클라이언트 측 비동기 연결(ConnectAsync) 지원
@@ -78,6 +83,32 @@ public:
 	Iocp::CloseReason GetCloseReason() const noexcept { return _closeReason.load(std::memory_order_acquire); }
 
 	//***************************************************************************
+	// @brief 상대가 연결을 정상 종료(FIN)해서 세션이 종료됐는지 반환합니다.
+	// @details 수신 완료가 오류 없이 0바이트로 끝난 경우에만 true이며, 리셋/소켓 오류/로컬 종료는 false입니다.
+	//          상위 레이어가 "연결 종료로 끝나는 데이터"(HTTP/1.0식 본문 등)의 끝과 오류로 인한 끊김을
+	//          구분할 때 OnDisconnected() 안에서 사용합니다.
+	//***************************************************************************
+	bool WasGracefulClose() const noexcept { return _gracefulClose.load(std::memory_order_acquire); }
+
+	//***************************************************************************
+	// @brief 연결이 완료될 때(ProcessConnect, OnConnected() 직전) 소켓에 적용할 TCP 옵션.
+	// @details 기본값은 모두 꺼짐(기존 동작). 서버 서비스는 SetSessionSocketOptions()로 접속하는 모든 세션에,
+	//          세션 서브클래스는 생성자나 OnConnected() 이전에 SetSocketOptions()로 자기 세션에 지정할 수 있다.
+	//          - noDelay: TCP_NODELAY(Nagle 끔). 작은 패킷을 연달아 보내는 채팅/게임처럼 지연에 민감한 서비스용.
+	//          - keepAlive: SO_KEEPALIVE. FIN/RST 없이 조용히 끊긴 연결을 유휴 중에도 감지한다.
+	//***************************************************************************
+	struct SocketOptions
+	{
+		bool	noDelay = false;
+		bool	keepAlive = false;
+		uint32	keepAliveIdleMs = 30000;		// 마지막 데이터 이후 첫 keep-alive 확인까지 (keepAlive가 true일 때만 사용)
+		uint32	keepAliveIntervalMs = 10000;	// keep-alive 확인 간격
+	};
+
+	void			SetSocketOptions(const SocketOptions& options) noexcept { _socketOptions = options; }
+	SocketOptions	GetSocketOptions() const noexcept { return _socketOptions; }
+
+	//***************************************************************************
 	// @brief 고유 세션 ID를 설정합니다.
 	// @param sessionId 설정할 고유 세션 ID
 	//***************************************************************************
@@ -91,7 +122,61 @@ public:
 
 public:
 	void			ProcessConnect();	// CIocpListener의 OnAcceptCallback 등에서 연결 수락 완료 후 호출
+
+	//***************************************************************************
+	// @brief 바이트 데이터를 송신 큐에 넣고 전송을 요청합니다 (Thread-safe).
+	// @param data 전송할 데이터 포인터
+	// @param size 전송할 바이트 수 (1 ~ 65535)
+	// @return bool 큐잉 성공 여부. 연결되지 않았거나 인자가 잘못된 경우, SendBuffer를
+	//         확보하지 못한 경우, 송신 큐 상한을 넘겨 연결이 종료된 경우 false.
+	// @details size가 Iocp::SEND_BUFFER_CHUNK_SIZE보다 크면 여러 SendBuffer로 나눠
+	//          한 번의 락 구간에서 한꺼번에 큐에 넣으므로, 여러 스레드가 동시에 Send()해도
+	//          한 호출의 조각들이 다른 호출의 데이터와 섞이지 않습니다.
+	//***************************************************************************
 	bool			Send(const void* data, uint16 size) noexcept;
+
+	//***************************************************************************
+	// @brief Send() 한 번이 만드는 SendBuffer 묶음.
+	// @details 같은 데이터를 여러 세션에 보낼 때(Broadcast) PrepareSend()로 한 번만 만들고
+	//          SendPrepared()로 세션마다 공유 전송한다. SendBuffer는 Close() 이후 읽기 전용이라
+	//          여러 세션의 송신 큐가 같은 버퍼를 동시에 참조해도 안전하며, 마지막 세션의 전송이
+	//          끝나 참조가 모두 풀려야 청크가 풀로 반환된다.
+	//***************************************************************************
+	struct SendPieces
+	{
+		CSendBufferRef	buffers[Iocp::kMaxSendPieces];
+		size_t			count = 0;
+		uint64			totalBytes = 0;
+	};
+
+	//***************************************************************************
+	// @brief 데이터를 SendBuffer들로 복사해 SendPieces를 만듭니다 (호출 스레드의 thread_local 청크 사용).
+	// @param data 전송할 데이터 포인터
+	// @param size 전송할 바이트 수 (1 ~ 65535)
+	// @param out 결과를 받을 SendPieces
+	// @return bool 성공 여부 (인자가 잘못됐거나 SendBuffer를 확보하지 못하면 false)
+	//***************************************************************************
+	static bool		PrepareSend(const void* data, uint16 size, SendPieces& out) noexcept;
+
+	//***************************************************************************
+	// @brief PrepareSend()로 만든 SendBuffer 묶음을 이 세션의 송신 큐에 넣습니다 (Thread-safe).
+	// @param pieces 전송할 묶음 (호출 후에도 그대로 유지되어 다른 세션에 다시 쓸 수 있다)
+	// @return bool 큐잉 성공 여부. Send()와 같은 조건에서 false.
+	//***************************************************************************
+	bool			SendPrepared(const SendPieces& pieces) noexcept;
+
+	//***************************************************************************
+	// @brief 송신 큐(아직 WSASend에 넘기지 않은 데이터)의 누적 바이트 상한을 설정합니다.
+	// @param maxBytes 상한 바이트 수. 0이면 무제한(기본값).
+	// @details 상한을 넘기게 되는 Send()는 데이터를 큐에 넣지 않고
+	//          Disconnect(Iocp::CloseReason::SendBufferOverflow)를 호출한 뒤 false를 반환합니다.
+	//          대용량 body를 큐잉하는 HTTP 클라이언트 세션 등은 무제한(0)으로 두고,
+	//          수신 속도가 느린 클라이언트로부터 서버 메모리를 보호해야 하는
+	//          게임/채팅 세션에서만 지정하는 용도입니다. 이미 WSASend에 넘어간
+	//          in-flight 데이터는 이 상한에 포함되지 않습니다.
+	//***************************************************************************
+	void			SetMaxSendQueueBytes(uint64 maxBytes) noexcept { _maxSendQueueBytes.store(maxBytes, std::memory_order_relaxed); }
+	uint64			GetMaxSendQueueBytes() const noexcept { return _maxSendQueueBytes.load(std::memory_order_relaxed); }
 
 	//***************************************************************************
 	// @brief ConnectEx로 비동기 연결을 게시합니다 (클라이언트 측 전용).
@@ -123,7 +208,20 @@ protected:
 	virtual void	OnSend(int32 len) {}
 
 private:
-	void			Send(CSendBufferRef sendBuffer);
+	//***************************************************************************
+	// @brief 이미 Close()된 SendBuffer들을 하나의 단위로 송신 큐에 넣고, 진행 중인
+	//        WSASend가 없으면 RegisterSend()를 시작합니다.
+	// @param buffers SendBuffer 배열 (큐로 이동됨)
+	// @param count 배열 원소 수
+	// @param totalBytes 배열이 담고 있는 데이터의 총 바이트 수
+	// @return bool 큐잉 성공 여부 (미연결 또는 상한 초과 시 false)
+	//***************************************************************************
+	bool			EnqueueSend(CSendBufferRef* buffers, size_t count, uint64 totalBytes);
+
+	void			ApplySocketOptions() noexcept;	// _socketOptions를 소켓에 적용 (ProcessConnect()에서 OnConnected() 직전에 호출)
+
+	// 이 completion 하나에 대응하는 outstanding I/O 카운트를 내리고 종료 통지 조건을 재확인합니다.
+	void			ReleaseIo() noexcept;
 
 	void			RegisterRecv();
 	void			RegisterSend();
@@ -132,25 +230,6 @@ private:
 	void			ProcessRecv(int32 numOfBytes);
 	void			ProcessSend(int32 numOfBytes);
 	void			ProcessDisconnect();
-
-	//***************************************************************************
-	// @brief 현재 SendEvent의 cursor(currentBufferIndex/currentBufferOffset)
-	//        위치부터 WSABUF 배열(_sendEvent.wsaBufs)을 구성합니다.
-	// @return 전송할 데이터가 하나 이상 있으면 true, 없으면 false.
-	// @details 부분 전송(Partial WSASend) 지원의 일부. RegisterSend()에서
-	//          WSASend 호출 직전에 사용한다.
-	//***************************************************************************
-	bool			BuildSendWsaBuffers();
-
-	//***************************************************************************
-	// @brief WSASend 완료로 전달된 numOfBytes만큼 SendEvent cursor를 이동합니다.
-	// @param numOfBytes 이번 WSASend 완료로 실제 전송된 바이트 수
-	// @return numOfBytes가 현재 등록된 전송 범위(sendBuffers 총 잔여량)를
-	//         벗어나지 않으면 true, 벗어나면(있어서는 안 되는 상태) false.
-	// @details 부분 전송(Partial WSASend) 지원의 일부. ProcessSend()에서
-	//          가장 먼저 호출한다.
-	//***************************************************************************
-	bool			AdvanceSendCursor(uint32 numOfBytes);
 
 	//***************************************************************************
 	// @brief ConnectEx 비동기 연결을 실제로 게시합니다 (ConnectAsync() 내부에서 호출).
@@ -169,50 +248,38 @@ private:
 	//***************************************************************************
 	// @brief connect 실패 시 정리 전용 경로.
 	// @param reason 실패 사유
-	// @details Disconnect(reason)을 재사용하지 않는 이유: 그 함수는
-	//          `_connected.exchange(false) == false`면 즉시 return하는 가드가
-	//          있는데, connect 실패 시점엔 _connected가 한 번도 true였던 적이
-	//          없어(ProcessConnect()가 아직 호출되지 않음) 그 가드에 걸려 소켓도
-	//          안 닫히고 OnDisconnected()도 호출되지 않은 채 소켓 핸들만 새는
-	//          문제가 있었습니다. 이 함수는 _connected 상태와 무관하게 항상
-	//          소켓을 닫고 통지 콜백을 호출합니다.
+	// @details _connected 상태와 무관하게 소켓을 닫고 OnDisconnected() 통지를 완료합니다.
+	//          Disconnect(Iocp::CloseReason)의 "미연결 상태 강제 종료" 경로와
+	//          _disconnectNotified CAS 가드를 공유하므로 어느 쪽이 먼저 실행되든 통지는
+	//          1회만 나갑니다(취소된 ConnectEx의 완료가 뒤늦게 도착해도 중복 통지 없음).
 	//***************************************************************************
 	void			FailConnect(Iocp::CloseReason reason);
 
 	//***************************************************************************
-	// @brief [수정 — outstanding recv/send 완료를 기다린 뒤에만 OnDisconnected() 통지]
-	// @details 예전에는 ProcessDisconnect()(DisconnectEx 자신의 completion)가
-	//          도착하는 즉시 OnDisconnected()를 통지했다. 그런데 그 시점에
-	//          이미 게시돼 있던 WSARecv/WSASend가 다른 워커 스레드에서 "취소되지
-	//          않고 실제 데이터와 함께" 완료될 수 있는 좁은 레이스가 있어서,
-	//          "연결 끊김" 통지가 이미 나간 뒤에 OnRecv()가 뒤늦게 호출되는
-	//          순서 역전이 가능했다(크래시는 아님 — CIocpEvent의 owner shared_ptr이
-	//          객체 lifetime은 보장하므로 — 하지만 상위 프로토콜 레이어 입장에서는
-	//          이미 죽었다고 통지받은 세션에서 데이터가 더 오는 논리적 모순).
+	// @brief outstanding recv/send가 모두 완료되고 DisconnectEx 자신의 completion도
+	//        처리됐을 때에만 OnDisconnected()를 1회 통지합니다.
+	// @details 조건은 _pendingIoCount == 0 && _disconnectCompleted 입니다. 어느 쪽이 나중에
+	//          만족되든(마지막 recv/send completion, 또는 DisconnectEx completion) 그쪽 호출부가
+	//          이 함수를 통해 통지를 트리거하며, _disconnectNotified CAS로 이중 통지를 막습니다.
+	//          세 상태 변수는 seq_cst로만 접근합니다(서로 다른 두 원자 변수에 걸친
+	//          "나중에 만족시킨 쪽이 통지한다"는 인과관계를 단순하게 보장하기 위함).
 	//
-	//          이제 _pendingIoCount(outstanding recv+send 수)가 0이고
-	//          _disconnectCompleted도 true일 때만(둘 다 만족해야 함 — 어느 쪽이
-	//          나중에 만족되든 그쪽이 실제로 통지를 트리거함) OnDisconnected()를
-	//          호출한다. _disconnectNotified로 이중 통지를 막는다.
-	//
-	//          [부분 전송(Partial WSASend) 관련 주의] ProcessSend()는 remainder가
-	//          남아있는 completion에 대해서는 다음 WSASend 재등록(_pendingIoCount
-	//          fetch_add)을 먼저 마친 뒤에야 이번 completion의 fetch_sub를
-	//          수행한다. 그렇지 않으면 remainder가 남았는데도 pendingIoCount가
-	//          순간적으로 0이 되어 여기서 조기에 OnDisconnected()를 통지하는
-	//          회귀가 발생한다.
+	//          [Process* 와의 순서] ProcessRecv/ProcessSend는 자신의 completion에 대응하는
+	//          _pendingIoCount 감소와 이 함수 호출을 함수가 끝날 때(OnRecv()/OnSend()와 다음 I/O
+	//          게시까지 마친 뒤) 수행합니다. 따라서 OnRecv()/OnSend()가 실행되는 동안에는 다른
+	//          스레드가 OnDisconnected()를 통지하지 못하고, 통지 이후에는 이 세션의 어떤
+	//          Process*도 콜백을 호출하지 않습니다(종료가 시작된 세션, 즉 IsConnected() == false이면
+	//          콜백 자체를 건너뜁니다). 이 보장의 예외는 Disconnect()의 강제 정리 경로입니다 —
+	//          미연결 세션, CNetService::Close(), Register* 실패 롤백, 사용자 코드의 중복
+	//          Disconnect() 호출은 이 카운트를 기다리지 않고 OnDisconnected()를 통지합니다
+	//          (연결 상태를 명시적 상태 머신으로 분리하는 개선은 보류).
 	//
 	//          [알려진 잔여 레이스 — 의도적으로 미해결] RegisterRecv()/RegisterSend()의
-	//          "IsConnected() 체크 후 post" 사이의 극히 좁은 틈에 Disconnect()가
-	//          끼어들면, 그 체크 통과 이후 실제 post(및 _pendingIoCount 증가)가
-	//          ProcessDisconnect()의 "카운트 0 확인"보다 늦게 반영될 이론적
-	//          가능성이 남아있다(개별 원자 변수들은 전부 seq_cst이지만, 서로
-	//          다른 두 원자 변수에 걸친 이 특정 인과관계까지 강제하려면
-	//          RegisterRecv/RegisterSend의 hot path에 락을 추가해야 해서 비용
-	//          대비 실익이 낮다고 판단해 보류함). 이 경우도 그 post는 곧
-	//          DisconnectEx에 의해 취소되어 aborted(0바이트)로 안전하게 완료되는
-	//          게 거의 항상이라(위 연구에서 확인한 IOCP의 표준 동작), 실질적
-	//          발생 확률은 극히 낮다.
+	//          "IsConnected() 체크 후 post" 사이의 극히 좁은 틈에 Disconnect()가 끼어들면,
+	//          실제 post(및 _pendingIoCount 증가)가 ProcessDisconnect()의 "카운트 0 확인"보다
+	//          늦게 반영될 이론적 가능성이 남아있다. 이를 강제하려면 RegisterRecv/RegisterSend의
+	//          hot path에 락을 추가해야 해서 비용 대비 실익이 낮다고 보아 보류했다. 이 경우에도
+	//          그 post는 곧 DisconnectEx에 의해 취소되어 aborted(0바이트)로 완료되는 것이 일반적이다.
 	//***************************************************************************
 	void			TryFinalizeDisconnect() noexcept;
 
@@ -223,6 +290,8 @@ private:
 
 	std::atomic<bool>				_connected = false;							// 원자적(Atomic) 연산을 보장하는 세션 연결/해제 상태 플래그
 	std::atomic<Iocp::CloseReason>	_closeReason{ Iocp::CloseReason::None };	// 세션 종료 사유 변수
+	SocketOptions					_socketOptions;								// 연결 완료 시 적용할 TCP 옵션 (SetSocketOptions() 참고)
+	std::atomic<bool>				_gracefulClose = false;						// 상대의 정상 종료(FIN)로 끝났는지 (WasGracefulClose() 참고)
 
 	// TryFinalizeDisconnect() 관련 — OnDisconnected() 통지를 outstanding
 	// recv/send 완료까지 지연시키기 위한 상태. 셋 다 seq_cst로만 접근한다
@@ -237,10 +306,12 @@ private:
 	std::mutex				_lock;                          // 송신 큐(_sendQueue) 스레드 동기화를 위한 뮤텍스
 	CRingBuffer				_recvBuffer;                    // 제로카피 비동기 수신(WSARecv)을 관리하는 수신 링버퍼
 	CVector<CSendBufferRef> _sendQueue;                     // 전송 대기 중인 패킷 참조(CSendBufferRef)들을 보관하는 송신 큐
+	uint64					_sendQueueBytes = 0;            // _sendQueue에 쌓인 데이터의 누적 바이트 수 (_lock으로 보호)
+	std::atomic<uint64>		_maxSendQueueBytes{ 0 };         // 송신 큐 누적 상한 (0 = 무제한)
 	std::atomic<bool>		_sendRegistered = false;        // WSASend 비동기 요청 중복 호출을 방지하는 원자적 등록 상태 플래그
 
 	RecvEvent				_recvEvent;                     // 비동기 수신(WSARecv) 요청 및 완료 처리를 위한 OVERLAPPED 이벤트 객체
-	SendEvent				_sendEvent;                     // 비동기 송신(WSASend) 요청 및 완료 처리를 위한 OVERLAPPED 이벤트 객체 (부분 전송 커서 보유)
+	SendEvent				_sendEvent;                     // 비동기 송신(WSASend) 요청 및 완료 처리를 위한 OVERLAPPED 이벤트 객체 (sendBuffers/wsaBufs 보유)
 	DisconnectEvent			_disconnectEvent;               // 비동기 해제(DisconnectEx) 요청 및 완료 처리를 위한 OVERLAPPED 이벤트 객체
 	ConnectEvent			_connectEvent;                  // 비동기 연결(ConnectEx) 요청 및 완료 처리를 위한 OVERLAPPED 이벤트 객체 (클라이언트 전용)
 };

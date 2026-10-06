@@ -7,6 +7,7 @@
 #ifndef UC_HTTPCONNPOOL_H
 #define UC_HTTPCONNPOOL_H
 
+#include <Network/Session.h>
 #include <Network/HTTP/HttpConnPoolCommon.h>
 #include <Containers/Queue/DelayedTaskQueue.h>
 
@@ -19,7 +20,11 @@
 #include <thread>
 #include <atomic>
 #include <algorithm>
+#include <chrono>
 #include <functional>
+#include <type_traits>
+#include <utility>
+#include <unordered_map>
 
 //***************************************************************************
 // @class CHttpConnPoolT
@@ -32,25 +37,22 @@
 //      없이도 이 파일 하나만으로 로직을 단위 테스트할 수 있다(테스트는 이
 //      파일과 함께 제공).
 //
-//      [엔진 비대칭 — 지금은 해소됨]
-//      IOCP/RIO 둘 다 이제 ConnectOneMoreSession()이 "게시만 하고" 즉시
-//      리턴하고, 실제 연결 완료/실패는 세션의 OnConnected()/OnDisconnected()
-//      훅으로 항상 비동기 통지된다(RIO도 CRioConnectDispatcher 도입 이후
-//      IOCP와 동일한 계약 — RioSession.h/RioService.h 변경 이력 참고). 그래서
-//      이 풀은 두 엔진을 완전히 동일한 코드 경로로 다룬다 —
-//      ConnectOneMoreSession()의 반환값은 "게시 시도" 성공 여부 로깅용으로만
-//      참고하고, 실제 유휴 목록 등록은 항상 OnSessionConnStateChanged
-//      (connected=true) 콜백에서만 수행한다.
+//      [연결 계약] IOCP/RIO 모두 ConnectOneMoreSession()은 연결 시도를 게시만 하고
+//      즉시 리턴하며, 실제 연결 완료/실패는 세션의 OnConnected()/OnDisconnected()가
+//      항상 비동기로 통지한다. 그래서 이 풀은 두 엔진을 같은 코드 경로로 다룬다 —
+//      ConnectOneMoreSession()의 반환값은 로깅용으로만 보고, 유휴 목록 등록은
+//      OnSessionConnStateChanged(connected=true)에서만 한다.
 //
 //      [_minIdle vs _maxConnections — 책임 분리]
 //      이 풀은 커넥션 수 관리를 두 가지 독립된 메커니즘으로 나눈다:
-//      - ScheduleReconnect() (백오프 경로): 세션이 끊겼을 때(OnSessionConnStateChanged
+//      - ScheduleReconnect() (백오프 경로): 세션이 끊겼거나 연결 게시에 실패했을 때(OnSessionConnStateChanged
 //        (false)) 호출된다. 목적은 "기준선(_minIdle) 유지"다 — 현재 세션 수가
 //        _minIdle 미만일 때만 지수 백오프(200ms 시작, 2배씩 증가, 10초 상한)를
 //        걸어 CDelayedTaskQueue에 재연결을 예약한다. 이미 _minIdle을 채우고
 //        있으면(끊긴 게 여분의 버스트 커넥션이었다면) 여기서는 더 만들지 않는다.
-//        디스커넥트는 원격 서버의 일시적 장애를 의미할 수 있어 백오프로 과도한
-//        재시도를 피한다.
+//        지연은 연속 "연결 실패"(연결에 한 번도 성공하지 못한 세션의 종료, 연결 게시 실패)가
+//        쌓일 때만 커지고, 연결에 성공하면 다시 기본값으로 돌아간다. 연결됐다가 끊긴 세션이나
+//        Connection: close 폐기는 기본 지연으로 바로 다시 채운다.
 //      - TryGrow() (즉시 경로): SendRequest()가 유휴 세션을 못 찾아 요청을
 //        대기열에 쌓아야 할 때 호출된다. 이건 장애 복구가 아니라 "지금 수요가
 //        기준선을 넘었다"는 정상적인 신호이므로, 백오프 없이 즉시
@@ -76,17 +78,31 @@
 //      안 죽는 leak)이 생긴다. raw this + 소멸자에서 확실한 join이 더 안전한
 //      선택이다.
 //***************************************************************************
+// 서비스가 SetRemoteAddress()를 지원하는지 컴파일 타임에 판별한다 (지원하지 않는 서비스는 주소 갱신을 무시한다).
+template<typename T, typename = void>
+struct HttpSvcHasSetRemoteAddress : std::false_type {};
+template<typename T>
+struct HttpSvcHasSetRemoteAddress<T, std::void_t<decltype(std::declval<T&>().SetRemoteAddress(std::declval<const CNetAddress&>()))>> : std::true_type {};
+
 template<typename TSession, typename TSessionRef, typename TService, typename TServiceRef>
 class CHttpConnPoolT
 	: public IHttpConnPool
 	, public std::enable_shared_from_this<CHttpConnPoolT<TSession, TSessionRef, TService, TServiceRef>>
 {
 	using ThisPool = CHttpConnPoolT<TSession, TSessionRef, TService, TServiceRef>;
+	using Clock = std::chrono::steady_clock;
 
 public:
 	// 재연결 백오프 기준값 — 테스트에서 타이밍 검증에 사용하므로 public.
 	static constexpr int32 kBackoffBaseDelayMs = 200; // 최초 재연결 지연(ms)
 	static constexpr int32 kBackoffMaxDelayMs = 10000; // 재연결 지연 상한(ms)
+
+	// 요청 타임아웃: 기본 무응답 시간, 점검 주기, 멱등 요청 자동 재시도 횟수
+	static constexpr int64 kDefaultRequestTimeoutMs = 30000;
+	static constexpr int32 kTimeoutScanIntervalMs = 500;
+	static constexpr int32 kMaxIdempotentRetries = 1;
+
+	using IHttpConnPool::SendRequest; // 3인자 오버로드(풀 기본 타임아웃 사용)를 가리지 않게 한다
 
 	//***************************************************************************
 	// @brief 풀을 생성합니다. 세션 팩토리가 이 풀 자신(weak_ptr)을 캡처해야 하는
@@ -161,8 +177,11 @@ public:
 		}
 		catch( ... )
 		{
+			_clientService->Close(); // 이미 게시된 초기 연결을 되돌린다
 			return false;
 		}
+
+		ScheduleTimeoutScan(); // 요청 타임아웃 주기 점검 시작
 
 		return true;
 	}
@@ -172,12 +191,16 @@ public:
 	//***************************************************************************
 	void Close() override
 	{
+		_closed.store(true, std::memory_order_release);
 		_delayedTaskQueue.Stop();
 		if( _taskThread.joinable() )
 			_taskThread.join();
 
 		if( _clientService )
 			_clientService->Close();
+
+		// 닫힌 뒤에는 대기 큐의 요청이 영원히 처리되지 않으므로 실패로 통지한다.
+		FailPendingRequests();
 	}
 
 	//***************************************************************************
@@ -199,6 +222,7 @@ public:
 	//***************************************************************************
 	void SetSessionCountChangedHandler(std::function<void(size_t)> handler) override
 	{
+		std::lock_guard<std::recursive_mutex> guard(_notifyLock);
 		_sessionCountChangedHandler = std::move(handler);
 	}
 
@@ -214,109 +238,104 @@ public:
 	//          호출 시점까지만 유효" 전제가 큐잉 상황에서는 성립하지 않기
 	//          때문), 호출부가 반환 후 즉시 원본 버퍼를 해제해도 안전하다.
 	//***************************************************************************
-	void SendRequest(const char* data, size_t len, HttpRequestCompletionHandler onComplete) override
+	void SendRequest(const char* data, size_t len, HttpRequestCompletionHandler onComplete,
+		std::chrono::milliseconds timeout) override
 	{
-		PendingRequest req{ std::string(data, len), std::move(onComplete) };
+		PendingRequest req;
+		req.data.assign(data, len);
+		req.onComplete = std::move(onComplete);
+		req.submitTime = Clock::now();
+		req.timeout = ResolveTimeout(timeout);
+		req.idempotent = IsIdempotentRequest(req.data);
+		req.retriesLeft = req.idempotent ? kMaxIdempotentRetries : 0;
 
-		TSessionRef idleSession;
-		bool queued = false;
+		Submit(std::move(req), /*front=*/false);
+	}
+
+	void SetRemoteAddress(const CNetAddress& address) override
+	{
+		if constexpr( HttpSvcHasSetRemoteAddress<TService>::value )
 		{
-			std::lock_guard<std::mutex> guard(_lock);
-			if( !_idleSessions.empty() )
-			{
-				idleSession = _idleSessions.back();
-				_idleSessions.pop_back();
-			}
-			else
-			{
-				_pendingRequests.push_back(std::move(req));
-				queued = true;
-			}
+			if( _clientService )
+				_clientService->SetRemoteAddress(address);
 		}
+	}
 
-		if( queued )
-		{
-			// 유휴 세션이 없어 대기열로 갔다 = 지금 수요가 기준선(_minIdle)을
-			// 넘어섰을 수 있다는 신호 — 락 밖에서(ConnectOneMoreSession() 호출이
-			// 걸릴 수 있으므로) 즉시 증설을 시도한다.
-			TryGrow();
-			return;
-		}
-
-		DispatchToSession(idleSession, std::move(req));
+	void SetDefaultRequestTimeout(std::chrono::milliseconds timeout) override
+	{
+		_defaultTimeoutMs.store(timeout.count(), std::memory_order_relaxed);
 	}
 
 	//***************************************************************************
 	// @brief 세션의 연결 상태 변화를 통지받습니다.
 	// @param sessionBase 상태가 변한 세션 (베이스 CSessionRef로 넘어옴)
 	// @param connected true면 방금 연결 완료, false면 끊김(연결 실패 포함)
-	// @details 실제 배포 코드에서는 SetConnStateHandler로 등록된 람다를 통해서만
-	//          호출되지만, 단위 테스트에서 직접 연결/해제 이벤트를 시뮬레이션할
-	//          수 있도록 public으로 둔다(DisconnectHandler와 동일한 패턴).
-	//          connected==false면 ScheduleReconnect()로 기준선(_minIdle) 유지를
-	//          시도하고, true면 백오프 카운터를 리셋한 뒤 DispatchOrIdle()로 넘긴다.
+	// @details 실제로는 세션 팩토리가 등록한 콜백(SetConnStateHandler)을 통해서만 호출되지만,
+	//          단위 테스트가 연결/해제 이벤트를 직접 흉내 낼 수 있게 public으로 둔다.
+	//          connected==false면 ScheduleReconnect()로 기준선(_minIdle) 유지를 시도하고,
+	//          true면 백오프 카운터를 리셋한 뒤 DispatchOrIdle()로 넘긴다.
 	//
-	//          [_notifiedSessionCount와 연결 실패 세션 — 중요]
-	//          CIocpSession/CRioSession의 FailConnect()(연결 시도 자체가 실패하는
-	//          경로)는 OnConnected()를 절대 호출하지 않고 OnDisconnected()만
-	//          호출한다 — 즉 이 세션에 대해 connected==true 통지는 한 번도 안 오고
-	//          connected==false만 온다. "OnConnected/OnDisconnected가 세션당
-	//          1:1"이라는 가정은 실제로는 성립하지 않는다. 그래서 단순히
-	//          fetch_add/fetch_sub만 하면, 연결 실패가 쌓일 때마다 카운터가
-	//          매칭되는 increment 없이 감소해 영구적으로 실제보다 낮게 드리프트한다.
-	//          이를 막기 위해 _connectedSessions(세션 포인터 집합, _lock으로 보호)에
-	//          "실제로 connected==true를 받은 세션"만 기록해두고, connected==false가
-	//          왔을 때 그 집합에 있던 세션에 대해서만 감소시킨다 — 한 번도
-	//          연결되지 않았던 세션의 실패 통지는 카운터에 아예 반영하지 않는다.
+	//          [연결 실패 세션] 연결 시도 자체가 실패한 세션은 OnConnected() 없이
+	//          OnDisconnected()만 호출한다 — connected==true 통지 없이 false만 온다.
+	//          그래서 _connectedSessions에 "connected==true를 받은 세션"만 기록하고, false가
+	//          왔을 때 그 집합에 있던 세션에 대해서만 _notifiedSessionCount를 줄인다.
 	//
-	//          [_sessionCountChangedHandler에 _notifiedSessionCount를 쓰는 이유]
-	//          처음에는 여기서 GetActiveSessionCount()(=_clientService->
-	//          GetCurrentSessionCount(), 즉 하위 CNetService::_sessions.size()를
-	//          실시간 조회)를 그대로 넘겼는데, 실제로 돌려보니 CNetService의
-	//          disconnect 처리 순서가 "OnDisconnected() 훅을 먼저 호출하고,
-	//          그 세션을 _sessions에서 실제로 빼는 건 그 다음"이라, 마지막
-	//          세션이 끊길 때 우리가 읽는 값이 항상 실제보다 1 많게(예: 세션
-	//          3개면 통지값이 3,2,1로만 오고 0은 절대 안 옴) 나오는 레이스가
-	//          있었다. CNetService::_sessions를 우리가 직접 건드릴 수 없으니,
-	//          _sessions.size()에 의존하는 대신 "연결 성공/해제 통지를 우리가
-	//          직접 받은 횟수"만으로 순수하게 세는 별도 카운터
-	//          (_notifiedSessionCount)를 둬서 이 레이스 자체를 회피한다.
+	//          [세션 수 통지는 직접 센 값] 핸들러에는 서비스의 세션 수(GetCurrentSessionCount)가 아니라
+	//          이 풀이 받은 연결/해제 통지로 직접 센 연결 완료 세션 수를 넘긴다. 서비스는 OnDisconnected()
+	//          훅을 부른 뒤에야 세션을 목록에서 빼므로, 그 값을 읽으면 마지막 세션이 끊길 때 0이 아니라
+	//          1이 읽힌다.
 	//***************************************************************************
 	void OnSessionConnStateChanged(CSessionRef sessionBase, bool connected)
 	{
 		TSessionRef session = std::static_pointer_cast<TSession>(sessionBase);
 
-		int64 notifiedCount;
 		if( !connected )
 		{
 			bool wasConnected = false;
 			{
 				std::lock_guard<std::mutex> guard(_lock);
 				wasConnected = (_connectedSessions.erase(sessionBase.get()) != 0);
+
+				// 유휴 목록에 있던 세션이 끊겼다면(서버의 유휴 keep-alive 종료) 목록에서 제거한다 —
+				// 남겨두면 다음 요청이 이 죽은 세션에 배정돼 즉시 실패한다.
+				_idleSessions.erase(std::remove_if(_idleSessions.begin(), _idleSessions.end(),
+					[&session](const TSessionRef& s) { return s.get() == session.get(); }), _idleSessions.end());
 			}
 
 			// 한 번도 연결된 적 없던 세션(FailConnect() 경로)의 실패 통지는
 			// 카운터에 반영하지 않는다 — 매칭되는 increment가 없었으므로.
-			notifiedCount = wasConnected
-				? (_notifiedSessionCount.fetch_sub(1, std::memory_order_acq_rel) - 1)
-				: _notifiedSessionCount.load(std::memory_order_acquire);
+			if( wasConnected )
+				_notifiedSessionCount.fetch_sub(1, std::memory_order_acq_rel);
 
-			ScheduleReconnect();
+			// 연결에 한 번도 성공하지 못한 세션의 종료만 "연결 실패"로 세어 백오프를 키운다. 연결됐다가
+			// 끊긴 세션(서버의 유휴 종료 등)은 장애가 아니므로 기본 지연으로 바로 다시 채운다.
+			ScheduleReconnect(/*countAsFailure=*/!wasConnected);
 		}
 		else
 		{
 			{
 				std::lock_guard<std::mutex> guard(_lock);
-				_connectedSessions.insert(sessionBase.get());
+				_connectedSessions.emplace(sessionBase.get(), session);
 			}
 
-			notifiedCount = _notifiedSessionCount.fetch_add(1, std::memory_order_acq_rel) + 1;
+			_notifiedSessionCount.fetch_add(1, std::memory_order_acq_rel);
 			_consecutiveFailCount.store(0, std::memory_order_relaxed); // 연결 성공 -> 백오프 리셋
 			DispatchOrIdle(session);
 		}
 
-		if( _sessionCountChangedHandler )
-			_sessionCountChangedHandler(static_cast<size_t>((std::max)(notifiedCount, static_cast<int64>(0))));
+		// 통지 직렬화: 값을 읽는 것과 핸들러 호출을 같은 락 안에서 한다. 두 세션이 서로 다른 스레드에서
+		// 거의 동시에 끊기면, 카운트를 먼저 계산한 스레드의 통지가 나중에 도착해 핸들러(매니저)가 오래된
+		// 값으로 굳을 수 있다. 이렇게 하면 통지는 항상 "전달 시점의 최신 카운트"를 담고 순서대로 전달되므로
+		// 마지막 통지는 언제나 최종 값이다. 호출 스레드가 이 풀을 강한 참조(weakPool.lock())로 쥐고 있어
+		// 핸들러 안에서 풀이 파괴되지 않는다. 핸들러 안의 사용자 콜백이 재진입할 수 있어 재귀 뮤텍스를 쓴다.
+		{
+			std::lock_guard<std::recursive_mutex> guard(_notifyLock);
+			if( _sessionCountChangedHandler )
+			{
+				const int64 count = _notifiedSessionCount.load(std::memory_order_acquire);
+				_sessionCountChangedHandler(static_cast<size_t>((std::max)(count, static_cast<int64>(0))));
+			}
+		}
 	}
 
 	//***************************************************************************
@@ -347,6 +366,10 @@ private:
 	{
 		std::string data;                        // 전송할 요청 패킷 바이트 (SendRequest()에서 복사됨)
 		HttpRequestCompletionHandler onComplete;  // 응답 완결 시 호출할 사용자 콜백
+		Clock::time_point submitTime{};           // 타임아웃 기준 시각 (SendRequest() 호출 시점, 재시도해도 유지)
+		std::chrono::milliseconds timeout{ 0 };    // 이 요청의 무응답 타임아웃 (0 이하면 없음)
+		bool idempotent = false;                  // GET/HEAD인지 (자동 재시도 대상)
+		int32 retriesLeft = 0;                    // 남은 자동 재시도 횟수
 	};
 
 	//***************************************************************************
@@ -368,45 +391,72 @@ private:
 	//          세션을 폐기한다. 성공하면 세션의 완료 콜백 안에서 사용자 콜백을
 	//          먼저 부른 뒤 OnRequestComplete()로 이어서 세션을 반납/폐기한다.
 	//
-	//          [순환 참조 방지] 이 완료 콜백은 session->SendRequest() 내부에서
-	//          CHttpClientCore::m_onComplete로 저장된다 — 즉 콜백이 "그 세션
-	//          자신의 멤버 안"에 들어간다. 예전에는 이 콜백이 TSessionRef(강한
-	//          shared_ptr)를 캡처했는데, 그러면 "세션이 자기 자신을 가리키는
-	//          shared_ptr을 자기 멤버 안에 들고 있는" 자기 참조 순환이 생겨서,
-	//          응답이 끝까지 안 오는 경우(연결 중간에 끊김, TLS 핸드셰이크 실패
-	//          등 FeedRecv()가 끝내 m_onComplete를 비우지 못하는 모든 경로)
-	//          세션이 영원히 해제되지 않는 메모리 릭이 됐다. 지금은 원시 포인터
-	//          (sessionRaw)만 캡처한다 — 이 콜백은 세션 자신이 자기 멤버 안에서
-	//          호출해주는 것이라 불리는 시점엔 세션이 반드시 살아있음이 보장되고
-	//          (자기가 자기를 부르는 구조라 댕글링 가능성 자체가 없음), 세션의
-	//          실제 수명은 어차피 CNetService::_sessions(서비스가 소유)가 별도로
-	//          보장하므로 이 콜백이 강한 참조를 들고 있을 필요가 애초에 없었다.
-	//          TSessionRef가 진짜로 필요한 시점(OnRequestComplete()가 유휴
-	//          목록에 반납/폐기 판단할 때)에만 shared_from_this()로 다시 만든다.
+	//          [순환 참조 방지] 완료 콜백은 session->SendRequest() 안에서 그 세션의 CHttpClientCore에
+	//          저장된다 — 즉 콜백이 세션 자신의 멤버 안에 들어간다. 여기에 TSessionRef(강한 참조)를
+	//          캡처하면 세션이 자기 자신을 붙드는 순환이 되어, 응답이 끝내 오지 않는 경로(연결 중간 끊김,
+	//          TLS 핸드셰이크 실패 등)에서 세션이 영원히 해제되지 않는다. 그래서 원시 포인터(sessionRaw)만
+	//          캡처한다. 콜백은 세션이 자기 멤버 안에서 부르므로 호출 시점에 세션은 반드시 살아 있고,
+	//          세션의 실제 수명은 서비스(CNetService::_sessions)가 보장한다. 강한 참조가 필요한
+	//          OnRequestComplete() 시점에만 shared_from_this()로 다시 만든다.
 	//***************************************************************************
 	void DispatchToSession(TSessionRef session, PendingRequest&& req)
 	{
-		std::string dataOwned = std::move(req.data);
 		HttpRequestCompletionHandler userCb = std::move(req.onComplete);
+		const Clock::time_point submitTime = req.submitTime;
+		const std::chrono::milliseconds timeout = req.timeout;
+		const int32 retriesLeft = req.retriesLeft;
+
+		// 재시도 가능한 요청(멱등, 남은 횟수 있음)은 실패 시 다시 보낼 수 있게 요청 바이트를 공유 버퍼로
+		// 보관한다(복사 없이 이동). 재시도 대상이 아니면 전송 호출 동안만 쓰는 지역 버퍼로 충분하다.
+		std::shared_ptr<const std::string> retryData;
+		std::string localData;
+		const std::string* dataPtr = nullptr;
+		if( retriesLeft > 0 )
+		{
+			retryData = std::make_shared<const std::string>(std::move(req.data));
+			dataPtr = retryData.get();
+		}
+		else
+		{
+			localData = std::move(req.data);
+			dataPtr = &localData;
+		}
 
 		auto self = this->shared_from_this();
-		TSession* sessionRaw = session.get(); // 강한 참조 대신 원시 포인터만 캡처 (위 설명 참고)
+		TSession* sessionRaw = session.get(); // 강한 참조 대신 원시 포인터만 캡처 (세션 -> 코어 -> 콜백 -> 세션 순환 방지)
 
-		bool began = session->SendRequest(dataOwned.data(), dataOwned.size(),
-			[self, sessionRaw, userCb](bool success, CHttpResponseParser& parser)
+		bool began = session->SendRequest(dataPtr->data(), dataPtr->size(),
+			[self, sessionRaw, userCb, retryData, submitTime, timeout, retriesLeft](bool success, CHttpResponseParser& parser)
 			{
+				TSessionRef sessionRef = std::static_pointer_cast<TSession>(sessionRaw->shared_from_this());
+
+				// 응답 바이트를 하나도 받기 전에 연결 수준에서 실패한 멱등 요청(예: 서버가 닫은 유휴 연결에 보낸
+				// 경우)은 사용자에게 알리지 않고 한 번 다시 시도한다. 타임아웃은 서버가 요청을 이미 처리했을 수
+				// 있으므로 재시도하지 않는다.
+				if( !success && retryData && !parser.IsTimedOut() && parser.BytesFed() == 0 )
+				{
+					self->DiscardSession(sessionRef);
+					self->Submit(self->MakeRetry(*retryData, userCb, submitTime, timeout, retriesLeft - 1), /*front=*/true);
+					return;
+				}
+
 				if( userCb )
 					userCb(success, parser);
-				// 이 시점에 sessionRaw는 반드시 유효하다(자기 자신이 자기 콜백을
-				// 호출하는 구조). TSessionRef가 필요한 곳(OnRequestComplete)에만
-				// 여기서 다시 만들어 넘긴다 — 콜백 자체는 강한 참조를 들고 있지 않음.
-				TSessionRef sessionRef = std::static_pointer_cast<TSession>(sessionRaw->shared_from_this());
+
 				self->OnRequestComplete(sessionRef, success);
-			});
+			},
+			timeout, submitTime);
 
 		if( !began )
 		{
-			// 세션이 이미 죽었거나(재진입 등) Send 자체가 실패 — 즉시 실패 통지.
+			// 전송을 시작하지 못했다 — 이 경우 위 완료 핸들러는 호출되지 않았으므로 여기서 직접 처리한다.
+			if( retryData )
+			{
+				DiscardSession(session);
+				Submit(MakeRetry(*retryData, userCb, submitTime, timeout, retriesLeft - 1), /*front=*/true);
+				return;
+			}
+
 			if( userCb )
 			{
 				CHttpResponseParser dummy;
@@ -426,8 +476,8 @@ private:
 	//***************************************************************************
 	void OnRequestComplete(TSessionRef session, bool success)
 	{
-		// Connection: close 응답을 받았거나 실패했으면 재사용하지 않고 폐기.
-		if( !success || session->IsConnectionCloseRequested() )
+		// Connection: close 응답을 받았거나 실패했거나 이미 끊긴 세션이면 재사용하지 않고 폐기.
+		if( !success || session->IsConnectionCloseRequested() || !session->IsConnected() )
 		{
 			DiscardSession(session);
 			return;
@@ -467,17 +517,15 @@ private:
 	//***************************************************************************
 	// @brief 세션을 폐기하고, 기준선(_minIdle) 유지를 위한 재연결을 예약합니다.
 	// @param session 폐기할 세션
-	// @details Disconnect()가 비동기로 OnDisconnected()를 유발해
-	//          ScheduleReconnect()가 다시 불릴 수 있음 — ScheduleReconnect()
-	//          자체가 _minIdle 체크로 중복 호출에도 안전하게 설계돼 있으므로
-	//          (currentSessionCount >= minIdle이면 그냥 무시) 여기서도 호출해
-	//          두는 것이 안전하다(세션이 이미 Disconnected라 콜백이 다시 안
-	//          오는 경로까지 커버).
+	// @details Disconnect()가 비동기로 OnDisconnected()를 유발해 ScheduleReconnect()가 다시 불릴 수
+	//          있다. 재연결 작업은 실행 시점에 세션 수를 다시 확인하므로 중복 예약은 안전하다. 세션이
+	//          이미 끊겨 통지가 다시 오지 않는 경로를 위해 여기서도 예약한다. 폐기는 연결 실패가 아니므로
+	//          백오프 카운터는 올리지 않는다.
 	//***************************************************************************
 	void DiscardSession(TSessionRef session)
 	{
 		session->Disconnect(_T("HttpConnPool discard"));
-		ScheduleReconnect();
+		ScheduleReconnect(/*countAsFailure=*/false);
 	}
 
 	//***************************************************************************
@@ -501,15 +549,21 @@ private:
 	//          둘 다 다시 확인한다 — 어느 한쪽이라도 이미 채워져 있으면 실행을
 	//          건너뛴다.
 	//***************************************************************************
-	void ScheduleReconnect()
+	void ScheduleReconnect(bool countAsFailure)
 	{
 		if( !_clientService )
 			return;
 
-		if( _clientService->GetCurrentSessionCount() >= _minIdle )
-			return;
+		// 스케줄 시점의 세션 수로 걸러내지 않는다 — 이 함수는 세션의 OnDisconnected() 통지 안에서
+		// (풀로의 연결 상태 통지로) 불리고, 그 시점엔 끊기는 세션이 아직 서비스의 세션 수에 포함돼
+		// 있다(CSession::OnDisconnected()의 ReleaseSession이 그 뒤에 실행된다). 여기서 걸러내면
+		// 기준선(_minIdle) 아래로 내려가도 재연결이 스케줄되지 않는다. 실행 시점의 세션 수 검사(아래
+		// 람다)가 과잉 연결을 막는다.
 
-		uint32 failCount = _consecutiveFailCount.fetch_add(1, std::memory_order_relaxed);
+		// countAsFailure면 연속 실패 횟수를 올려 지연을 키우고, 아니면 현재 횟수(성공 시 0)의 지연을 쓴다.
+		const uint32 failCount = countAsFailure
+			? _consecutiveFailCount.fetch_add(1, std::memory_order_relaxed)
+			: _consecutiveFailCount.load(std::memory_order_relaxed);
 		int32 delayMs = ComputeBackoffDelay(failCount);
 
 		_delayedTaskQueue.Reserve(std::chrono::milliseconds(delayMs), [this]()
@@ -519,7 +573,9 @@ private:
 				int32 currentCount = _clientService->GetCurrentSessionCount();
 				if( currentCount >= _minIdle || currentCount >= _maxConnections )
 					return;
-				_clientService->ConnectOneMoreSession();
+				// 연결 시도를 게시하지 못했다(소켓 생성 실패 등) — 기준선이 비어 있으므로 백오프로 다시 시도한다.
+				if( !_clientService->ConnectOneMoreSession() )
+					ScheduleReconnect(/*countAsFailure=*/true);
 			});
 	}
 
@@ -537,24 +593,192 @@ private:
 		if( !_clientService )
 			return;
 
-		if( _clientService->GetCurrentSessionCount() < _maxConnections )
-			_clientService->ConnectOneMoreSession();
+		if( _clientService->GetCurrentSessionCount() < _maxConnections && !_clientService->ConnectOneMoreSession() )
+			ScheduleReconnect(/*countAsFailure=*/true); // 게시 실패 — 기준선 아래라면 백오프 재시도 (이상이면 아무 일도 안 함)
+	}
+
+	//***************************************************************************
+	// @brief 요청을 유휴 세션에 배정하거나 대기 큐에 넣습니다 (SendRequest()와 자동 재시도가 공유).
+	// @param front true면 대기 큐 맨 앞에 넣는다 (재시도 요청은 이미 오래 기다렸으므로)
+	//***************************************************************************
+	void Submit(PendingRequest&& req, bool front)
+	{
+		TSessionRef idleSession;
+		bool queued = false;
+		bool closed = false;
+		{
+			std::lock_guard<std::mutex> guard(_lock);
+
+			// 닫힌 풀의 대기 큐에 넣으면 영원히 처리되지 않는다. Close()는 _closed를 먼저 세운 뒤 같은
+			// 락으로 대기 큐를 비우므로, 락 안에서 확인하면 닫히는 도중의 요청도 큐에 남지 않는다.
+			if( _closed.load(std::memory_order_acquire) )
+			{
+				closed = true;
+			}
+			else
+			{
+				// 이미 끊긴 유휴 세션(서버가 유휴 keep-alive 연결을 닫은 경우)은 건너뛴다 — 그런 세션에
+				// 요청을 보내면 Send가 실패한다. 끊김 통지(OnSessionConnStateChanged)가 도착하기 전의 좁은
+				// 틈을 위한 방어이며, 통지가 도착한 세션은 거기서 이미 이 목록에서 제거된다.
+				while( !_idleSessions.empty() )
+				{
+					TSessionRef candidate = std::move(_idleSessions.back());
+					_idleSessions.pop_back();
+					if( candidate && candidate->IsConnected() )
+					{
+						idleSession = std::move(candidate);
+						break;
+					}
+				}
+
+				if( !idleSession )
+				{
+					if( front )
+						_pendingRequests.push_front(std::move(req));
+					else
+						_pendingRequests.push_back(std::move(req));
+					queued = true;
+				}
+			}
+		}
+
+		if( closed )
+		{
+			if( req.onComplete )
+			{
+				CHttpResponseParser dummy;
+				req.onComplete(false, dummy);
+			}
+			return;
+		}
+
+		if( queued )
+		{
+			// 유휴 세션이 없다 — 한도 안이면 연결을 늘려 대기 요청이 곧 처리되게 한다.
+			TryGrow();
+			return;
+		}
+
+		DispatchToSession(idleSession, std::move(req));
+	}
+
+	PendingRequest MakeRetry(const std::string& data, const HttpRequestCompletionHandler& userCb,
+		Clock::time_point submitTime, std::chrono::milliseconds timeout, int32 retriesLeft) const
+	{
+		PendingRequest retry;
+		retry.data = data;
+		retry.onComplete = userCb;
+		retry.submitTime = submitTime;
+		retry.timeout = timeout;
+		retry.idempotent = true;
+		retry.retriesLeft = retriesLeft;
+		return retry;
+	}
+
+	std::chrono::milliseconds ResolveTimeout(std::chrono::milliseconds requested) const
+	{
+		if( requested.count() < 0 )
+			return std::chrono::milliseconds(-1); // 이 요청은 타임아웃 없음
+		if( requested.count() > 0 )
+			return requested;
+		return std::chrono::milliseconds(_defaultTimeoutMs.load(std::memory_order_relaxed)); // 풀 기본값 (0 이하면 없음)
+	}
+
+	static bool IsIdempotentRequest(const std::string& data) noexcept
+	{
+		return data.compare(0, 4, "GET ") == 0 || data.compare(0, 5, "HEAD ") == 0;
+	}
+
+	//***************************************************************************
+	// @brief 대기 큐와 연결된 세션을 점검해 무응답 타임아웃을 넘긴 요청을 실패로 통지합니다.
+	// @details 사용자 콜백은 락 밖에서 호출한다. 진행 중인 요청의 만료 판단은 세션(코어)이 자기 락 안에서
+	//          "현재 요청"에 대해 하므로, 점검과 요청 완료/세션 재사용이 겹쳐도 엉뚱한 요청을 끊지 않는다.
+	//***************************************************************************
+	void ScanTimeouts()
+	{
+		const Clock::time_point now = Clock::now();
+		std::vector<PendingRequest> expired;
+		std::vector<TSessionRef> sessions;
+		{
+			std::lock_guard<std::mutex> guard(_lock);
+
+			for( auto it = _pendingRequests.begin(); it != _pendingRequests.end(); )
+			{
+				if( it->timeout.count() > 0 && now - it->submitTime >= it->timeout )
+				{
+					expired.push_back(std::move(*it));
+					it = _pendingRequests.erase(it);
+				}
+				else
+				{
+					++it;
+				}
+			}
+
+			sessions.reserve(_connectedSessions.size());
+			for( auto& entry : _connectedSessions )
+				sessions.push_back(entry.second);
+		}
+
+		for( PendingRequest& r : expired )
+		{
+			if( r.onComplete )
+			{
+				CHttpResponseParser parser;
+				parser.MarkTimedOut();
+				r.onComplete(false, parser);
+			}
+		}
+
+		for( TSessionRef& session : sessions )
+			session->CheckRequestTimeout(now);
+	}
+
+	void ScheduleTimeoutScan()
+	{
+		// 일회성 예약이므로 실행될 때마다 자기 자신을 다시 예약한다. Close()가 큐를 Stop()하면
+		// Reserve()가 false를 반환하며 조용히 무시되어 재귀가 끊긴다.
+		_delayedTaskQueue.Reserve(std::chrono::milliseconds(kTimeoutScanIntervalMs), [this]()
+			{
+				ScanTimeouts();
+				ScheduleTimeoutScan();
+			});
+	}
+
+	// 풀이 닫힌 뒤 대기 큐에 남은 요청을 실패로 통지한다 (이후 처리될 방법이 없다).
+	void FailPendingRequests()
+	{
+		std::deque<PendingRequest> drained;
+		{
+			std::lock_guard<std::mutex> guard(_lock);
+			drained.swap(_pendingRequests);
+		}
+
+		for( PendingRequest& r : drained )
+		{
+			if( r.onComplete )
+			{
+				CHttpResponseParser dummy;
+				r.onComplete(false, dummy);
+			}
+		}
 	}
 
 private:
 	TServiceRef _clientService; // 이 풀이 소유하는 IOCP/RIO 클라이언트 서비스
 	std::function<void(size_t)> _sessionCountChangedHandler; // 활성 세션 수 변화 통지 콜백 (주로 CHttpConnPoolManager가 등록)
-	std::atomic<int64> _notifiedSessionCount{ 0 }; // OnSessionConnStateChanged()로 직접 받은 연결/해제 통지만으로 세는 카운터
-	// (하위 CNetService::_sessions의 정리 타이밍 레이스를 피하기 위해
-	// GetActiveSessionCount() 대신 이 값을 _sessionCountChangedHandler에 씀 — 위 설명 참고)
+	std::recursive_mutex _notifyLock;                // 세션 수 통지의 값 읽기+핸들러 호출을 직렬화
+	std::atomic<int64> _notifiedSessionCount{ 0 }; // 연결/해제 통지로 직접 센 연결 완료 세션 수 (_sessionCountChangedHandler에 넘기는 값)
 	int32 _minIdle;             // host당 항상 유지할 기준 커넥션 수 (ScheduleReconnect()가 지킴)
 	int32 _maxConnections;      // host당 허용할 최대 커넥션 수 (TryGrow()의 상한)
 
 	std::mutex _lock;                            // _idleSessions/_pendingRequests/_connectedSessions 보호
 	std::vector<TSessionRef> _idleSessions;      // 요청을 받을 수 있는 유휴 세션 목록
 	std::deque<PendingRequest> _pendingRequests; // 유휴 세션이 없을 때 대기 중인 요청 큐
-	std::unordered_set<CSession*> _connectedSessions; // 실제로 connected==true 통지를 받은 세션 집합 (_notifiedSessionCount 드리프트 방지용, OnSessionConnStateChanged 참고)
+	std::unordered_map<CSession*, TSessionRef> _connectedSessions; // connected==true 통지를 받은 세션 (강한 참조 — 타임아웃 점검이 안전하게 호출하도록. 연결 실패 세션은 제외)
 
+	std::atomic<int64> _defaultTimeoutMs{ kDefaultRequestTimeoutMs }; // timeout 인자가 0인 요청에 적용할 기본 무응답 타임아웃(ms), 0 이하면 없음
+	std::atomic<bool> _closed{ false };             // Close()가 호출됐는지 (이후 요청은 즉시 실패 처리)
 	std::atomic<uint32> _consecutiveFailCount{ 0 }; // 지수 백오프용 연속 연결 실패 횟수
 	CDelayedTaskQueue _delayedTaskQueue;              // 재연결 작업 예약 큐
 	std::thread _taskThread;                          // _delayedTaskQueue.ProcessExpiredTasks() 전용 스레드

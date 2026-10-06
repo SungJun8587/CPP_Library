@@ -96,11 +96,19 @@ void CRioConnectDispatcher::WorkerLoop()
 		ULONG_PTR completionKey = 0;
 		LPOVERLAPPED overlapped = nullptr;
 
-		::GetQueuedCompletionStatus(_iocpHandle, &numOfBytes, &completionKey, &overlapped, INFINITE);
+		const BOOL succeeded = ::GetQueuedCompletionStatus(_iocpHandle, &numOfBytes, &completionKey, &overlapped, INFINITE);
 
 		if( overlapped == nullptr )
 		{
-			// wake-up(정지) 패킷 또는 핸들 자체 오류 — while 조건에서 _running 재확인
+			// Shutdown()의 wake-up 패킷이면 succeeded가 TRUE다. FALSE라면 IOCP 핸들 자체의 오류라
+			// 같은 오류로 즉시 되돌아오므로, CPU를 태우며 도는 것을 막기 위해 잠시 쉰다.
+			if( !succeeded && _running.load(std::memory_order_acquire) )
+			{
+				LOG_ERROR(_T("[CRioConnectDispatcher] GetQueuedCompletionStatus failed! error: %lu"), ::GetLastError());
+				::Sleep(10);
+			}
+
+			// while 조건에서 _running 재확인
 			continue;
 		}
 

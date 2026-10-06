@@ -7,6 +7,8 @@
 #include "pch.h"
 #include "IocpService.h"
 
+#include <utility>
+
 //***************************************************************************
 // CIocpServerService Implementation
 //***************************************************************************
@@ -19,8 +21,8 @@
 // @param maxSessionCount 최대 세션 수
 // @param workerThreadCount 워커 스레드 개수
 //***************************************************************************
-CIocpServerService::CIocpServerService(CNetAddress address, CIocpCoreRef iocpCore, SessionFactory factory, int32 maxSessionCount, uint32 workerThreadCount)
-	: CNetService(NetServiceType::Server, address, factory, maxSessionCount), _iocpCore(iocpCore), _workerThreadCount(workerThreadCount)
+CIocpServerService::CIocpServerService(const CNetAddress& address, CIocpCoreRef iocpCore, SessionFactory factory, int32 maxSessionCount, uint32 workerThreadCount)
+	: CNetService(NetServiceType::Server, address, std::move(factory), maxSessionCount), _iocpCore(std::move(iocpCore)), _workerThreadCount(workerThreadCount)
 {
 }
 
@@ -37,28 +39,11 @@ bool CIocpServerService::Start()
 	if( CanStart() == false || _iocpCore == nullptr )
 		return false;
 
-	uint32 workerThreadCount = _workerThreadCount;
-	if( workerThreadCount == 0 )
-	{
-		unsigned int hwThreads = std::thread::hardware_concurrency();
-		workerThreadCount = (hwThreads > 0) ? hwThreads : 2;
-	}
-
 	// 1. CThreadManager를 통해 워커 스레드 풀 구동 (자동 TLS 초기화 및 종료 감지 적용)
-	for( uint32 i = 0; i < workerThreadCount; ++i )
+	if( !_workers.Start(_iocpCore.get(), _workerThreadCount) )
 	{
-		bool created = _threadManager.CreateThread([this]() {
-			while( !_threadManager.IsShuttingDown() )
-			{
-				_iocpCore->DispatchBatch(10);
-			}
-			});
-
-		if( !created )
-		{
-			Close();
-			return false;
-		}
+		Close();
+		return false;
 	}
 
 	// 2. Listener 생성 및 AcceptEx 개시
@@ -68,6 +53,8 @@ bool CIocpServerService::Start()
 		Close();
 		return false;
 	}
+
+	_listener->SetAddressMode(_listenAddressMode);
 
 	std::weak_ptr<CIocpServerService> serviceWeak = std::static_pointer_cast<CIocpServerService>(shared_from_this());
 
@@ -81,9 +68,20 @@ bool CIocpServerService::Start()
 				return nullptr;
 
 			CSessionRef session = service->CreateSession();
+			if( session == nullptr )
+				return nullptr;
+
+			// CNetService::CreateSession()가 설치한 기본 해제 핸들러를 서버 전용 핸들러로
+			// 교체한다 — 서비스 추적 목록(_sessions)뿐 아니라 세션 매니저에서도 즉시 제거한다.
+			session->SetDisconnectHandler([serviceWeak](CSessionRef disconnected)
+				{
+					if( auto svc = serviceWeak.lock() )
+						svc->OnSessionDisconnected(std::move(disconnected));
+				});
+
 			return std::static_pointer_cast<CIocpSession>(session);
 		},
-		10,
+		_acceptPoolSize,
 		[serviceWeak](CIocpObjectRef session, CNetAddress netAddr)
 		{
 			auto service = serviceWeak.lock();
@@ -91,17 +89,47 @@ bool CIocpServerService::Start()
 				return;
 
 			CIocpSessionRef iocpSession = std::static_pointer_cast<CIocpSession>(session);
-			if( iocpSession )
+			if( iocpSession == nullptr )
+				return;
+
+			// 동시 접속 슬롯 예약. 상한을 적용 중이고 초과하면 서비스에 등록하지 않고 버린다 —
+			// 서비스/매니저에 등록된 적이 없는 세션이라 이 콜백이 반환되며 참조가 사라지면
+			// 소멸자가 소켓을 닫는다(OnConnected/OnDisconnected는 호출되지 않는다).
+			const int32 active = service->_activeSessionCount.fetch_add(1, std::memory_order_acq_rel) + 1;
+			if( service->_enforceMaxSessionCount.load(std::memory_order_relaxed) && active > service->GetMaxSessionCount() )
 			{
-				iocpSession->SetNetAddress(netAddr);
-				service->AddSession(iocpSession);
+				service->_activeSessionCount.fetch_sub(1, std::memory_order_acq_rel);
 
-				uint64 sessionId = service->GetSessionManager().GenerateSessionId();
-				iocpSession->SetSessionId(sessionId);
-				service->GetSessionManager().AddSession(sessionId, iocpSession);
-
-				iocpSession->ProcessConnect();
+				const uint64 rejected = service->_rejectedSessionCount.fetch_add(1, std::memory_order_relaxed) + 1;
+				if( rejected == 1 || rejected % 1000 == 0 )
+				{
+					LOG_WARNING(_T("[CIocpServerService] max session count reached (%d) - connection rejected (total rejected=%llu)"),
+						service->GetMaxSessionCount(), rejected);
+				}
+				return;
 			}
+
+			iocpSession->SetNetAddress(netAddr);
+
+			// 세션 ID는 서비스/매니저 등록과 ProcessConnect() 이전에 부여한다 — 이후 어느
+			// 경로로 해제 통지가 와도 OnSessionDisconnected()가 ID로 슬롯 반환 여부를 판단한다.
+			const uint64 sessionId = service->GetSessionManager().GenerateSessionId();
+			iocpSession->SetSessionId(sessionId);
+
+			// 서비스가 종료 중이면 AddSession()이 세션을 거부하고 Disconnect()까지 요청한다. 그 세션은
+			// 해제 통지(OnSessionDisconnected)가 위에서 예약한 동시 접속 슬롯을 이미 반환하므로 여기서는
+			// 매니저 등록이나 ProcessConnect() 없이 끝낸다 (이어서 진행하면 OnDisconnected()가 두 번 통지된다).
+			if( !service->AddSession(iocpSession) )
+				return;
+
+			service->GetSessionManager().AddSession(sessionId, iocpSession);
+
+			// 서비스에 지정된 TCP 소켓 옵션이 있으면 세션에 전달한다 (ProcessConnect()가 OnConnected() 직전에 적용).
+			CIocpSession::SocketOptions socketOptions;
+			if( service->GetSessionSocketOptions(socketOptions) )
+				iocpSession->SetSocketOptions(socketOptions);
+
+			iocpSession->ProcessConnect();
 		}
 	);
 
@@ -111,10 +139,9 @@ bool CIocpServerService::Start()
 		return false;
 	}
 
-	// 3. 세션 reap 스레드 시작 — Running 중 자연 종료된 세션의 _sessionManager
-	//    엔트리를 kSessionReapInterval마다 정리한다(예전에는 Close() 시점에만
-	//    정리돼 서버가 오래 떠 있을수록 map이 무한정 커질 수 있었음). Listener/
-	//    워커가 이미 정상 구동 중인 이 시점 이후에 시작해야, reap 스레드가
+	// 3. 세션 reap 스레드 시작 — 해제 통지 경로(OnSessionDisconnected)가 놓친
+	//    _sessionManager 엔트리를 Iocp::kSessionReapInterval마다 정리하는 안전망이다.
+	//    Listener/워커가 이미 정상 구동 중인 이 시점 이후에 시작해야, reap 스레드가
 	//    도는 동안 세션이 실제로 늘어나는 정상 상태와 겹쳐도 안전하다.
 	_sessionReapThread = std::thread([this]() { _sessionReapQueue.ProcessExpiredTasks(); });
 	ScheduleSessionReap();
@@ -123,11 +150,36 @@ bool CIocpServerService::Start()
 }
 
 //***************************************************************************
+// @brief 세션 해제 통지(OnDisconnected) 시 호출되는 서버 전용 핸들러입니다.
+// @param session 해제된 세션
+// @details 세션 매니저에서 즉시 제거하고 동시 접속 슬롯을 반환한 뒤, 서비스의 추적
+//          목록에서도 제거합니다(CNetService::Close()의 대기 해제 포함). 매니저 제거를
+//          먼저 하는 이유는 ReleaseSession()이 Close() 대기를 깨우는 시점에 매니저도
+//          이미 정리돼 있게 하기 위함입니다.
+//***************************************************************************
+void CIocpServerService::OnSessionDisconnected(CSessionRef session)
+{
+	if( session == nullptr )
+		return;
+
+	CIocpSessionRef iocpSession = std::static_pointer_cast<CIocpSession>(session);
+
+	const uint64 sessionId = iocpSession->GetSessionId();
+	if( sessionId != 0 )
+	{
+		_sessionManager.RemoveSession(sessionId);
+		_activeSessionCount.fetch_sub(1, std::memory_order_acq_rel);
+	}
+
+	ReleaseSession(session);
+}
+
+//***************************************************************************
 // @brief _sessionManager에 다음 reap tick을 예약합니다(self-rescheduling).
 //***************************************************************************
 void CIocpServerService::ScheduleSessionReap()
 {
-	_sessionReapQueue.Reserve(kSessionReapInterval, [this]()
+	_sessionReapQueue.Reserve(Iocp::kSessionReapInterval, [this]()
 		{
 			_sessionManager.RemoveClosedSessions();
 			ScheduleSessionReap(); // 다음 tick 재예약. Close() 이후엔 Reserve()가 false를 반환하며 조용히 멈춤.
@@ -138,9 +190,14 @@ void CIocpServerService::ScheduleSessionReap()
 // @brief 서버 종료 처리
 // @details
 // 순서:
-// 1. 소속된 세션 매니저의 모든 세션 일괄 종료
-// 2. Listener 소켓 닫기
-// 3. PostQueuedCompletionStatus를 호출하여 대기 중인 워커 스레드들을 깨우고 Join 대기
+// 0. 세션 reap 스레드 정지
+// 1. Listener 정지 (신규 연결 차단)
+// 2. 세션 매니저의 모든 세션 종료 게시
+// 3. 워커 스레드가 살아있는 동안 세션 해제 통지(OnDisconnected)가 모두 끝날 때까지 대기
+//    (Iocp::kCloseDrainTimeout 상한)
+// 4. 세션 매니저에 남은 해제 세션 정리
+// 5. 워커 스레드를 깨우고 Join
+// 6. CNetService::Close()로 3번에서 끝내지 못한 세션을 강제 정리
 //***************************************************************************
 void CIocpServerService::Close()
 {
@@ -155,43 +212,31 @@ void CIocpServerService::Close()
 
 	// 1. 신규 연결 차단을 가장 먼저 (RIO 쪽과 동일한 이유 — 세션 정리 도중에도
 	//    계속 새 세션이 들어와 BeginCloseAllSessions()의 스냅샷에서 누락되는
-	//    상황을 막기 위함)
+	//    상황을 막기 위함). CloseSocket()이 아니라 Stop()을 쓰는 이유: Stop()이
+	//    _closing을 먼저 세워, 취소된 AcceptEx의 완료 통지가 재시도 경로(스레드 생성)를
+	//    타지 않고 즉시 포기되게 한다.
 	if( _listener )
 	{
-		_listener->CloseSocket();
+		_listener->Stop();
 		_listener = nullptr;
 	}
 
 	// 2. 기존 세션 종료 게시
 	_sessionManager.BeginCloseAllSessions();
 
-	// 3. 실제로 다 닫힐 때까지 대기 — 워커 스레드(_threadManager)가 아직
-	//    살아있어서 close 완료 통지를 계속 처리해줄 수 있는 동안에 해야 한다.
-	//    AreAllSessionsClosed()/BeginCloseAllSessions()/RemoveClosedSessions()가
-	//    폴링 전용으로 설계돼 있어(RIO 쪽과 동일) 여기서도 짧은 간격 폴링으로 대기.
-	while( !_sessionManager.AreAllSessionsClosed() )
-	{
-		std::this_thread::sleep_for(std::chrono::milliseconds(10));
-	}
+	// 3. 세션 해제 통지가 실제로 끝날 때까지 대기 — pending I/O와 DisconnectEx의 완료
+	//    통지는 워커 스레드가 처리하므로 워커가 살아있는 동안에 해야 한다. 응답 없는
+	//    피어처럼 상한 시간 안에 끝나지 않는 세션은 6단계에서 강제 정리한다.
+	WaitForSessionsEmpty(Iocp::kCloseDrainTimeout);
+
+	// 4. 해제 통지 경로가 정리하지 못한 매니저 엔트리 정리
 	_sessionManager.RemoveClosedSessions();
 
-	// 4. 세션 정리가 다 끝난 뒤에야 워커 스레드 정지
-	//    [수정] RequestShutdown()으로 종료 플래그를 먼저 세팅한 뒤 PQCS를
-	//    게시한다 — 순서가 바뀌면(PQCS 먼저) 깨어난 워커가 IsShuttingDown()을
-	//    아직 false로 관측해 DispatchBatch(10)을 한 번 더 돈 뒤에야(최대 10ms)
-	//    종료를 인지하는 지연이 생긴다. JoinThreads() 자신도 내부에서 플래그를
-	//    세팅하므로 기능적 hang은 없지만, 여기서 먼저 세팅해두면 그 지연이 없다.
-	_threadManager.RequestShutdown();
-	if( _iocpCore && _iocpCore->GetHandle() != INVALID_HANDLE_VALUE )
-	{
-		size_t threadCount = _threadManager.GetThreadCount();
-		for( size_t i = 0; i < threadCount; ++i )
-		{
-			::PostQueuedCompletionStatus(_iocpCore->GetHandle(), 0, 0, nullptr);
-		}
-	}
-	_threadManager.JoinThreads();
+	// 5. 세션 정리가 끝난 뒤 워커 스레드 정지
+	_workers.Stop(_iocpCore.get());
 
+	// 6. 3번에서 끝내지 못한 세션이 있으면 CNetService::Close()가 Disconnect()의
+	//    강제 정리 경로로 마무리하고, 서비스의 세션이 0개가 될 때까지 대기한다.
 	CNetService::Close();
 }
 
@@ -207,8 +252,8 @@ void CIocpServerService::Close()
 // @param maxSessionCount 생성할 세션 개수
 // @param workerThreadCount 워커 스레드 개수
 //***************************************************************************
-CIocpClientService::CIocpClientService(CNetAddress address, CIocpCoreRef iocpCore, SessionFactory factory, int32 maxSessionCount, uint32 workerThreadCount)
-	: CNetService(NetServiceType::Client, address, factory, maxSessionCount), _iocpCore(iocpCore), _workerThreadCount(workerThreadCount)
+CIocpClientService::CIocpClientService(const CNetAddress& address, CIocpCoreRef iocpCore, SessionFactory factory, int32 maxSessionCount, uint32 workerThreadCount)
+	: CNetService(NetServiceType::Client, address, std::move(factory), maxSessionCount), _iocpCore(std::move(iocpCore)), _workerThreadCount(workerThreadCount), _remoteAddress(address)
 {
 }
 
@@ -249,18 +294,31 @@ CIocpSessionRef CIocpClientService::ConnectOneMoreSession()
 	if( _iocpCore->Register(iocpSession) == false )
 		return nullptr;
 
-	iocpSession->SetNetAddress(_address);
+	// 접속 대상은 SetRemoteAddress()로 바뀔 수 있으므로 한 번 읽어 이 연결 전체에 같은 주소를 쓴다.
+	const CNetAddress remote = GetRemoteAddress();
+	iocpSession->SetNetAddress(remote);
 
 	// 연결 완료를 기다리지 않고 즉시 추적 목록에 등록합니다. 연결이 실패하면
 	// CIocpSession::FailConnect()가 호출하는 CSession::OnDisconnected()가
 	// DisconnectHandler(ReleaseSession 콜백)를 통해 자동으로 제거하므로,
 	// "연결 시도 중" 세션이 목록에 남는 leak은 없습니다.
-	AddSession(iocpSession);
+	//
+	// 서비스가 종료 중이면 AddSession()이 세션을 거부하고 Disconnect()까지 요청해 해제 통지를 이미
+	// 마쳤으므로, ConnectAsync()를 게시하지 않고 실패로 반환한다(이어서 진행하면 OnDisconnected()가
+	// 두 번 통지된다).
+	if( !AddSession(iocpSession) )
+		return nullptr;
 
 	// ConnectAsync()의 반환값은 "게시 시도" 성공 여부일 뿐입니다 — false든 true든
 	// 최종 연결 결과는 세션의 OnConnected()/OnDisconnected()로 비동기 통지됩니다.
 	// 여기서는 게시 자체의 성공 여부만 보고합니다.
-	if( !iocpSession->ConnectAsync(_address) )
+	{
+		CIocpSession::SocketOptions socketOptions;
+		if( GetSessionSocketOptions(socketOptions) )
+			iocpSession->SetSocketOptions(socketOptions);
+	}
+
+	if( !iocpSession->ConnectAsync(remote) )
 		return nullptr;
 
 	return iocpSession;
@@ -282,28 +340,11 @@ bool CIocpClientService::Start()
 	if( CanStart() == false || _iocpCore == nullptr )
 		return false;
 
-	uint32 workerThreadCount = _workerThreadCount;
-	if( workerThreadCount == 0 )
-	{
-		unsigned int hwThreads = std::thread::hardware_concurrency();
-		workerThreadCount = (hwThreads > 0) ? hwThreads : 2;
-	}
-
 	// 1. 클라이언트 워커 스레드 풀 구동
-	for( uint32 i = 0; i < workerThreadCount; ++i )
+	if( !_workers.Start(_iocpCore.get(), _workerThreadCount) )
 	{
-		bool created = _threadManager.CreateThread([this]() {
-			while( !_threadManager.IsShuttingDown() )
-			{
-				_iocpCore->DispatchBatch(10);
-			}
-			});
-
-		if( !created )
-		{
-			Close();
-			return false;
-		}
+		Close();
+		return false;
 	}
 
 	// 2. 세션 연결 게시 (실제 절차는 ConnectOneMoreSession()에 위임)
@@ -321,34 +362,30 @@ bool CIocpClientService::Start()
 
 //***************************************************************************
 // @brief 클라이언트 서비스 종료 처리
-// @details 세션을 정리하고, 대기 중인 워커 스레드들을 깨운 뒤 Join을 수행합니다.
+// @details
+// 순서:
+// 1. 신규 세션 등록을 막고 모든 세션의 종료를 게시
+// 2. 워커 스레드가 살아있는 동안 세션 해제 통지(OnDisconnected)가 모두 끝날 때까지 대기
+//    (Iocp::kCloseDrainTimeout 상한) — pending I/O와 DisconnectEx의 완료 통지는 워커가 처리하므로
+//    워커를 먼저 멈추면 끝나지 않는다.
+// 3. 세션 정리가 끝난 뒤 워커 스레드를 깨우고 Join
+// 4. 2번에서 끝내지 못한 세션(응답 없는 피어 등)은 CNetService::Close()가 Disconnect()의
+//    강제 정리 경로로 마무리한다. CNetService::Close() 자체는 상한 없이 대기하지만, 강제 정리
+//    경로는 즉시 통지하므로 이 단계에서는 오래 걸리지 않는다.
 //***************************************************************************
 void CIocpClientService::Close()
 {
-	// 1. 세션 정리를 게시하고, 실제로 세션이 0개가 될 때까지 블로킹 대기한다.
-	//    이 시점엔 아직 워커 스레드(_threadManager)가 살아있어서 disconnect
-	//    완료 통지를 계속 처리해줄 수 있다 — 그래서 여기서 먼저 기다려야 한다.
-	//    2번(워커 스레드 정지)을 먼저 해버리면, 게시된 세션 정리들이 완료 통지를
-	//    처리해줄 스레드가 없어져서 영원히 안 끝나는 문제가 생긴다.
-	CNetService::Close();	// 세션이 실제로 0개 될 때까지 블로킹 대기
+	// 1. 종료 진입: 이후 ConnectOneMoreSession()이 등록하려는 신규 세션을 거부하게 하고, 기존 세션의
+	//    종료를 게시한다(스냅샷 수집과 락 밖 Disconnect()는 CloseSessions()가 담당 — 락을 쥔 채
+	//    Disconnect()를 호출하면 그 안에서 ReleaseSession()이 같은 락을 잡아 교착된다). 대기는 하지 않는다.
+	CloseSessions(false);
 
-	// 2. 세션 정리가 다 끝났으니, 이제 워커 스레드들에게 종료 신호를 보낸다.
-	//    [수정] RequestShutdown()을 PQCS 게시보다 먼저 호출 — 이유는
-	//    CIocpServerService::Close()와 동일(깨어난 워커가 곧바로 종료를
-	//    인지하도록, 최대 10ms 지연 제거).
-	_threadManager.RequestShutdown();
-	if( _iocpCore && _iocpCore->GetHandle() != INVALID_HANDLE_VALUE )
-	{
-		// 2-1. 워커 스레드 개수만큼 wake-up(빈 overlapped) 패킷을 게시한다.
-		//      GetQueuedCompletionStatus()로 블로킹 중인 각 워커 스레드가
-		//      이 패킷을 하나씩 받아 깨어나 종료 조건을 확인하게 하기 위함.
-		size_t threadCount = _threadManager.GetThreadCount();
-		for( size_t i = 0; i < threadCount; ++i )
-		{
-			::PostQueuedCompletionStatus(_iocpCore->GetHandle(), 0, 0, nullptr);
-		}
-	}
+	// 2. 워커가 살아있는 동안 해제 통지 대기 (상한 적용)
+	WaitForSessionsEmpty(Iocp::kCloseDrainTimeout);
 
-	// 3. 모든 워커 스레드가 실제로 종료될 때까지 join으로 확실하게 대기한다.
-	_threadManager.JoinThreads();
+	// 3. 워커 스레드 정지
+	_workers.Stop(_iocpCore.get());
+
+	// 4. 2번에서 끝내지 못한 세션 강제 정리 (종료 상태도 여기서 해제된다)
+	CNetService::Close();
 }

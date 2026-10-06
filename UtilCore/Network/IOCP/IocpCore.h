@@ -37,6 +37,13 @@ class CIocpObject
 {
 public:
     //***************************************************************************
+    // @brief 가상 소멸자.
+    // @details CIocpObjectRef(shared_ptr<CIocpObject>)가 어떤 경로로 생성되더라도
+    //          파생 객체가 올바르게 소멸되도록 보장합니다.
+    //***************************************************************************
+    virtual ~CIocpObject() = default;
+
+    //***************************************************************************
     // @brief IOCP에 등록할 소켓 핸들을 반환합니다.
     // @return HANDLE 소켓 핸들
     //***************************************************************************
@@ -46,6 +53,8 @@ public:
     // @brief IOCP 완료 통지가 왔을 때 IocpCore가 호출하는 가상 함수입니다.
     // @param iocpEvent 완료된 IOCP 이벤트 포인터
     // @param numOfBytes 전송된 바이트 수 (0인 경우 정상 연결 끊김 또는 에러)
+    // @note 실패한 완료는 numOfBytes = 0 으로 통지되며, 원인 Win32 에러 코드는
+    //       iocpEvent->errorCode 로 조회합니다.
     //***************************************************************************
     virtual void    Dispatch(class CIocpEvent* iocpEvent, int32 numOfBytes = 0) abstract;
 
@@ -72,18 +81,26 @@ public:
 //     여러 워커 스레드가 동시에 Dispatch()를 호출해도 각자 다른 이벤트를 처리한다.
 //     이것이 IOCP가 고성능 멀티스레드 서버의 기반이 되는 이유다.
 //
-// [성능 개선]
-//     ① DispatchBatch() 추가 (GetQueuedCompletionStatusEx)
-//        - 1회 syscall로 최대 64개 이벤트 처리
-//        - 10,000 이벤트/초 기준: syscall 10,000회 → 157회
-//     ② 에러 처리 완성 (기존 default: TODO → 실제 분기)
-//     ③ ProcessOverlappedResult() 추출 (Dispatch/DispatchBatch 공통 처리)
+// [설계 요약]
+//     ① DispatchBatch() (GetQueuedCompletionStatusEx)
+//        - 1회 syscall로 최대 kBatchSize(64)개 이벤트 처리
+//        - 큐가 계속 깊은 이론상 최선: 10,000 이벤트/초 → 약 157 syscall/초
+//          (실제 이득은 부하 패턴과 워커 수에 따라 달라지므로 측정 기반으로 조정)
+//     ② 실패 완료는 numOfBytes = 0 으로 통지하고, 원인 에러 코드는 CIocpEvent::errorCode로 전달
+//     ③ ProcessOverlappedResult()가 Dispatch/DispatchBatch의 공통 완료 처리를 담당
+//     ④ 종료: PostQuit()은 워커 1개당 1회 게시. Dispatch()는 false, DispatchBatch()는 Iocp::kDispatchQuit(-1)로 종료를 알림.
+//        IOCP 핸들 무효/폐쇄처럼 복구 불가능한 수거 실패는 DispatchBatch()가 Iocp::kDispatchFatal(-2)로 알림
 //***************************************************************************
 class CIocpCore
 {
 public:
     CIocpCore();
     ~CIocpCore();
+
+    // IOCP 핸들을 소유하므로 복사를 금지한다 — 복사본이 소멸하며 같은 핸들을 두 번 닫게 된다.
+    // 공유가 필요하면 CIocpCoreRef(shared_ptr)를 사용한다.
+    CIocpCore(const CIocpCore&) = delete;
+    CIocpCore& operator=(const CIocpCore&) = delete;
 
     //***************************************************************************
     // @brief 워커 스레드 종료를 위한 Quit 이벤트 패킷을 IOCP 큐에 게시합니다.
@@ -92,6 +109,9 @@ public:
     // QUIT_KEY를 완료 키로 전달하여 IOCP 큐에 종료 이벤트를 등록합니다.
     // 워커 스레드는 큐에 대기 중인 잔여 I/O 패킷들을 순차적으로 모두 처리한 후,
     // 이 패킷을 수거하는 시점에 안전하게 스레드 루프를 탈출합니다.
+    // 수거 시 Dispatch()는 false, DispatchBatch()는 -1을 반환합니다.
+    // 워커 N개를 멈추려면 N회 호출합니다. 한 번의 배치에서 여러 개가 수거되면
+    // 초과분은 DispatchBatch()가 다시 게시하므로 다른 워커가 받을 수 있습니다.
     //***************************************************************************
     bool PostQuit()
     {
@@ -121,20 +141,20 @@ public:
     //     이 라이브러리는 Completion Key 대신 IocpEvent::owner 포인터로
     //     객체를 식별하므로 0으로 고정해도 무방하다.
     //***************************************************************************
-    bool    Register(CIocpObjectRef iocpObject);
+    bool    Register(const CIocpObjectRef& iocpObject);
 
     //***************************************************************************
     // @brief 단건 GQCS 방식으로 완료 이벤트를 1개 꺼내 처리합니다.
     // @param timeoutMs 대기 시간 (기본값: INFINITE)
-    // @return true 이벤트 처리 완료, false 타임아웃
+    // @return true 이벤트 처리 완료, false 처리한 이벤트 없음
     // 
     // @details
     // GetQueuedCompletionStatus로 완료 이벤트 1개를 꺼낸다.
     // timeoutMs = INFINITE: 이벤트가 올 때까지 무한 대기.
     // timeoutMs = N: N밀리초 대기 후 타임아웃 반환.
     // 
-    // 반환 false: 타임아웃 (이벤트 없음)
-    // 반환 true:  이벤트 처리 완료 (성공 또는 연결 끊김 에러)
+    // 반환 false: 처리한 완료 이벤트 없음 (타임아웃, QUIT 신호, 큐 수거 자체 실패)
+    // 반환 true:  완료 이벤트 1개 처리 (I/O 성공 또는 실패 완료)
     // 
     // 저부하 환경이나 단순 구조에서 충분하다.
     //***************************************************************************
@@ -143,7 +163,12 @@ public:
     //***************************************************************************
     // @brief 배치 GQCSEx 방식으로 최대 BATCH_SIZE개의 완료 이벤트를 수거해 처리합니다.
     // @param timeoutMs 대기 시간 (기본값: INFINITE)
-    // @return int32 실제 처리한 이벤트 수
+    // @return int32 실제 디스패치한 I/O 완료 항목 수. 0은 "처리한 I/O 완료가 없음"을 뜻하며,
+    //         타임아웃뿐 아니라 사용자 게시 패킷(PostQueuedCompletionStatus로 넣은 wake-up 등)만
+    //         수거한 경우도 포함한다 — 0만 보고 타임아웃이었다고 단정해서는 안 된다.
+    //         QUIT 패킷을 수거했다면 나머지 이벤트를 모두 처리한 뒤 Iocp::kDispatchQuit(-1),
+    //         복구 불가능한 수거 실패(ERROR_INVALID_HANDLE/ERROR_ABANDONED_WAIT_0)면 Iocp::kDispatchFatal(-2).
+    //         그 밖의 일시적 수거 실패는 로그와 짧은 대기 후 0을 반환합니다.
     // 
     // @details
     // GetQueuedCompletionStatusEx로 최대 BATCH_SIZE개의 완료 이벤트를
@@ -174,22 +199,23 @@ private:
     // 
     // @details
     // 성공(success == TRUE):
-    //     iocpObject->Dispatch(iocpEvent, numOfBytes) 직접 호출
+    //     iocpObject->Dispatch(iocpEvent, numOfBytes) 호출
     //     
     // 실패(success == FALSE):
-    //     에러 코드에 따라 분류:
-    //     - WAIT_TIMEOUT: 처리 없음
-    //     - ERROR_NETNAME_DELETED:  원격지 강제 종료 (프로세스 kill 등)
-    //     - ERROR_CONNECTION_RESET: TCP RST 수신 (연결 재설정)
-    //     - ERROR_OPERATION_ABORTED: 소켓 Close로 인한 I/O 취소
-    //     - ERROR_SEM_TIMEOUT:       keepalive 타임아웃
-    //     → 위 4가지는 정상적인 연결 끊김으로 처리:
-    //       Dispatch(iocpEvent, 0) → Session::ProcessRecv/Send에서 Disconnect 유도
-    //     - 그 외: 로그 후 동일하게 Dispatch(0)
+    //     iocpEvent->errorCode에 에러 코드를 기록한 뒤 Dispatch(iocpEvent, 0)을 호출한다.
+    //     실패한 완료와 성공한 Recv의 numOfBytes == 0(상대의 graceful shutdown, FIN)은 둘 다 0으로
+    //     전달되므로 구분이 필요하면 iocpEvent->errorCode를 본다. 연결 종료 정책은 Session 계층이
+    //     결정하며(Recv/Send 완료 경로에서 Disconnect를 유도), Listener/Connect 경로는 자체 실패
+    //     처리를 수행한다.
+    //     완료 통지가 owner 참조를 해제하는 유일한 경로이므로 실패 완료도 반드시 Dispatch한다.
     //     
-    //     [기존 문제]
-    //     에러 처리가 없으면 연결 끊김 이벤트가 세션 종료로 이어지지 않아
-    //     좀비 세션이 누적된다.
+    //     정상적인 연결 종료·취소로 간주하는 에러 (로그 생략):
+    //     - ERROR_NETNAME_DELETED / ERROR_CONNECTION_ABORTED / WSAECONNRESET / WSAECONNABORTED:
+    //       원격지 강제 종료, TCP RST
+    //     - ERROR_OPERATION_ABORTED: 소켓 Close/Disconnect로 인한 pending I/O 취소
+    //     - ERROR_SEM_TIMEOUT: keepalive 타임아웃
+    //     그 외 에러는 LOG_ERROR로 기록한다. 단, Connect 이벤트는 실패가 일상적이므로
+    //     Session 계층(ProcessConnectEx/FailConnect)의 처리에 맡기고 로그를 생략한다.
     //***************************************************************************
     void    ProcessOverlappedResult(BOOL success, CIocpEvent* iocpEvent,
         DWORD numOfBytes, DWORD errorCode);

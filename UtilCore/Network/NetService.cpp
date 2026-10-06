@@ -7,6 +7,8 @@
 #include "pch.h"
 #include "NetService.h"
 
+#include <chrono>
+#include <utility>
 #include <vector>
 
 //***************************************************************************
@@ -16,17 +18,25 @@
 // @param factory 세션 생성 팩토리
 // @param maxSessionCount 최대 세션 수
 //***************************************************************************
-CNetService::CNetService(NetServiceType type, CNetAddress address, SessionFactory factory, int32 maxSessionCount)
-	: _type(type), _address(address), _sessionFactory(factory), _maxSessionCount(maxSessionCount)
+CNetService::CNetService(NetServiceType type, const CNetAddress& address, SessionFactory factory, int32 maxSessionCount)
+	: _type(type), _address(address), _sessionFactory(std::move(factory)), _maxSessionCount(maxSessionCount)
 {
 }
 
 //***************************************************************************
 // @brief CNetService 소멸자 구현
+// @note 소멸자가 실행되는 시점에는 shared_ptr strong count가 이미 0이라
+//       CreateSession()의 DisconnectHandler 안 weak_ptr::lock()이 항상 실패하고
+//       ReleaseSession()이 호출되지 않는다. 따라서 여기서 _sessions가 빌 때까지
+//       대기하면 영원히 끝나지 않을 수 있다 — 대기 없이 Disconnect 요청만 한다.
+//       또한 소멸자 안의 가상 호출은 CNetService::Close()로 고정되어 파생 클래스의
+//       정리 로직이 실행되지 않으므로 Close()를 호출하지 않는다.
+//       정상 종료는 소유자가 Close()를 명시적으로 호출해야 한다.
 //***************************************************************************
 CNetService::~CNetService()
 {
-	Close();
+	_closing.store(true);	// 소멸 이후에는 되돌리지 않는다
+	CloseSessions(false);
 }
 
 //***************************************************************************
@@ -45,43 +55,95 @@ CNetService::~CNetService()
 // 패턴과 동일하게, 락 안에서는 세션 목록의 스냅샷만 수집하고 실제
 // Disconnect() 호출은 락 밖에서 수행하도록 바꿔 이 재진입 데드락을 근본적으로
 // 제거한다(Disconnect()가 동기/비동기 어느 쪽이든 안전).
+//
+// [수정] (1) _closing 플래그: 스냅샷 이후 AddSession()으로 들어오는 세션은
+// Disconnect 대상에서 빠져 _sessions가 영원히 비지 않을 수 있었다 — 종료 중에는
+// AddSession()이 신규 세션을 거부한다. (2) 무기한 wait() 대신 타임아웃을 두어
+// 한 세션의 disconnect가 끝나지 않아도(워커 정체 등) 종료 절차 전체가 멈추지
+// 않게 한다. (3) 소멸자는 대기 없이 같은 로직(waitForDrain=false)만 사용한다.
 //***************************************************************************
 void CNetService::Close()
 {
+	CloseSessions(true);
+}
+
+//***************************************************************************
+// @brief 세션 종료 공통 구현.
+// @param waitForDrain true면 _sessions가 빌 때까지 최대 kCloseWaitTimeout 대기
+//***************************************************************************
+void CNetService::CloseSessions(bool waitForDrain)
+{
+	static constexpr std::chrono::seconds kCloseWaitTimeout{ 10 };
+
+	// 0. 이후 AddSession()은 신규 세션을 거부한다.
+	_closing.store(true);
+
 	// 1. 락 안에서는 세션 목록 스냅샷만 수집한다(shared_ptr 복사이므로 이
 	//    시점 이후 다른 스레드가 원본 세션을 정리해도 여기 보관된 참조는
 	//    안전하게 유효하다).
-	std::vector<CSessionRef> sessionsToClose;
-	{
-		std::lock_guard<std::mutex> guard(_lock);
-		sessionsToClose.reserve(_sessions.size());
-		for( const CSessionRef& session : _sessions )
-			sessionsToClose.push_back(session);
-	}
+	std::vector<CSessionRef> sessionsToClose = GetSessionsSnapshot();
 
 	// 2. 락 밖에서 Disconnect()를 호출한다. Disconnect()가 동기적으로
 	//    ReleaseSession()(같은 _lock)을 재진입하더라도, 이 스레드는 더 이상
 	//    _lock을 쥐고 있지 않으므로 안전하다.
 	for( const CSessionRef& session : sessionsToClose )
-		session->Disconnect(L"NetService Close");
+		session->Disconnect(_T("NetService Close"));
 
-	// 3. 각 세션의 disconnect가 실제로 완료되면(OnDisconnected() 훅 이후)
-	//    ReleaseSession()이 호출되어 _sessions에서 제거되고 _sessionsEmptyCv가
-	//    notify된다 — 그 순간이 올 때까지, 즉 _sessions가 실제로 빌 때까지
-	//    여기서 블로킹 대기한다. wait()는 대기 중 guard(락)를 자동으로
-	//    풀어주므로 그 사이 ReleaseSession()이 락을 잡을 수 있다.
+	sessionsToClose.clear();
+
+	if( waitForDrain )
+	{
+		// 3. 각 세션의 disconnect가 실제로 완료되면(OnDisconnected() 훅 이후)
+		//    ReleaseSession()이 호출되어 _sessions에서 제거되고 _sessionsEmptyCv가
+		//    notify된다. wait_for()는 대기 중 guard(락)를 자동으로 풀어주므로 그
+		//    사이 ReleaseSession()이 락을 잡을 수 있다.
+		std::unique_lock<std::mutex> guard(_lock);
+		if( !_sessionsEmptyCv.wait_for(guard, kCloseWaitTimeout, [this] { return _sessions.empty(); }) )
+		{
+			LOG_ERROR(_T("[CNetService] Close timeout: %d session(s) remaining"), static_cast<int32>(_sessions.size()));
+		}
+
+		// 4. 종료 절차가 끝났으므로 재시작(Start() 재호출)이 가능하도록 되돌린다.
+		_closing.store(false);
+	}
+}
+
+//***************************************************************************
+// @brief _sessions가 빌 때까지 최대 timeout 동안 대기합니다.
+// @return 제한 시간 안에 비었으면 true
+// @details wait_for()는 대기 중 락을 풀어 주므로 그 사이 ReleaseSession()이 락을 잡고
+//          _sessionsEmptyCv를 notify할 수 있다.
+//***************************************************************************
+bool CNetService::WaitForSessionsEmpty(std::chrono::milliseconds timeout)
+{
 	std::unique_lock<std::mutex> guard(_lock);
-	_sessionsEmptyCv.wait(guard, [this] { return _sessions.empty(); });
+	return _sessionsEmptyCv.wait_for(guard, timeout, [this] { return _sessions.empty(); });
 }
 
 //***************************************************************************
 // @brief 현재 활성화된 세션 수 조회
 // @return int32 관리 세션 수
 //***************************************************************************
-int32 CNetService::GetCurrentSessionCount()
+int32 CNetService::GetCurrentSessionCount() const
 {
 	std::lock_guard<std::mutex> guard(_lock);
 	return static_cast<int32>(_sessions.size());
+}
+
+//***************************************************************************
+// @brief 현재 세션 목록의 스냅샷을 반환합니다.
+// @return 세션 shared_ptr 복사본 목록 (락은 1회만 획득)
+//***************************************************************************
+std::vector<CSessionRef> CNetService::GetSessionsSnapshot() const
+{
+	std::lock_guard<std::mutex> guard(_lock);
+
+	std::vector<CSessionRef> snapshot;
+	snapshot.reserve(_sessions.size());
+	for( const CSessionRef& session : _sessions )
+		snapshot.push_back(session);
+
+	return snapshot;
 }
 
 //***************************************************************************
@@ -111,21 +173,36 @@ CSessionRef CNetService::CreateSession()
 //***************************************************************************
 // @brief 세션 관리 추가
 // @param session 추가할 세션 객체
+// @return 등록(또는 이미 등록됨)되면 true, 종료 중이라 거부되면 false
+// @note 종료 중 거부된 세션은 여기서 Disconnect를 요청한다(락 밖에서 호출 —
+//       Disconnect()가 동기적으로 ReleaseSession()을 재진입해도 안전하며,
+//       등록된 적 없는 세션이라 ReleaseSession()은 무시한다).
 //***************************************************************************
-void CNetService::AddSession(CSessionRef session)
+bool CNetService::AddSession(CSessionRef session)
 {
 	if( session == nullptr )
-		return;
+		return false;
 
-	std::lock_guard<std::mutex> guard(_lock);
+	{
+		std::lock_guard<std::mutex> guard(_lock);
 
-	// [수정] std::find() O(n) 선형탐색 대신 _sessionIndex(unordered_map)로
-	// O(1) 평균 중복 체크.
-	if( _sessionIndex.find(session.get()) != _sessionIndex.end() )
-		return;
+		// _closing 확인과 등록이 같은 락 안이어야, CloseSessions()의 스냅샷 이후에
+		// 등록되는 세션이 생기지 않는다(스냅샷도 같은 락으로 수집).
+		if( !_closing.load() )
+		{
+			// [수정] std::find() O(n) 선형탐색 대신 _sessionIndex(unordered_map)로
+			// O(1) 평균 중복 체크.
+			if( _sessionIndex.find(session.get()) != _sessionIndex.end() )
+				return true;
 
-	_sessionIndex.emplace(session.get(), _sessions.size());
-	_sessions.push_back(session);
+			_sessionIndex.emplace(session.get(), _sessions.size());
+			_sessions.push_back(session);
+			return true;
+		}
+	}
+
+	session->Disconnect(_T("NetService Closing"));
+	return false;
 }
 
 //***************************************************************************
@@ -159,7 +236,9 @@ void CNetService::ReleaseSession(CSessionRef session)
 	_sessions.erase(_sessions.begin() + lastIdx); // 맨 뒤 원소 제거 — 시프트 없음
 	_sessionIndex.erase(it);
 
-	_sessionsEmptyCv.notify_all();
+	// 대기자는 "_sessions가 빔"만 기다리므로 비었을 때만 깨우면 된다.
+	if( _sessions.empty() )
+		_sessionsEmptyCv.notify_all();
 }
 
 //***************************************************************************

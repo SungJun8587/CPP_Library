@@ -7,99 +7,53 @@
 #ifndef UC_HTTPRESPONSEPARSER_H
 #define UC_HTTPRESPONSEPARSER_H
 
-#include <Network/HTTP/HttpParseUtil.h>
+#include <Network/HTTP/HttpMessageParser.h>
 
-#include <cstdint>
-#include <cstring>
 #include <string>
-#include <vector>
-#include <utility>
-#include <charconv>
-#include <algorithm>
-#include <cctype>
 
 //***************************************************************************
 // @class CHttpResponseParser
 // @brief HTTP/1.1 응답을 증분(incremental)으로 파싱하는 상태머신
 //
 // @details
-//      요청 빌더(HttpPacketBuilder.h)와 달리 이 쪽은 "제로카피 뷰"가 아니라
-//      내부에 데이터를 복사/누적해야 한다: 응답 바이트는 CRecvBuffer 같은
-//      링/시프트 버퍼에서 오는데, 그 버퍼는 다음 Dispatch() 콜에서 덮어써지거나
-//      재사용될 수 있어 Feed() 호출이 끝난 뒤에도 살아있어야 하는 상태(헤더,
-//      지금까지 읽은 body)는 소유권을 가져야 한다.
+//      헤더/본문 프레이밍은 CHttpMessageParser가 처리하고, 이 클래스는 상태 라인과 응답 쪽
+//      본문 규칙(HEAD/1xx/204/304, "연결 종료까지" 본문, keep-alive 판단)을 담당한다.
 //
-//      [char 전용] HTTP 관련 클래스는 전부 char 타입으로 통일한다 — Feed()가
-//      받는 데이터는 소켓에서 그대로 온 와이어 바이트라 항상 1바이트 단위
-//      (char)로 처리해야 한다(TCHAR=wchar_t로 바꾸면 "TCP 스트림이 2바이트
-//      단위로 온다"고 잘못 가정하게 되어 파싱이 깨짐 — HttpPacketBuilder.h의
-//      UNICODE 빌드 주의사항과 동일한 문제). TCHAR 문자열이 필요한 호출부는
-//      CIconvUtil 등으로 미리 변환해서 char로 넘기거나, GetBody()/GetHeaders()
-//      결과를 받아 직접 변환하는 것을 권장한다 — 변환을 이 계층 안에 숨기면
-//      중복 변환을 호출부가 통제할 수 없게 된다.
+//      요청 빌더(HttpPacketBuilder.h)와 달리 이 쪽은 "제로카피 뷰"가 아니라 내부에 데이터를
+//      복사/누적한다: 응답 바이트는 수신 링버퍼에서 오는데 그 버퍼는 다음 수신 때 재사용되므로,
+//      Feed() 호출이 끝난 뒤에도 살아있어야 하는 상태(헤더, 지금까지 읽은 body)는 소유권을
+//      가져야 한다.
 //
 //      [사용 패턴 — 세션의 수신 훅에서]
 //      CHttpResponseParser parser;
-//      // ... Dispatch() 콜백마다:
+//      // ... 수신 콜백마다:
 //      auto state = parser.Feed(recvData, recvLen);
-//      if (state == HTTP::EParseState::Complete) { /* 콜백/future에 결과 전달 */ }
-//      else if (state == HTTP::EParseState::Error) { /* 커넥션 폐기, 재시도 판단 */ }
+//      if( state == HTTP::EParseState::Complete ) { /* 콜백/future에 결과 전달 */ }
+//      else if( state == HTTP::EParseState::Error ) { /* 커넥션 폐기, 재시도 판단 */ }
 //      // 같은 커넥션에서 다음 요청을 보내기 전 반드시 parser.Reset() 호출 (keep-alive 재사용)
 //
-//      [알려진 제약] Content-Length도 chunked도 없는 응답은 본 구현이 "연결
-//      종료까지 body"를 지원하지 않아 body 없음으로 간주하고 즉시 Complete
-//      처리한다(OnHeadersComplete() 참고). keep-alive 풀에서 이런 응답을 만나면
-//      그 커넥션을 재사용하지 말고 폐기해야 한다 — 상위 계층이 명시적으로
-//      처리해야 하는 부분.
+//      [본문 길이 규칙] RFC 7230 3.3.3에 따라 HEAD 응답과 1xx/204/304 응답은 본문이 없고,
+//      Transfer-Encoding(마지막 코딩이 chunked), Content-Length 순으로 본문 길이를 정한다.
+//      Transfer-Encoding의 마지막 코딩이 chunked가 아니면 본문은 연결 종료까지이고,
+//      Content-Length가 잘못됐거나 서로 다른 값이 중복되면 Error다.
+//      둘 다 없을 때: 서버가 연결을 닫는다고 알린 경우(Connection: close, 또는 명시적 keep-alive가
+//      없는 HTTP/1.0)에는 본문이 "연결 종료까지"이므로 응답을 Complete로 만들지 않고 종료 신호를
+//      기다린다. 호출 측은 상대의 정상 종료(FIN)를 알게 되면 IsReadingUntilClose()가 true인
+//      파서에 FinishAtConnectionClose()를 호출해 완결시킨다(CHttpClientCore가 한다). 리셋 등
+//      비정상 종료는 본문이 잘렸을 수 있으므로 완결시키지 않는다. 종료 신호도 길이도 없는 모호한
+//      응답(keep-alive인데 길이를 주지 않는 비표준 서버)은 빈 본문으로 즉시 Complete 처리한다.
 //***************************************************************************
-class CHttpResponseParser
+class CHttpResponseParser : public CHttpMessageParser
 {
 public:
 	//***************************************************************************
-	// @brief CHttpResponseParser 생성자
-	// @details 헤더 목록 벡터를 미리 reserve해 초기 파싱 중 재할당을 줄인다.
-	//***************************************************************************
-	CHttpResponseParser() { m_headers.reserve(16); }
-
-	//***************************************************************************
 	// @brief 수신 바이트를 밀어넣습니다. 여러 번 나눠 호출해도 내부 상태로 이어붙여 처리합니다.
-	// @param data 수신 바이트 포인터 (와이어 바이트, 항상 char 기준)
-	// @param len data의 길이
 	// @return HTTP::EParseState 이 호출 이후의 현재 상태 (Complete/Error면 호출부가 후속 처리)
 	//***************************************************************************
 	HTTP::EParseState Feed(const char* data, size_t len)
 	{
-		size_t pos = 0;
-		while( pos < len && m_state != HTTP::EParseState::Complete && m_state != HTTP::EParseState::Error )
-		{
-			switch( m_state )
-			{
-			case HTTP::EParseState::StartLine:
-				pos += ConsumeLine(data + pos, len - pos, /*isStatusLine=*/true);
-				break;
-			case HTTP::EParseState::Headers:
-				pos += ConsumeLine(data + pos, len - pos, /*isStatusLine=*/false);
-				break;
-			case HTTP::EParseState::Body:
-				pos += ConsumeBody(data + pos, len - pos);
-				break;
-			case HTTP::EParseState::ChunkedSize:
-				pos += ConsumeChunkSizeLine(data + pos, len - pos);
-				break;
-			case HTTP::EParseState::ChunkedData:
-				pos += ConsumeChunkData(data + pos, len - pos);
-				break;
-			case HTTP::EParseState::ChunkedCRLF:
-				pos += ConsumeChunkTrailingCrlf(data + pos, len - pos);
-				break;
-			case HTTP::EParseState::ChunkedTrailer:
-				pos += ConsumeLine(data + pos, len - pos, /*isStatusLine=*/false, /*isTrailer=*/true);
-				break;
-			default:
-				break;
-			}
-		}
-		return m_state;
+		m_bytesFed += len;
+		return CHttpMessageParser::Feed(data, len);
 	}
 
 	//***************************************************************************
@@ -107,23 +61,23 @@ public:
 	//***************************************************************************
 	void Reset()
 	{
-		m_state = HTTP::EParseState::StartLine;
-		m_lineBuffer.clear();
+		ResetMessageState();
 		m_statusCode = 0;
 		m_reasonPhrase.clear();
-		m_headers.clear();
-		m_body.clear();
-		m_contentLength = 0;
-		m_hasContentLength = false;
-		m_chunked = false;
-		m_chunkRemaining = 0;
 		m_connectionClose = false;
+		m_headResponse = false;
+		m_timedOut = false;
+		m_bytesFed = 0;
+		m_http10 = false;
+		m_untilClose = false;
 	}
 
 	//***************************************************************************
-	// @brief 현재 파싱 진행 상태를 반환합니다.
+	// @brief 다음에 파싱할 응답이 HEAD 요청에 대한 것임을 알립니다 (Reset() 이후, Feed() 이전에 호출).
+	// @details HEAD 응답은 Content-Length/Transfer-Encoding 헤더가 있어도 본문이 없다(RFC 7230 3.3.3).
+	//          파서는 요청 메서드를 모르므로 호출 측이 알려줘야 한다.
 	//***************************************************************************
-	HTTP::EParseState GetState() const noexcept { return m_state; }
+	void SetHeadResponse(bool isHead) noexcept { m_headResponse = isHead; }
 
 	//***************************************************************************
 	// @brief 응답 상태 코드를 반환합니다 (예: 200, 404).
@@ -131,322 +85,198 @@ public:
 	int GetStatusCode() const noexcept { return m_statusCode; }
 
 	//***************************************************************************
+	// @brief 요청이 타임아웃(무응답 시간 초과)으로 실패했는지 반환합니다.
+	//***************************************************************************
+	bool IsTimedOut() const noexcept { return m_timedOut; }
+
+	//***************************************************************************
+	// @brief 요청을 타임아웃으로 표시합니다 (CHttpClientCore가 실패 콜백 직전에 호출).
+	//***************************************************************************
+	void MarkTimedOut() noexcept { m_timedOut = true; }
+
+	//***************************************************************************
+	// @brief 본문이 "연결 종료까지"인 응답을 읽는 중인지 반환합니다.
+	//***************************************************************************
+	bool IsReadingUntilClose() const noexcept { return m_untilClose && m_state == HTTP::EParseState::Body; }
+
+	//***************************************************************************
+	// @brief 연결 종료까지가 본문인 응답을 읽던 중 서버가 연결을 정상 종료했을 때 응답을 완결시킵니다.
+	//***************************************************************************
+	void FinishAtConnectionClose() noexcept
+	{
+		if( IsReadingUntilClose() )
+			m_state = HTTP::EParseState::Complete;
+	}
+
+	//***************************************************************************
+	// @brief 이 응답으로 지금까지 Feed()에 들어온 총 바이트 수를 반환합니다.
+	// @details 0이면 서버로부터 응답 바이트를 하나도 받지 못한 것이다(연결 수준 실패 판단용).
+	//***************************************************************************
+	size_t BytesFed() const noexcept { return m_bytesFed; }
+
+	//***************************************************************************
 	// @brief 상태 메시지(Reason-Phrase)를 바이트 문자열 그대로 반환합니다.
 	//***************************************************************************
 	const std::string& GetReasonPhrase() const noexcept { return m_reasonPhrase; }
 
 	//***************************************************************************
-	// @brief 파싱된 헤더 목록을 바이트 문자열 쌍 그대로 반환합니다 (삽입 순서 보존).
-	//***************************************************************************
-	const std::vector<std::pair<std::string, std::string>>& GetHeaders() const noexcept { return m_headers; }
-
-	//***************************************************************************
-	// @brief 지금까지 누적된 body를 바이트 그대로 반환합니다.
-	// @details body는 임의의 인코딩(UTF-8 JSON, 바이너리 등)일 수 있어 Content-Type에
-	//          맞는 변환은 호출부 책임.
-	//***************************************************************************
-	const std::string& GetBody() const noexcept { return m_body; }
-
-	//***************************************************************************
-	// @brief 서버가 "Connection: close"를 명시했는지 반환합니다.
-	// @return bool true면 응답 완료 후 풀에 반납하지 말고 커넥션을 폐기해야 함
+	// @brief 응답 후 이 커넥션을 재사용하면 안 되는지 반환합니다.
+	// @return bool true면 풀에 반납하지 말고 커넥션을 폐기해야 함 — 서버가 "Connection: close"를
+	//         명시했거나, 명시적 keep-alive가 없는 HTTP/1.0 응답이거나, 본문 프레이밍이
+	//         모호해(Transfer-Encoding과 Content-Length 동시 존재 등) 연결을 닫아야 하는 경우
 	//***************************************************************************
 	bool IsConnectionCloseRequested() const noexcept { return m_connectionClose; }
 
-	//***************************************************************************
-	// @brief 헤더를 이름으로 찾습니다 (대소문자 무시, ASCII 바이트 문자열 기준).
-	// @param key 찾을 헤더 이름
-	// @return std::string_view 찾은 헤더 값(원본 버퍼를 가리키는 뷰). 없으면 빈 뷰.
-	//***************************************************************************
-	std::string_view FindHeader(std::string_view key) const noexcept
-	{
-		for( const auto& [k, v] : m_headers )
-			if( EqualsIgnoreCaseAscii(k, key) )
-				return v;
-		return {};
-	}
-
-private:
-	//***************************************************************************
-	// @brief 대소문자 무시 비교 (헤더 이름은 RFC 7230 기준 대소문자 무관, ASCII 범위만 처리).
-	// @details 실제 구현은 HTTP::EqualsIgnoreCaseAscii()에 위임 — CHttpRequestParser
-	//          등 다른 파서와 공유하기 위해 그쪽으로 승격했다. 이 private
-	//          래퍼는 기존 내부 호출부(EqualsIgnoreCaseAscii(...))를 그대로
-	//          유지하기 위해 남겨둔다.
-	//***************************************************************************
-	static bool EqualsIgnoreCaseAscii(std::string_view a, std::string_view b) noexcept
-	{
-		return HTTP::EqualsIgnoreCaseAscii(a, b);
-	}
-
-	//***************************************************************************
-	// @brief 문자열 앞뒤의 공백(스페이스/탭)을 제거합니다.
-	// @details 실제 구현은 HTTP::Trim()에 위임 (EqualsIgnoreCaseAscii와 동일한 이유).
-	//***************************************************************************
-	static std::string_view Trim(std::string_view sv) noexcept
-	{
-		return HTTP::Trim(sv);
-	}
-
-	//***************************************************************************
-	// @brief data 안에서 개행(\n)을 찾아 한 줄을 소비합니다.
-	// @param data 입력 바이트 포인터
-	// @param len data의 길이
-	// @param isStatusLine 상태 라인 파싱 중인지 여부 (true면 HandleStatusLine으로)
-	// @param isTrailer chunked 응답의 trailer 헤더 섹션인지 여부
-	// @return size_t 소비한 바이트 수. 개행을 못 찾으면 m_lineBuffer에 누적만
-	//         하고 len 전체를 반환, 찾으면 그 줄까지 소비한 바이트 수를 반환.
-	//***************************************************************************
-	size_t ConsumeLine(const char* data, size_t len, bool isStatusLine, bool isTrailer = false)
-	{
-		const char* nl = static_cast<const char*>(memchr(data, '\n', len));
-		if( !nl )
-		{
-			m_lineBuffer.append(data, len);
-			if( m_lineBuffer.size() > kMaxLineLen ) { m_state = HTTP::EParseState::Error; }
-			return len;
-		}
-		size_t consumed = static_cast<size_t>(nl - data) + 1;
-		m_lineBuffer.append(data, consumed - 1); // '\n' 직전까지
-		if( !m_lineBuffer.empty() && m_lineBuffer.back() == '\r' )
-			m_lineBuffer.pop_back();
-
-		if( isStatusLine )
-		{
-			HandleStatusLine(m_lineBuffer);
-		}
-		else if( m_lineBuffer.empty() )
-		{
-			// 빈 줄 = 헤더(or trailer) 섹션 종료
-			if( isTrailer )
-				m_state = HTTP::EParseState::Complete;
-			else
-				OnHeadersComplete();
-		}
-		else
-		{
-			HandleHeaderLine(m_lineBuffer);
-		}
-		m_lineBuffer.clear();
-		return consumed;
-	}
-
+protected:
 	//***************************************************************************
 	// @brief 상태 라인("HTTP/1.1 200 OK")을 파싱해 상태 코드/메시지를 채웁니다.
-	// @param line 개행이 제거된 상태 라인 원문
 	//***************************************************************************
-	void HandleStatusLine(const std::string& line)
+	void HandleStartLine(const std::string& line) override
 	{
-		// "HTTP/1.1 200 OK"
-		size_t sp1 = line.find(' ');
-		if( sp1 == std::string::npos ) { m_state = HTTP::EParseState::Error; return; }
-		size_t sp2 = line.find(' ', sp1 + 1);
-		std::string_view codeSv(line.data() + sp1 + 1, (sp2 == std::string::npos ? line.size() : sp2) - sp1 - 1);
+		if( line.compare(0, 5, "HTTP/") != 0 )
+		{
+			SetError();
+			return;
+		}
 
-		int code = 0;
-		auto res = std::from_chars(codeSv.data(), codeSv.data() + codeSv.size(), code);
-		if( res.ec != std::errc() ) { m_state = HTTP::EParseState::Error; return; }
-		m_statusCode = code;
+		const size_t sp1 = line.find(' ');
+		if( sp1 == std::string::npos ) { SetError(); return; }
+		const size_t sp2 = line.find(' ', sp1 + 1);
+		const size_t codeEnd = (sp2 == std::string::npos) ? line.size() : sp2;
+
+		// 상태 코드는 정확히 세 자리 숫자다 (RFC 7230 §3.1.2).
+		size_t code = 0;
+		if( codeEnd - sp1 - 1 != 3 || !HTTP::ParseUnsigned(std::string_view(line).substr(sp1 + 1, 3), code) )
+		{
+			SetError();
+			return;
+		}
+
+		m_statusCode = static_cast<int>(code);
+		m_http10 = (line.compare(0, 8, "HTTP/1.0") == 0);
 		if( sp2 != std::string::npos )
-			m_reasonPhrase.assign(line.data() + sp2 + 1, line.size() - sp2 - 1);
+			m_reasonPhrase.assign(line, sp2 + 1, std::string::npos);
 
 		m_state = HTTP::EParseState::Headers;
 	}
 
 	//***************************************************************************
-	// @brief 헤더 한 줄("Key: Value")을 파싱해 m_headers에 추가합니다.
-	// @param line 개행이 제거된 헤더 라인 원문
+	// @brief 헤더 섹션이 끝났을 때 keep-alive 여부와 본문 길이 규칙을 확정해 다음 파싱 상태를 정합니다.
 	//***************************************************************************
-	void HandleHeaderLine(const std::string& line)
+	void OnHeadersComplete() override
 	{
-		size_t colon = line.find(':');
-		if( colon == std::string::npos ) return; // 관례상 무시 (엄격 모드가 필요하면 Error로 바꿀 것)
-		std::string key(line.data(), colon);
-		std::string_view value = Trim(std::string_view(line).substr(colon + 1));
-		m_headers.emplace_back(std::move(key), std::string(value));
-	}
+		// 1xx 임시 응답(100 Continue 등, 101 제외)은 최종 응답이 아니다 — 버리고 이어서 오는 다음
+		// 응답을 파싱한다. 그대로 두면 임시 응답이 완결로 처리돼 최종 응답이 유실된다.
+		if( m_statusCode >= 100 && m_statusCode < 200 && m_statusCode != 101 )
+		{
+			m_statusCode = 0;
+			m_reasonPhrase.clear();
+			m_headers.clear();
+			m_connectionClose = false;
+			m_state = HTTP::EParseState::StartLine;
+			return;
+		}
 
-	//***************************************************************************
-	// @brief 헤더 섹션이 끝났을 때(빈 줄 도달) 호출되어, Transfer-Encoding/
-	//        Content-Length/Connection 헤더를 검사해 다음 파싱 상태를 결정합니다.
-	//***************************************************************************
-	void OnHeadersComplete()
-	{
-		std::string_view te = FindHeader("Transfer-Encoding");
-		std::string_view cl = FindHeader("Content-Length");
-		std::string_view conn = FindHeader("Connection");
-
-		if( EqualsIgnoreCaseAscii(conn, "close") )
+		if( HTTP::HeaderHasToken(m_headers, "Connection", "close") )
 			m_connectionClose = true;
 
-		if( EqualsIgnoreCaseAscii(te, "chunked") )
-		{
-			m_chunked = true;
-			m_state = HTTP::EParseState::ChunkedSize;
-			return;
-		}
+		// HTTP/1.0 응답은 명시적인 keep-alive가 없으면 응답 후 연결이 닫힌다 — 풀이 재사용하지 않게 한다.
+		if( m_http10 && !HTTP::HeaderHasToken(m_headers, "Connection", "keep-alive") )
+			m_connectionClose = true;
 
-		if( !cl.empty() )
+		// HEAD 응답과 204/304 응답은 헤더에 Content-Length/Transfer-Encoding이 있어도 본문이 없다
+		// (RFC 7230 3.3.3). 본문을 기다리면 응답이 영원히 완결되지 않는다.
+		if( m_headResponse || m_statusCode == 204 || m_statusCode == 304 )
 		{
-			size_t v = 0;
-			auto res = std::from_chars(cl.data(), cl.data() + cl.size(), v);
-			if( res.ec == std::errc() )
-			{
-				m_hasContentLength = true;
-				m_contentLength = v;
-			}
-		}
-
-		if( m_hasContentLength && m_contentLength > kMaxBodyLen )
-		{
-			// 비정상적으로 큰 Content-Length — 메모리 고갈 방지를 위해 즉시 에러 처리.
-			m_state = HTTP::EParseState::Error;
-			return;
-		}
-
-		if( m_hasContentLength && m_contentLength == 0 )
-		{
-			m_state = HTTP::EParseState::Complete; // body 없음 (예: 204, 또는 CL:0)
-			return;
-		}
-		if( !m_hasContentLength )
-		{
-			// Content-Length도 chunked도 없음: 클래스 설명의 [알려진 제약] 참고 —
-			// "연결 종료까지 body"는 지원하지 않고 body 없음으로 간주해 종료 처리.
 			m_state = HTTP::EParseState::Complete;
 			return;
 		}
-		m_body.reserve(m_contentLength); // 크기를 미리 알고(상한 이내) 있으므로 재할당 방지
+
+		const HTTP::SBodyFraming framing = HTTP::ResolveBodyFraming(m_headers, /*rejectBothTeAndCl=*/false);
+		switch( framing.kind )
+		{
+		case HTTP::EBodyFraming::Invalid:
+			SetError(); // 본문의 끝을 확정할 수 없다 — 다음 응답과 섞이므로 연결을 폐기해야 한다
+			return;
+
+		case HTTP::EBodyFraming::Chunked:
+			// Transfer-Encoding과 Content-Length가 함께 온 응답은 요청 스머글링의 징후일 수 있어
+			// (RFC 7230 §3.3.3) 이 응답을 읽은 뒤 연결을 닫는다.
+			if( !HTTP::FindHeaderValue(m_headers, "Content-Length").empty() )
+				m_connectionClose = true;
+			m_state = HTTP::EParseState::ChunkedSize;
+			return;
+
+		case HTTP::EBodyFraming::UnknownCoding:
+			// 마지막 코딩이 chunked가 아니면 본문은 연결 종료까지다.
+			m_connectionClose = true;
+			m_untilClose = true;
+			m_state = HTTP::EParseState::Body;
+			return;
+
+		case HTTP::EBodyFraming::None:
+			// 본문 길이를 알려주는 헤더가 없다. 서버가 연결을 닫는다고 알린 경우에는 본문이
+			// 연결 종료까지이므로 종료 신호를 기다리고, 그렇지 않은 모호한 응답은 빈 본문으로 완결한다.
+			if( m_connectionClose )
+			{
+				m_untilClose = true;
+				m_state = HTTP::EParseState::Body;
+			}
+			else
+			{
+				m_state = HTTP::EParseState::Complete;
+			}
+			return;
+
+		case HTTP::EBodyFraming::ContentLength:
+			break;
+		}
+
+		m_contentLength = framing.contentLength;
+		if( m_contentLength > MaxBodyLen() )
+		{
+			SetError(); // 비정상적으로 큰 Content-Length — 메모리 고갈 방지를 위해 즉시 에러 처리
+			return;
+		}
+
+		if( m_contentLength == 0 )
+		{
+			m_state = HTTP::EParseState::Complete; // body 없음 (CL:0)
+			return;
+		}
+
+		ReserveBody(m_contentLength);
 		m_state = HTTP::EParseState::Body;
 	}
 
 	//***************************************************************************
-	// @brief Content-Length 기준으로 body 바이트를 소비합니다.
-	// @param data 입력 바이트 포인터
-	// @param len data의 길이
-	// @return size_t 실제로 소비한 바이트 수 (m_contentLength 남은 만큼만)
-	// @details m_contentLength는 OnHeadersComplete()에서 이미 kMaxBodyLen 이하임이
-	//          확인된 값이므로 여기서는 별도 상한 체크가 필요 없다.
+	// @brief 본문 바이트를 소비합니다. 연결 종료까지가 본문이면 받은 바이트를 그대로 붙이되 상한을
+	//        넘으면 에러 처리하고, 아니면 Content-Length 기준으로 소비합니다.
 	//***************************************************************************
-	size_t ConsumeBody(const char* data, size_t len)
+	size_t ConsumeBodyBytes(const char* data, size_t len) override
 	{
-		size_t remaining = m_contentLength - m_body.size();
-		size_t take = (std::min)(len, remaining);
-		m_body.append(data, take);
-		if( m_body.size() >= m_contentLength )
-			m_state = HTTP::EParseState::Complete;
-		return take;
-	}
+		if( !m_untilClose )
+			return CHttpMessageParser::ConsumeBodyBytes(data, len);
 
-	//***************************************************************************
-	// @brief chunked 인코딩의 청크 크기 라인(16진수)을 파싱합니다.
-	// @param data 입력 바이트 포인터
-	// @param len data의 길이
-	// @return size_t 소비한 바이트 수
-	//***************************************************************************
-	size_t ConsumeChunkSizeLine(const char* data, size_t len)
-	{
-		const char* nl = static_cast<const char*>(memchr(data, '\n', len));
-		if( !nl )
+		if( m_body.size() + len > MaxBodyLen() )
 		{
-			m_lineBuffer.append(data, len);
-			if( m_lineBuffer.size() > kMaxLineLen ) m_state = HTTP::EParseState::Error;
+			SetError();
 			return len;
 		}
-		size_t consumed = static_cast<size_t>(nl - data) + 1;
-		m_lineBuffer.append(data, consumed - 1);
-		if( !m_lineBuffer.empty() && m_lineBuffer.back() == '\r' )
-			m_lineBuffer.pop_back();
-
-		// chunk-extension(";" 이후)은 무시하고 크기(hex)만 파싱
-		std::string_view sizeSv(m_lineBuffer);
-		size_t semi = sizeSv.find(';');
-		if( semi != std::string_view::npos ) sizeSv = sizeSv.substr(0, semi);
-
-		size_t chunkSize = 0;
-		auto res = std::from_chars(sizeSv.data(), sizeSv.data() + sizeSv.size(), chunkSize, 16);
-		if( res.ec != std::errc() ) { m_state = HTTP::EParseState::Error; return consumed; }
-
-		m_lineBuffer.clear();
-		if( chunkSize == 0 )
-		{
-			m_state = HTTP::EParseState::ChunkedTrailer; // 마지막 청크: trailer 헤더(없으면 빈 줄) 처리로 이동
-		}
-		else
-		{
-			m_chunkRemaining = chunkSize;
-			m_state = HTTP::EParseState::ChunkedData;
-		}
-		return consumed;
-	}
-
-	//***************************************************************************
-	// @brief chunked 인코딩의 청크 데이터 바이트를 소비합니다.
-	// @param data 입력 바이트 포인터
-	// @param len data의 길이
-	// @return size_t 실제로 소비한 바이트 수 (m_chunkRemaining 남은 만큼만)
-	// @details chunked는 Content-Length처럼 총량을 미리 알 수 없어 OnHeadersComplete()의
-	//          사전 체크가 적용되지 않는다 — 그래서 여기서 누적 크기를 직접
-	//          kMaxBodyLen과 비교해 상한을 넘으면 Error로 전환한다(메모리 고갈 방지).
-	//***************************************************************************
-	size_t ConsumeChunkData(const char* data, size_t len)
-	{
-		size_t take = (std::min)(len, m_chunkRemaining);
-		m_body.append(data, take);
-		m_chunkRemaining -= take;
-
-		if( m_body.size() > kMaxBodyLen )
-		{
-			m_state = HTTP::EParseState::Error;
-			return take;
-		}
-
-		if( m_chunkRemaining == 0 )
-			m_state = HTTP::EParseState::ChunkedCRLF;
-		return take;
-	}
-
-	//***************************************************************************
-	// @brief 청크 데이터 뒤에 오는 CRLF 두 바이트를 소비합니다 (부분 수신 대비 1바이트씩 처리).
-	// @param len 입력 가능한 바이트 수
-	// @return size_t 실제로 소비한 바이트 수 (최대 2, m_crlfSkipped가 2에 도달할 때까지)
-	//***************************************************************************
-	size_t ConsumeChunkTrailingCrlf(const char* /*data*/, size_t len)
-	{
-		size_t consumed = 0;
-		while( consumed < len && m_crlfSkipped < 2 )
-		{
-			++consumed;
-			++m_crlfSkipped;
-		}
-		if( m_crlfSkipped >= 2 )
-		{
-			m_crlfSkipped = 0;
-			m_state = HTTP::EParseState::ChunkedSize;
-		}
-		return consumed;
+		OnBodyData(data, len);
+		return len;
 	}
 
 private:
-	static constexpr size_t kMaxLineLen = 8192; // 헤더 한 줄 상한 (비정상 응답/공격 방어)
-	static constexpr size_t kMaxBodyLen = 64 * 1024 * 1024; // body 누적 크기 상한(64MB) — Content-Length/chunked 둘 다 이 상한을 넘으면 Error(메모리 고갈 방지)
+	int m_statusCode = 0;           // 응답 상태 코드
+	std::string m_reasonPhrase;     // 상태 메시지 (Reason-Phrase)
 
-	HTTP::EParseState m_state = HTTP::EParseState::StartLine; // 파싱 진행 상태
-	std::string m_lineBuffer;                              // 개행을 못 찾은 부분 라인의 누적 버퍼 (char 기준)
-
-	int m_statusCode = 0;                                        // 응답 상태 코드
-	std::string m_reasonPhrase;                                  // 상태 메시지 (Reason-Phrase, char 기준)
-	std::vector<std::pair<std::string, std::string>> m_headers;  // 파싱된 헤더 목록 (삽입 순서 보존, char 기준)
-	std::string m_body;                                          // 지금까지 누적된 body (char 기준, 임의 인코딩 가능)
-
-	bool m_hasContentLength = false; // Content-Length 헤더 존재 여부
-	size_t m_contentLength = 0;      // Content-Length 값
-
-	bool m_chunked = false;      // Transfer-Encoding: chunked 여부
-	size_t m_chunkRemaining = 0; // 현재 청크에서 아직 안 읽은 바이트 수
-	int m_crlfSkipped = 0;       // 청크 데이터 뒤 CRLF 소비 진행도(0~2)
-
-	bool m_connectionClose = false; // "Connection: close" 응답 헤더 존재 여부
+	bool m_connectionClose = false; // 응답 후 연결을 재사용하면 안 되는지
+	bool m_headResponse = false;    // 이 응답이 HEAD 요청에 대한 것인지 (본문이 없어야 함)
+	bool m_http10 = false;          // 상태 라인이 HTTP/1.0인지 (명시적 keep-alive가 없으면 응답 후 연결이 닫힌다)
+	bool m_untilClose = false;      // 본문이 연결 종료까지인지
+	bool m_timedOut = false;        // 요청이 타임아웃으로 실패했는지 (CHttpClientCore가 실패 콜백 직전에 표시)
+	size_t m_bytesFed = 0;          // 이 응답으로 Feed()에 들어온 총 바이트 수 (응답을 하나도 못 받았는지 판단용)
 };
 
 #endif // ndef UC_HTTPRESPONSEPARSER_H

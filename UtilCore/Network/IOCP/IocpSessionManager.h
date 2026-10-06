@@ -29,8 +29,8 @@ public:
     CIocpSessionManager(const CIocpSessionManager&) = delete;
     CIocpSessionManager& operator=(const CIocpSessionManager&) = delete;
 
-    CIocpSessionManager(CIocpSessionManager&&) noexcept = default;
-    CIocpSessionManager& operator=(CIocpSessionManager&&) noexcept = default;
+    CIocpSessionManager(CIocpSessionManager&&) = delete;
+    CIocpSessionManager& operator=(CIocpSessionManager&&) = delete;
 
 public:
     uint64 GenerateSessionId();
@@ -47,8 +47,10 @@ public:
     void RemoveClosedSessions();
 
 private:
-    CClusterSpinUnorderedMap<uint64, CIocpSessionRef, Iocp::kSessionClusterCnt> _sessions;    // SessionId를 키로 하고, 16개의 클러스터로 분산 처리하여 락 경합을 최소화하는 고성능 해시맵
-    // [수정] AddSession()/RemoveSession()/FindSession()이 전부 sessionId==0을
+    using SessionMap = CClusterSpinUnorderedMap<uint64, CIocpSessionRef, Iocp::kSessionClusterCnt>;
+
+    mutable SessionMap _sessions;    // SessionId를 키로 하고, 16개의 클러스터로 분산 처리하여 락 경합을 최소화하는 고성능 해시맵
+    // AddSession()/RemoveSession()/FindSession()이 전부 sessionId==0을
     // "무효한 값"으로 취급해 거부한다(0을 sentinel로 쓰는 관례). 그런데
     // GenerateSessionId()가 fetch_add(1)의 반환값(증가 *전* 값)을 그대로
     // 돌려주므로, 이 카운터가 0에서 시작하면 맨 처음 발급되는 ID가 정확히
