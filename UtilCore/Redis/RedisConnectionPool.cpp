@@ -244,7 +244,7 @@ void CRedisConnectionPool::PushConnection(CRedisClientRef pClient, uint64 genera
 	// 한다 — 전송 자체는 블로킹 작업이 아니지만(IOCP 비동기), 락을 쥔 채로
 	// 콜백 체인을 시작하는 습관을 들이지 않기 위한 방어적 조치다.
 	if( hasPending )
-		DispatchOnClient(pClient, pending.vecArgs, pending.fnCallback);
+		DispatchOnClient(pClient, pending.vecArgs, std::move(pending.fnCallback));
 }
 
 //***************************************************************************
@@ -279,12 +279,24 @@ bool CRedisConnectionPool::SendCommand(const CVector<std::string>& vecArgs, Redi
 	{
 		std::lock_guard<std::mutex> lock(_lock);
 
-		if( !_queueFree.empty() )
+		// 유휴 중에 서버나 중간 장비가 끊어버린 커넥션은 반납 경로를 거치지 않아 Free 큐에
+		// 그대로 남아 있다. 그런 커넥션에 명령을 실으면 에러 응답으로 요청 하나가 실패하므로,
+		// 꺼내는 시점에 연결 상태를 확인해 끊긴 것은 격리 큐로 보내고 다음 커넥션을 고른다.
+		while( !_queueFree.empty() )
 		{
-			pClient = _queueFree.front();
+			CRedisClientRef pCandidate = _queueFree.front();
 			_queueFree.pop();
+
+			if( pCandidate->IsConnected() )
+			{
+				pClient = std::move(pCandidate);
+				break;
+			}
+
+			_queueBroken.push(std::move(pCandidate));
 		}
-		else
+
+		if( !pClient )
 		{
 			// [수정 — 버그 수정] 예전엔 여기서 그냥 false를 돌려주고 끝이었다 —
 			// 풀의 모든 커넥션이 사용 중일 때 새 요청이 아무 알림도 없이
@@ -303,12 +315,12 @@ bool CRedisConnectionPool::SendCommand(const CVector<std::string>& vecArgs, Redi
 				return false;
 			}
 
-			_queuePending.push(TPendingCommand{ vecArgs, fnCallback });
+			_queuePending.push(TPendingCommand{ vecArgs, std::move(fnCallback) });
 			return true;
 		}
 	}
 
-	DispatchOnClient(pClient, vecArgs, fnCallback);
+	DispatchOnClient(pClient, vecArgs, std::move(fnCallback));
 	return true;
 }
 
@@ -324,10 +336,14 @@ bool CRedisConnectionPool::SendCommand(const CVector<std::string>& vecArgs, Redi
 //***************************************************************************
 void CRedisConnectionPool::DispatchOnClient(CRedisClientRef pClient, const CVector<std::string>& vecArgs, RedisCallback fnCallback)
 {
-	std::weak_ptr<CRedisConnectionPool> weakSelf = shared_from_this();
+	// 풀이 소멸 중이면(Clear()가 재연결 스레드를 조인하는 동안 그 스레드가 대기 중이던
+	// 요청을 전송하는 경우) shared_from_this()는 bad_weak_ptr를 던진다. weak_from_this()는
+	// 던지지 않고 빈 weak_ptr을 주며, 이 경우 완료 콜백의 PushConnection()은 건너뛰어지고
+	// 커넥션은 곧 Clear()가 정리한다.
+	std::weak_ptr<CRedisConnectionPool> weakSelf = weak_from_this();
 	const uint64 generation = _generation.load(std::memory_order_acquire);
 
-	auto fnWrappedCallback = [weakSelf, pClient, fnCallback, generation](const RedisValue& res) {
+	auto fnWrappedCallback = [weakSelf, pClient, fnCallback = std::move(fnCallback), generation](const RedisValue& res) {
 		// [추가 — 방어적 하드닝] 사용자 콜백(fnCallback)이 예외를 던지면
 		// 원래는 이 람다 자체가 중간에 끊겨서 아래 PushConnection()이
 		// 실행되지 않는다 — 그러면 이 커넥션이 풀로 영원히 반납되지 않고
@@ -364,7 +380,7 @@ void CRedisConnectionPool::DispatchOnClient(CRedisClientRef pClient, const CVect
 	// 커넥션이 Free 큐에 중복으로 들어가 결국 두 개의 다른 명령에 동시에
 	// 대여되는 버그로 이어질 수 있었다. 반환값은 이제 참고 정보일 뿐이라
 	// 무시한다.
-	pClient->SendCommand(vecArgs, fnWrappedCallback);
+	pClient->SendCommand(vecArgs, std::move(fnWrappedCallback));
 }
 
 //***************************************************************************

@@ -7,8 +7,6 @@
 #include "pch.h"
 #include "NetworkFactory.h"
 
-#include <utility>
-
 //***************************************************************************
 // @brief 지정된 엔진 코어에 맞는 서버 서비스 객체를 동적으로 생성합니다.
 // @param engineCore IOCP 또는 RIO 코어 참조(variant) — 담긴 대안이 곧 엔진 타입
@@ -17,11 +15,10 @@
 // @param maxSessionCount 최대 수용 세션 수
 // @param workerThreadCount 워커 스레드 개수 (기본값: 0)
 // @return CNetServiceRef 생성된 서비스 객체 포인터 (실패 시 nullptr)
-// @details std::visit()가 컴파일 타임에 engineCore에 실제로 담긴 타입
-//          (CIocpCoreRef 또는 CRioCoreRef)만으로 분기하므로, 예전처럼
-//          "enum 값과 실제 포인터 타입이 서로 다를 수 있는" 경로 자체가
-//          존재하지 않는다 — switch에 break가 빠지는 식의 fallthrough로
-//          엉뚱한 타입을 static_cast하는 버그 클래스가 통째로 제거됨.
+// @details std::visit()가 컴파일 타임에 engineCore에 실제로 담긴 타입(CIocpCoreRef 또는
+//          CRioCoreRef)만으로 분기한다. 엔진 종류와 코어 포인터 타입이 서로 다를 수 있는
+//          경로 자체가 없고, 새 엔진 타입이 variant에 추가되면 static_assert가 분기 누락을
+//          컴파일 에러로 알려 준다.
 //***************************************************************************
 CNetServiceRef CNetworkFactory::CreateServerService(
 	const EngineCoreRef& engineCore,

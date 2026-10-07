@@ -1021,6 +1021,18 @@
     <ClCompile Include="Image\GifCodec.cpp">
       <Filter>Image</Filter>
     </ClCompile>
+    <ClCompile Include="Network\HTTP\HttpClient.cpp">
+      <Filter>Network\HTTP</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\HTTP\HttpClientCore.cpp">
+      <Filter>Network\HTTP</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\HTTP\HttpConnPoolFactory.cpp">
+      <Filter>Network\HTTP</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\HTTP\HttpConnPoolManager.cpp">
+      <Filter>Network\HTTP</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="DB\BaseODBC.inl">

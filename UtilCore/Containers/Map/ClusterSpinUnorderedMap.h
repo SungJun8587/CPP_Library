@@ -12,6 +12,7 @@
 
 #include <unordered_map>
 #include <utility>
+#include <optional>
 #include <cassert>
 
 //***************************************************************************
@@ -39,6 +40,8 @@
 //   - 대규모 하이엔드 서버 환경(32코어 이상, 수천 명 동접): 32 또는 64 권장
 //   - 소규모 서버 또는 테스트 환경(2 ~ 4코어): 8 또는 16 권장
 // [주의 사항]
+//   - EraseObject()/ClearObjectMap()으로 제거된 값은 락을 푼 뒤에 소멸되므로, T2의 소멸자가
+//     같은 맵을 다시 호출해도 교착하지 않습니다.
 //   - getSize()/ClearObjectMap()은 각 클러스터 단위로는 안전하지만, 전체 클러스터를 아우르는
 //     하나의 순간을 나타내는 atomic snapshot은 아닙니다(클러스터별로 순차적으로 락을 걸고 풉니다).
 //   - WriteLockByIdx/ReadLockByIdx로 여러 클러스터의 락을 동시에 보유해야 하는 경우,
@@ -77,11 +80,13 @@ public:
 	// @param idx 클러스터 인덱스 (0 ~ nClusterCnt - 1)
 	// @return ObjectMap& 해당 클러스터의 맵 참조
 	//***************************************************************************
-	ObjectMap& GetClusterMapByIdx(__int32 idx) {
+	ObjectMap& GetClusterMapByIdx(__int32 idx)
+	{
 		assert(idx >= 0 && idx < nClusterCnt);
 		return m_ObjectMaps[idx];
 	}
-	const ObjectMap& GetClusterMapByIdx(__int32 idx) const {
+	const ObjectMap& GetClusterMapByIdx(__int32 idx) const
+	{
 		assert(idx >= 0 && idx < nClusterCnt);
 		return m_ObjectMaps[idx];
 	}
@@ -92,80 +97,92 @@ public:
 	//          bInnerLock=false 상태에서 GetClusterMapByIdx/GetObjectMap으로
 	//          raw 맵에 접근할 때 반드시 이 메서드로 감싸야 합니다.
 	//***************************************************************************
-	void WriteLockByIdx(__int32 idx, const char* name = nullptr) {
+	void WriteLockByIdx(__int32 idx, const char* name = nullptr)
+	{
 		lockWrite(idx, name);
 	}
 
 	//***************************************************************************
 	// @brief 클러스터 인덱스로 직접 쓰기 락을 해제합니다. (외부 제어용, 항상 동작)
 	//***************************************************************************
-	void WriteUnlockByIdx(__int32 idx, const char* name = nullptr) {
+	void WriteUnlockByIdx(__int32 idx, const char* name = nullptr)
+	{
 		unlockWrite(idx, name);
 	}
 
 	//***************************************************************************
 	// @brief 클러스터 인덱스로 직접 읽기 락을 획득합니다. (외부 제어용, 항상 동작)
 	//***************************************************************************
-	void ReadLockByIdx(__int32 idx, const char* name = nullptr) {
+	void ReadLockByIdx(__int32 idx, const char* name = nullptr)
+	{
 		lockRead(idx, name);
 	}
 
 	//***************************************************************************
 	// @brief 클러스터 인덱스로 직접 읽기 락을 해제합니다. (외부 제어용, 항상 동작)
 	//***************************************************************************
-	void ReadUnlockByIdx(__int32 idx, const char* name = nullptr) {
+	void ReadUnlockByIdx(__int32 idx, const char* name = nullptr)
+	{
 		unlockRead(idx, name);
 	}
 
 	//***************************************************************************
 	// @brief 키에 해당하는 클러스터의 읽기 락을 획득합니다. (외부 제어용, 항상 동작)
 	//***************************************************************************
-	void ReadLock(const T1& key, const char* name = nullptr) {
+	void ReadLock(const T1& key, const char* name = nullptr)
+	{
 		lockRead(getClusterIdx(key), name);
 	}
 
 	//***************************************************************************
 	// @brief 키에 해당하는 클러스터의 읽기 락을 해제합니다. (외부 제어용, 항상 동작)
 	//***************************************************************************
-	void ReadUnlock(const T1& key, const char* name = nullptr) {
+	void ReadUnlock(const T1& key, const char* name = nullptr)
+	{
 		unlockRead(getClusterIdx(key), name);
 	}
 
 	//***************************************************************************
 	// @brief 키에 해당하는 클러스터의 쓰기 락을 획득합니다. (외부 제어용, 항상 동작)
 	//***************************************************************************
-	void WriteLock(const T1& key, const char* name = nullptr) {
+	void WriteLock(const T1& key, const char* name = nullptr)
+	{
 		lockWrite(getClusterIdx(key), name);
 	}
 
 	//***************************************************************************
 	// @brief 키에 해당하는 클러스터의 쓰기 락을 해제합니다. (외부 제어용, 항상 동작)
 	//***************************************************************************
-	void WriteUnlock(const T1& key, const char* name = nullptr) {
+	void WriteUnlock(const T1& key, const char* name = nullptr)
+	{
 		unlockWrite(getClusterIdx(key), name);
 	}
 
 	//***************************************************************************
 	// @brief 키에 해당하는 클러스터의 내부 해시맵 참조를 반환합니다.
 	//***************************************************************************
-	ObjectMap& GetObjectMap(const T1& key) {
+	ObjectMap& GetObjectMap(const T1& key)
+	{
 		return m_ObjectMaps[getClusterIdx(key)];
 	}
-	const ObjectMap& GetObjectMap(const T1& key) const {
+	const ObjectMap& GetObjectMap(const T1& key) const
+	{
 		return m_ObjectMaps[getClusterIdx(key)];
 	}
 
 	//***************************************************************************
 	// @brief 설정된 전체 클러스터 개수를 반환합니다.
 	//***************************************************************************
-	__int32 GetClusterCnt(void) const {
+	__int32 GetClusterCnt(void) const
+	{
 		return nClusterCnt;
 	}
 
 	//***************************************************************************
 	// @brief 전체 클러스터를 순회하며 맵 데이터를 비웁니다.
 	//***************************************************************************
-	void ClearObjectMap(void) {
+	void ClearObjectMap(void)
+	{
 		clearObjectMap();
 	}
 
@@ -275,41 +292,50 @@ protected:
 	//***************************************************************************
 	// @brief 키를 바탕으로 해시맵이 위치할 클러스터 인덱스를 계산합니다.
 	//***************************************************************************
-	__int32 getClusterIdx(const T1& key) const {
+	__int32 getClusterIdx(const T1& key) const
+	{
 		return static_cast<__int32>(Hash{}(key) % static_cast<size_t>(nClusterCnt));
 	}
 
 	// 실제 락 조작 (bInnerLock 값과 무관하게 항상 실행) — WriteLockByIdx 등
 	// "외부 제어용" 공개 API 및 아래의 내부 자동 락 헬퍼가 공통으로 사용합니다.
-	void lockRead(__int32 nClusterIdx, const char* name = nullptr) {
+	void lockRead(__int32 nClusterIdx, const char* name = nullptr)
+	{
 		assert(nClusterIdx >= 0 && nClusterIdx < nClusterCnt);
 		m_ObjectLocks[nClusterIdx].lock.ReadLock(name);
 	}
-	void unlockRead(__int32 nClusterIdx, const char* name = nullptr) {
+	void unlockRead(__int32 nClusterIdx, const char* name = nullptr)
+	{
 		assert(nClusterIdx >= 0 && nClusterIdx < nClusterCnt);
 		m_ObjectLocks[nClusterIdx].lock.ReadUnlock(name);
 	}
-	void lockWrite(__int32 nClusterIdx, const char* name = nullptr) {
+	void lockWrite(__int32 nClusterIdx, const char* name = nullptr)
+	{
 		assert(nClusterIdx >= 0 && nClusterIdx < nClusterCnt);
 		m_ObjectLocks[nClusterIdx].lock.WriteLock(name);
 	}
-	void unlockWrite(__int32 nClusterIdx, const char* name = nullptr) {
+	void unlockWrite(__int32 nClusterIdx, const char* name = nullptr)
+	{
 		assert(nClusterIdx >= 0 && nClusterIdx < nClusterCnt);
 		m_ObjectLocks[nClusterIdx].lock.WriteUnlock(name);
 	}
 
 	// 내부 자동 락 (InsertObject/FindObject/EraseObject/getSize/ClearObjectMap 전용)
 	// bInnerLock=false 이면 컴파일 타임에 완전히 제거됩니다.
-	void readLock(__int32 nClusterIdx, const char* name = nullptr) {
+	void readLock(__int32 nClusterIdx, const char* name = nullptr)
+	{
 		if constexpr( bInnerLock ) lockRead(nClusterIdx, name);
 	}
-	void readUnlock(__int32 nClusterIdx, const char* name = nullptr) {
+	void readUnlock(__int32 nClusterIdx, const char* name = nullptr)
+	{
 		if constexpr( bInnerLock ) unlockRead(nClusterIdx, name);
 	}
-	void writeLock(__int32 nClusterIdx, const char* name = nullptr) {
+	void writeLock(__int32 nClusterIdx, const char* name = nullptr)
+	{
 		if constexpr( bInnerLock ) lockWrite(nClusterIdx, name);
 	}
-	void writeUnlock(__int32 nClusterIdx, const char* name = nullptr) {
+	void writeUnlock(__int32 nClusterIdx, const char* name = nullptr)
+	{
 		if constexpr( bInnerLock ) unlockWrite(nClusterIdx, name);
 	}
 

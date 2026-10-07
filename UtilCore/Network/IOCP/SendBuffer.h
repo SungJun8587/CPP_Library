@@ -12,6 +12,7 @@
 #include <Network/IOCP/IocpCommon.h>
 
 #include <array>
+#include <utility>
 
 extern thread_local CSendBufferChunkRef	LSendBufferChunk;
 
@@ -94,10 +95,8 @@ private:
 //  - 객체 풀(ObjectPool)을 통한 SendBufferChunk 재사용 및 성능 최적화
 //  - 필요에 따른 동적 청크 교체 및 오픈 처리
 //
-// [수정] Open()은 멤버 변수를 전혀 갖지 않고 thread_local LSendBufferChunk만
-// 참조하는 순수 정적 동작이므로 static으로 변경했습니다. 기존에는 호출부
-// (예: CIocpSession::Send())가 매번 인스턴스를 지역 변수로 만들어 호출했는데,
-// 실질 비용은 0에 가깝지만 static 메서드로 명시해 의도를 분명히 합니다.
+// Open()은 멤버 변수를 갖지 않고 thread_local LSendBufferChunk만 참조하는 순수 정적 동작이라
+// static 메서드다(호출부가 인스턴스를 만들 필요 없음).
 //***************************************************************************
 class CSendBufferManager
 {

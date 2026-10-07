@@ -7,10 +7,6 @@
 #include "pch.h"
 #include "NetService.h"
 
-#include <chrono>
-#include <utility>
-#include <vector>
-
 //***************************************************************************
 // @brief CNetService 생성자 구현
 // @param type 서비스 타입
@@ -42,25 +38,18 @@ CNetService::~CNetService()
 //***************************************************************************
 // @brief 서비스에 등록된 모든 세션을 종료합니다.
 // @note
-// [수정] 기존에는 _lock을 쥔 채로 각 session->Disconnect()를 호출했다. 이는
-// Disconnect()가 항상 순수 비동기(게시만 하고 즉시 반환)라는 가정 위에서만
-// 안전했는데, CIocpSession::Disconnect(Iocp::CloseReason)의 "아직 연결 완료
-// 전(Accept/ConnectEx 진행 중)" 경로는 그 자리에서 동기적으로
-// OnDisconnected()→CSession::OnDisconnected()→(DisconnectHandler)→
-// CNetService::ReleaseSession()까지 호출하며 같은 _lock(non-recursive
-// std::mutex)을 다시 잡으려 한다 — 같은 스레드의 재진입이라 그 즉시
-// 데드락이었다.
+// 락 안에서는 세션 목록의 스냅샷만 수집하고, 실제 Disconnect() 호출은 락 밖에서 한다.
+// CIocpSession::Disconnect(Iocp::CloseReason)의 "아직 연결 완료 전(Accept/ConnectEx 진행 중)"
+// 경로는 그 자리에서 동기적으로 OnDisconnected()→CSession::OnDisconnected()→(DisconnectHandler)→
+// CNetService::ReleaseSession()까지 호출하며 같은 _lock(non-recursive std::mutex)을 다시 잡는다.
+// 락을 쥔 채 Disconnect()를 호출하면 같은 스레드의 재진입이라 즉시 데드락이 되므로, Disconnect()가
+// 동기/비동기 어느 쪽이든 안전하도록 이 패턴을 쓴다(CIocpSessionManager의 Broadcast()/
+// BeginCloseAllSessions()도 동일).
 //
-// CIocpSessionManager::Broadcast()/BeginCloseAllSessions()가 이미 쓰고 있는
-// 패턴과 동일하게, 락 안에서는 세션 목록의 스냅샷만 수집하고 실제
-// Disconnect() 호출은 락 밖에서 수행하도록 바꿔 이 재진입 데드락을 근본적으로
-// 제거한다(Disconnect()가 동기/비동기 어느 쪽이든 안전).
-//
-// [수정] (1) _closing 플래그: 스냅샷 이후 AddSession()으로 들어오는 세션은
-// Disconnect 대상에서 빠져 _sessions가 영원히 비지 않을 수 있었다 — 종료 중에는
-// AddSession()이 신규 세션을 거부한다. (2) 무기한 wait() 대신 타임아웃을 두어
-// 한 세션의 disconnect가 끝나지 않아도(워커 정체 등) 종료 절차 전체가 멈추지
-// 않게 한다. (3) 소멸자는 대기 없이 같은 로직(waitForDrain=false)만 사용한다.
+// _closing 플래그: 종료 중에는 AddSession()이 신규 세션을 거부한다. 스냅샷 이후 등록된 세션이
+// Disconnect 대상에서 빠져 _sessions가 영원히 비지 않는 일을 막는다. 대기에는 타임아웃을 두어
+// 한 세션의 disconnect가 끝나지 않아도(워커 정체 등) 종료 절차 전체가 멈추지 않게 하고, 소멸자는
+// 대기 없이 같은 로직(waitForDrain=false)만 사용한다.
 //***************************************************************************
 void CNetService::Close()
 {
@@ -190,8 +179,7 @@ bool CNetService::AddSession(CSessionRef session)
 		// 등록되는 세션이 생기지 않는다(스냅샷도 같은 락으로 수집).
 		if( !_closing.load() )
 		{
-			// [수정] std::find() O(n) 선형탐색 대신 _sessionIndex(unordered_map)로
-			// O(1) 평균 중복 체크.
+			// _sessionIndex(unordered_map)로 O(1) 평균 중복 체크.
 			if( _sessionIndex.find(session.get()) != _sessionIndex.end() )
 				return true;
 
@@ -216,10 +204,9 @@ void CNetService::ReleaseSession(CSessionRef session)
 
 	std::lock_guard<std::mutex> guard(_lock);
 
-	// [수정] std::find() O(n) 선형탐색 + erase()의 O(n) 원소 시프트 대신,
-	// _sessionIndex로 대상 위치를 O(1) 평균으로 찾고 맨 뒤 원소와 자리를
-	// 바꾼 뒤(swap-and-pop) 맨 뒤를 제거 — 순서 보장이 필요 없는 컨테이너라
-	// 안전하다. 자리를 옮긴 세션의 인덱스도 함께 갱신해야 한다.
+	// _sessionIndex로 대상 위치를 O(1) 평균으로 찾고, 맨 뒤 원소와 자리를 바꾼 뒤(swap-and-pop)
+	// 맨 뒤를 제거한다 — 순서 보장이 필요 없는 컨테이너라 안전하다. 자리를 옮긴 세션의 인덱스도
+	// 함께 갱신해야 한다.
 	auto it = _sessionIndex.find(session.get());
 	if( it == _sessionIndex.end() )
 		return;
@@ -229,7 +216,7 @@ void CNetService::ReleaseSession(CSessionRef session)
 
 	if( removeIdx != lastIdx )
 	{
-		_sessions[removeIdx] = _sessions[lastIdx];
+		_sessions[removeIdx] = std::move(_sessions[lastIdx]);
 		_sessionIndex[_sessions[removeIdx].get()] = removeIdx;
 	}
 

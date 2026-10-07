@@ -7,8 +7,6 @@
 #include "pch.h"
 #include "RioListener.h"
 
-#include <algorithm>
-
 namespace
 {
     //***************************************************************************
@@ -27,6 +25,19 @@ namespace
     bool ShouldLogAcceptRetry(uint32 retryCount) noexcept
     {
         return retryCount == 1 || (retryCount % Rio::kAcceptRetryLogInterval) == 0;
+    }
+
+    //***************************************************************************
+    // @brief 연결 하나가 수락되기 전에 클라이언트가 끊어 AcceptEx가 실패 완료된 경우인지 판단합니다.
+    // @details 포트 스캔이나 클라이언트의 중도 포기로 흔히 일어나며 서버 자원 문제가 아니므로
+    //          백오프 없이 곧바로 재게시한다. 백오프로 워커를 재우면 정상 연결의 수락까지 늦어진다.
+    //***************************************************************************
+    bool IsPerConnectionAcceptError(DWORD errorCode) noexcept
+    {
+        return errorCode == ERROR_NETNAME_DELETED
+            || errorCode == ERROR_CONNECTION_ABORTED
+            || errorCode == WSAECONNRESET
+            || errorCode == WSAECONNABORTED;
     }
 }
 
@@ -406,6 +417,7 @@ void CRioListener::AcceptWorkerLoop()
         LPOVERLAPPED overlapped = nullptr;
 
         BOOL success = ::GetQueuedCompletionStatus(_acceptIocp, &bytesTransferred, &completionKey, &overlapped, INFINITE);
+        const DWORD errorCode = success ? 0 : ::GetLastError(); // 다른 API 호출 전에 바로 읽는다
 
         if( overlapped == nullptr )
         {
@@ -417,7 +429,7 @@ void CRioListener::AcceptWorkerLoop()
 
         RioAcceptContext* context = static_cast<RioAcceptContext*>(overlapped);
 
-        ProcessAccept(context, success != FALSE);
+        ProcessAccept(context, success != FALSE, errorCode);
 
         // self-stop 재진입 시나리오 방어: ProcessAccept() 도중 Stop()이 이미
         // _acceptIocp를 닫았다면 여기서 즉시 종료하고, 절대 다음 루프에서
@@ -431,8 +443,9 @@ void CRioListener::AcceptWorkerLoop()
 // @brief AcceptEx 완료 처리
 // @param context 완료된 AcceptContext
 // @param succeeded GetQueuedCompletionStatus가 보고한 이 I/O의 성공 여부
+// @param errorCode 실패 완료일 때의 오류 코드 (성공이면 0)
 //***************************************************************************
-void CRioListener::ProcessAccept(RioAcceptContext* context, bool succeeded)
+void CRioListener::ProcessAccept(RioAcceptContext* context, bool succeeded, DWORD errorCode)
 {
     SOCKET clientSocket = context->acceptSocket;
     context->acceptSocket = INVALID_SOCKET;
@@ -446,6 +459,13 @@ void CRioListener::ProcessAccept(RioAcceptContext* context, bool succeeded)
 
         if( !_isListening.load(std::memory_order_acquire) )
             return; // Stop() 진행 중 — 이 슬롯은 더 이상 재게시하지 않는다.
+
+        // 수락 전에 클라이언트가 끊은 경우 — 서버 쪽 문제가 아니므로 대기 없이 바로 재게시한다.
+        if( IsPerConnectionAcceptError(errorCode) )
+        {
+            PostAccept(context);
+            return;
+        }
 
         RepostAfterFailure(context, _T("AcceptEx completed with failure"));
         return;
@@ -523,8 +543,17 @@ void CRioListener::ProcessAccept(RioAcceptContext* context, bool succeeded)
 
     if( session == nullptr )
     {
+        // 팩토리가 세션을 주지 않았다(주로 최대 세션 수 도달). 이 연결만 거절하고 대기 없이 재게시한다 —
+        // 백오프로 워커를 재우면 빈 자리가 생긴 뒤에도 정상 연결의 수락이 최대 지연만큼 늦어진다.
+        // 자원 고갈로 재게시 자체가 실패하는 경우는 PostAccept()가 자체 백오프로 처리한다.
         CSocketUtils::Close(clientSocket);
-        RepostAfterFailure(context, _T("Session factory returned null"));
+
+        static std::atomic<uint32> rejectedCount{ 0 };
+        const uint32 rejected = rejectedCount.fetch_add(1, std::memory_order_relaxed) + 1;
+        if( rejected == 1 || (rejected % 1000) == 0 )
+            LOG_WARNING(_T("[RioListener] Session factory returned null - connection rejected (total=%u)"), rejected);
+
+        PostAccept(context);
         return;
     }
 

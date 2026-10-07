@@ -631,38 +631,22 @@ SOCKET CSocketUtils::Accept(SOCKET listenSocket, sockaddr_in& outClientAddress)
 //***************************************************************************
 // @brief 문자열 형식의 IP 주소를 이진 주소 구조체(in_addr / in6_addr)로 변환합니다.
 // @param af 주소 체계 (AF_INET 또는 AF_INET6)
-// @param hostAddress IP 주소 문자열 (예: _T("127.0.0.1"))
+// @param hostAddress IP 주소 문자열 (예: _T("127.0.0.1")). 포트가 붙은 문자열이나 축약형은 허용하지 않는다.
 // @param dest 변환 결과를 저장할 메모리 버퍼 포인터
-// @return 성공 시 TRUE, 실패 시 FALSE
+// @return 성공 시 true, 실패 시 false (실패하면 dest는 변경되지 않는다)
 //***************************************************************************
 bool CSocketUtils::IPToAddr(const int af, const TCHAR* hostAddress, void* dest)
 {
 	if( hostAddress == nullptr || dest == nullptr )
 		return false;
 
-	// 지원하지 않는 주소 체계는 변환 전에 거른다(성공을 반환하면서 dest에 아무것도
-	// 쓰지 않는 경로 방지).
+	// 지원하지 않는 주소 체계는 변환 전에 거른다(성공을 반환하면서 dest에 아무것도 쓰지 않는 경로 방지).
 	if( af != AF_INET && af != AF_INET6 )
 		return false;
 
-	int nLen = sizeof(sockaddr_storage);
-	struct sockaddr_storage ss;
-	TCHAR tszHostAddress[IP6_STRLEN + 1];
-
-	::ZeroMemory(&ss, sizeof(ss));
-	_tcsncpy_s(tszHostAddress, _countof(tszHostAddress), hostAddress, _TRUNCATE);
-
-	int nRet = ::WSAStringToAddress(tszHostAddress, af, NULL,
-		reinterpret_cast<SOCKADDR*>(&ss), &nLen);
-	if( nRet != 0 )
-		return false;
-
-	if( af == AF_INET )
-		::memcpy(dest, &reinterpret_cast<sockaddr_in*>(&ss)->sin_addr, sizeof(struct in_addr));
-	else
-		::memcpy(dest, &reinterpret_cast<sockaddr_in6*>(&ss)->sin6_addr, sizeof(struct in6_addr));
-
-	return true;
+	// InetPton은 엄격한 텍스트 형식(IPv4 점-십진 표기 / IPv6)만 받아들인다 — "127.1" 같은 축약형이나
+	// "1.2.3.4:80"처럼 포트가 붙은 문자열은 거부한다. 성공(1)일 때만 dest에 쓴다.
+	return ::InetPton(af, hostAddress, dest) == 1;
 }
 
 //***************************************************************************
@@ -670,37 +654,18 @@ bool CSocketUtils::IPToAddr(const int af, const TCHAR* hostAddress, void* dest)
 // @param af 주소 체계 (AF_INET 또는 AF_INET6)
 // @param src 바이너리 주소 구조체 포인터
 // @param hostAddress 변환된 문자열이 저장될 버퍼
-// @param size 버퍼의 크기
-// @return 성공 시 TRUE, 실패 시 FALSE
+// @param size 버퍼의 크기(TCHAR 개수)
+// @return 성공 시 true, 실패 시 false
 //***************************************************************************
 bool CSocketUtils::AddrToIP(const int af, const void* src, TCHAR* hostAddress, socklen_t size)
 {
-	struct sockaddr_storage ss;
-	unsigned long ulSize = size;
-
-	::ZeroMemory(&ss, sizeof(ss));
-	ss.ss_family = static_cast<ADDRESS_FAMILY>(af);
-
-	DWORD dwSockAddrLen = sizeof(ss);
-
-	switch( af )
-	{
-	case AF_INET:
-		reinterpret_cast<sockaddr_in*>(&ss)->sin_addr = *reinterpret_cast<const struct in_addr*>(src);
-		dwSockAddrLen = sizeof(sockaddr_in); // [수정] IPv4 정확한 구조체 크기 지정
-		break;
-	case AF_INET6:
-		reinterpret_cast<sockaddr_in6*>(&ss)->sin6_addr = *reinterpret_cast<const struct in6_addr*>(src);
-		dwSockAddrLen = sizeof(sockaddr_in6); // [수정] IPv6 정확한 구조체 크기 지정
-		break;
-	default:
-		return false;
-	}
-
-	if( ::WSAAddressToString(reinterpret_cast<SOCKADDR*>(&ss), dwSockAddrLen, NULL, hostAddress, &ulSize) != 0 )
+	if( src == nullptr || hostAddress == nullptr || size == 0 )
 		return false;
 
-	return true;
+	if( af != AF_INET && af != AF_INET6 )
+		return false;
+
+	return ::InetNtop(af, src, hostAddress, size) != nullptr;
 }
 
 //***************************************************************************
@@ -772,12 +737,11 @@ bool CSocketUtils::GetSockAddrIn(const TCHAR* hostName, const int port, std::lis
 		addrinfo addrInfo;
 		::memcpy(&addrInfo, pAddrInfo, sizeof(addrinfo));
 
-		// [수정] 얕은 복사(memcpy)만 하면 ai_addr/ai_canonname이 freeaddrinfo()로
-		// 해제될 pResult 내부 메모리를 계속 가리키는 댕글링 포인터가 된다.
-		// ai_addr이 가리키는 sockaddr 내용을 별도 힙 버퍼로 deep-copy해서
-		// 리스트 원소가 자체 소유 메모리를 갖도록 한다. 이 사본은 호출자가
-		// FreeSockAddrIn()으로 해제해야 한다(해제하지 않으면 호출당 addrinfo 결과
-		// 수만큼 누수 — 재연결 등 반복 경로에서는 반드시 해제할 것).
+		// 얕은 복사(memcpy)만 하면 ai_addr/ai_canonname이 freeaddrinfo()로 해제될 pResult 내부
+		// 메모리를 가리키는 댕글링 포인터가 된다. 그래서 ai_addr이 가리키는 sockaddr 내용을 별도 힙
+		// 버퍼로 deep-copy해 리스트 원소가 자체 소유 메모리를 갖게 한다. 이 사본은 호출자가
+		// FreeSockAddrIn()으로 해제해야 한다(해제하지 않으면 호출당 결과 수만큼 누수 — 재연결 등
+		// 반복 경로에서는 반드시 해제할 것).
 		if( pAddrInfo->ai_addr != nullptr && pAddrInfo->ai_addrlen > 0 )
 		{
 			sockaddr* pAddrCopy = static_cast<sockaddr*>(::malloc(pAddrInfo->ai_addrlen));

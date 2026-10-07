@@ -113,6 +113,8 @@ bool CClusterSpinUnorderedMap<T1, T2, nClusterCnt, bInnerLock, Hash>::FindObject
 
 //***************************************************************************
 // @brief 클러스터별 쓰기 락을 이용하여 데이터 삭제
+// @details 값은 락 안에서 꺼내기만 하고, T2의 소멸(마지막 shared_ptr 해제 등 임의의 소멸자 실행)은
+//          락을 푼 뒤에 일어납니다. 소멸자가 같은 클러스터를 다시 접근해도 교착하지 않습니다.
 // @param key 삭제할 데이터의 키
 // @return bool 삭제 성공 시 true, 존재하지 않으면 false
 //***************************************************************************
@@ -122,10 +124,14 @@ bool CClusterSpinUnorderedMap<T1, T2, nClusterCnt, bInnerLock, Hash>::EraseObjec
 	__int32 nClusterIdx = getClusterIdx(key);
 	bool nRet = false;
 
+	// 제거된 값은 락 밖에서 소멸되도록 guard보다 먼저 선언합니다(소멸은 선언의 역순).
+	std::optional<T2> removed;
+
 	InnerWriteGuard guard(*this, nClusterIdx, __FUNCTION__);
 	auto iter = m_ObjectMaps[nClusterIdx].find(key);
 	if( iter != m_ObjectMaps[nClusterIdx].end() )
 	{
+		removed.emplace(std::move(iter->second));
 		m_ObjectMaps[nClusterIdx].erase(iter);
 		nRet = true;
 	}
@@ -137,14 +143,16 @@ bool CClusterSpinUnorderedMap<T1, T2, nClusterCnt, bInnerLock, Hash>::EraseObjec
 // @brief 전체 클러스터를 순회하며 맵 데이터 비우기
 // @details 클러스터별로는 안전하게 비우지만, 전체를 아우르는 하나의 순간에
 //          atomic하게 비우는 것은 아닙니다 (다른 스레드가 이미 처리된
-//          클러스터 이후 클러스터에 동시에 insert할 수 있음).
+//          클러스터 이후 클러스터에 동시에 insert할 수 있음). 클러스터의 내용은 락 안에서
+//          임시 맵으로 옮기고, 요소 소멸은 락을 푼 뒤에 일어납니다.
 //***************************************************************************
 template<typename T1, typename T2, __int32 nClusterCnt, bool bInnerLock, typename Hash>
 void CClusterSpinUnorderedMap<T1, T2, nClusterCnt, bInnerLock, Hash>::clearObjectMap(void)
 {
 	for( __int32 i = 0; i < nClusterCnt; ++i )
 	{
+		ObjectMap removed;	// guard보다 먼저 선언 — 요소는 락 해제 후 소멸
 		InnerWriteGuard guard(*this, i, __FUNCTION__);
-		m_ObjectMaps[i].clear();
+		removed.swap(m_ObjectMaps[i]);
 	}
 }

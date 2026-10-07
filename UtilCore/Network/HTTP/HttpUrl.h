@@ -33,23 +33,30 @@ struct CHttpUrl
 // @return bool 파싱 성공 여부. scheme이 http/https가 아니거나 host가 비어있으면 false.
 // @details 이 함수는 순수 문자열 파싱만 하고 DNS resolve나 네트워크 I/O는 전혀
 //          하지 않는다 — 그래서 타이머/스레드 없이 단위 테스트 가능하다.
+//          URL에 공백/제어 문자(CR/LF 포함)가 있으면 거부한다 — 요청 라인에 그대로 실려 요청이
+//          분할(추가 헤더/요청 주입)되는 것을 막기 위함이다. 경로의 공백 등은 호출부가 미리
+//          percent-encoding(HTTP::UrlEncode())해야 한다. 경로 없이 쿼리만 오는 형태
+//          ("http://host?a=b")는 경로 "/"에 쿼리를 붙여 해석한다.
 //          userinfo(user:pass@host, RFC 3986)는 지원하지 않는다 — 지원 필요시
 //          별도로 추가해야 한다. fragment(#...)는 인식해서 잘라내지만 out에
 //          담지 않는다(HTTP 요청에 fragment를 보내지 않는 것이 스펙에 맞음).
 //***************************************************************************
 inline bool ParseHttpUrl(std::string_view url, CHttpUrl& out)
 {
+	if( HTTP::ContainsControlOrSpace(url) )
+		return false;
+
 	size_t schemeEnd = url.find("://");
-	if (schemeEnd == std::string_view::npos)
+	if( schemeEnd == std::string_view::npos )
 		return false;
 
 	std::string_view scheme = url.substr(0, schemeEnd);
-	if (HTTP::EqualsIgnoreCaseAscii(scheme, "https"))
+	if( HTTP::EqualsIgnoreCaseAscii(scheme, "https") )
 	{
 		out.isHttps = true;
 		out.port = 443;
 	}
-	else if (HTTP::EqualsIgnoreCaseAscii(scheme, "http"))
+	else if( HTTP::EqualsIgnoreCaseAscii(scheme, "http") )
 	{
 		out.isHttps = false;
 		out.port = 80;
@@ -63,26 +70,29 @@ inline bool ParseHttpUrl(std::string_view url, CHttpUrl& out)
 
 	// fragment(#...) 제거 — HTTP 요청에는 포함시키지 않는다.
 	size_t fragmentStart = rest.find('#');
-	if (fragmentStart != std::string_view::npos)
+	if( fragmentStart != std::string_view::npos )
 		rest = rest.substr(0, fragmentStart);
 
-	size_t pathStart = rest.find('/');
-	std::string_view hostPort = (pathStart == std::string_view::npos) ? rest : rest.substr(0, pathStart);
+	// authority는 첫 '/' 또는 '?'에서 끝난다 ('?'가 먼저면 경로 없이 쿼리만 있는 URL).
+	size_t authorityEnd = rest.find_first_of("/?");
+	std::string_view hostPort = (authorityEnd == std::string_view::npos) ? rest : rest.substr(0, authorityEnd);
 
-	if (pathStart == std::string_view::npos)
+	if( authorityEnd == std::string_view::npos )
 		out.pathAndQuery = "/";
+	else if( rest[authorityEnd] == '/' )
+		out.pathAndQuery = std::string(rest.substr(authorityEnd));
 	else
-		out.pathAndQuery = std::string(rest.substr(pathStart));
+		out.pathAndQuery = "/" + std::string(rest.substr(authorityEnd));
 
 	size_t colon = hostPort.find(':');
-	if (colon != std::string_view::npos)
+	if( colon != std::string_view::npos )
 	{
 		out.host = std::string(hostPort.substr(0, colon));
 
 		std::string_view portSv = hostPort.substr(colon + 1);
 		int portValue = 0;
 		auto res = std::from_chars(portSv.data(), portSv.data() + portSv.size(), portValue);
-		if (res.ec != std::errc() || portValue <= 0 || portValue > 65535)
+		if( res.ec != std::errc() || res.ptr != portSv.data() + portSv.size() || portValue <= 0 || portValue > 65535 )
 			return false;
 		out.port = static_cast<uint16>(portValue);
 	}

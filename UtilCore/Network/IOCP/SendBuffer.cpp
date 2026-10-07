@@ -7,8 +7,6 @@
 #include "pch.h"
 #include "SendBuffer.h"
 
-#include <utility>
-
 thread_local CSendBufferChunkRef	LSendBufferChunk;
 
 //***************************************************************************
@@ -84,7 +82,7 @@ CSendBufferRef CSendBufferChunk::Open(uint32 allocSize)
 	if( allocSize > FreeSize() )
 		return nullptr;
 
-	// MakeShared 할당 수행 후 성공 시에만 _open = true 설정 (이슈 9번 해결)
+	// MakeShared 할당이 성공한 경우에만 _open = true로 표시한다.
 	CSendBufferRef buffer = CObjectPool<CSendBuffer>::MakeShared(shared_from_this(), Buffer(), allocSize);
 	if( buffer != nullptr )
 	{
@@ -109,7 +107,7 @@ void CSendBufferChunk::Close(uint32 writeSize)
 // @brief 지정된 크기의 SendBuffer를 오픈하여 반환합니다.
 // @param size 요청할 크기
 // @return 생성된 SendBuffer 스마트 포인터
-// @note [수정] static 메서드로 변경 (인스턴스 상태를 갖지 않으므로 인스턴스화 불필요).
+// @note static 메서드 — 인스턴스 상태를 갖지 않는다.
 //***************************************************************************
 CSendBufferRef CSendBufferManager::Open(uint32 size)
 {

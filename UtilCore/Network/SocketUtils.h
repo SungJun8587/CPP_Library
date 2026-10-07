@@ -27,6 +27,20 @@ typedef struct _WINSOCK_ERRORCODE_INFO
 } WINSOCK_ERRORCODE_INFO, * PWINSOCK_ERRORCODE_INFO;
 
 //***************************************************************************
+// @brief Listen 소켓의 주소 바인딩 방식.
+// @details Windows에서 SO_REUSEADDR는 이미 사용 중인 포트에 다른 소켓이 강제로 바인드하는 것을 허용한다
+//          (같은 서버를 두 번 띄워도 "주소가 이미 사용 중" 에러 없이 뜨고, 접속을 어느 소켓이 받을지
+//          불확정). MS는 서버에 SO_EXCLUSIVEADDRUSE를 권하지만, 이 옵션을 쓴 소켓은 닫기 전에 제대로
+//          shutdown해야 하는 등 재시작 동작이 달라질 수 있어 기본값은 기존 동작(ReuseAddress)을 유지한다.
+//***************************************************************************
+enum class ListenAddressMode : uint8
+{
+	ReuseAddress,       // SO_REUSEADDR (기본값, 기존 동작)
+	ExclusiveAddrUse,   // SO_EXCLUSIVEADDRUSE — 같은 주소/포트에 다른 소켓이 바인드하지 못하게 한다
+	None                // 주소 관련 옵션을 설정하지 않는다 (Windows 기본 동작)
+};
+
+//***************************************************************************
 // @class CSocketUtils
 // @brief TCP/UDP 소켓 생성·옵션 설정, IOCP 확장 함수(AcceptEx/ConnectEx/DisconnectEx),
 //        RIO(Registered I/O) 전용 소켓 생성까지 아우르는 static 유틸리티 모음.
@@ -49,20 +63,6 @@ typedef struct _WINSOCK_ERRORCODE_INFO
 // 스레드 안전성:
 //     확장 함수 포인터는 Init()에서 단일 스레드로 1회만 로드한다고 가정한다.
 //     서버 시작 시 WSAStartup 직후, 다른 스레드가 뜨기 전에 CSocketUtils::Init()을 호출할 것.
-//***************************************************************************
-// @brief Listen 소켓의 주소 바인딩 방식.
-// @details Windows에서 SO_REUSEADDR는 이미 사용 중인 포트에 다른 소켓이 강제로 바인드하는 것을 허용한다
-//          (같은 서버를 두 번 띄워도 "주소가 이미 사용 중" 에러 없이 뜨고, 접속을 어느 소켓이 받을지
-//          불확정). MS는 서버에 SO_EXCLUSIVEADDRUSE를 권하지만, 이 옵션을 쓴 소켓은 닫기 전에 제대로
-//          shutdown해야 하는 등 재시작 동작이 달라질 수 있어 기본값은 기존 동작(ReuseAddress)을 유지한다.
-//***************************************************************************
-enum class ListenAddressMode : uint8
-{
-	ReuseAddress,       // SO_REUSEADDR (기본값, 기존 동작)
-	ExclusiveAddrUse,   // SO_EXCLUSIVEADDRUSE — 같은 주소/포트에 다른 소켓이 바인드하지 못하게 한다
-	None                // 주소 관련 옵션을 설정하지 않는다 (Windows 기본 동작)
-};
-
 //***************************************************************************
 class CSocketUtils
 {

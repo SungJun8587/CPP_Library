@@ -7,6 +7,16 @@
 #include "pch.h"
 #include "RedisResultSet.h"
 
+namespace
+{
+	// stoul()/stoull()은 "-1" 같은 음수 문자열을 예외 없이 래핑된 큰 값으로 돌려준다.
+	bool IsNegativeText(const std::string& str)
+	{
+		const size_t nPos = str.find_first_not_of(" \t\r\n");
+		return nPos != std::string::npos && str[nPos] == '-';
+	}
+}
+
 //***************************************************************************
 // @brief RedisValue 응답 객체를 수신받아 내부 순차 보관 컨테이너를 구성함
 // @param value 파싱 완료된 Redis 응답 구조체
@@ -106,7 +116,11 @@ bool CRedisResultSet::GetData(INT8& Dest)
 
 	try
 	{
-		Dest = static_cast<INT8>(std::stoi(_vecResultSplit[_readCursor]));
+		const int nValue = std::stoi(_vecResultSplit[_readCursor]);
+		if( nValue < (std::numeric_limits<INT8>::min)() || nValue >(std::numeric_limits<INT8>::max)() )
+			return false;
+
+		Dest = static_cast<INT8>(nValue);
 		++_readCursor;
 		return true;
 	}
@@ -126,7 +140,14 @@ bool CRedisResultSet::GetData(UINT8& Dest)
 
 	try
 	{
-		Dest = static_cast<UINT8>(std::stoul(_vecResultSplit[_readCursor]));
+		if( IsNegativeText(_vecResultSplit[_readCursor]) )
+			return false;
+
+		const unsigned long nValue = std::stoul(_vecResultSplit[_readCursor]);
+		if( nValue > (std::numeric_limits<UINT8>::max)() )
+			return false;
+
+		Dest = static_cast<UINT8>(nValue);
 		++_readCursor;
 		return true;
 	}
@@ -146,7 +167,11 @@ bool CRedisResultSet::GetData(INT16& Dest)
 
 	try
 	{
-		Dest = static_cast<INT16>(std::stoi(_vecResultSplit[_readCursor]));
+		const int nValue = std::stoi(_vecResultSplit[_readCursor]);
+		if( nValue < (std::numeric_limits<INT16>::min)() || nValue >(std::numeric_limits<INT16>::max)() )
+			return false;
+
+		Dest = static_cast<INT16>(nValue);
 		++_readCursor;
 		return true;
 	}
@@ -186,6 +211,9 @@ bool CRedisResultSet::GetData(UINT32& Dest)
 
 	try
 	{
+		if( IsNegativeText(_vecResultSplit[_readCursor]) )
+			return false;
+
 		Dest = static_cast<UINT32>(std::stoul(_vecResultSplit[_readCursor]));
 		++_readCursor;
 		return true;
@@ -226,6 +254,9 @@ bool CRedisResultSet::GetData(UINT64& Dest)
 
 	try
 	{
+		if( IsNegativeText(_vecResultSplit[_readCursor]) )
+			return false;
+
 		Dest = std::stoull(_vecResultSplit[_readCursor]);
 		++_readCursor;
 		return true;
@@ -244,6 +275,37 @@ bool CRedisResultSet::GetData(std::string& Dest)
 	if( _vecResultSplit.empty() || _vecResultSplit.size() <= _readCursor ) return false;
 
 	Dest = _vecResultSplit[_readCursor++];
+	return true;
+}
+
+//***************************************************************************
+// @brief 순차 커서 위치에서 std::wstring 타입 데이터를 추출함
+// @details Redis에 저장된 문자열은 UTF-8이므로 CP_UTF8로 UTF-16 변환한다
+//          (GetData(TCHAR*, int)와 같은 코드페이지). 변환에 실패하면 커서를
+//          옮기지 않고 false를 반환한다.
+//***************************************************************************
+bool CRedisResultSet::GetData(std::wstring& Dest)
+{
+	Dest.clear();
+	if( _vecResultSplit.empty() || _vecResultSplit.size() <= _readCursor ) return false;
+
+	const std::string& strSrc = _vecResultSplit[_readCursor];
+	if( !strSrc.empty() )
+	{
+		const int nSrcLen = static_cast<int>(strSrc.size());
+		const int nNeeded = ::MultiByteToWideChar(CP_UTF8, 0, strSrc.c_str(), nSrcLen, nullptr, 0);
+		if( nNeeded <= 0 )
+			return false;
+
+		Dest.resize(static_cast<size_t>(nNeeded));
+		if( ::MultiByteToWideChar(CP_UTF8, 0, strSrc.c_str(), nSrcLen, &Dest[0], nNeeded) <= 0 )
+		{
+			Dest.clear();
+			return false;
+		}
+	}
+
+	++_readCursor;
 	return true;
 }
 
@@ -267,10 +329,29 @@ bool CRedisResultSet::GetData(TCHAR* Dest, int nSize)
 
 	if( _vecResultSplit.empty() || _vecResultSplit.size() <= _readCursor ) return false;
 
+	const std::string& strSrc = _vecResultSplit[_readCursor++];
+
 #if defined(UNICODE) || defined(_UNICODE)
-	::MultiByteToWideChar(CP_UTF8, 0, _vecResultSplit[_readCursor++].c_str(), -1, Dest, nSize);
+	if( !strSrc.empty() )
+	{
+		const int nSrcLen = static_cast<int>(strSrc.size());
+
+		// 버퍼에 다 들어가면 그대로 변환한다. 모자라면 MultiByteToWideChar()는 아무것도
+		// 쓰지 않고 실패하므로(결과가 빈 문자열이 됨), 임시 버퍼로 변환한 뒤 잘라 넣는다 —
+		// ANSI 빌드의 _TRUNCATE 동작과 같다.
+		if( ::MultiByteToWideChar(CP_UTF8, 0, strSrc.c_str(), nSrcLen, Dest, nSize - 1) == 0 )
+		{
+			const int nNeeded = ::MultiByteToWideChar(CP_UTF8, 0, strSrc.c_str(), nSrcLen, nullptr, 0);
+			if( nNeeded > 0 )
+			{
+				std::wstring strWide(static_cast<size_t>(nNeeded), L'\0');
+				::MultiByteToWideChar(CP_UTF8, 0, strSrc.c_str(), nSrcLen, &strWide[0], nNeeded);
+				::wcsncpy_s(Dest, nSize, strWide.c_str(), _TRUNCATE);
+			}
+		}
+	}
 #else
-	::strncpy_s(Dest, nSize, _vecResultSplit[_readCursor++].c_str(), _TRUNCATE);
+	::strncpy_s(Dest, nSize, strSrc.c_str(), _TRUNCATE);
 #endif
 
 	return true;

@@ -10,13 +10,16 @@
 #ifndef UC_THREADMANAGER_H
 #define UC_THREADMANAGER_H
 
+#include <BaseRedefineDataType.h>
+#include <BaseTLS.h>
+#include <Memory/Memory.h>
+
+#include <algorithm>
 #include <thread>
+#include <vector>
 #include <functional>
 #include <atomic>
 #include <mutex>
-
-#include <BaseRedefineDataType.h>
-#include <BaseTLS.h>
 
 //***************************************************************************
 // @brief 워커 스레드의 생성/종료(Join)/TLS 초기화-정리를 전담하는 클래스.
@@ -105,6 +108,20 @@ public:
     //  - 이미 종료 절차가 진행 중이어도 안전하게 재호출 가능하다(멱등).
     //***************************************************************************
     void RequestShutdown() { _bShuttingDown.store(true); }
+
+    //***************************************************************************
+    // @brief 종료 플래그를 해제하여 CreateThread()를 다시 허용합니다(재시작용).
+    //
+    // @details
+    //  - JoinThreads() 이후 관리 중인 스레드가 하나도 없을 때만 플래그를 해제한다.
+    //    살아 있는 스레드가 남아 있으면(RequestShutdown()만 호출되고 Join 전 등)
+    //    아무 것도 하지 않고 false를 반환한다.
+    //  - 서비스 Stop() 직후 같은 객체로 Start()를 다시 호출하는 흐름에서,
+    //    Stop() 끝(Join 완료 후)에 한 번 호출한다.
+    //
+    // @return 플래그를 해제했으면 true, 스레드가 남아 있어 유지했으면 false
+    //***************************************************************************
+    bool ResetShutdown();
 
 private:
     void InitTLS();

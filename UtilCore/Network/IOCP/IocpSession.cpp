@@ -315,8 +315,8 @@ void CIocpSession::RegisterRecv()
 	DWORD numOfBytes = 0;
 	DWORD flags = 0;
 
-	// [수정] 실제 게시 직전에 증가시키고, 게시 자체가 즉시 실패하면(completion이
-	// 절대 안 옴) 바로 롤백한다 — TryFinalizeDisconnect()의 설명 참고.
+	// 실제 게시 직전에 증가시키고, 게시 자체가 즉시 실패하면(completion이 절대 안 옴)
+	// 바로 롤백한다 — TryFinalizeDisconnect()의 설명 참고.
 	_pendingIoCount.fetch_add(1, std::memory_order_seq_cst);
 
 	if( ::WSARecv(_socket, wsaBufs, static_cast<DWORD>(bufferCount), OUT & numOfBytes, &flags, static_cast<LPOVERLAPPED>(&_recvEvent), nullptr) == SOCKET_ERROR )
@@ -468,6 +468,13 @@ void CIocpSession::ProcessRecv(int32 numOfBytes)
 	}
 
 	_recvEvent.owner = nullptr; // OnRecv 처리 완료 후 수명 해제
+
+	// 버퍼를 전부 소비했다면 읽기/쓰기 커서를 시작점으로 되돌린다. 이 세션은 WSARecv를 하나만 게시하고
+	// 그 completion이 지금 처리되고 있으므로 진행 중인 수신이 없어 안전하다. 커서가 계속 앞으로만 가면
+	// 버퍼 끝에서 데이터가 두 조각으로 갈라져 WSARecv에 WSABUF 2개를 넘기고, OnRecv()에는 연속 버퍼로
+	// 복사해서 넘겨야 한다. 비우면서 되돌리면 소형 패킷 위주 트래픽은 항상 연속 구간 하나만 쓴다.
+	if( _recvBuffer.GetSizeUsed() == 0 )
+		_recvBuffer.Clear();
 
 	// 다음 데이터 수신 대기. RegisterRecv() 진입 시 자체적으로 IsConnected()를
 	// 검사하므로, OnRecv() 도중 상위 레이어가 Disconnect()를 호출한 경우에도
@@ -632,12 +639,10 @@ void CIocpSession::ProcessSend(int32 numOfBytes)
 
 //***************************************************************************
 // @brief DisconnectEx 완료 처리
-// @details [수정] 예전에는 여기서 곧바로 OnDisconnected()를 통지했다. 이제는
-//          _disconnectCompleted만 세팅해두고 TryFinalizeDisconnect()에
-//          위임한다 — 그 시점에 이미 게시돼 있던 WSARecv/WSASend가 아직
-//          outstanding이면(다른 워커 스레드가 처리 중) 그 마지막 완료가
-//          알아서 마저 통지해준다. 자세한 배경은 헤더의 TryFinalizeDisconnect()
-//          선언부 주석 참고.
+// @details _disconnectCompleted만 세팅하고 통지는 TryFinalizeDisconnect()에 위임한다. 그 시점에
+//          이미 게시돼 있던 WSARecv/WSASend가 아직 outstanding이면(다른 워커 스레드가 처리 중)
+//          그 마지막 완료가 마저 통지한다. 자세한 배경은 헤더의 TryFinalizeDisconnect() 선언부
+//          주석 참고.
 //***************************************************************************
 void CIocpSession::ProcessDisconnect()
 {
@@ -724,7 +729,7 @@ void CIocpSession::Disconnect(const TCHAR* cause)
 //          CNetAddress()의 기본 생성자는 SOCKADDR_IN을 전부 0으로 두는데,
 //          이러면 sin_family도 0이 되어 AF_INET 소켓에 bind()가 실패합니다
 //          (CNetAddress(ip, port) 생성자만 sin_family=AF_INET을 명시적으로
-//          세팅함 — NetAddress.h/.cpp 확인 후 발견/수정). 그래서 명시적으로
+//          세팅한다). 그래서 명시적으로
 //          CNetAddress(_T("0.0.0.0"), 0)을 사용합니다.
 //          이 함수의 모든 실패 경로는 FailConnect()를 호출해 OnDisconnected()까지
 //          통지를 완료하므로, 호출부는 반환값이 false여도 별도로 정리할 것이
@@ -788,10 +793,10 @@ void CIocpSession::ProcessConnectEx()
 {
 	_connectEvent.owner = nullptr; // Ref -1
 
+	// 완료 자체가 실패로 통지됐으면(연결 거부/타임아웃/취소 등) 더 확인할 것 없이 실패다. 완료가 성공으로
+	// 통지돼도 SO_ERROR로 한 번 더 확인한다.
 	int32 sockError = 0;
-	bool getOptOk = CSocketUtils::GetSocketError(_socket, sockError);
-
-	if( !getOptOk || sockError != 0 )
+	if( _connectEvent.errorCode != 0 || !CSocketUtils::GetSocketError(_socket, sockError) || sockError != 0 )
 	{
 		FailConnect(Iocp::CloseReason::SocketError);
 		return;
@@ -813,12 +818,10 @@ void CIocpSession::ProcessConnectEx()
 //***************************************************************************
 // @brief connect 실패 시 정리 전용 경로.
 // @param reason 실패 사유
-// @details [수정] Disconnect(Iocp::CloseReason)의 "미연결 상태 강제 종료" 경로와
-//          동일한 _disconnectNotified CAS 가드를 공유한다. CNetService::Close()가
-//          연결 완료 전인 이 세션에 대해 먼저 Disconnect()를 호출해 소켓을 이미
-//          닫고 통지까지 마친 뒤, 취소된 ConnectEx의 완료가 뒤늦게 도착해
-//          ProcessConnectEx()가 이 함수를 호출하는 경우 — 가드가 없으면
-//          OnDisconnected()가 두 번 호출된다.
+// @details Disconnect(Iocp::CloseReason)의 "미연결 상태 강제 종료" 경로와 _disconnectNotified CAS
+//          가드를 공유하므로 어느 쪽이 먼저 실행되든 통지는 1회만 나간다. CNetService::Close()가
+//          연결 완료 전인 세션에 먼저 Disconnect()를 호출해 소켓을 닫고 통지까지 마친 뒤, 취소된
+//          ConnectEx의 완료가 뒤늦게 도착해 ProcessConnectEx()가 이 함수를 호출해도 중복 통지되지 않는다.
 //***************************************************************************
 void CIocpSession::FailConnect(Iocp::CloseReason reason)
 {

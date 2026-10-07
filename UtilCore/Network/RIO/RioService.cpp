@@ -45,7 +45,16 @@ bool CRioServerService::Start()
 		return false;
 
 	// 2. Listener 생성. MakeShared는 실패 시 nullptr이 아니라 예외를 던진다.
-	_listener = MakeShared<CRioListener>();
+	try
+	{
+		_listener = MakeShared<CRioListener>();
+	}
+	catch( ... )
+	{
+		LOG_ERROR(_T("[CRioServerService] failed to create listener"));
+		CRioServiceHelper::StopCore(_rioCore, _globalRecvBuffer, _eventPool);
+		return false;
+	}
 
 	std::weak_ptr<CRioServerService> weakService = std::static_pointer_cast<CRioServerService>(shared_from_this());
 
@@ -68,7 +77,11 @@ bool CRioServerService::Start()
 			CSessionRef session = service->CreateSession();
 			if( session == nullptr )
 			{
-				LOG_WARNING(_T("[Error] CreateSession() returned nullptr! (Max session count reached?)"));
+				// 최대 세션 수에 도달한 동안 접속이 몰리면 매번 기록하지 않도록 첫 회와 1000회마다만 남긴다.
+				static std::atomic<uint64> failedCount{ 0 };
+				const uint64 failed = failedCount.fetch_add(1, std::memory_order_relaxed) + 1;
+				if( failed == 1 || failed % 1000 == 0 )
+					LOG_WARNING(_T("[CRioServerService] CreateSession() returned nullptr (max session count reached?) - total=%llu"), failed);
 			}
 			return std::static_pointer_cast<CRioSession>(session);
 		},
@@ -122,8 +135,21 @@ bool CRioServerService::Start()
 	// 4. 세션 reap 스레드 시작 — Running 중 자연 종료된 세션의 _sessionManager 엔트리를
 	//    Rio::kSessionReapInterval마다 정리한다. Listener/워커가 정상 구동 중인 이 시점
 	//    이후에 시작해야, 세션이 실제로 늘어나는 정상 상태와 겹쳐도 안전하다.
-	_sessionReapThread = std::thread([this]() { _sessionReapQueue.ProcessExpiredTasks(); });
-	ScheduleSessionReap();
+	//    큐는 Start()마다 새로 만든다. 스레드 생성/예약이 예외로 실패하면 구동한 Listener/워커를
+	//    Close()로 되돌리고 실패를 반환한다(예외가 새면 서비스가 반쯤 구동된 채 남는다).
+	try
+	{
+		_sessionReapQueue = std::make_unique<CDelayedTaskQueue>();
+		CDelayedTaskQueue* const reapQueue = _sessionReapQueue.get();
+		_sessionReapThread = std::thread([reapQueue]() { reapQueue->ProcessExpiredTasks(); });
+		ScheduleSessionReap();
+	}
+	catch( ... )
+	{
+		LOG_ERROR(_T("[CRioServerService] failed to start session reap thread"));
+		Close();
+		return false;
+	}
 
 	return true;
 }
@@ -133,7 +159,10 @@ bool CRioServerService::Start()
 //***************************************************************************
 void CRioServerService::ScheduleSessionReap()
 {
-	_sessionReapQueue.Reserve(Rio::kSessionReapInterval, [this]()
+	if( _sessionReapQueue == nullptr )
+		return;
+
+	_sessionReapQueue->Reserve(Rio::kSessionReapInterval, [this]()
 		{
 			_sessionManager.RemoveClosedSessions();
 			ScheduleSessionReap(); // 다음 tick 재예약. Close() 이후엔 Reserve()가 false를 반환하며 조용히 멈춤.
@@ -155,7 +184,8 @@ void CRioServerService::Close()
 	// 0. reap 스레드부터 정지 — 아래에서 _sessionManager를 직접 조작하는 동안 같은 맵을
 	//    동시에 건드리지 않도록 가장 먼저 멈춘다. Stop()은 신호만 보내고 반환하므로
 	//    반드시 join까지 해야 한다(CDelayedTaskQueue의 Lifetime 계약).
-	_sessionReapQueue.Stop();
+	if( _sessionReapQueue )
+		_sessionReapQueue->Stop();
 	if( _sessionReapThread.joinable() )
 		_sessionReapThread.join();
 

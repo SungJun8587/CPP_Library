@@ -7,8 +7,6 @@
 #include "pch.h"
 #include "IocpService.h"
 
-#include <utility>
-
 //***************************************************************************
 // CIocpServerService Implementation
 //***************************************************************************
@@ -143,8 +141,22 @@ bool CIocpServerService::Start()
 	//    _sessionManager 엔트리를 Iocp::kSessionReapInterval마다 정리하는 안전망이다.
 	//    Listener/워커가 이미 정상 구동 중인 이 시점 이후에 시작해야, reap 스레드가
 	//    도는 동안 세션이 실제로 늘어나는 정상 상태와 겹쳐도 안전하다.
-	_sessionReapThread = std::thread([this]() { _sessionReapQueue.ProcessExpiredTasks(); });
-	ScheduleSessionReap();
+	// 큐는 Start()마다 새로 만든다(Stop()된 큐는 재사용하지 않는다). 스레드 생성/예약이 예외로 실패하면
+	// 이미 구동한 Listener/워커를 Close()로 되돌리고 실패를 반환한다 — Start()에서 예외가 새면
+	// 서비스가 반쯤 구동된 채 남는다.
+	try
+	{
+		_sessionReapQueue = std::make_unique<CDelayedTaskQueue>();
+		CDelayedTaskQueue* const reapQueue = _sessionReapQueue.get();
+		_sessionReapThread = std::thread([reapQueue]() { reapQueue->ProcessExpiredTasks(); });
+		ScheduleSessionReap();
+	}
+	catch( ... )
+	{
+		LOG_ERROR(_T("[CIocpServerService] failed to start session reap thread"));
+		Close();
+		return false;
+	}
 
 	return true;
 }
@@ -179,7 +191,10 @@ void CIocpServerService::OnSessionDisconnected(CSessionRef session)
 //***************************************************************************
 void CIocpServerService::ScheduleSessionReap()
 {
-	_sessionReapQueue.Reserve(Iocp::kSessionReapInterval, [this]()
+	if( _sessionReapQueue == nullptr )
+		return;
+
+	_sessionReapQueue->Reserve(Iocp::kSessionReapInterval, [this]()
 		{
 			_sessionManager.RemoveClosedSessions();
 			ScheduleSessionReap(); // 다음 tick 재예약. Close() 이후엔 Reserve()가 false를 반환하며 조용히 멈춤.
@@ -206,7 +221,8 @@ void CIocpServerService::Close()
 	//    동시에 같은 맵을 건드리지 않도록 가장 먼저 멈춘다. Stop()은 신호만
 	//    보내고 반환하므로 반드시 join까지 해야 한다(CDelayedTaskQueue의
 	//    Lifetime 계약).
-	_sessionReapQueue.Stop();
+	if( _sessionReapQueue )
+		_sessionReapQueue->Stop();
 	if( _sessionReapThread.joinable() )
 		_sessionReapThread.join();
 
@@ -259,22 +275,17 @@ CIocpClientService::CIocpClientService(const CNetAddress& address, CIocpCoreRef 
 
 //***************************************************************************
 // @brief 이미 구동 중인 서비스에 세션 하나를 추가로 연결 "게시"합니다.
-// @details Start()의 접속 루프 본체와 동일한 절차(세션 생성 → IOCP Core 등록 →
-//          서비스에 즉시 등록 → ConnectEx 비동기 게시)를 그대로 수행합니다.
+// @details Start()의 접속 루프 본체와 동일한 절차(세션 생성 → IOCP Core 등록 → 서비스에 즉시 등록 →
+//          ConnectEx 비동기 게시)를 수행합니다.
 //
-//          [비동기 전환] 과거 버전은 동기 connect()를 사용해 이 함수가 "연결까지
-//          끝난 세션"을 그 자리에서 반환했습니다. 그 과정에서 connect()가
-//          WSAEWOULDBLOCK을 반환해도 곧바로 ProcessConnect()를 호출해버려, TCP
-//          핸드셰이크가 실제로 끝나기 전에 WSARecv를 거는 버그가 있었습니다
-//          (select() 기반 유계 대기로 임시 수정했던 이력 있음). 지금은
-//          CIocpSession::ConnectAsync()가 ConnectEx 기반 진짜 비동기라 그 문제
-//          자체가 사라졌습니다 — 대신 이 함수의 반환값 의미가 바뀌었습니다.
-//          자세한 계약은 헤더의 ConnectOneMoreSession() 주석 참고.
+//          [비동기 계약] CIocpSession::ConnectAsync()가 ConnectEx 기반 비동기라, 이 함수는 연결이
+//          끝난 세션이 아니라 "연결 시도를 게시한 세션"을 반환합니다. 실제 연결 성공/실패는 세션의
+//          OnConnected()/OnDisconnected()로 통지됩니다. 자세한 계약은 헤더의
+//          ConnectOneMoreSession() 주석 참고.
 //
-//          Register()나 CreateSession() 실패 시 로컬 shared_ptr(session/
-//          iocpSession)이 스코프를 벗어나며 소멸자가 소켓을 정리하므로 별도
-//          정리가 필요 없습니다. ConnectAsync() 자신의 모든 실패 경로는 내부에서
-//          FailConnect()를 호출해 정리 및 OnDisconnected() 통지까지 완료합니다.
+//          Register()나 CreateSession() 실패 시 로컬 shared_ptr(session/iocpSession)이 스코프를
+//          벗어나며 소멸자가 소켓을 정리하므로 별도 정리가 필요 없습니다. ConnectAsync() 자신의 모든
+//          실패 경로는 내부에서 FailConnect()를 호출해 정리 및 OnDisconnected() 통지까지 완료합니다.
 // @return CIocpSessionRef 세션 생성 + IOCP 등록 + ConnectEx 게시까지 성공하면
 //         세션 참조(연결 완료 보장 아님), 그 전 단계 실패 시 nullptr.
 //***************************************************************************

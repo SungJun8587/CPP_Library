@@ -37,7 +37,7 @@ CNetAddress::CNetAddress(const _tstring& ip, uint16 port)
 //***************************************************************************
 _tstring CNetAddress::GetIpAddress() const
 {
-	TCHAR buffer[46] = {};  // IPv6 최대 길이 대비 (IP6_STRLEN 등 프로젝트 상수 활용 권장)
+	TCHAR buffer[INET_ADDRSTRLEN] = {};	// IPv4 전용 주소이므로 INET_ADDRSTRLEN으로 충분하다.
 	if( CSocketUtils::AddrToIP(AF_INET, &_sockAddr.sin_addr, buffer, _countof(buffer)) == false )
 		return _tstring();	// 변환 실패 시 초기화되지 않은 버퍼 대신 빈 문자열을 반환한다.
 

@@ -274,6 +274,10 @@
     <ClCompile Include="Memory\MemBuffer.cpp" />
     <ClCompile Include="Memory\Memory.cpp" />
     <ClCompile Include="Memory\MemoryPool.cpp" />
+    <ClCompile Include="Network\HTTP\HttpClient.cpp" />
+    <ClCompile Include="Network\HTTP\HttpClientCore.cpp" />
+    <ClCompile Include="Network\HTTP\HttpConnPoolFactory.cpp" />
+    <ClCompile Include="Network\HTTP\HttpConnPoolManager.cpp" />
     <ClCompile Include="Network\IOCP\IocpCore.cpp" />
     <ClCompile Include="Network\IOCP\IocpEvent.cpp" />
     <ClCompile Include="Network\IOCP\IocpListener.cpp" />

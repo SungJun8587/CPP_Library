@@ -101,7 +101,7 @@ public:
 	template<typename T, typename Ret, typename... Args>
 	void DoTimer(uint64 tickAfterMs, Ret(T::* memFunc)(Args...), Args... args);
 
-	void ClearJobs() { _jobs.Clear(); }
+	void ClearJobs();
 
 public:
 	void Push(CJobRef job, bool pushOnly = false);

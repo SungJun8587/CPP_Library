@@ -7,7 +7,15 @@
 #include "pch.h"
 #include "RedisServerHeartbeat.h"
 
-#include <chrono>
+namespace
+{
+	int64 NowMs()
+	{
+		return static_cast<int64>(
+			std::chrono::duration_cast<std::chrono::milliseconds>(
+				std::chrono::system_clock::now().time_since_epoch()).count());
+	}
+}
 
 //***************************************************************************
 // @brief CRedisServerHeartbeat 생성자
@@ -44,6 +52,25 @@ std::string CRedisServerHeartbeat::BuildKey() const
 }
 
 //***************************************************************************
+// @brief 등록 키의 전체 필드를 쓰는 HSET 명령 인자를 만듭니다.
+// @details 최초 등록과 매 주기 갱신이 같은 필드 집합을 쓰므로, 키가 사라진 뒤
+//          갱신이 키를 다시 만들더라도 항상 완전한 등록 정보가 된다.
+//***************************************************************************
+void CRedisServerHeartbeat::BuildRegistrationArgs(CVector<std::string>& args, const int64 nowMs) const
+{
+	args.push_back("HSET");
+	args.push_back(BuildKey());
+	args.push_back("serverName");	args.push_back(_serverName);
+	args.push_back("serverGroupId");	args.push_back(_serverGroupId);
+	args.push_back("serverChannelId");	args.push_back(_serverChannelId);
+	args.push_back("port");		args.push_back(std::to_string(_port));
+	args.push_back("pid");			args.push_back(std::to_string(static_cast<int64>(::GetCurrentProcessId())));
+	args.push_back("sessionCount");	args.push_back(std::to_string(_sessionCountProvider ? _sessionCountProvider() : 0));
+	args.push_back("startedAt");	args.push_back(std::to_string(_startedAtMs));
+	args.push_back("updatedAt");	args.push_back(std::to_string(nowMs));
+}
+
+//***************************************************************************
 // @brief 최초 등록(HSET) 후 주기적 EXPIRE 갱신 스레드를 시작합니다.
 //***************************************************************************
 bool CRedisServerHeartbeat::Start(int32 ttlSec, int32 heartbeatIntervalSec)
@@ -73,6 +100,7 @@ bool CRedisServerHeartbeat::Start(int32 ttlSec, int32 heartbeatIntervalSec)
 	_ttlSec = ttlSec;
 	_heartbeatIntervalSec = heartbeatIntervalSec;
 	_stopping.store(false);
+	_startedAtMs = NowMs();
 
 	RegisterInitial();
 
@@ -130,21 +158,8 @@ void CRedisServerHeartbeat::RegisterInitial()
 {
 	const std::string key = BuildKey();
 
-	const int64 nowMs = static_cast<int64>(
-		std::chrono::duration_cast<std::chrono::milliseconds>(
-			std::chrono::system_clock::now().time_since_epoch()).count());
-
 	CVector<std::string> args;
-	args.push_back("HSET");
-	args.push_back(key);
-	args.push_back("serverName");	args.push_back(_serverName);
-	args.push_back("serverGroupId");	args.push_back(_serverGroupId);
-	args.push_back("serverChannelId");	args.push_back(_serverChannelId);
-	args.push_back("port");		args.push_back(std::to_string(_port));
-	args.push_back("pid");			args.push_back(std::to_string(static_cast<int64>(::GetCurrentProcessId())));
-	args.push_back("sessionCount");	args.push_back(std::to_string(_sessionCountProvider ? _sessionCountProvider() : 0));
-	args.push_back("startedAt");	args.push_back(std::to_string(nowMs));
-	args.push_back("updatedAt");	args.push_back(std::to_string(nowMs));
+	BuildRegistrationArgs(args, NowMs());
 
 	const int32 ttlSec = _ttlSec;
 	CRedisService* redisService = _redisService; // [수정] this 대신 이 값 자체를 캡처
@@ -166,7 +181,7 @@ void CRedisServerHeartbeat::RegisterInitial()
 }
 
 //***************************************************************************
-// @brief updatedAt 필드 갱신 + TTL 갱신을 게시합니다.
+// @brief 등록 정보 전체 재기록(HSET) + TTL 갱신(EXPIRE)을 게시합니다.
 // @details 두 커맨드는 서로 다른 왕복(RTT)이라 완전한 원자성은 없다(HSET
 //          성공, EXPIRE 실패 시 TTL이 이번 틱엔 안 갱신될 수 있음). 다만
 //          heartbeat 자체가 짧은 주기로 반복되므로 다음 틱에서 자연히
@@ -177,17 +192,10 @@ void CRedisServerHeartbeat::SendHeartbeat()
 {
 	const std::string key = BuildKey();
 
-	const int64 nowMs = static_cast<int64>(
-		std::chrono::duration_cast<std::chrono::milliseconds>(
-			std::chrono::system_clock::now().time_since_epoch()).count());
-
+	// 갱신마다 등록 필드 전체를 다시 쓴다 — 키가 TTL 만료나 Redis 재시작으로 사라졌더라도
+	// 이 HSET이 완전한 등록 정보로 복원한다.
 	CVector<std::string> hsetArgs;
-	hsetArgs.push_back("HSET");
-	hsetArgs.push_back(key);
-	hsetArgs.push_back("updatedAt");
-	hsetArgs.push_back(std::to_string(nowMs));
-	hsetArgs.push_back("sessionCount");
-	hsetArgs.push_back(std::to_string(_sessionCountProvider ? _sessionCountProvider() : 0));
+	BuildRegistrationArgs(hsetArgs, NowMs());
 	_redisService->SendCommand(hsetArgs, [](const RedisValue& /*res*/) {});
 
 	CVector<std::string> expireArgs;

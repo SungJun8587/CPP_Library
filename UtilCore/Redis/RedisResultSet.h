@@ -11,6 +11,7 @@
 
 #include <vector>
 #include <string>
+#include <limits>
 
 //***************************************************************************
 // @class RedisResultSet
@@ -80,6 +81,7 @@ public:
 	bool GetData(INT64& Dest);
 	bool GetData(UINT64& Dest);
 	bool GetData(std::string& Dest);
+	bool GetData(std::wstring& Dest);	// 저장된 UTF-8 문자열을 UTF-16으로 변환해 추출
 	bool GetData(TCHAR* Dest, int nSize);
 
 	//***************************************************************************

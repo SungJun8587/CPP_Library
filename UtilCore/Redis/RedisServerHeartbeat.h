@@ -15,6 +15,7 @@
 #include <condition_variable>
 #include <atomic>
 #include <functional>
+#include <chrono>
 
 //***************************************************************************
 // @class CRedisServerHeartbeat
@@ -31,6 +32,11 @@
 //     비정상 종료(크래시 등)되면 heartbeat가 끊기고 TTL 만료로 Redis에서
 //     해당 키가 자동 소멸 — 디스커버리/모니터링 쪽에서 별도 정리 배치 없이도
 //     "죽은 서버" 항목이 자연스럽게 사라진다.
+//
+// 등록 정보 복원:
+//     매 주기 갱신은 updatedAt/sessionCount만 쓰지 않고 등록 필드 전체를 HSET으로
+//     다시 쓴다. Redis 장애/재시작이나 TTL 만료로 키가 사라졌다가 복구돼도
+//     일부 필드만 가진 불완전한 항목이 아니라 완전한 등록 정보로 되살아난다.
 //
 // 정상 종료 시:
 //     Stop()이 heartbeat 스레드를 즉시 멈춘 뒤 DEL로 키를 바로 지워, TTL
@@ -108,6 +114,7 @@ public:
 
 private:
 	void			RegisterInitial();
+	void			BuildRegistrationArgs(CVector<std::string>& args, int64 nowMs) const;
 	void			SendHeartbeat();
 	void			HeartbeatLoop();
 	std::string		BuildKey() const;
@@ -121,6 +128,7 @@ private:
 
 	int32					_ttlSec = 15;				// Start()에서 넘겨받아 저장 — EXPIRE에 매번 이 값을 씀
 	int32					_heartbeatIntervalSec = 5;	// Start()에서 넘겨받아 저장 — HeartbeatLoop()의 대기 주기로 씀
+	int64					_startedAtMs = 0;			// Start() 시각(epoch ms) — 매 갱신의 HSET에 같은 값으로 기록됨
 
 	SessionCountProvider	_sessionCountProvider;	// 설정 안 하면(nullptr) sessionCount 필드는 항상 0
 

@@ -17,12 +17,8 @@
 // @param tickAfterMs 지금으로부터 몇 밀리초 후에 실행할지 지정하는 지연 시간
 // @param owner 작업을 처리할 대상 작업 큐의 약한 참조 (weak_ptr)
 // @param job 예약할 작업 객체 레퍼런스
-// @details [수정 — 예외 안전성] _items.push()(내부 벡터 재할당 등으로
-//          bad_alloc 같은 예외를 던질 가능성이 있음)가 실패하면, 이미
-//          객체 풀에서 꺼내온 jobData를 아무도 돌려주지 않아 누수로
-//          남았다 — 발생 확률은 극히 낮지만(메모리 할당 실패 시나리오),
-//          try/catch로 감싸서 실패 시 풀에 반환한 뒤 예외를 그대로
-//          다시 던진다(호출부가 원래 보게 될 예외 자체는 그대로 전파).
+// @details _items.push()가 예외(bad_alloc 등)를 던지면 객체 풀에서 꺼낸 jobData를 풀에 반환한 뒤
+//          예외를 그대로 다시 던집니다.
 //***************************************************************************
 void CJobTimer::Reserve(uint64 tickAfterMs, weak_ptr<CJobQueue> owner, CJobRef job)
 {
@@ -60,7 +56,7 @@ void CJobTimer::Distribute(uint64 now)
 		while( _items.empty() == false )
 		{
 			const TimerItem& timerItem = _items.top();
-			// [개선] now와 executeTick 모두 QPC 카운트 단위 → 올바른 비교
+			// now와 executeTick 모두 QPC 카운트 단위입니다.
 			if( now < timerItem.executeTick )
 				break;
 
@@ -82,15 +78,22 @@ void CJobTimer::Distribute(uint64 now)
 
 //***************************************************************************
 // @brief 타이머에 등록된 모든 예약 작업을 초기화합니다.
-// @detail 쓰기 락을 획득한 상태에서 우선순위 큐에 남아있는 모든 타이머 항목들을 순회하며 객체 풀에 반환하고 큐를 비웁니다.
+// @detail 쓰기 락 안에서는 항목만 인출하고, JobData 반환(보관 중이던 작업 객체의 해제)은 락 밖에서 수행합니다.
+//         작업 객체의 소멸자가 다시 Reserve()를 호출하더라도 락 재진입 교착이 발생하지 않습니다.
 //***************************************************************************
 void CJobTimer::Clear()
 {
-	PRWriteLockGuard writeLock(_lock);
-	while( _items.empty() == false )
+	CVector<JobData*> jobDatas;
 	{
-		const TimerItem& timerItem = _items.top();
-		CObjectPool<JobData>::Push(timerItem.jobData);
-		_items.pop();
+		PRWriteLockGuard writeLock(_lock);
+		jobDatas.reserve(_items.size());
+		while( _items.empty() == false )
+		{
+			jobDatas.push_back(_items.top().jobData);
+			_items.pop();
+		}
 	}
+
+	for( JobData* jobData : jobDatas )
+		CObjectPool<JobData>::Push(jobData);
 }

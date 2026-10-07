@@ -44,7 +44,7 @@ void CJobQueue::DoTimer(uint64 tickAfterMs, CallbackType&& callback)
 void CJobQueue::Push(CJobRef job, bool pushOnly)
 {
 	const int32 prevCount = _jobCount.fetch_add(1);
-	_jobs.Push(job);
+	_jobs.Push(std::move(job));
 
 	if( prevCount == 0 )
 	{
@@ -55,6 +55,25 @@ void CJobQueue::Push(CJobRef job, bool pushOnly)
 			if( gpGlobalQueue != nullptr ) gpGlobalQueue->Push(shared_from_this());
 		}
 	}
+}
+
+//***************************************************************************
+// @brief 큐에 대기 중인 작업을 모두 폐기합니다.
+// @detail 폐기한 개수만큼 _jobCount도 함께 차감해 "대기 작업 수"와 큐 내용의 일관성을 유지합니다.
+//         (큐만 비우면 _jobCount가 0으로 돌아오지 않아 이후 Push가 실행을 예약하지 못합니다.)
+//         이미 Execute()가 인출해 실행 중인 작업은 영향을 받지 않으며, 폐기된 작업 객체는
+//         이 함수가 반환될 때 호출 스레드에서 해제됩니다.
+// @note Execute()가 실행 중이거나 전역 큐에 대기 중인 상태에서 호출하면, 개수가 0이 되는 순간
+//       들어온 Push가 별도의 실행을 예약할 수 있으므로 종료/정리 단계처럼 새 Push가 없는
+//       시점이나 이 큐의 작업 내부에서 호출해야 합니다.
+//***************************************************************************
+void CJobQueue::ClearJobs()
+{
+	CVector<CJobRef> jobs;
+	_jobs.PopAll(OUT jobs);
+
+	if( jobs.empty() == false )
+		_jobCount.fetch_sub(static_cast<int32>(jobs.size()));
 }
 
 //***************************************************************************

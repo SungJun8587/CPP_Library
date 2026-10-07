@@ -155,6 +155,16 @@ bool CRedisClient::Connect(const std::string& strIP, const uint16 nPort, const i
 	if( !HasNoOutstandingIo() )
 		return false;
 
+	// 이전 연결의 잔여 수신 상태를 비운다. 이 시점에는 걸려있는 I/O가 없으므로(위 확인)
+	// 어떤 스레드도 _recvBuffer/_parser를 건드리지 않는다. 이전 연결이 프로토콜 오류나
+	// Disconnect()와 겹친 수신 처리로 끝났다면 파서/링버퍼에 그 연결의 미완성 바이트가
+	// 남아 있을 수 있고, 그대로 두면 새 연결의 첫 응답 앞에 붙어 스트림이 어긋난다.
+	{
+		std::lock_guard<std::mutex> lock(_recvLock);
+		_parser.Reset();
+		_recvBuffer.Clear();
+	}
+
 	// [추가] 타임아웃 값 자체가 비정상(0 이하)이면 아래 select()의
 	// TIMEVAL 계산이 "무한 대기"나 "즉시 타임아웃"처럼 의도치 않게
 	// 동작할 수 있으므로 방어한다.
@@ -357,6 +367,8 @@ bool CRedisClient::Disconnect(ERedisDisconnectReason reason)
 		_pendingSendBuffers.clear();
 		_sendOffset = 0;
 		_sendTotalSize = 0;
+		_nextSendBuffers.clear();
+		_nextSendTotalSize = 0;
 	}
 
 	if( fnPendingCallback )
@@ -428,6 +440,18 @@ bool CRedisClient::SendCommand(const CVector<std::string>& vecArgs, RedisCallbac
 			else
 			{
 				_pendingCallback = fnCallback;
+
+				// 직전 명령의 송신 완료 통지(WSASend completion)가 아직 처리되지 않았다면
+				// (_pendingSendBuffers가 남아 있음) _sendEvent를 다시 쓸 수 없다. 응답이 송신 완료
+				// 통지보다 먼저 처리되면 풀이 이 커넥션을 바로 반납·재대여할 수 있기 때문이다.
+				// 이번 명령은 다음 명령으로 보관해 두었다가 그 송신 완료 처리가 이어서 보낸다.
+				if( !_pendingSendBuffers.empty() )
+				{
+					_nextSendBuffers = std::move(sendBuffers);
+					_nextSendTotalSize = nCmdSize;
+					return true;
+				}
+
 				_pendingSendBuffers = std::move(sendBuffers);
 				_sendOffset = 0;
 				_sendTotalSize = nCmdSize;
@@ -655,6 +679,10 @@ void CRedisClient::Dispatch(CIocpEvent* iocpEvent, int32 numOfBytes)
 		// completion 자체는 확실히 끝난 것이므로 카운트는 감소시킨다.
 		if( _pendingSendBuffers.empty() || _sendTotalSize == 0 )
 		{
+			// 이 completion으로 송신 I/O가 완전히 끝났으므로 이벤트가 쥔 자기 참조(owner)와
+			// 송신 버퍼 사본도 여기서 풀어준다.
+			_sendEvent.owner = nullptr;
+			_sendEvent.Reset();
 			_pendingIoCount.fetch_sub(1, std::memory_order_seq_cst);
 			return;
 		}
@@ -684,6 +712,21 @@ void CRedisClient::Dispatch(CIocpEvent* iocpEvent, int32 numOfBytes)
 			_pendingSendBuffers.clear();
 			_sendOffset = 0;
 			_sendTotalSize = 0;
+
+			// SendCommand()가 이 송신 완료 전에 보관해 둔 다음 명령이 있으면 이어서 보낸다.
+			// DoSend()가 먼저 카운트를 올린 뒤 이번 completion의 -1을 수행하므로 중간에 0이 되지 않는다.
+			if( !_nextSendBuffers.empty() )
+			{
+				_pendingSendBuffers = std::move(_nextSendBuffers);
+				_nextSendBuffers.clear();
+				_sendOffset = 0;
+				_sendTotalSize = _nextSendTotalSize;
+				_nextSendTotalSize = 0;
+
+				if( !DoSend() )
+					bSendFailed = true;
+			}
+
 			_pendingIoCount.fetch_sub(1, std::memory_order_seq_cst);
 		}
 	}

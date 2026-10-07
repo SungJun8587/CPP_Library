@@ -11,7 +11,7 @@
 #include <memory>
 #include <WinSock2.h>
 
-#include <Network/NetworkRedefineDataType.h>	// CSessionRef, uint16 등
+#include <Network/NetworkRedefineDataType.h>
 
 using SessionFactory = std::function<CSessionRef()>;
 using DisconnectHandler = std::function<void(CSessionRef)>;
@@ -44,7 +44,7 @@ public:
 	virtual bool			Send(const void* data, uint16 size) noexcept = 0;
 
 	// 연결 해제 이벤트 콜백 등록
-	void					SetDisconnectHandler(DisconnectHandler handler) { _onDisconnected = handler; }
+	void					SetDisconnectHandler(DisconnectHandler handler) { _onDisconnected = std::move(handler); }
 
 protected:
 	// 연결 해제 발생 시 하위 구현체(CIocpSession/CRioSession)에서 호출

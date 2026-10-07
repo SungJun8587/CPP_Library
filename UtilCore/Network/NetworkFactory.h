@@ -14,6 +14,7 @@
 #include <functional>
 #include <variant>
 #include <type_traits>
+#include <utility>
 
 //***************************************************************************
 // @enum ENetworkEngineType
@@ -32,23 +33,12 @@ class CNetAddress;
 // @brief 서버/클라이언트 서비스를 생성할 때 넘길 엔진 코어 참조.
 //
 // @details
-//      [재설계 — void* + ENetworkEngineType 조합에서 std::variant로 전환]
-//      예전 버전은 `ENetworkEngineType engineType` 파라미터와
-//      `void* engineCoreRef` 파라미터를 따로 받아, 호출부가 engineType에
-//      맞는 실제 타입(CIocpCoreRef* 또는 CRioCoreRef*)으로 직접 캐스팅해서
-//      넘겨야 했다. 이 둘은 서로 다른 소스(하나는 enum 값, 하나는 임의의
-//      포인터)라 컴파일러가 둘의 일치를 전혀 검증할 수 없었고, 실제로 이
-//      불일치 때문에 switch에 break가 빠지면 엉뚱한 타입으로 static_cast하는
-//      버그가 있었다(진단 이력 참고).
-//
-//      std::variant<CIocpCoreRef, CRioCoreRef>로 통합하면 "어떤 엔진인지"와
-//      "그 엔진의 코어가 무엇인지"가 하나의 값으로 합쳐져, 애초에 서로
-//      어긋난 조합을 만들 수 없다 — 호출부는 IOCP 코어를 쓰려면
-//      CIocpCoreRef를 그대로 담아 넘기면 되고, 어떤 엔진인지는 이 함수들
-//      내부에서 std::visit()로 컴파일 타임에 분기한다. 별도의
-//      ENetworkEngineType 인자는 이제 불필요해 파라미터 목록에서 제거했다
-//      (variant의 활성 대안(alternative) 자체가 엔진 타입의 유일한
-//      출처이므로, 두 값이 어긋날 여지가 없다).
+//      std::variant<CIocpCoreRef, CRioCoreRef>로 "어떤 엔진인지"와 "그 엔진의 코어가
+//      무엇인지"를 하나의 값에 담는다. 엔진 종류를 따로 받는 인자(enum)가 없으므로
+//      종류와 코어 타입이 서로 어긋난 조합을 만들 수 없다 — 호출부는 IOCP 코어를 쓰려면
+//      CIocpCoreRef를, RIO 코어를 쓰려면 CRioCoreRef를 그대로 담아 넘기면 되고, 어떤
+//      엔진인지는 CNetworkFactory 내부에서 std::visit()로 컴파일 타임에 분기한다
+//      (variant의 활성 대안이 엔진 타입의 유일한 출처).
 //***************************************************************************
 using EngineCoreRef = std::variant<CIocpCoreRef, CRioCoreRef>;
 

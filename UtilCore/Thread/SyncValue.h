@@ -22,18 +22,37 @@ template<typename T>
 class CSyncValue
 {
 public:
+	//***************************************************************************
+	// @brief CSyncValue 기본 생성자
+	// @details T의 기본 생성자로 값을 초기화합니다.
+	//***************************************************************************
 	CSyncValue() = default;
+
+	//***************************************************************************
+	// @brief 초기 값을 지정하는 CSyncValue 생성자
+	// @param value 초기화할 값 (rvalue/lvalue 모두 이동 생성)
+	//***************************************************************************
 	explicit CSyncValue(T value) : _value(std::move(value)) {}
 
 	CSyncValue(const CSyncValue&) = delete;
 	CSyncValue& operator=(const CSyncValue&) = delete;
 
+	//***************************************************************************
+	// @brief 스레드 안전하게 값을 설정
+	// @param value 새로 설정할 값
+	// @details 뮤텍스 락을 획득하여 안전하게 내부 값을 변경합니다.
+	//***************************************************************************
 	void Set(const T& value)
 	{
 		std::lock_guard<std::mutex> guard(_lock);
 		_value = value;
 	}
 
+	//***************************************************************************
+	// @brief 스레드 안전하게 현재 값의 복사본을 반환
+	// @return 보호받는 현재 값의 복사본
+	// @details 뮤텍스 락을 획득하여 안전하게 값을 복사하여 반환합니다.
+	//***************************************************************************
 	T Get() const
 	{
 		std::lock_guard<std::mutex> guard(_lock);
@@ -41,8 +60,8 @@ public:
 	}
 
 private:
-	mutable std::mutex	_lock;
-	T					_value{};
+	mutable std::mutex	_lock;		// 데이터 동기화를 위한 뮤텍스
+	T					_value{};	// 뮤텍스로 보호되는 실제 값
 };
 
 #endif // ndef UC_SYNCVALUE_H

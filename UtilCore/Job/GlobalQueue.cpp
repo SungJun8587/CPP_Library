@@ -36,7 +36,7 @@ CGlobalQueue::~CGlobalQueue()
 //***************************************************************************
 void CGlobalQueue::Push(CJobQueueRef jobQueue)
 {
-	_jobQueues.Push(jobQueue);
+	_jobQueues.Push(std::move(jobQueue));
 }
 
 //***************************************************************************

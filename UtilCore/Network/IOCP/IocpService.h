@@ -19,9 +19,11 @@
 
 #include <atomic>
 #include <chrono>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <thread>
+#include <utility>
 
 //***************************************************************************
 // @class CIocpServerService
@@ -129,9 +131,9 @@ private:
 	// @details 세션은 해제 통지 시점에 OnSessionDisconnected()가 즉시 _sessionManager에서
 	//          제거하며, 이 reap은 그 경로를 놓친 엔트리를 정리하는 안전망이다.
 	//          CDelayedTaskQueue::Reserve()가 일회성이라 이 함수가 실행될 때마다 자기 자신을
-	//          다시 예약하는 self-rescheduling 패턴을 쓴다. Close()가 _sessionReapQueue.Stop()을
+	//          다시 예약하는 self-rescheduling 패턴을 쓴다. Close()가 _sessionReapQueue->Stop()을
 	//          호출하면 그 이후의 재예약 시도는 Reserve()가 false를 반환하며 조용히 무시되어
-	//          재귀가 자연스럽게 끊긴다. CRioServerService::ScheduleSessionReap()과 동일한 설계이며,
+	//          재귀가 자연스럽게 끊긴다. 재시작(Start())할 때는 큐를 새로 만들어 reap이 다시 동작한다. CRioServerService::ScheduleSessionReap()과 동일한 설계이며,
 	//          CIocpClientService는 CIocpSessionManager를 소유하지 않으므로(ConnectOneMoreSession()이
 	//          CNetService::_sessions만 씀) 서버 전용이다.
 	//***************************************************************************
@@ -146,8 +148,8 @@ private:
 	//***************************************************************************
 	void OnSessionDisconnected(CSessionRef session);
 
-	CDelayedTaskQueue	_sessionReapQueue;						// reap tick 예약 큐 (스스로 워커 스레드를 안 가짐)
-	std::thread			_sessionReapThread;						// _sessionReapQueue.ProcessExpiredTasks()를 실행하는 전용 스레드
+	std::unique_ptr<CDelayedTaskQueue>	_sessionReapQueue;	// reap tick 예약 큐 (스스로 워커 스레드를 안 가짐). Start()마다 새로 만든다(Stop()된 큐는 재사용하지 않는다).
+	std::thread			_sessionReapThread;						// _sessionReapQueue->ProcessExpiredTasks()를 실행하는 전용 스레드
 
 private:
 	CIocpCoreRef			_iocpCore = nullptr;    // 연동된 IOCP 코어 객체 참조
@@ -195,11 +197,9 @@ public:
 	//         [중요] ConnectAsync()가 진짜 비동기(ConnectEx)로 바뀌면서, 이 함수가
 	//         true를 반환해도 실제 TCP 연결이 전부(혹은 하나라도) 완료됐다는 보장이
 	//         없습니다 — 연결 성공/실패는 각 세션의 OnConnected()/OnDisconnected()
-	//         오버라이드로 나중에 비동기 통지됩니다. Start()는 오직 "N개 세션 생성 +
-	//         IOCP 등록 + ConnectEx 게시"까지만 동기로 보장하고 리턴합니다(과거
-	//         버전은 동기 connect() 기반이라 true 반환 = 실제 연결 완료를 의미했으나
-	//         이제는 아닙니다). 세션 하나를 연결 게시하는 실제 절차는
-	//         ConnectOneMoreSession()에 있습니다.
+	//         오버라이드로 나중에 비동기 통지됩니다. Start()는 "N개 세션 생성 + IOCP 등록 +
+	//         ConnectEx 게시"까지만 동기로 보장하고 리턴합니다. 세션 하나를 연결 게시하는
+	//         실제 절차는 ConnectOneMoreSession()에 있습니다.
 	//***************************************************************************
 	virtual bool	Start() override;
 
@@ -231,9 +231,8 @@ public:
 	//          세션 서브클래스가 OnConnected()/OnDisconnected()를 오버라이드해 그
 	//          결과를 콜백 등으로 상위에 알리는 방식으로 연동해야 합니다.
 	//
-	//          세션은 ConnectEx 게시 이전에 이미 AddSession()으로 서비스의 추적
-	//          목록에 들어갑니다(과거 버전은 연결 성공 후에만 등록했으나, 비동기
-	//          전환으로 "연결 시도 중"인 세션도 추적할 필요가 있어짐). 연결이 실패하면
+	//          세션은 ConnectEx 게시 이전에 AddSession()으로 서비스의 추적 목록에
+	//          들어갑니다("연결 시도 중"인 세션도 추적 대상). 연결이 실패하면
 	//          CIocpSession::FailConnect()가 호출하는 CSession::OnDisconnected() →
 	//          DisconnectHandler → CNetService::ReleaseSession() 경로로 자동
 	//          제거되므로, 실패한 세션이 목록에 남는 leak은 없습니다.

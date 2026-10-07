@@ -65,4 +65,7 @@ void CIocpWorkerPool::Stop(CIocpCore* iocpCore)
 	}
 
 	_threadManager.JoinThreads();
+
+	// Join이 끝나 스레드가 없으므로 종료 플래그를 풀어 같은 풀로 Start()를 다시 호출할 수 있게 한다.
+	_threadManager.ResetShutdown();
 }

@@ -7,14 +7,6 @@
 #include "pch.h"
 #include "ThreadManager.h"
 
-// 프로젝트에 CMemory 모듈이 포함된 경우에만 TLS 캐시 flush 호출을 활성화.
-// UC_MEMORY_H는 Memory.h에 정의된 인클루드 가드를 그대로 재사용하여,
-// ThreadManager가 CMemory 모듈 존재 여부와 무관하게 독립적으로 컴파일될 수
-// 있도록 합니다(BaseGlobal.cpp와 동일한 패턴).
-#ifdef UC_MEMORY_H
-#include "Memory.h"
-#endif
-
 //***************************************************************************
 // Construction/Destruction
 //***************************************************************************
@@ -43,10 +35,12 @@ bool CThreadManager::CreateThread(std::function<void(void)> fncCallback)
 
     _threads.emplace_back([this, fncCallback]() {
         InitTLS();
-        try {
+        try
+        {
             fncCallback();
         }
-        catch( ... ) {
+        catch( ... )
+        {
             // 예외 발생 시에도 TLS 정리 보장.
             // 아래 재던지는 std::thread 진입 함수를 벗어나므로 std::terminate()로
             // 이어진다(로그 없이 프로세스 종료). 콜백 내부 예외는 콜백에서 직접 처리할 것.
@@ -77,6 +71,20 @@ void CThreadManager::JoinThreads()
     for( auto& th : localThreads )
         if( th.joinable() )
             th.join();
+}
+
+//***************************************************************************
+// @brief 관리 중인 스레드가 없을 때 종료 플래그를 해제합니다(재시작 허용).
+// @return 해제했으면 true, 스레드가 남아 있어 유지했으면 false
+//***************************************************************************
+bool CThreadManager::ResetShutdown()
+{
+    std::lock_guard<std::mutex> lock(_lock);
+
+    if( !_threads.empty() ) return false;
+
+    _bShuttingDown.store(false);
+    return true;
 }
 
 //***************************************************************************
@@ -140,7 +148,8 @@ void CThreadManager::JoinThreadById(std::thread::id threadId)
         auto it = std::find_if(_threads.begin(), _threads.end(),
             [&](std::thread& t) { return t.get_id() == threadId; });
 
-        if( it != _threads.end() && it->joinable() ) {
+        if( it != _threads.end() && it->joinable() )
+        {
             th = std::move(*it);
             _threads.erase(it); // 목록에서 제거
         }

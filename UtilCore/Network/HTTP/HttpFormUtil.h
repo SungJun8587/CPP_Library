@@ -31,12 +31,38 @@ namespace HTTP
 	//          함수를 재사용하기 위함이며(둘을 구분해서 따로 관리할 이유가
 	//          없음), 현대 서버는 대부분 %20도 정상 처리한다.
 	//***************************************************************************
+	inline void AppendUrlEncoded(std::string& result, std::string_view input);
+
 	inline std::string UrlEncode(std::string_view input)
 	{
-		static constexpr char kHex[] = "0123456789ABCDEF";
-
 		std::string result;
 		result.reserve(input.size() + input.size() / 2); // 인코딩이 일부만 필요한 일반적인 경우를 가정, 모자라면 자란다
+		AppendUrlEncoded(result, input);
+		return result;
+	}
+
+	//***************************************************************************
+	// @brief percent-encoding(%XX)된 문자열을 원래 바이트로 디코딩합니다.
+	// @param input 디코딩할 문자열 (URL 경로 또는 쿼리스트링 일부)
+	// @return std::string 디코딩된 문자열
+	// @details '+'는 공백으로 바꾸지 않는다 — 그건 application/x-www-form-urlencoded
+	//          쿼리 파라미터 값에만 해당하는 관례고, URL 경로(path) 세그먼트에서는
+	//          '+'가 그냥 리터럴 '+' 문자다(RFC 3986). 잘못된 %XX 시퀀스(뒤에 hex가
+	//          아닌 문자가 오는 등)는 원본 그대로 통과시킨다(엄격 실패 대신 관대하게 처리).
+	//          실제 구현은 HTTP::PercentDecode()이며, '+'를 공백으로 바꾸는 폼 값 디코딩은
+	//          FormUrlEncodedParser.h의 DecodeFormUrlEncodedValue()가 담당한다.
+	//***************************************************************************
+	inline std::string UrlDecode(std::string_view input)
+	{
+		return PercentDecode(input);
+	}
+
+	//***************************************************************************
+	// @brief 문자열을 percent-encoding해 result 끝에 덧붙입니다 (UrlEncode()와 같은 규칙, 임시 문자열 없음).
+	//***************************************************************************
+	inline void AppendUrlEncoded(std::string& result, std::string_view input)
+	{
+		static constexpr char kHex[] = "0123456789ABCDEF";
 
 		for( unsigned char c : input )
 		{
@@ -55,24 +81,6 @@ namespace HTTP
 				result.push_back(kHex[c & 0x0F]);
 			}
 		}
-
-		return result;
-	}
-
-	//***************************************************************************
-	// @brief percent-encoding(%XX)된 문자열을 원래 바이트로 디코딩합니다.
-	// @param input 디코딩할 문자열 (URL 경로 또는 쿼리스트링 일부)
-	// @return std::string 디코딩된 문자열
-	// @details '+'는 공백으로 바꾸지 않는다 — 그건 application/x-www-form-urlencoded
-	//          쿼리 파라미터 값에만 해당하는 관례고, URL 경로(path) 세그먼트에서는
-	//          '+'가 그냥 리터럴 '+' 문자다(RFC 3986). 잘못된 %XX 시퀀스(뒤에 hex가
-	//          아닌 문자가 오는 등)는 원본 그대로 통과시킨다(엄격 실패 대신 관대하게 처리).
-	//          실제 구현은 HTTP::PercentDecode()이며, '+'를 공백으로 바꾸는 폼 값 디코딩은
-	//          FormUrlEncodedParser.h의 DecodeFormUrlEncodedValue()가 담당한다.
-	//***************************************************************************
-	inline std::string UrlDecode(std::string_view input)
-	{
-		return PercentDecode(input);
 	}
 
 	//***************************************************************************
@@ -100,9 +108,9 @@ namespace HTTP
 		{
 			if( !first ) result.push_back('&');
 			first = false;
-			result += UrlEncode(key);
+			AppendUrlEncoded(result, key);
 			result.push_back('=');
-			result += UrlEncode(value);
+			AppendUrlEncoded(result, value);
 		}
 		return result;
 	}

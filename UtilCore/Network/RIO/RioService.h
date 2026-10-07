@@ -16,6 +16,7 @@
 #include <Containers/Queue/DelayedTaskQueue.h>
 #include <Thread/SyncValue.h>
 
+#include <memory>
 #include <thread>
 #include <atomic>
 #include <mutex>
@@ -116,16 +117,16 @@ private:
 	// @details 최초 호출은 Start()에서, 이후로는 이 함수 자신이 실행될 때마다
 	//          다음 tick을 다시 예약합니다 — CDelayedTaskQueue::Reserve()가
 	//          일회성이라 주기적 동작을 만들려면 이 패턴이 필요합니다. Close()가
-	//          _sessionReapQueue.Stop()을 호출하면 그 이후의 재예약 시도는
+	//          _sessionReapQueue->Stop()을 호출하면 그 이후의 재예약 시도는
 	//          Reserve()가 false를 반환하며 조용히 무시되어 재귀가 자연스럽게
-	//          끊깁니다.
+	//          끊깁니다. 재시작(Start())할 때는 큐를 새로 만들어 reap이 다시 동작합니다.
 	//***************************************************************************
 	void ScheduleSessionReap();
 
 	// Running 중 자연 종료된(원격 종료/에러 등) 세션의 _sessionManager 엔트리는
 	// ScheduleSessionReap()이 Rio::kSessionReapInterval마다 RemoveClosedSessions()로 정리한다.
-	CDelayedTaskQueue	_sessionReapQueue;						// reap tick 예약 큐 (스스로 워커 스레드를 안 가짐)
-	std::thread			_sessionReapThread;						// _sessionReapQueue.ProcessExpiredTasks()를 실행하는 전용 스레드
+	std::unique_ptr<CDelayedTaskQueue>	_sessionReapQueue;	// reap tick 예약 큐 (스스로 워커 스레드를 안 가짐). Start()마다 새로 만든다(Stop()된 큐는 재사용하지 않는다).
+	std::thread			_sessionReapThread;						// _sessionReapQueue->ProcessExpiredTasks()를 실행하는 전용 스레드
 
 private:
 	CRioCoreRef			_rioCore = nullptr;					// 연동된 RIO 코어 참조 (생성자에서 주입받음)

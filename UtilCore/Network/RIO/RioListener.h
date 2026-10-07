@@ -206,8 +206,9 @@ private:
     //        재게시까지 전부 수행합니다.
     // @param context 완료된 AcceptContext
     // @param succeeded GetQueuedCompletionStatus가 보고한 이 I/O의 성공 여부
+    // @param errorCode 실패 완료일 때의 오류 코드 (성공이면 0)
     //***************************************************************************
-    void ProcessAccept(RioAcceptContext* context, bool succeeded);
+    void ProcessAccept(RioAcceptContext* context, bool succeeded, DWORD errorCode);
 
     //***************************************************************************
     // @brief 지정된 클라이언트 소켓용 RIO Request Queue를 생성합니다.

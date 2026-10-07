@@ -275,6 +275,13 @@ private:
 	uint32					_sendOffset = 0;		// _pendingSendBuffers 전체(명령 하나) 중 이미 보낸 바이트 수 — _commandLock으로 보호
 	uint32					_sendTotalSize = 0;		// _pendingSendBuffers의 전체 바이트 수 — _commandLock으로 보호
 
+	// 직전 명령의 송신 완료 통지가 처리되기 전에 SendCommand()가 호출되면 그 명령의 송신 버퍼를 여기에 보관한다.
+	// 응답이 송신 완료 통지보다 먼저 처리돼 풀이 커넥션을 바로 재대여하는 경우에 해당하며, _sendEvent는 송신
+	// 완료 통지를 소비한 뒤에만 다시 쓸 수 있다. 송신 완료 처리가 이 값을 _pendingSendBuffers로 승격해 이어서
+	// 보낸다. _pendingSendBuffers가 비어 있으면 항상 비어 있다 — _commandLock으로 보호
+	CVector<CSendBufferRef>	_nextSendBuffers;
+	uint32					_nextSendTotalSize = 0;	// _nextSendBuffers의 전체 바이트 수 — _commandLock으로 보호
+
 	// [수정] _recvLock으로 파서 접근(ProcessRecv())과 파서 리셋(Disconnect())을
 	// 직렬화한다 — 클래스 문서 상단의 "파서 동시 접근" 설명 참고.
 	std::mutex				_recvLock;				// _parser 동기화

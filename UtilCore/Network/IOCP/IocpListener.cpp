@@ -7,12 +7,25 @@
 #include "pch.h"
 #include "IocpListener.h"
 
-#include <algorithm>
-#include <chrono>
-#include <thread>
-
 static_assert(sizeof(AcceptEvent::acceptBuffer) >= 2 * CSocketUtils::kAcceptExAddrLen,
     "acceptBuffer must hold the local and remote address blocks written by AcceptEx");
+
+namespace
+{
+    //***************************************************************************
+    // @brief 수락 중이던 연결 하나가 상대 쪽 사정으로 끊어진 것을 뜻하는 완료 에러인지 판별합니다.
+    // @details 접속 직후 RST/취소를 보내는 클라이언트나 포트 스캔 때문에 서버가 정상이어도 흔히 발생한다.
+    //          리스너 자체의 문제가 아니므로 백오프 없이 같은 슬롯을 바로 다시 게시한다. 이 에러들은 실제
+    //          연결 시도 하나당 한 번씩만 완료되므로 재게시가 스스로 폭주하지 않는다.
+    //***************************************************************************
+    bool IsPerConnectionAcceptError(DWORD errorCode) noexcept
+    {
+        return errorCode == ERROR_NETNAME_DELETED
+            || errorCode == ERROR_CONNECTION_ABORTED
+            || errorCode == WSAECONNRESET
+            || errorCode == WSAECONNABORTED;
+    }
+}
 
 //***************************************************************************
 // @brief CIocpListener 생성자
@@ -358,6 +371,14 @@ void CIocpListener::ProcessAccept(AcceptEvent* acceptEvent)
     if( session == nullptr )
     {
         HandleAcceptFailure(acceptEvent, _T("NullSession"), 0);
+        return;
+    }
+
+    // 수락 도중 상대가 연결을 끊은 경우: 이 세션은 버리고(소멸자가 소켓 정리) 슬롯만 바로 다시 게시한다.
+    // 백오프 재시도 스레드를 만들면 그 시간 동안 슬롯이 비고, 스캔/RST 폭주 시 스레드가 쌓인다.
+    if( completionError != 0 && IsPerConnectionAcceptError(completionError) )
+    {
+        RegisterAccept(acceptEvent);
         return;
     }
 
