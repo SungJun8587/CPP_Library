@@ -7,6 +7,9 @@
 #ifndef UC_STRINGUTIL_H
 #define UC_STRINGUTIL_H
 
+#include <Util/UrlParser.h>
+#include <Util/EncodingConvert.h>
+
 #include <tchar.h>
 #include <atlbase.h>
 

@@ -421,6 +421,9 @@ tcmalloc/malloc 중 컴파일 타임 선택) 경로를 탄다.
   `DECLARE_DBASYNC_HANDLER_EX(srvClass, command)` 매크로를 제공한다. `CAdoAsyncSrv`도
   `srvClass` 자리에 §12의 `MEMBER_DB_ASYNC`(= `CDbServiceManager::Instance().MemberDB()`,
   실제로 `CAdoAsyncSrv&`를 반환)를 그대로 넣어 재사용한다 — `DECLARE_DBASYNC_HANDLER_EX(해당_접근자, command) { ... }` 형태.
+  정적 멤버 `asyncHandler`의 초기화식은 `Regist()`를 바로 호출하지 않고 `DBAsyncRegistry::Defer(...)`로
+  예약만 해 두며, `StartService()` 첫머리의 `DBAsyncRegistry::Flush()`가 워커 스레드 기동 전에 이를
+  실행한다. 따라서 `srvClass` 표현식은 정적 초기화 시점이 아니라 `BaseGlobal::Init()` 이후에 평가된다.
 - 요청 큐 `_queueDBAsyncRq`는 `CChunkedSwapQueue<std::unique_ptr<st_DBAsyncRq>>`다. 요청은
   원시 포인터가 아니라 `std::unique_ptr`로 소유되며, 큐를 떠난 요청 객체는 수동 해제 없이
   `unique_ptr`가 스코프를 벗어나는 시점에 RAII로 자동 해제된다.
@@ -491,6 +494,8 @@ notify_all()`로 `WaitPushCapacity()` 대기 중인 생산자를 모두 깨운�
 `CAdoAsyncSrv`는 생성자에서 아무 것도 시작하지 않는다 — ADO 커넥션 풀 초기화와 워커
 스레드 기동을 한 번에 처리하는 `StartService(dbNodeVec, nMaxThreadCnt = 0)`을 명시적으로
 호출해야 실제로 동작을 시작한다.
+`StartService()`는 가장 먼저 `DBAsyncRegistry::Flush()`를 호출해, 정적 초기화 시점에 예약된
+핸들러 등록(§11.1)을 워커 스레드가 뜨기 전에 모두 실행한다.
 
 - `_bStarted` 플래그로 한 인스턴스당 정확히 한 번만 호출 가능하도록 막는다. 이미 시작된
   인스턴스에 다시 호출하면, 내부적으로 `InitAdo()`가 `_adoPools.clear()`를 하는 과정에서
@@ -660,7 +665,7 @@ bool bOk2 = PushDBAsyncRequestBlocking<CAdoAsyncSrv, PRODUCER_DATA_BATCH_REQ>(
 #### Public — 요청 등록 / 큐 조작
 | 함수 | 설명 |
 |---|---|
-| `Regist(command, handler)` | `callIdent`별 핸들러 등록. 보통 직접 호출하지 않고 `DECLARE_DBASYNC_HANDLER_EX` 매크로가 정적 초기화 시점에 대신 호출(§11.1) |
+| `Regist(command, handler)` | `callIdent`별 핸들러 등록. 보통 직접 호출하지 않고 `DECLARE_DBASYNC_HANDLER_EX` 매크로가 대신 호출(정적 초기화 시점에 예약해 두었다가 `StartService()` 시작 직전에 실행, §11.1) |
 | `Push(pAsyncRq)` | 큐에 요청 추가. `_mutex` 보호 구간 안에서 `PushAndGetSize()`만 수행하고, 락을 해제한 뒤 `_cva.notify_one()`을 호출한다(§11.1). 반환값은 삽입 후 큐 크기, `_bStopThread`가 켜져 있으면 `0` |
 | `Pop(localQueue)` | 로컬 큐 우선 소비, 비어 있으면 `_mutex`+`_cva`로 대기 후 큐 크기 경고 로직 실행 → `SwapChunk(64)`로 일괄 인출, 락 해제 후 `_cvProducer.notify_all()`(§11.1a) |
 | `GetQueryQueueSize()` | 큐에 쌓인 요청 수 조회 |
@@ -689,7 +694,7 @@ bool bOk2 = PushDBAsyncRequestBlocking<CAdoAsyncSrv, PRODUCER_DATA_BATCH_REQ>(
 ### 11.9 사용법
 
 ```cpp
-// 1. 핸들러 등록 — 정적 초기화 시점에 자동으로 Regist()가 호출된다(§11.1, DBAsyncHandler.h)
+// 1. 핸들러 등록 — 정적 초기화 시점에 등록이 예약되고 StartService() 시작 직전에 Regist()가 호출된다(§11.1, DBAsyncHandler.h)
 DECLARE_DBASYNC_HANDLER_EX(MEMBER_DB_ASYNC, CMD_PRODUCER_DATA_BATCH)
 {
     PRODUCER_DATA_BATCH_REQ* pReq = static_cast<PRODUCER_DATA_BATCH_REQ*>(pStAsync);
@@ -741,9 +746,10 @@ CDbServiceManager::Instance().ShutdownAll();
 곧 `MEMBER_DB_ASYNC`가 가리키는 실체다 — 세부 동작은 `COdbcConnPool_설명.md`의 §12와 동일하다.
 
 - `CDbServiceManager::Instance()`는 함수-지역 `static CDbServiceManager instance;`로
-  구현된 Meyer's singleton이다 — 최초 호출 시점에 생성되므로, `DECLARE_DBASYNC_HANDLER_EX`
-  매크로의 정적 멤버 초기화식처럼 다른 전역 객체의 정적 초기화 도중 이 함수가 호출돼도
-  정적 초기화 순서 문제(SIOF)에서 자유롭다.
+  구현된 Meyer's singleton이다 — 최초 호출 시점에 생성된다. 생성자가 `StlAllocator`를 쓰는
+  서비스 객체를 만들므로 `BaseGlobal::Init()`(gpMemory 생성) 이후에 처음 호출돼야 하며, 정적
+  초기화 도중(main 이전)에는 호출하지 않는다. `DECLARE_DBASYNC_HANDLER_EX`가 서비스에 대한
+  `Regist()`를 `StartService()` 시작 직전으로 미루는 것이 이 때문이다(§11.1).
 - 생성자에서 `_memberDB = std::make_unique<CAdoAsyncSrv>()`로 인스턴스만 만들 뿐,
   `StartService()`는 자동으로 호출하지 않는다 — 실제 DB 접속/워커 스레드 기동은 호출부가
   `MEMBER_DB_ASYNC.StartService(...)`(§11.9의 2번)를 명시적으로 호출해야 한다.

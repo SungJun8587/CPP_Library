@@ -8,6 +8,7 @@
 #define UC_HTTPURL_H
 
 #include <Network/HTTP/HttpParseUtil.h>
+#include <Util/UrlParser.h>
 
 #include <string>
 #include <string_view>
@@ -43,65 +44,31 @@ struct CHttpUrl
 //***************************************************************************
 inline bool ParseHttpUrl(std::string_view url, CHttpUrl& out)
 {
-	if( HTTP::ContainsControlOrSpace(url) )
+	// 분해 자체는 StringUtil의 ParseURL과 공유하는 Util/UrlParser.h가 한다.
+	// 공백/제어 문자는 거부한다(rejectControlOrSpace 기본값 true) — 요청 라인 주입 방지.
+	UrlParser::ParsedUrl parsed;
+	if( !UrlParser::Parse(url, parsed) || !parsed.hasScheme )
 		return false;
 
-	size_t schemeEnd = url.find("://");
-	if( schemeEnd == std::string_view::npos )
-		return false;
-
-	std::string_view scheme = url.substr(0, schemeEnd);
-	if( HTTP::EqualsIgnoreCaseAscii(scheme, "https") )
-	{
+	if( parsed.IsScheme("https") )
 		out.isHttps = true;
-		out.port = 443;
-	}
-	else if( HTTP::EqualsIgnoreCaseAscii(scheme, "http") )
-	{
+	else if( parsed.IsScheme("http") )
 		out.isHttps = false;
-		out.port = 80;
-	}
 	else
-	{
 		return false;
-	}
 
-	std::string_view rest = url.substr(schemeEnd + 3);
+	// userinfo와 IPv6 리터럴은 인식은 하되 이 함수에서는 받아들이지 않는다.
+	// IPv6는 Host 헤더에 대괄호가 필요한데(HttpClient가 host를 그대로 이어붙여 만듦)
+	// 그 처리가 아직 없다 — 지원하려면 parsed.hostIsIpv6를 CHttpUrl에 싣고
+	// HttpClient의 Host 헤더 조립에서 "[host]"로 감싸야 한다.
+	if( parsed.hasUserinfo || parsed.hostIsIpv6 )
+		return false;
 
-	// fragment(#...) 제거 — HTTP 요청에는 포함시키지 않는다.
-	size_t fragmentStart = rest.find('#');
-	if( fragmentStart != std::string_view::npos )
-		rest = rest.substr(0, fragmentStart);
+	out.host = std::string(parsed.host);
+	out.port = static_cast<uint16>(parsed.EffectivePort());
+	out.pathAndQuery = parsed.RequestTarget();	// 경로가 비면 "/", fragment는 제외
 
-	// authority는 첫 '/' 또는 '?'에서 끝난다 ('?'가 먼저면 경로 없이 쿼리만 있는 URL).
-	size_t authorityEnd = rest.find_first_of("/?");
-	std::string_view hostPort = (authorityEnd == std::string_view::npos) ? rest : rest.substr(0, authorityEnd);
-
-	if( authorityEnd == std::string_view::npos )
-		out.pathAndQuery = "/";
-	else if( rest[authorityEnd] == '/' )
-		out.pathAndQuery = std::string(rest.substr(authorityEnd));
-	else
-		out.pathAndQuery = "/" + std::string(rest.substr(authorityEnd));
-
-	size_t colon = hostPort.find(':');
-	if( colon != std::string_view::npos )
-	{
-		out.host = std::string(hostPort.substr(0, colon));
-
-		std::string_view portSv = hostPort.substr(colon + 1);
-		int portValue = 0;
-		auto res = std::from_chars(portSv.data(), portSv.data() + portSv.size(), portValue);
-		if( res.ec != std::errc() || res.ptr != portSv.data() + portSv.size() || portValue <= 0 || portValue > 65535 )
-			return false;
-		out.port = static_cast<uint16>(portValue);
-	}
-	else
-	{
-		out.host = std::string(hostPort);
-	}
-
-	return !out.host.empty();
+	return true;
 }
 
 #endif // ndef UC_HTTPURL_H

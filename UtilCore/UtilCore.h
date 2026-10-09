@@ -110,6 +110,8 @@ using namespace std;
 #include <Util/DirectoryUtil.h>
 #include <Util/FileUtil.h>
 #include <Util/ShellUtil.h>
+#include <Util/PercentCodec.h>
+#include <Util/UrlParser.h>
 #include <Util/WebUtil.h>
 #include <Util/Endian.h>
 #include <Util/BufferReader.h>
@@ -179,6 +181,7 @@ using namespace std;
 #include <DB/DBCommon.h>
 
 #include <DB/DBAsyncSrv.h>
+#include <DB/DBAsyncRegistry.h>
 #include <DB/DBAsyncHandler.h>
 #include <DB/DBAsyncPushHelper.h>
 

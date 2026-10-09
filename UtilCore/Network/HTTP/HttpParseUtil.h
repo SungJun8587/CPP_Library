@@ -7,6 +7,8 @@
 #ifndef UC_HTTPPARSEUTIL_H
 #define UC_HTTPPARSEUTIL_H
 
+#include <Util/PercentCodec.h>
+
 #include <charconv>
 #include <cstddef>
 #include <cstring>
@@ -342,38 +344,12 @@ namespace HTTP
 	//          (application/x-www-form-urlencoded), HttpFormUtil.h(UrlDecode)가
 	//          공통으로 쓴다. 결과는 원본 바이트 그대로이며(문자셋 변환 없음), "%" 뒤에
 	//          유효한 16진수 두 글자가 없으면 그 "%"는 원본 그대로 둔다(관대한 처리).
+	//          실제 규칙은 WebUtil(UrlDecode 등)과 공유하는 Util/PercentCodec.h에 있다 —
+	//          두 곳의 디코딩 규칙이 서로 어긋나지 않게 하려는 것이다.
 	//***************************************************************************
 	inline std::string PercentDecode(std::string_view encoded)
 	{
-		auto hexDigit = [](char c) -> int
-			{
-				if( c >= '0' && c <= '9' ) return c - '0';
-				if( c >= 'a' && c <= 'f' ) return c - 'a' + 10;
-				if( c >= 'A' && c <= 'F' ) return c - 'A' + 10;
-				return -1;
-			};
-
-		std::string result;
-		result.reserve(encoded.size());
-
-		for( size_t i = 0; i < encoded.size(); ++i )
-		{
-			// "%XX"가 입력 끝에 정확히 걸쳐도 디코딩되도록 i + 2가 마지막 인덱스 이하인지 확인한다.
-			if( encoded[i] == '%' && i + 2 < encoded.size() )
-			{
-				const int hi = hexDigit(encoded[i + 1]);
-				const int lo = hexDigit(encoded[i + 2]);
-				if( hi >= 0 && lo >= 0 )
-				{
-					result.push_back(static_cast<char>((hi << 4) | lo));
-					i += 2;
-					continue;
-				}
-			}
-			result.push_back(encoded[i]);
-		}
-
-		return result;
+		return PercentCodec::Decode(encoded, false);
 	}
 }
 

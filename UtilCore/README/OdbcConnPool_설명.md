@@ -422,11 +422,12 @@ tcmalloc/malloc 중 컴파일 타임 선택) 경로를 탄다.
   `DECLARE_DBASYNC_HANDLER_EX(srvClass, command)` 매크로를 제공한다. 이 매크로 한 줄로
   `command##_handler` 클래스 정의(`CDBAsyncSrvHandler` 상속, 생성자/가상 소멸자, `ProcessAsyncCall`
   선언)와, 정적 멤버 `asyncHandler`의 초기화식 안에서 `(srvClass).Regist(command,
-  std::make_shared<command##_handler>())`를 호출해 프로그램 시작(정적 초기화) 시점에 자동으로
-  핸들러가 등록되게 하는 것까지 한 번에 끝낸다. 호출부는 매크로 뒤에 `ProcessAsyncCall`의 본문만
+  std::make_shared<command##_handler>())`를 `DBAsyncRegistry::Defer(...)`로 예약해 두고, 각 서비스의 `StartService()` 첫머리에서 호출하는
+  `DBAsyncRegistry::Flush()`가 워커 스레드 기동 전에 그 등록을 실행하게 하는 것까지 한 번에 끝낸다.
+  정적 초기화 시점에는 `srvClass` 표현식을 평가하지 않는다. 호출부는 매크로 뒤에 `ProcessAsyncCall`의 본문만
   `{ ... }`로 이어 붙이면 된다. `srvClass`에는 보통 §12의 `MEMBER_DB_ASYNC` 같은 매크로(즉
   `CDbServiceManager::Instance().MemberDB()` 표현식)를 그대로 넘긴다 — `CDbServiceManager::
-  Instance()`가 함수-지역 `static`이라 이 정적 초기화 시점의 호출 순서(SIOF)에서 안전하다(§12).
+  Instance()`는 `StartService()` 시점, 즉 `BaseGlobal::Init()` 이후에 평가되므로 정적 초기화 순서의 영향을 받지 않는다(§12).
 - 요청 큐 `_queueDBAsyncRq`는 `CChunkedSwapQueue<std::unique_ptr<st_DBAsyncRq>>`로,
   요청은 원시 포인터가 아니라 `std::unique_ptr`로 소유된다. 즉 큐를 떠난 요청 객체는
   수동 해제 없이, `unique_ptr`가 스코프를 벗어나는 시점에 RAII로 자동 해제된다 — 처리
@@ -536,6 +537,8 @@ tcmalloc/malloc 중 컴파일 타임 선택) 경로를 탄다.
 `COdbcAsyncSrv`는 생성자에서 아무 것도 시작하지 않는다 — ODBC 커넥션 풀 초기화와 워커
 스레드 기동을 한 번에 처리하는 `StartService(dbNodeVec, nMaxThreadCnt = 0)`을 명시적으로
 호출해야 실제로 동작을 시작한다.
+`StartService()`는 가장 먼저 `DBAsyncRegistry::Flush()`를 호출해, 정적 초기화 시점에 예약된
+핸들러 등록(§11.1)을 워커 스레드가 뜨기 전에 모두 실행한다.
 
 - `_bStarted` 플래그로 한 인스턴스당 정확히 한 번만 호출 가능하도록 막는다. 이미 시작된
   인스턴스에 다시 호출하면, 내부적으로 `InitOdbc()`가 `_odbcPools.clear()`를 하는 과정에서
@@ -735,7 +738,7 @@ bool bOk2 = PushDBAsyncRequestBlocking<COdbcAsyncSrv, PRODUCER_DATA_BATCH_REQ>(
 #### Public — 요청 등록 / 큐 조작
 | 함수 | 설명 |
 |---|---|
-| `Regist(command, handler)` | `callIdent`별 핸들러 등록. 보통 직접 호출하지 않고 `DECLARE_DBASYNC_HANDLER_EX` 매크로가 정적 초기화 시점에 대신 호출(§11.1) |
+| `Regist(command, handler)` | `callIdent`별 핸들러 등록. 보통 직접 호출하지 않고 `DECLARE_DBASYNC_HANDLER_EX` 매크로가 대신 호출(정적 초기화 시점에 예약해 두었다가 `StartService()` 시작 직전에 실행, §11.1) |
 | `Push(pAsyncRq)` | 큐에 요청 추가. `_mutex` 보호 구간 안에서 `PushAndGetSize()`만 수행하고, 락을 해제한 뒤 `_cva.notify_one()`을 호출한다(§11.1). 반환값은 삽입 후 큐 크기, `_bStopThread`가 켜져 있으면 `0` |
 | `Pop(localQueue)` | 로컬 큐 우선 소비, 비어 있으면 `_mutex`+`_cva`로 대기 후 `SwapChunk(64)`로 일괄 인출, 락 해제 후 `_cvProducer.notify_all()`(§11.1a) |
 | `GetQueryQueueSize()` | 큐에 쌓인 요청 수 조회 |
@@ -764,7 +767,7 @@ bool bOk2 = PushDBAsyncRequestBlocking<COdbcAsyncSrv, PRODUCER_DATA_BATCH_REQ>(
 ### 11.9 사용법
 
 ```cpp
-// 1. 핸들러 등록 — 정적 초기화 시점에 자동으로 Regist()가 호출된다(§11.1, DBAsyncHandler.h)
+// 1. 핸들러 등록 — 정적 초기화 시점에 등록이 예약되고 StartService() 시작 직전에 Regist()가 호출된다(§11.1, DBAsyncHandler.h)
 //    실제 쿼리 실행은 이 ProcessAsyncCall 본문 안에서, GetOdbcConnPool()로 얻은 풀을
 //    OdbcConnGuard로 감싸 수행한다 — Action()의 워커 스레드가 이 코드를 실행하는
 //    바로 그 지점이므로, 블로킹 쿼리를 호출해도 IOCP 워커나 게임 로직 스레드를 막지 않는다.
@@ -821,9 +824,10 @@ CDbServiceManager::Instance().ShutdownAll();
 `CAdoAsyncSrv`) 인스턴스를 소유하고 이름 있는 접근자로 노출하는 프로세스 전역 매니저다.
 
 - `CDbServiceManager::Instance()`는 함수-지역 `static CDbServiceManager instance;`로
-  구현된 Meyer's singleton이다 — 최초 호출 시점에 생성되므로, `DECLARE_DBASYNC_HANDLER_EX`
-  매크로의 정적 멤버 초기화식처럼 다른 전역 객체의 정적 초기화 도중 이 함수가 호출돼도
-  정적 초기화 순서 문제(SIOF)에서 자유롭다.
+  구현된 Meyer's singleton이다 — 최초 호출 시점에 생성된다. 생성자가 `StlAllocator`를 쓰는
+  서비스 객체를 만들므로 `BaseGlobal::Init()`(gpMemory 생성) 이후에 처음 호출돼야 하며, 정적
+  초기화 도중(main 이전)에는 호출하지 않는다. `DECLARE_DBASYNC_HANDLER_EX`가 서비스에 대한
+  `Regist()`를 `StartService()` 시작 직전으로 미루는 것이 이 때문이다(§11.1).
 - 생성자에서 `_memberDB = std::make_unique<COdbcAsyncSrv>()`로 인스턴스만 만들 뿐,
   `StartService()`는 자동으로 호출하지 않는다 — 실제 DB 접속/워커 스레드 기동은 호출부가
   `MemberDB().StartService(...)`(§11.9의 2번)를 명시적으로 호출해야 한다.

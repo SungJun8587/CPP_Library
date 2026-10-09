@@ -7,6 +7,7 @@
 #ifndef UC_ODBCASYNCSRV_H
 #define UC_ODBCASYNCSRV_H
 
+#include <DB/DBAsyncRegistry.h>
 #include <DB/OdbcConnPool.h>
 #include <Containers/Queue/ChunkedSwapQueue.h>
 

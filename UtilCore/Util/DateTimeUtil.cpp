@@ -12,10 +12,6 @@
 #include "pch.h"
 #include "DateTimeUtil.h"
 
-#include <sstream>
-#include <iomanip>
-#include <thread>
-
 //***************************************************************************
 // Windows 전용 (SYSTEMTIME / TIMESTAMP_STRUCT / SQL_TIMESTAMP_STRUCT)
 //***************************************************************************
@@ -565,6 +561,18 @@ namespace ptime
 	double MonotonicNowSec()
 	{
 		return std::chrono::duration<double>(SteadyClock::now().time_since_epoch()).count();
+	}
+
+	//***************************************************************************
+	// @brief 단조 증가 클럭(steady_clock) 기준 현재 시각을 마이크로초 단위 정수로 반환합니다.
+	// @detail MonotonicNowSec()와 같은 클럭이며 RTT·지연 시간처럼 두 시점의 차이를
+	//         마이크로초로 재는 용도입니다. 절대 시각이 아니며 기준점(epoch)은 구현 정의입니다.
+	// @return steady_clock epoch 이후 경과 마이크로초
+	//***************************************************************************
+	int64 MonotonicNowMicros()
+	{
+		return std::chrono::duration_cast<std::chrono::microseconds>(
+			SteadyClock::now().time_since_epoch()).count();
 	}
 
 	//***************************************************************************

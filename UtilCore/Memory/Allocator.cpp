@@ -1,4 +1,5 @@
-﻿//***************************************************************************
+﻿
+//***************************************************************************
 // Allocator.cpp
 //
 // @brief Allocator.h에 정의된 메인 메모리 할당자들(BaseAllocator, StompAllocator,
@@ -448,6 +449,9 @@ void* PoolAllocator::Alloc(size_t size)
 	ASSERT_CRASH(size > 0);
 
 #if defined(USE_GPMEMORY)
+	// gpMemory는 BaseGlobal::Init()에서 만들어진다. 그 전(정적 초기화 단계 등)에 할당이
+	// 들어오면 널 포인터로 Allocate()를 부르게 되므로 여기서 분명히 멈춘다.
+	ASSERT_CRASH(gpMemory != nullptr);
 	return gpMemory->Allocate(size);
 #else
 	return ::operator new(size);
@@ -484,6 +488,7 @@ void* PoolAllocator::AllocAligned(size_t size, size_t alignment)
 
 	const size_t totalSize = size + alignment + sizeof(void*);
 
+	ASSERT_CRASH(gpMemory != nullptr);	// BaseGlobal::Init() 이전 할당 방지
 	void* raw = gpMemory->Allocate(totalSize);
 	ASSERT_CRASH(raw != nullptr);
 

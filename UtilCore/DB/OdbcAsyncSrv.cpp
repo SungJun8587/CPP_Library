@@ -140,6 +140,9 @@ std::shared_ptr<CDBAsyncSrvHandler> COdbcAsyncSrv::Regist(const BYTE command, st
 //***************************************************************************
 bool COdbcAsyncSrv::StartService(const CVector<CDBNode>& dbNodeVec, const int32 nMaxThreadCnt)
 {
+	// 정적 초기화 때 예약된 핸들러 등록을 이 시점에(워커 스레드 시작 전, gpMemory 준비 후) 실행한다
+	DBAsyncRegistry::Flush();
+
 	// [수정] 이미 시작된 인스턴스에 다시 호출되면 InitOdbc()의
 	// _odbcPools.clear()가 현재 실행 중인 워커 스레드가 참조 중인 풀을
 	// 파괴할 수 있다 — 재호출 자체를 막는다.

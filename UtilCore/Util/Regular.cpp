@@ -9,9 +9,9 @@
 
 //***************************************************************************
 //
-bool IsAllAscii(const TCHAR *ptszSource)
+bool IsAllAscii(const TCHAR* ptszSource)
 {
-	const TCHAR	*ptszSourceLoc = NULL;
+	const TCHAR* ptszSourceLoc = NULL;
 
 	if( !ptszSource ) return false;
 	if( _tcslen(ptszSource) < 0 ) return false;
@@ -24,9 +24,9 @@ bool IsAllAscii(const TCHAR *ptszSource)
 
 //***************************************************************************
 //
-bool IsAllAlpha(const TCHAR *ptszSource)
+bool IsAllAlpha(const TCHAR* ptszSource)
 {
-	const TCHAR	*ptszSourceLoc = NULL;
+	const TCHAR* ptszSourceLoc = NULL;
 
 	if( !ptszSource ) return false;
 	if( _tcslen(ptszSource) < 0 ) return false;
@@ -39,9 +39,9 @@ bool IsAllAlpha(const TCHAR *ptszSource)
 
 //***************************************************************************
 //
-bool IsAllKorean(const TCHAR *ptszSource)
+bool IsAllKorean(const TCHAR* ptszSource)
 {
-	const TCHAR	*ptszSourceLoc = NULL;
+	const TCHAR* ptszSourceLoc = NULL;
 
 	if( !ptszSource ) return false;
 	if( _tcslen(ptszSource) < 0 ) return false;
@@ -54,9 +54,9 @@ bool IsAllKorean(const TCHAR *ptszSource)
 
 //***************************************************************************
 //
-bool IsAllNumeric(const TCHAR *ptszSource)
+bool IsAllNumeric(const TCHAR* ptszSource)
 {
-	const TCHAR	*ptszSourceLoc = NULL;
+	const TCHAR* ptszSourceLoc = NULL;
 
 	if( !ptszSource ) return false;
 	if( _tcslen(ptszSource) < 0 ) return false;
@@ -69,9 +69,9 @@ bool IsAllNumeric(const TCHAR *ptszSource)
 
 //***************************************************************************
 //
-bool IsAllAlphaNum(const TCHAR *ptszSource)
+bool IsAllAlphaNum(const TCHAR* ptszSource)
 {
-	const TCHAR	*ptszSourceLoc = NULL;
+	const TCHAR* ptszSourceLoc = NULL;
 
 	if( !ptszSource ) return false;
 	if( _tcslen(ptszSource) < 0 ) return false;
@@ -84,66 +84,45 @@ bool IsAllAlphaNum(const TCHAR *ptszSource)
 
 //***************************************************************************
 //
-bool IsAllAlphaKor(const TCHAR *ptszSource)
+bool IsAllAlphaKor(const TCHAR* ptszSource)
 {
-	const TCHAR	*ptszSourceLoc = NULL;
+	const TCHAR* ptszSourceLoc = NULL;
 
 	if( !ptszSource ) return false;
 	if( _tcslen(ptszSource) < 0 ) return false;
 
 	for( ptszSourceLoc = ptszSource; *ptszSourceLoc; ptszSourceLoc++ )
-		if( !_istalpha(*ptszSourceLoc) && !IsKoreanChar(*ptszSourceLoc) ) return false;
+		if( !_istalpha(*ptszSourceLoc) && !AsciiChar::IsKoreanChar(*ptszSourceLoc) ) return false;
 
 	return true;
 }
 
 //***************************************************************************
 //
-bool IsAllKorNum(const TCHAR *ptszSource)
+bool IsAllKorNum(const TCHAR* ptszSource)
 {
-	const TCHAR	*ptszSourceLoc = NULL;
+	const TCHAR* ptszSourceLoc = NULL;
 
 	if( !ptszSource ) return false;
 	if( _tcslen(ptszSource) < 0 ) return false;
 
 	for( ptszSourceLoc = ptszSource; *ptszSourceLoc; ptszSourceLoc++ )
-		if( !IsKoreanChar(*ptszSourceLoc) && !_istdigit(*ptszSourceLoc) ) return false;
+		if( !AsciiChar::IsKoreanChar(*ptszSourceLoc) && !_istdigit(*ptszSourceLoc) ) return false;
 
 	return true;
 }
 
 //***************************************************************************
 //
-bool IsAllAlphaKorNum(const TCHAR *ptszSource)
+bool IsAllAlphaKorNum(const TCHAR* ptszSource)
 {
-	const TCHAR	*ptszSourceLoc = NULL;
+	const TCHAR* ptszSourceLoc = NULL;
 
 	if( !ptszSource ) return false;
 	if( _tcslen(ptszSource) < 0 ) return false;
 
 	for( ptszSourceLoc = ptszSource; *ptszSourceLoc; ptszSourceLoc++ )
-		if( !_istalnum(*ptszSourceLoc) && !IsKoreanChar(*ptszSourceLoc) ) return false;
+		if( !_istalnum(*ptszSourceLoc) && !AsciiChar::IsKoreanChar(*ptszSourceLoc) ) return false;
 
 	return true;
 }
-
-//***************************************************************************
-//
-bool IsCharacter(const int ch)
-{
-	if( ch >= _T('0') && ch <= _T('9') ) return true;
-	if( ch >= _T('a') && ch <= _T('z') ) return true;
-	if( ch >= _T('A') && ch <= _T('Z') ) return true;
-	if( ch == _T('-') || ch == _T('.') || ch == _T('?') || ch == _T('/') || ch == _T('&') || ch == _T('=') || ch == _T(':') ) return true;
-
-	return false;
-}
-
-//***************************************************************************
-//
-bool IsKoreanChar(const TCHAR ch)
-{
-	return (ch & 0x80);
-}
-
-

@@ -47,6 +47,7 @@
     <ClInclude Include="DB\BaseODBC.h" />
     <ClInclude Include="DB\DBAsyncHandler.h" />
     <ClInclude Include="DB\DBAsyncPushHelper.h" />
+    <ClInclude Include="DB\DBAsyncRegistry.h" />
     <ClInclude Include="DB\DBAsyncSrv.h" />
     <ClInclude Include="DB\DBBind.h" />
     <ClInclude Include="DB\DBCommon.h" />
@@ -212,10 +213,12 @@
     <ClInclude Include="Util\EncodingConvert.h" />
     <ClInclude Include="Util\FileStream.h" />
     <ClInclude Include="Util\KeyedTable.h" />
+    <ClInclude Include="Util\PercentCodec.h" />
     <ClInclude Include="Util\ScopeExit.h" />
     <ClInclude Include="Util\TextFieldParser.h" />
     <ClInclude Include="Util\TypeCast.h" />
     <ClInclude Include="Util\UniqNumGenerator.h" />
+    <ClInclude Include="Util\UrlParser.h" />
     <ClInclude Include="Util\WinCharsetConv.h" />
     <ClInclude Include="Util\DateTimeUtil.h" />
     <ClInclude Include="Util\Endian.h" />

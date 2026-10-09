@@ -7,6 +7,7 @@
 #ifndef UC_ADOASYNCSRV_H
 #define UC_ADOASYNCSRV_H
 
+#include <DB/DBAsyncRegistry.h>
 #include <DB/ADO/AdoConnPool.h>
 #include <Containers/Queue/ChunkedSwapQueue.h>
 

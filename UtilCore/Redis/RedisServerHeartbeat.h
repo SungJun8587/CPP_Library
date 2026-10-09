@@ -8,6 +8,7 @@
 #define UC_REDISSERVERHEARTBEAT_H
 
 #include <Redis/RedisService.h>
+#include <Util/DateTimeUtil.h>
 
 #include <string>
 #include <thread>

@@ -8,10 +8,7 @@
 #include "WebUtil.h"
 
 //***************************************************************************
-static const char g_pcDigits[16] = {
-	'0', '1' , '2', '3', '4', '5', '6', '7', '8', '9',
-	'A', 'B', 'C', 'D', 'E', 'F'
-};
+static const char* const g_pcDigits = PercentCodec::kHexDigitsUpper;	// 16진수 대문자 테이블(공용 코어와 공유)
 
 //***************************************************************************
 static const char g_pcMimeBase64[64] = {
@@ -51,61 +48,11 @@ static int g_pnDecodeMimeBase64[256] = {
 // malformed 입력에 대한 방어 누락이 함수마다 중복되는 것을 방지한다.
 //===========================================================================
 
-// @brief 영숫자 여부 판별 ('0'-'9','A'-'Z','a'-'z')
-static inline bool IsAlnum(unsigned char c)
-{
-	return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
-}
-
-// @brief hex 문자 1개를 nibble 값으로 변환. 유효하지 않으면 -1 반환.
-// (malformed % 시퀀스에서 잘못된 문자를 그대로 계산에 사용하는 것을 방지)
-static inline int HexNibble(TCHAR c)
-{
-	if( c >= '0' && c <= '9' ) return c - '0';
-	if( c >= 'A' && c <= 'F' ) return c - 'A' + 10;
-	if( c >= 'a' && c <= 'f' ) return c - 'a' + 10;
-	return -1;
-}
-
-// @brief 안전 문자(퍼센트 인코딩하지 않을 문자) 판별 테이블 생성.
-// 영숫자는 기본 포함, pszExtraSafe에 나열된 문자를 추가로 안전 문자 취급한다.
-static inline std::array<bool, 256> BuildSafeTable(const char* pszExtraSafe)
-{
-	std::array<bool, 256> table{};
-	for( int i = 0; i < 256; i++ )
-		table[i] = IsAlnum((unsigned char)i);
-
-	if( pszExtraSafe != nullptr )
-	{
-		for( const char* p = pszExtraSafe; *p; p++ )
-			table[(unsigned char)*p] = true;
-	}
-	return table;
-}
-
-// @brief 바이트 시퀀스를 퍼센트 인코딩. 안전 문자는 그대로, 공백은 옵션에 따라
-// '+' 또는 %20으로, 나머지는 %XX로 인코딩한다. 1-pass로 처리하여 사이즈 계산과
-// 채우기 로직이 어긋날 여지를 없앤다.
-static inline std::string PercentEncodeBytes(const std::string& source, const std::array<bool, 256>& safeTable, bool bSpaceAsPlus)
-{
-	std::string dest;
-	dest.reserve(source.size());
-
-	for( unsigned char cChar : source )
-	{
-		if( safeTable[cChar] )
-			dest.push_back((char)cChar);
-		else if( bSpaceAsPlus && cChar == ' ' )
-			dest.push_back('+');
-		else
-		{
-			dest.push_back('%');
-			dest.push_back(g_pcDigits[(cChar >> 4) & 0x0F]);
-			dest.push_back(g_pcDigits[cChar & 0x0F]);
-		}
-	}
-	return dest;
-}
+// 바이트 단위 퍼센트 인코딩/디코딩 코어는 Util/PercentCodec.h로 분리했다
+// (HTTP 파서와 같은 규칙을 공유하기 위함). 여기서는 이름만 가져다 쓴다.
+using PercentCodec::IsAlnum;
+using PercentCodec::HexNibble;
+using PercentCodec::BuildSafeTable;
 
 // @brief 퍼센트 인코딩 공통 진입점. source를 iCodePage(ANSI/UTF-8)로 변환한 뒤
 // 이미 만들어진 안전 문자 테이블로 인코딩한다. 테이블은 extras가 고정된 각
@@ -124,7 +71,7 @@ static inline _tstring PercentEncodeCoreWithTable(const _tstring& source, int iC
 	sourceData = (iCodePage == CP_UTF8) ? AnsiToUtf8(source) : source;
 #endif
 
-	std::string destData = PercentEncodeBytes(sourceData, safeTable, bSpaceAsPlus);
+	std::string destData = PercentCodec::Encode(sourceData, safeTable, bSpaceAsPlus);
 
 #ifdef _UNICODE
 	return WStringToTString(AnsiToUnicode(destData));
@@ -140,37 +87,13 @@ static inline _tstring PercentDecodeCore(const _tstring& source, int iCodePage, 
 {
 	if( source.empty() ) return _T("");
 
-	const size_t n = source.size();
-	std::string destData;
-	destData.reserve(n);
+	// TCHAR -> 바이트 (퍼센트 인코딩된 입력은 ASCII라는 전제 — 기존 동작과 동일하게 하위 바이트만 취함)
+	std::string narrowed;
+	narrowed.reserve(source.size());
+	for( TCHAR ch : source )
+		narrowed.push_back(static_cast<char>(ch));
 
-	size_t i = 0;
-	while( i < n )
-	{
-		TCHAR ch = source[i];
-
-		if( ch == '%' && i + 2 < n )
-		{
-			int hi = HexNibble(source[i + 1]);
-			int lo = HexNibble(source[i + 2]);
-			if( hi >= 0 && lo >= 0 )
-			{
-				destData.push_back((char)((hi << 4) | lo));
-				i += 3;
-				continue;
-			}
-			// 잘못된 %XX 시퀀스 -> '%'는 리터럴로 취급하고 한 글자만 전진
-		}
-		else if( bPlusAsSpace && ch == '+' )
-		{
-			destData.push_back(' ');
-			i++;
-			continue;
-		}
-
-		destData.push_back((char)ch);
-		i++;
-	}
+	std::string destData = PercentCodec::Decode(narrowed, bPlusAsSpace);
 
 	_tstring dest;
 #ifdef _UNICODE
@@ -340,7 +263,7 @@ _tstring UrlPathEncode(const _tstring& source)
 	sourceData = AnsiToUtf8(source);
 #endif
 
-	std::string destData = PercentEncodeBytes(sourceData, table, false);
+	std::string destData = PercentCodec::Encode(sourceData, table, false);
 
 #ifdef _UNICODE
 	return WStringToTString(AnsiToUnicode(destData));

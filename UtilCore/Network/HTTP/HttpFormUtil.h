@@ -8,6 +8,7 @@
 #define UC_HTTPFORMUTIL_H
 
 #include <Network/HTTP/HttpParseUtil.h>
+#include <Util/PercentCodec.h>
 
 #include <string>
 #include <string_view>
@@ -62,25 +63,8 @@ namespace HTTP
 	//***************************************************************************
 	inline void AppendUrlEncoded(std::string& result, std::string_view input)
 	{
-		static constexpr char kHex[] = "0123456789ABCDEF";
-
-		for( unsigned char c : input )
-		{
-			const bool isUnreserved =
-				(c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
-				c == '-' || c == '_' || c == '.' || c == '~';
-
-			if( isUnreserved )
-			{
-				result.push_back(static_cast<char>(c));
-			}
-			else
-			{
-				result.push_back('%');
-				result.push_back(kHex[c >> 4]);
-				result.push_back(kHex[c & 0x0F]);
-			}
-		}
+		// unreserved(영숫자 + "-._~")만 그대로 두는 규칙은 WebUtil과 공유하는 코어에 있다.
+		PercentCodec::AppendEncoded(result, input, PercentCodec::UnreservedTable(), false);
 	}
 
 	//***************************************************************************

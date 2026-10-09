@@ -7,6 +7,7 @@
 #ifndef UC_MYSQLASYNCSRV_H
 #define UC_MYSQLASYNCSRV_H
 
+#include <DB/DBAsyncRegistry.h>
 #include <DB/MySQL/MySQLConnPool.h>
 #include <Containers/Queue/ChunkedSwapQueue.h>
 

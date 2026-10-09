@@ -8,6 +8,7 @@
 #define UC_FORMURLENCODEDPARSER_H
 
 #include <Network/HTTP/HttpParseUtil.h>
+#include <Util/PercentCodec.h>
 
 #include <string>
 #include <string_view>
@@ -21,20 +22,14 @@ namespace HTTP
 	// @details 이 인코딩은 일반 퍼센트 인코딩(PercentDecode())과 규칙이 하나
 	//          다르다 — 공백을 "%20"이 아니라 '+'로 인코딩하는 게 관례다
 	//          (RFC 1866에서 유래한 HTML 폼의 오래된 관행, 지금도 거의 모든
-	//          브라우저/클라이언트가 이렇게 보낸다). 그래서 '+' -> ' ' 치환을
-	//          먼저 한 뒤 나머지를 PercentDecode()로 넘긴다 — 순서가 중요하다
-	//          (퍼센트 디코딩을 먼저 하면 "%2B"로 인코딩된 진짜 '+' 문자와
-	//          구분이 안 됨).
+	//          브라우저/클라이언트가 이렇게 보낸다). 공용 코어
+	//          (PercentCodec::Decode)의 plusAsSpace 옵션이 한 번의 pass로 처리한다 —
+	//          리터럴 '+'만 공백이 되고 "%2B"로 인코딩된 진짜 '+'는 '+'로 디코딩되므로
+	//          '+'를 먼저 치환하는 별도 단계가 필요 없다.
 	//***************************************************************************
 	inline std::string DecodeFormUrlEncodedValue(std::string_view raw)
 	{
-		std::string withSpaces;
-		withSpaces.reserve(raw.size());
-
-		for( char c : raw )
-			withSpaces.push_back(c == '+' ? ' ' : c);
-
-		return PercentDecode(withSpaces);
+		return PercentCodec::Decode(raw, true);
 	}
 
 	//***************************************************************************

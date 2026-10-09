@@ -23,6 +23,8 @@
 #include <cstdint>
 #include <string>
 #include <sstream>
+#include <iomanip>
+#include <thread>
 
 //***************************************************************************
 // Windows 전용 (SYSTEMTIME / TIMESTAMP_STRUCT / SQL_TIMESTAMP_STRUCT)
@@ -88,6 +90,7 @@ namespace ptime
 	int64 NowMillis();
 	int64 NowMicros();
 	double MonotonicNowSec();
+	int64 MonotonicNowMicros();
 
 	bool LocalTimeSafe(std::tm& out, const time_t& t);
 	bool GmTimeSafe(std::tm& out, const time_t& t);

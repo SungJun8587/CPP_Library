@@ -683,6 +683,15 @@
     <ClInclude Include="Network\HTTP\HttpMessageParser.h">
       <Filter>Network\HTTP</Filter>
     </ClInclude>
+    <ClInclude Include="Util\PercentCodec.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="Util\UrlParser.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="DB\DBAsyncRegistry.h">
+      <Filter>DB</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">

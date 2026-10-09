@@ -7,16 +7,6 @@
 #include "pch.h"
 #include "RedisServerHeartbeat.h"
 
-namespace
-{
-	int64 NowMs()
-	{
-		return static_cast<int64>(
-			std::chrono::duration_cast<std::chrono::milliseconds>(
-				std::chrono::system_clock::now().time_since_epoch()).count());
-	}
-}
-
 //***************************************************************************
 // @brief CRedisServerHeartbeat 생성자
 // @param redisService 명령 전송에 사용할 Redis 서비스 (nullptr이면 Start()가 실패)
@@ -100,7 +90,7 @@ bool CRedisServerHeartbeat::Start(int32 ttlSec, int32 heartbeatIntervalSec)
 	_ttlSec = ttlSec;
 	_heartbeatIntervalSec = heartbeatIntervalSec;
 	_stopping.store(false);
-	_startedAtMs = NowMs();
+	_startedAtMs = ptime::NowMillis();
 
 	RegisterInitial();
 
@@ -159,7 +149,7 @@ void CRedisServerHeartbeat::RegisterInitial()
 	const std::string key = BuildKey();
 
 	CVector<std::string> args;
-	BuildRegistrationArgs(args, NowMs());
+	BuildRegistrationArgs(args, ptime::NowMillis());
 
 	const int32 ttlSec = _ttlSec;
 	CRedisService* redisService = _redisService; // [수정] this 대신 이 값 자체를 캡처
@@ -195,7 +185,7 @@ void CRedisServerHeartbeat::SendHeartbeat()
 	// 갱신마다 등록 필드 전체를 다시 쓴다 — 키가 TTL 만료나 Redis 재시작으로 사라졌더라도
 	// 이 HSET이 완전한 등록 정보로 복원한다.
 	CVector<std::string> hsetArgs;
-	BuildRegistrationArgs(hsetArgs, NowMs());
+	BuildRegistrationArgs(hsetArgs, ptime::NowMillis());
 	_redisService->SendCommand(hsetArgs, [](const RedisValue& /*res*/) {});
 
 	CVector<std::string> expireArgs;

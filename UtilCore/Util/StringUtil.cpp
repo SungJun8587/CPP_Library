@@ -1021,7 +1021,7 @@ bool FileNameExtPassing(const _tstring& fileNameExt, _tstring& fileName, _tstrin
 	size_t	index = 0;
 
 	const TCHAR* ptszSourceLoc = nullptr;
-	
+
 	if( fileNameExt.c_str() == nullptr || fileNameExt.size() == 0 ) return false;
 
 	length = fileNameExt.size();
@@ -1061,62 +1061,31 @@ bool FileNameExtPassing(const _tstring& fileNameExt, _tstring& fileName, _tstrin
 // 
 bool ParseURL(const _tstring& fullUrl, _tstring& protocol, _tstring& hostName, _tstring& request, int& nPort)
 {
-	size_t	nTotalLen;
-	size_t	nProtocolLen;
-	size_t	nHostLen;
-	size_t	nRequestLen;
-	TCHAR*	ptszWork = nullptr;
-	TCHAR*	ptszPoint1 = nullptr;
-	TCHAR*	ptszPoint2 = nullptr;
-
+	protocol.clear();
+	hostName.clear();
+	request.clear();
 	nPort = 80;
 
-	if( fullUrl.c_str() == nullptr || fullUrl.size() == 0 ) return false;
-	nTotalLen = fullUrl.size();
+	if( fullUrl.empty() ) return false;
 
-	ptszWork = _tcsdup(fullUrl.c_str());
-	if( (ptszPoint1 = _tcsstr(ptszWork, _T("://"))) != NULL )
-	{
-		nProtocolLen = nTotalLen - _tcslen(ptszPoint1) + 3;
-		hostName.resize(nProtocolLen + 1);
-		_tcsncpy_s(const_cast<TCHAR*>(protocol.c_str()), nProtocolLen + 1, ptszWork, _TRUNCATE);
-	}
-	else
-	{
-		nProtocolLen = 0;
-		hostName.resize(8);
-		_tcsncpy_s(const_cast<TCHAR*>(protocol.c_str()), 8, _T("http://"), _TRUNCATE);
-		ptszPoint1 = ptszWork;
-	}
+	// 분해 자체는 Util/UrlParser.h(HTTP 쪽 ParseHttpUrl과 공유하는 코어)가 한다.
+	// 범용 함수라 scheme을 가리지 않고(ftp:// 등), 경로의 공백 같은 문자도 거부하지 않는다.
+	const std::string url = TStringToUtf8(fullUrl);
 
-	if( (*ptszPoint1 == ':') && (*(ptszPoint1 + 1) == '/') && (*(ptszPoint1 + 2) == '/') )				// skip past opening /'s 
-		ptszPoint1 += 3;
+	UrlParser::ParsedUrl parsed;
+	if( !UrlParser::Parse(url, parsed, false) ) return false;
 
-	nHostLen = 0;
-	ptszPoint2 = ptszPoint1;														// find host
-	while( (isalpha(*ptszPoint2) || isdigit(*ptszPoint2) || *ptszPoint2 == '-' || *ptszPoint2 == '.' || *ptszPoint2 == ':') && *ptszPoint2 )
-	{
-		ptszPoint2++;
-		nHostLen++;
-	}
-	*ptszPoint2 = 0;
+	// protocol: "scheme://" 형태. scheme이 없으면 예전 동작대로 "http://"로 간주.
+	protocol = parsed.hasScheme ? Utf8ToTString(std::string(parsed.scheme) + "://") : _tstring(_T("http://"));
 
-	hostName.resize(nHostLen + 1);
-	_tcsncpy_s(const_cast<TCHAR*>(hostName.c_str()), nHostLen + 1, ptszPoint1, _TRUNCATE);
+	hostName = Utf8ToTString(std::string(parsed.host));
 
-	nRequestLen = nTotalLen - nProtocolLen - nHostLen;
+	// request: host(및 포트) 뒤의 나머지 전체("/path?query#fragment"). URL에 없으면 빈 문자열.
+	request = Utf8ToTString(std::string(parsed.rest));
 
-	request.resize(nRequestLen + 1);
-	_tcsncpy_s(const_cast<TCHAR*>(request.c_str()), nRequestLen + 1, fullUrl.c_str() + (ptszPoint2 - ptszWork), _TRUNCATE);
-
-	ptszPoint1 = _tcschr(const_cast<TCHAR*>(hostName.c_str()), ':');									// find the port number, if any
-	if( ptszPoint1 != NULL )
-	{
-		*ptszPoint1 = 0;
-		nPort = _ttoi(ptszPoint1 + 1);
-	}
-
-	free(ptszWork);
+	// 포트: 명시되면 그 값, 아니면 scheme 기본값(http 80 / https 443 / ftp 21), 모르는 scheme은 80.
+	const int port = parsed.EffectivePort();
+	nPort = (port > 0) ? port : 80;
 
 	return true;
 }
@@ -1241,10 +1210,10 @@ size_t TokenCount(const _tstring& source, const _tstring& token)
 {
 	size_t	length = 0;
 	size_t	count = 0;
-	TCHAR*	ptszTokenize = nullptr;
-	TCHAR*	ptszSourceLoc = nullptr;
-	TCHAR*	ptszToken = nullptr;
-	TCHAR*	ptszNextToken = nullptr;
+	TCHAR* ptszTokenize = nullptr;
+	TCHAR* ptszSourceLoc = nullptr;
+	TCHAR* ptszToken = nullptr;
+	TCHAR* ptszNextToken = nullptr;
 
 	if( source.c_str() == nullptr || source.size() == 0 ) return -1;
 	if( token.c_str() == nullptr || token.size() == 0 ) return -1;
@@ -1278,10 +1247,10 @@ size_t TokenCount(const _tstring& source, const _tstring& token)
 bool Tokenize(std::vector<_tstring>& dests, const _tstring& source, const _tstring& token)
 {
 	size_t	length = 0;
-	TCHAR*	ptszTokenize = nullptr;
-	TCHAR*	ptszSourceLoc = nullptr;
-	TCHAR*	ptszToken = nullptr;
-	TCHAR*	ptszNextToken = nullptr;
+	TCHAR* ptszTokenize = nullptr;
+	TCHAR* ptszSourceLoc = nullptr;
+	TCHAR* ptszToken = nullptr;
+	TCHAR* ptszNextToken = nullptr;
 
 	if( source.c_str() == nullptr || source.size() == 0 ) return false;
 	if( token.c_str() == nullptr || token.size() == 0 ) return false;
@@ -1310,5 +1279,3 @@ bool Tokenize(std::vector<_tstring>& dests, const _tstring& source, const _tstri
 	return true;
 }
 #endif
-
-

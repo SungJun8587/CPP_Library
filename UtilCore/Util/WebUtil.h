@@ -9,6 +9,7 @@
 
 #include <BaseRedefineDataType.h>
 #include <Util/EncodingConvert.h>
+#include <Util/PercentCodec.h>
 
 #include <array>
 
