@@ -7,12 +7,11 @@
 #ifndef UC_PLATFORMLOCK_H
 #define UC_PLATFORMLOCK_H
 
-#include <Thread/SpinLock.h>
-
 #if defined(_WIN32) || defined(_WIN64)
 #include <Thread/SRWLock.h>
 #define PLATFORM_LOCK_WINDOWS 1
 #else
+#include <Thread/SpinLock.h>
 #define PLATFORM_LOCK_WINDOWS 0
 #endif
 
