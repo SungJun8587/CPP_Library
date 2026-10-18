@@ -23,6 +23,10 @@ class Win32Draw
 public:
     static void DrawToDC(HDC hdc, const ImageBuffer& img, int x, int y, int destW, int destH);
     static void DrawToDC(HDC hdc, const ImageBuffer& img, int x, int y);
+
+    // 알파 채널을 반영해 그림 (투명 PNG/캔버스용)
+    static void DrawToDCAlpha(HDC hdc, const ImageBuffer& img, int x, int y, int destW, int destH);
+    static void DrawToDCAlpha(HDC hdc, const ImageBuffer& img, int x, int y);
 };
 
 #endif // UC_WIN32DRAW_H

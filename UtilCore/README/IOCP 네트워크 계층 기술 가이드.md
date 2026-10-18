@@ -19,7 +19,9 @@ UtilCore의 IOCP 계층은 Windows 완료 포트(IOCP) 위에서 서버·클라�
 
 `Network` 폴더 바로 아래의 파일들은 IOCP와 RIO 두 엔진이 함께 쓰는 공통 계층이다. IOCP 세션·리스너는 `CSocketUtils`로 소켓을 만들고, 서비스는 `CNetAddress`를 들고 있으며, `CNetworkFactory`가 엔진에 맞는 서비스를 만든다. 패킷 규칙(`Packet.h`, `CPacketDispatcher`)은 엔진과 무관하다. `CNetService`·`CSession`·`CRingBuffer`는 뒤의 ‘클래스별 상세’에서 설명한다.
 
-&#91;embedded content: 엔진 선택과 공통 기반 클래스 · 팩토리·소켓·주소·패킷\]
+![엔진 선택과 공통 기반 클래스 · 팩토리·소켓·주소·패킷](md_images/01/01-engine-common-base.png)
+
+*그림 1. 엔진 선택과 공통 기반 클래스 · 팩토리·소켓·주소·패킷* ([SVG](md_images/01/01-engine-common-base.svg))
 
 ### 헤더 파일 구성 (NetworkCommon.h, NetworkRedefineDataType.h)
 
@@ -145,7 +147,9 @@ IOCP 계층은 `Network/` 밖의 UtilCore 공용 클래스 10여 개를 쓴다. 
 
 키를 해시해 N개 클러스터 중 하나를 고르고, 클러스터마다 해시맵과 읽기/쓰기 락을 하나씩 가진 맵이다. 서로 다른 클러스터에 접근하는 스레드는 락이 달라 서로 기다리지 않는다. IOCP에서는 `CIocpSessionManager`가 `CClusterSpinUnorderedMap<uint64, CIocpSessionRef, 16>`(`SessionMap`)로 세션을 SessionId에 맞춰 보관한다. 세션 수십만 개가 동시에 등록·조회·삭제될 때 단일 락 하나로 직렬화되는 것을 피하기 위한 구조다.
 
-&#91;embedded content: 세션 맵 구조 · 16개 클러스터, 클러스터별 락\]
+![세션 맵 구조 · 16개 클러스터, 클러스터별 락](md_images/01/02-session-map-cluster.png)
+
+*그림 2. 세션 맵 구조 · 16개 클러스터, 클러스터별 락* ([SVG](md_images/01/02-session-map-cluster.svg))
 
 서로 다른 SessionId가 다른 클러스터에 떨어지면 락이 겹치지 않아 동시에 진행된다. 전체 순회만 클러스터를 번호 순서로 차례로 잡는다.
 
@@ -339,11 +343,15 @@ IOCP 계층의 메모리 할당은 대부분 `Memory/` 폴더를 거친다. 흐�
 
 서비스(`CIocpServerService`/`CIocpClientService`)가 `CIocpCore`를 공유하며 워커 풀과 리스너, 세션 매니저를 조립한다. 첫 번째 그림은 이 조립 관계, 두 번째 그림은 세션이 소유하는 객체와 상속 관계다.
 
-&#91;embedded content: IOCP 서비스 구성 · 7개 클래스\]
+![IOCP 서비스 구성 · 7개 클래스](md_images/01/03-service-composition.png)
+
+*그림 3. IOCP 서비스 구성 · 7개 클래스* ([SVG](md_images/01/03-service-composition.svg))
 
 서버 서비스만 리스너와 세션 매니저를 가지며, 서버·클라이언트 모두 자기 워커 풀을 가진다. 워커 풀은 코어의 `DispatchBatch`를 반복 호출한다.
 
-&#91;embedded content: 세션 중심 클래스 관계 · 상속·소유\]
+![세션 중심 클래스 관계 · 상속·소유](md_images/01/04-session-class-relations.png)
+
+*그림 4. 세션 중심 클래스 관계 · 상속·소유* ([SVG](md_images/01/04-session-class-relations.svg))
 
 세션은 수신 링버퍼와 이벤트 4종을 멤버로 직접 가지고, 송신 데이터는 `CSendBuffer`(8KB 청크 조각)로 큐에 쌓는다. 리스너는 `AcceptEvent` 풀을 따로 가진다.
 
@@ -664,7 +672,9 @@ IOCP 커널 오브젝트를 소유하고, 워커 스레드가 완료 통지를 �
 
 종료는 세 조건이 모두 맞을 때 한 번만 완료된다. 아래 그림이 그 순서다.
 
-&#91;embedded content: 세션 종료 통지 순서 · 조건 3개\]
+![세션 종료 통지 순서 · 조건 3개](md_images/01/05-session-close-order.png)
+
+*그림 5. 세션 종료 통지 순서 · 조건 3개* ([SVG](md_images/01/05-session-close-order.svg))
 
 마지막 단계에서 `_disconnectNotified`를 한 번만 true로 바꾸는 스레드가 `OnDisconnected`를 실행하므로, 워커 여러 개가 같은 세션의 완료를 동시에 처리해도 통지는 중복되지 않는다.
 

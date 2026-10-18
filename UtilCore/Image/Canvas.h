@@ -11,8 +11,12 @@
 #include <Image/ImageProcessor.h>
 #include <Image/Sprite.h>
 
+#include <vector>
+
 //***************************************************************************
 // @brief ImageBuffer를 내부 캔버스로 사용하는 Canvas 클래스
+// @details 캔버스는 top-down(첫 행이 화면 위쪽) RGBA8 버퍼이며,
+//          Win32Draw::DrawToDC / DrawToDCAlpha 및 PNG 인코딩과 같은 방향이다.
 //***************************************************************************
 class CCanvas
 {
@@ -24,6 +28,7 @@ public:
 	// @brief 지정한 크기로 Canvas 버퍼 생성 및 초기화
 	// @param nWidth 가로 크기(픽셀)
 	// @param nHeight 세로 크기(픽셀)
+	// @details 크기가 0 이하이면 버퍼를 비운 상태로 둔다.
 	//***************************************************************************
 	void Init(int nWidth, int nHeight);
 	void Close();
@@ -43,14 +48,16 @@ public:
 	// @param x 렌더링 시작 X 좌표
 	// @param y 렌더링 시작 Y 좌표
 	// @param nIndex 스프라이트 프레임 인덱스
+	// @details 캔버스 범위를 벗어나는 픽셀은 잘라낸다. 로드되지 않았거나
+	//          범위를 벗어난 nIndex는 무시한다.
 	//***************************************************************************
 	void DrawImage(CSprite* pSprite, int x, int y, int nIndex);
 	void DrawAlpha(CSprite* pSprite, int x, int y, int nIndex);
 
 	//***************************************************************************
 	// @brief 영역 자르기
-	// @param rRect 잘라낼 RECT 영역
-	// @return 처리 성공 여부
+	// @param rRect 잘라낼 RECT 영역 (캔버스 밖 영역은 투명 픽셀로 채움)
+	// @return 처리 성공 여부 (비어 있거나 크기가 0 이하인 RECT이면 FALSE)
 	//***************************************************************************
 	BOOL Crop(RECT rRect);
 
@@ -89,7 +96,7 @@ public:
 	const ImageBuffer& GetBuffer() const { return m_canvas; }
 
 public:
-	ImageBuffer m_canvas; // RGBA8 캔버스 버퍼
+	ImageBuffer m_canvas; // RGBA8 캔버스 버퍼 (top-down)
 };
 
 #endif // ndef UC_CANVAS_H

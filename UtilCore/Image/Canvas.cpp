@@ -7,6 +7,9 @@
 #include "pch.h"
 #include "Canvas.h"
 
+#include <new>
+#include <cstring>
+
 CCanvas::CCanvas()
 {
 }
@@ -24,6 +27,8 @@ CCanvas::~CCanvas()
 void CCanvas::Init(int nWidth, int nHeight)
 {
 	Close();
+
+	if( nWidth <= 0 || nHeight <= 0 ) return;
 
 	m_canvas.Resize(static_cast<uint32_t>(nWidth), static_cast<uint32_t>(nHeight));
 
@@ -69,89 +74,35 @@ BOOL CCanvas::Resize(int nWidth, int nHeight, ResizeMethod method)
 // @param x 렌더링 시작 X 좌표
 // @param y 렌더링 시작 Y 좌표
 // @param nIndex 스프라이트 프레임 인덱스
+// @details 캔버스는 top-down 버퍼이므로 스프라이트 y를 그대로 행으로 사용한다.
+//          (이전의 dh - y - 1 뒤집기는 bottom-up DIB 시절 방식이라 제거)
+//          RLE 데이터는 Size 범위 안에서만 읽고, 픽셀 단위로 클리핑한다.
 //***************************************************************************
 void CCanvas::DrawImage(CSprite* pSprite, int x, int y, int nIndex)
 {
-	if( !pSprite || m_canvas.Empty() ) return;
+	if( !pSprite || m_canvas.Empty() || !pSprite->IsValidIndex(nIndex) ) return;
 
-	int dw = static_cast<int>(m_canvas.Width());
-	int dh = static_cast<int>(m_canvas.Height());
+	const int dw = static_cast<int>(m_canvas.Width());
+	const int dh = static_cast<int>(m_canvas.Height());
 
-	int sw = pSprite->GetWidth(nIndex);
-	int sh = pSprite->GetHeight(nIndex);
+	const int sw = pSprite->GetWidth(nIndex);
+	const int sh = pSprite->GetHeight(nIndex);
 
 	x += pSprite->GetAdjustX(nIndex);
 	y += pSprite->GetAdjustY(nIndex);
 
-	BYTE* data = pSprite->GetImage(nIndex);
-	RGBQUAD* pal = pSprite->Palette;
+	// 완전히 캔버스 밖이면 그릴 것이 없다
+	if( x + sw < 0 || y + sh < 0 || x >= dw || y >= dh ) return;
 
-	int ox = x;
-	long c1 = 0;
+	const RGBQUAD* pal = pSprite->Palette;
 
-	if( x < 0 || y < 0 || x + sw >= dw || y + sh >= dh )
-	{
-		// Clipping 처리
-		long ox2 = x;
-		for( ;;)
+	pSprite->ForEachPixel(nIndex, x, y, dh, 1, [&](long px, long py, BYTE idx)
 		{
-			c1 = *(WORD*)data;
-			data += 2;
-			if( c1 == 0xffff ) break;
-			if( c1 == 0xfffe )
-			{
-				y++;
-				if( y >= dh ) return;
-				x = ox2;
-				continue;
-			}
-			x += c1;
-			c1 = *(WORD*)data;
-			data += 2;
+			if( px < 0 || px >= dw || py < 0 || py >= dh ) return;
 
-			while( c1-- )
-			{
-				int targetY = dh - y - 1;
-				if( y >= 0 && x >= 0 && x < dw && targetY >= 0 && targetY < dh )
-				{
-					RGBQUAD color = pal[*data];
-					m_canvas.SetPixel(static_cast<uint32_t>(x), static_cast<uint32_t>(targetY), color.rgbRed, color.rgbGreen, color.rgbBlue, 255);
-				}
-				data++;
-				x++;
-			}
-		}
-		return;
-	}
-
-	// Non-clipping Fast Path
-	for( ;;)
-	{
-		c1 = *(WORD*)data;
-		data += 2;
-		if( c1 == 0xffff ) break;
-		if( c1 == 0xfffe )
-		{
-			y++;
-			x = ox;
-			continue;
-		}
-		x += c1;
-		c1 = *(WORD*)data;
-		data += 2;
-
-		while( c1-- )
-		{
-			int targetY = dh - y - 1;
-			if( targetY >= 0 && targetY < dh )
-			{
-				RGBQUAD color = pal[*data];
-				m_canvas.SetPixel(static_cast<uint32_t>(x), static_cast<uint32_t>(targetY), color.rgbRed, color.rgbGreen, color.rgbBlue, 255);
-			}
-			x++;
-			data++;
-		}
-	}
+			const RGBQUAD& color = pal[idx];
+			m_canvas.SetPixel(static_cast<uint32_t>(px), static_cast<uint32_t>(py), color.rgbRed, color.rgbGreen, color.rgbBlue, 255);
+		});
 }
 
 //***************************************************************************
@@ -163,62 +114,44 @@ void CCanvas::DrawImage(CSprite* pSprite, int x, int y, int nIndex)
 //***************************************************************************
 void CCanvas::DrawAlpha(CSprite* pSprite, int x, int y, int nIndex)
 {
-	if( !pSprite || m_canvas.Empty() ) return;
+	if( !pSprite || m_canvas.Empty() || !pSprite->IsValidIndex(nIndex) ) return;
 
-	int dw = static_cast<int>(m_canvas.Width());
-	int dh = static_cast<int>(m_canvas.Height());
+	const int dw = static_cast<int>(m_canvas.Width());
+	const int dh = static_cast<int>(m_canvas.Height());
 
-	int sw = pSprite->GetWidth(nIndex);
-	int sh = pSprite->GetHeight(nIndex);
+	const int sw = pSprite->GetWidth(nIndex);
+	const int sh = pSprite->GetHeight(nIndex);
 
 	x += pSprite->GetAdjustX(nIndex);
 	y += pSprite->GetAdjustY(nIndex);
 
-	BYTE* data = pSprite->GetImage(nIndex);
-	int ox = x;
-	long c1 = 0;
+	if( x + sw < 0 || y + sh < 0 || x >= dw || y >= dh ) return;
 
-	for( ;;)
-	{
-		c1 = *(WORD*)data;
-		data += 2;
-		if( c1 == 0xffff ) break;
-		if( c1 == 0xfffe )
+	pSprite->ForEachPixel(nIndex, x, y, dh, 1, [&](long px, long py, BYTE)
 		{
-			y++;
-			if( y >= dh ) return;
-			x = ox;
-			continue;
-		}
-		x += c1;
-		c1 = *(WORD*)data;
-		data += 2;
+			if( px < 0 || px >= dw || py < 0 || py >= dh ) return;
 
-		while( c1-- )
-		{
-			int targetY = dh - y - 1;
-			if( y >= 0 && x >= 0 && x < dw && targetY >= 0 && targetY < dh )
-			{
-				uint8_t* p = m_canvas.At(static_cast<uint32_t>(x), static_cast<uint32_t>(targetY));
-				p[3] = 255; // Alpha 채널 갱신
-			}
-			data++;
-			x++;
-		}
-	}
+			uint8_t* p = m_canvas.At(static_cast<uint32_t>(px), static_cast<uint32_t>(py));
+			p[3] = 255; // Alpha 채널 갱신
+		});
 }
 
 //***************************************************************************
 // @brief 지정 영역 자르기
 // @param rRect 잘라낼 RECT 영역
 // @return 성공 시 true
+// @details RECT가 캔버스 밖으로 나가면(음수 좌표 포함) 해당 부분은 투명 픽셀로 채운다.
 //***************************************************************************
 BOOL CCanvas::Crop(RECT rRect)
 {
 	if( m_canvas.Empty() ) return FALSE;
+	if( rRect.right <= rRect.left || rRect.bottom <= rRect.top ) return FALSE;
 
-	uint32_t newWidth = static_cast<uint32_t>(rRect.right - rRect.left);
-	uint32_t newHeight = static_cast<uint32_t>(rRect.bottom - rRect.top);
+	const uint32_t newWidth = static_cast<uint32_t>(rRect.right - rRect.left);
+	const uint32_t newHeight = static_cast<uint32_t>(rRect.bottom - rRect.top);
+
+	const long srcW = static_cast<long>(m_canvas.Width());
+	const long srcH = static_cast<long>(m_canvas.Height());
 
 	ImageBuffer cropped(newWidth, newHeight);
 
@@ -226,13 +159,17 @@ BOOL CCanvas::Crop(RECT rRect)
 	{
 		for( uint32_t x = 0; x < newWidth; ++x )
 		{
-			uint32_t srcX = rRect.left + x;
-			uint32_t srcY = rRect.top + y;
+			const long srcX = rRect.left + static_cast<long>(x);
+			const long srcY = rRect.top + static_cast<long>(y);
 
-			if( srcX < m_canvas.Width() && srcY < m_canvas.Height() )
+			if( srcX >= 0 && srcY >= 0 && srcX < srcW && srcY < srcH )
 			{
-				const uint8_t* srcP = m_canvas.At(srcX, srcY);
+				const uint8_t* srcP = m_canvas.At(static_cast<uint32_t>(srcX), static_cast<uint32_t>(srcY));
 				cropped.SetPixel(x, y, srcP[0], srcP[1], srcP[2], srcP[3]);
+			}
+			else
+			{
+				cropped.SetPixel(x, y, 0, 0, 0, 0);
 			}
 		}
 	}
@@ -326,7 +263,9 @@ int CCanvas::Encode(BYTE*& pbBuffer, ImageFormat format)
 	int nSize = Encode(tempBuffer, format);
 	if( nSize <= 0 ) return 0;
 
-	pbBuffer = new BYTE[nSize];
+	pbBuffer = new(std::nothrow) BYTE[nSize];
+	if( pbBuffer == nullptr ) return 0;
+
 	memcpy(pbBuffer, tempBuffer.data(), nSize);
 
 	return nSize;
