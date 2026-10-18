@@ -1050,7 +1050,7 @@ I/O를 발행한 스레드가 종료되는 경우에 대해서는 공식 문서(
 
 IOCP의 기본 흐름(소켓 등록, 비동기 수신·송신, 완료 처리, 종료)만 한 파일에 담은 가장 단순한 에코 서버다. 연결 수락은 `AcceptEx`가 아니라 일반 `accept()`를 별도 스레드에서 돌리고, 받은 소켓을 IOCP에 등록한다. 그래서 `WSARecv`, `WSASend`, `GetQueuedCompletionStatus`의 동작에 집중해서 읽을 수 있다. 연결 수락까지 비동기로 처리하는 구조는 6.6절의 `AcceptEx`와 7.1절의 순서를 따른다.
 
-![IOCP echo flow · 4단계](md_images/01-iocp-echo-flow.png)
+![IOCP echo flow · 4단계](md_images/02/01-iocp-echo-flow.png)
 
 *IOCP echo flow · 4단계*
 
