@@ -231,45 +231,92 @@ bool CSocketUtils::BindExtensionFunction(SOCKET socket, GUID guid, void** fn)
 
 // ---------- 소켓 생성 ----------
 
-//***************************************************************************
-// @brief 비동기 Overlapped I/O를 지원하는 TCP 소켓(IPv4)을 생성합니다.
-// @return 생성된 소켓 핸들 (실패 시 INVALID_SOCKET)
-//***************************************************************************
-SOCKET CSocketUtils::CreateSocket()
+namespace
 {
-	return ::WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED);
+	//***************************************************************************
+	// @brief family 검증 후 WSASocket을 호출하는 공통 생성 헬퍼
+	// @details AF_INET6 소켓은 듀얼스택(IPV6_V6ONLY=0)으로 설정해, 와일드카드(::)에 바인드하면
+	//          IPv4 상대도 받을 수 있게 한다(Windows 기본값은 V6ONLY=1).
+	//          실패 시 WSAGetLastError()에 원인이 남는다.
+	//***************************************************************************
+	SOCKET CreateSocketByFamily(int af, int type, int protocol, DWORD flags)
+	{
+		if( af != AF_INET && af != AF_INET6 )
+		{
+			::WSASetLastError(WSAEAFNOSUPPORT);
+			return INVALID_SOCKET;
+		}
+
+		SOCKET socket = ::WSASocket(af, type, protocol, nullptr, 0, flags);
+		if( socket == INVALID_SOCKET )
+			return INVALID_SOCKET;
+
+		if( af == AF_INET6 && CSocketUtils::SetIPv6Only(socket, false) == false )
+		{
+			const int error = ::WSAGetLastError();
+			::closesocket(socket);
+			::WSASetLastError(error);
+			return INVALID_SOCKET;
+		}
+
+		return socket;
+	}
 }
 
 //***************************************************************************
-// @brief 비동기 Overlapped I/O를 지원하는 UDP 소켓(IPv4)을 생성합니다.
+// @brief 비동기 Overlapped I/O를 지원하는 TCP 소켓을 생성합니다.
+// @param af 주소 체계 (AF_INET 기본값, AF_INET6이면 듀얼스택)
 // @return 생성된 소켓 핸들 (실패 시 INVALID_SOCKET)
 //***************************************************************************
-SOCKET CSocketUtils::CreateUdpSocket()
+SOCKET CSocketUtils::CreateSocket(int af)
 {
-	return ::WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, nullptr, 0, WSA_FLAG_OVERLAPPED);
+	return CreateSocketByFamily(af, SOCK_STREAM, IPPROTO_TCP, WSA_FLAG_OVERLAPPED);
+}
+
+//***************************************************************************
+// @brief 비동기 Overlapped I/O를 지원하는 UDP 소켓을 생성합니다.
+// @param af 주소 체계 (AF_INET 기본값, AF_INET6이면 듀얼스택)
+// @return 생성된 소켓 핸들 (실패 시 INVALID_SOCKET)
+//***************************************************************************
+SOCKET CSocketUtils::CreateUdpSocket(int af)
+{
+	return CreateSocketByFamily(af, SOCK_DGRAM, IPPROTO_UDP, WSA_FLAG_OVERLAPPED);
 }
 
 //***************************************************************************
 // @brief RIO(Registered I/O) 전용 TCP 소켓(WSA_FLAG_REGISTERED_IO)을 생성합니다.
+// @param af 주소 체계 (AF_INET 기본값, AF_INET6이면 듀얼스택)
 // @return 생성된 소켓 핸들 (실패 시 INVALID_SOCKET)
 //***************************************************************************
-SOCKET CSocketUtils::CreateRioSocket()
+SOCKET CSocketUtils::CreateRioSocket(int af)
 {
-	return ::WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0,
-		WSA_FLAG_OVERLAPPED | WSA_FLAG_REGISTERED_IO);
+	return CreateSocketByFamily(af, SOCK_STREAM, IPPROTO_TCP, WSA_FLAG_OVERLAPPED | WSA_FLAG_REGISTERED_IO);
 }
 
 //***************************************************************************
 // @brief RIO(Registered I/O) 전용 UDP 소켓(WSA_FLAG_REGISTERED_IO)을 생성합니다.
+// @param af 주소 체계 (AF_INET 기본값, AF_INET6이면 듀얼스택)
 // @return 생성된 소켓 핸들 (실패 시 INVALID_SOCKET)
 //***************************************************************************
-SOCKET CSocketUtils::CreateRioUdpSocket()
+SOCKET CSocketUtils::CreateRioUdpSocket(int af)
 {
-	return ::WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, nullptr, 0,
-		WSA_FLAG_OVERLAPPED | WSA_FLAG_REGISTERED_IO);
+	return CreateSocketByFamily(af, SOCK_DGRAM, IPPROTO_UDP, WSA_FLAG_OVERLAPPED | WSA_FLAG_REGISTERED_IO);
 }
 
 // ---------- 옵션 ----------
+
+//***************************************************************************
+// @brief IPV6_V6ONLY 옵션을 설정합니다 (AF_INET6 소켓 전용).
+// @param socket 대상 소켓 핸들 (Bind()/Connect() 이전에 설정해야 한다)
+// @param flag true면 IPv6 전용, false면 듀얼스택(IPv4 상대는 v4-mapped 주소로 처리)
+// @return 성공 시 true, 실패 시 false
+//***************************************************************************
+bool CSocketUtils::SetIPv6Only(SOCKET socket, bool flag)
+{
+	DWORD value = flag ? 1 : 0;
+	return ::setsockopt(socket, IPPROTO_IPV6, IPV6_V6ONLY,
+		reinterpret_cast<const char*>(&value), sizeof(value)) != SOCKET_ERROR;
+}
 
 //***************************************************************************
 // @brief SO_REUSEADDR 옵션을 설정하여 이미 사용 중인 주소의 재사용 여부를 지정합니다.
@@ -467,15 +514,14 @@ bool CSocketUtils::Connect(SOCKET socket, const CNetAddress& netAddr)
 	if( socket == INVALID_SOCKET )
 		return false;
 
-	// IP 문자열 파싱에 실패한 주소(0.0.0.0)로 접속을 시도하지 않는다.
-	if( netAddr.IsValid() == false )
+	// IP 문자열 파싱에 실패한 주소(0.0.0.0)나 family가 없는 주소로 접속을 시도하지 않는다.
+	if( netAddr.IsValid() == false || netAddr.GetSockAddrLen() == 0 )
 	{
 		LOG_ERROR(_T("[CSocketUtils] Connect rejected: invalid address"));
 		return false;
 	}
 
-	const SOCKADDR_IN& serverAddr = netAddr.GetSockAddr();
-	int result = ::connect(socket, reinterpret_cast<const SOCKADDR*>(&serverAddr), sizeof(serverAddr));
+	int result = ::connect(socket, netAddr.GetSockAddr(), netAddr.GetSockAddrLen());
 
 	if( result == SOCKET_ERROR )
 	{
@@ -496,14 +542,14 @@ bool CSocketUtils::Bind(SOCKET socket, const CNetAddress& netAddr)
 {
 	// IP 문자열 파싱에 실패한 주소는 0.0.0.0으로 남아 있어, 그대로 바인드하면
 	// 의도와 달리 모든 인터페이스에 열리게 된다 — 명시적으로 거부한다.
-	if( netAddr.IsValid() == false )
+	// family가 없는 주소(기본 생성 CNetAddress)도 bind()가 실패할 뿐이므로 미리 거부한다.
+	if( netAddr.IsValid() == false || netAddr.GetSockAddrLen() == 0 )
 	{
 		LOG_ERROR(_T("[CSocketUtils] Bind rejected: invalid address"));
 		return false;
 	}
 
-	const SOCKADDR_IN& sockAddr = netAddr.GetSockAddr();
-	return ::bind(socket, reinterpret_cast<const SOCKADDR*>(&sockAddr), sizeof(sockAddr)) != SOCKET_ERROR;
+	return ::bind(socket, netAddr.GetSockAddr(), netAddr.GetSockAddrLen()) != SOCKET_ERROR;
 }
 
 //***************************************************************************
@@ -535,8 +581,8 @@ void CSocketUtils::Close(SOCKET socket)
 // @param acceptSocket 미리 생성해 둔 수락 대상 소켓 핸들
 // @param outputBuffer 첫 수신 데이터 및 로컬/원격 주소를 수신할 버퍼 포인터
 // @param receiveDataLength outputBuffer에서 데이터 수신용으로 사용할 바이트 크기
-// @param localAddrLength 로컬 주소 저장용 버퍼 크기 (sizeof(sockaddr_in) + 16)
-// @param remoteAddrLength 원격 주소 저장용 버퍼 크기 (sizeof(sockaddr_in) + 16)
+// @param localAddrLength 로컬 주소 저장용 버퍼 크기 (kAcceptExAddrLen = sizeof(sockaddr_in6) + 16)
+// @param remoteAddrLength 원격 주소 저장용 버퍼 크기 (kAcceptExAddrLen = sizeof(sockaddr_in6) + 16)
 // @param bytesReceived 실제 수신 완료된 바이트 수가 출력될 포인터
 // @param overlapped 비동기 I/O 처리를 위한 OVERLAPPED 구조체 포인터
 // @return 성공 시 TRUE, 실패 시 FALSE (WSA_IO_PENDING 등)
@@ -619,13 +665,18 @@ bool CSocketUtils::SetNonBlocking(SOCKET socket, bool nonBlocking)
 //***************************************************************************
 // @brief 클라이언트의 연결 요청을 수락(Accept)하고 주소 정보를 읽어옵니다.
 // @param listenSocket 연결 요청을 수신 대기 중인 리슨(Listen) 소켓 핸들
-// @param outClientAddress [OUT] 연결된 클라이언트의 주소 정보(sockaddr_in)를 저장할 참조 변수
+// @param outClientAddress [OUT] 연결된 클라이언트의 주소 정보 (IPv4/IPv6, 듀얼스택이면 v4-mapped)
 // @return 생성된 클라이언트 소켓 핸들 (실패 시 INVALID_SOCKET)
 //***************************************************************************
-SOCKET CSocketUtils::Accept(SOCKET listenSocket, sockaddr_in& outClientAddress)
+SOCKET CSocketUtils::Accept(SOCKET listenSocket, CNetAddress& outClientAddress)
 {
-	int addrLen = sizeof(outClientAddress);
-	return ::accept(listenSocket, reinterpret_cast<SOCKADDR*>(&outClientAddress), &addrLen);
+	SOCKADDR_INET addr = {};
+	int addrLen = sizeof(addr);
+	SOCKET clientSocket = ::accept(listenSocket, reinterpret_cast<SOCKADDR*>(&addr), &addrLen);
+	if( clientSocket != INVALID_SOCKET )
+		outClientAddress = CNetAddress::FromSockAddr(reinterpret_cast<const SOCKADDR*>(&addr), addrLen);
+
+	return clientSocket;
 }
 
 //***************************************************************************
@@ -685,9 +736,8 @@ void CSocketUtils::IPv4ToIPv6(const struct in_addr ipv4, struct in6_addr& ipv6)
 // @param hostName 도메인 이름 또는 IP 문자열
 // @param port 포트 번호
 // @param sockAddrList 조회된 addrinfo 목록이 저장될 std::list 참조
-// @param family 조회할 주소 체계 (기본값 AF_INET — 이 스택의 소켓 생성 함수가 모두
-//        AF_INET 소켓만 만들므로 IPv6 결과가 섞이면 후속 connect/bind가 실패한다.
-//        IPv6까지 필요하면 AF_UNSPEC을 명시)
+// @param family 조회할 주소 체계 (기본값 AF_INET — IPv4 결과만 받는다. 호출부가 IPv6 결과를
+//        소켓 family에 맞춰 처리할 수 있을 때만 AF_UNSPEC/AF_INET6를 명시)
 // @return 성공 시 TRUE, 실패 시 FALSE
 // @note 리스트 원소의 ai_addr은 이 함수가 malloc한 사본이다. 반복 호출되는 경로에서
 //       누수를 막으려면 사용 후 FreeSockAddrIn()으로 해제할 것.
@@ -790,27 +840,45 @@ void CSocketUtils::FreeSockAddrIn(std::list<addrinfo>& sockAddrList)
 //***************************************************************************
 // @brief getpeername()을 래핑하여 연결된 소켓의 원격지 주소를 조회합니다.
 // @param socket 대상 소켓 핸들
-// @param outAddress 조회된 원격지 주소가 채워질 구조체
-// @return 성공 시 true, 실패 시 false
+// @param outAddress 조회된 원격지 주소가 채워질 객체 (IPv4/IPv6, 듀얼스택이면 v4-mapped)
+// @return 성공 시 true, 실패 시 false (outAddress는 성공했을 때만 갱신된다)
 //***************************************************************************
-bool CSocketUtils::GetPeerAddress(SOCKET socket, sockaddr_in& outAddress)
+bool CSocketUtils::GetPeerAddress(SOCKET socket, CNetAddress& outAddress)
 {
-	int addrLen = sizeof(outAddress);
-	return ::getpeername(socket, reinterpret_cast<SOCKADDR*>(&outAddress), &addrLen) == 0;
+	SOCKADDR_INET addr = {};
+	int addrLen = sizeof(addr);
+	if( ::getpeername(socket, reinterpret_cast<SOCKADDR*>(&addr), &addrLen) != 0 )
+		return false;
+
+	CNetAddress result = CNetAddress::FromSockAddr(reinterpret_cast<const SOCKADDR*>(&addr), addrLen);
+	if( result.IsValid() == false )
+		return false;
+
+	outAddress = result;
+	return true;
 }
 
 //***************************************************************************
 // @brief getsockname()을 래핑하여 소켓에 바인딩된 로컬 주소를 조회합니다.
 // @param socket 대상 소켓 핸들
-// @param outAddress 조회된 로컬 주소가 채워질 구조체
-// @return 성공 시 true, 실패 시 false
+// @param outAddress 조회된 로컬 주소가 채워질 객체
+// @return 성공 시 true, 실패 시 false (outAddress는 성공했을 때만 갱신된다)
 // @details ConnectEx로 연결한 클라이언트 소켓처럼 로컬 포트를 커널이 임의
 //          배정하는 경우, 실제 배정된 포트를 확인할 때 사용합니다.
 //***************************************************************************
-bool CSocketUtils::GetLocalAddress(SOCKET socket, sockaddr_in& outAddress)
+bool CSocketUtils::GetLocalAddress(SOCKET socket, CNetAddress& outAddress)
 {
-	int addrLen = sizeof(outAddress);
-	return ::getsockname(socket, reinterpret_cast<SOCKADDR*>(&outAddress), &addrLen) == 0;
+	SOCKADDR_INET addr = {};
+	int addrLen = sizeof(addr);
+	if( ::getsockname(socket, reinterpret_cast<SOCKADDR*>(&addr), &addrLen) != 0 )
+		return false;
+
+	CNetAddress result = CNetAddress::FromSockAddr(reinterpret_cast<const SOCKADDR*>(&addr), addrLen);
+	if( result.IsValid() == false )
+		return false;
+
+	outAddress = result;
+	return true;
 }
 
 // ---------- 에러 메시지 ----------

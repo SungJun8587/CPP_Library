@@ -7,7 +7,6 @@
 #ifndef	UC_SPRITE_H
 #define	UC_SPRITE_H
 
-#include <Image/FileManager.h>
 #include <cstddef>
 
 //***************************************************************************

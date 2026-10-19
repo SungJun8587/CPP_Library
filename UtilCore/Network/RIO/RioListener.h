@@ -142,7 +142,7 @@ private:
     //***************************************************************************
     struct RioAcceptContext : public OVERLAPPED
     {
-        static constexpr DWORD kAddrLen = sizeof(SOCKADDR_IN) + 16;
+        static constexpr DWORD kAddrLen = sizeof(SOCKADDR_IN6) + 16;	// IPv6까지 담을 수 있는 가장 큰 주소 기준
 
         //***********************************************************************
         // @brief OVERLAPPED 필드를 0으로 초기화합니다. AcceptEx 재사용 전 필수.
@@ -219,6 +219,7 @@ private:
 
 private:
     ListenAddressMode			_addressMode = ListenAddressMode::ReuseAddress; // 주소 바인딩 옵션 (StartAccept() 이전에 설정)
+    int                      _addressFamily = AF_INET;           // Listen/Accept 소켓의 주소 체계 (StartAccept()의 주소로 결정, AF_INET6면 듀얼스택)
     std::atomic<SOCKET>     _listenSocket{ INVALID_SOCKET };    // 리스닝 소켓 핸들 (Accept Worker와 Stop() 호출 스레드가 동시 접근)
     CRioCoreRef              _rioCore = nullptr;                 // 연동할 RIO 코어 참조 (RIOCreateRequestQueue 호출용, completion 경로는 무관)
     RioSessionFactory        _sessionFactory = nullptr;          // 세션 생성 팩터리

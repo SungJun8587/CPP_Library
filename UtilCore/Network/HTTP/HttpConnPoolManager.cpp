@@ -368,9 +368,7 @@ void CHttpConnPoolManager::OnPoolSessionCountChanged(IHttpConnPool* rawPool, siz
 
 bool CHttpConnPoolManager::SameAddress(const CNetAddress& a, const CNetAddress& b)
 {
-	const auto sa = a.GetSockAddr();
-	const auto sb = b.GetSockAddr();
-	return sa.sin_addr.s_addr == sb.sin_addr.s_addr && sa.sin_port == sb.sin_port;
+	return a == b;	// family + IP + 포트 비교 (CNetAddress::operator==)
 }
 
 // 첫 풀이 만들어질 때(또는 주기가 설정될 때) 갱신 스레드를 시작한다. 주기가 0 이하이면 시작하지 않는다.

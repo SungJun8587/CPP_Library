@@ -10,15 +10,54 @@
 //***************************************************************************
 // @brief CIocpSession 생성자
 // @details 기본 버퍼 크기(Iocp::BUFFER_SIZE_DEFAULT)로 수신 CRingBuffer를 초기화합니다.
+//          소켓은 ScopedCreationFamily가 지정한 family(기본 AF_INET)로 만듭니다.
 //***************************************************************************
+namespace
+{
+	// ScopedCreationFamily가 지정하는, 이 스레드에서 생성되는 세션 소켓의 family (기본 AF_INET)
+	thread_local int t_creationFamily = AF_INET;
+}
+
+CIocpSession::ScopedCreationFamily::ScopedCreationFamily(int af) noexcept : _previous(t_creationFamily)
+{
+	t_creationFamily = af;
+}
+
+CIocpSession::ScopedCreationFamily::~ScopedCreationFamily()
+{
+	t_creationFamily = _previous;
+}
+
 CIocpSession::CIocpSession() : _recvBuffer(Iocp::BUFFER_SIZE_DEFAULT)
 {
-	_socket = CSocketUtils::CreateSocket();
+	_addressFamily = t_creationFamily;
+	_socket = CSocketUtils::CreateSocket(_addressFamily);
 	if( _socket == INVALID_SOCKET )
 	{
 		// TODO: 로그 기록 등 소켓 생성 실패 예외 처리
 		LOG_INFO(_T("CIocpSession::CIocpSession Failed to create socket"));
 	}
+}
+
+//***************************************************************************
+// @brief 세션 소켓의 주소 체계를 지정합니다 (소켓을 해당 family로 다시 만듭니다).
+// @param af AF_INET 또는 AF_INET6
+// @return 성공 시 true, 실패 시 false (실패하면 기존 소켓 유지)
+// @note IOCP 등록·AcceptEx·ConnectAsync 이전에만 호출해야 합니다.
+//***************************************************************************
+bool CIocpSession::SetAddressFamily(int af)
+{
+	if( af == _addressFamily && _socket != INVALID_SOCKET )
+		return true;
+
+	SOCKET newSocket = CSocketUtils::CreateSocket(af);
+	if( newSocket == INVALID_SOCKET )
+		return false;
+
+	CSocketUtils::Close(_socket);
+	_socket = newSocket;
+	_addressFamily = af;
+	return true;
 }
 
 //***************************************************************************
@@ -725,12 +764,10 @@ void CIocpSession::Disconnect(const TCHAR* cause)
 // @return bool 게시 시도 자체의 성공 여부. 상세 계약은 헤더의 ConnectAsync()
 //         주석 참고 — 이 값이 true라고 해서 연결이 성공했다는 뜻이 아닙니다.
 // @details ConnectEx는 사전에 bind()된 소켓에서만 호출 가능합니다 — 클라이언트가
-//          로컬 포트를 지정할 이유가 없으므로 와일드카드(0.0.0.0:0)로 바인딩합니다.
-//          CNetAddress()의 기본 생성자는 SOCKADDR_IN을 전부 0으로 두는데,
-//          이러면 sin_family도 0이 되어 AF_INET 소켓에 bind()가 실패합니다
-//          (CNetAddress(ip, port) 생성자만 sin_family=AF_INET을 명시적으로
-//          세팅한다). 그래서 명시적으로
-//          CNetAddress(_T("0.0.0.0"), 0)을 사용합니다.
+//          로컬 포트를 지정할 이유가 없으므로 소켓 family에 맞는 와일드카드(0.0.0.0:0 또는 [::]:0)로
+//          바인딩합니다. CNetAddress()의 기본 생성자는 family가 0이라 bind()가 실패하므로
+//          CNetAddress::Wildcard()로 family가 채워진 주소를 사용합니다.
+//          원격 주소의 family는 세션 소켓의 family(SetAddressFamily())와 같아야 합니다.
 //          이 함수의 모든 실패 경로는 FailConnect()를 호출해 OnDisconnected()까지
 //          통지를 완료하므로, 호출부는 반환값이 false여도 별도로 정리할 것이
 //          없습니다(FailConnect() 계약 — 헤더 주석 참고).
@@ -748,7 +785,15 @@ bool CIocpSession::ConnectAsync(const CNetAddress& remoteAddr)
 		return false;
 	}
 
-	if( !CSocketUtils::Bind(_socket, CNetAddress(_T("0.0.0.0"), 0)) )
+	if( remoteAddr.GetFamily() != _addressFamily )
+	{
+		LOG_ERROR(_T("[CIocpSession] ConnectAsync: remote address family (%d) differs from socket family (%d)"),
+			remoteAddr.GetFamily(), _addressFamily);
+		FailConnect(Iocp::CloseReason::SocketError);
+		return false;
+	}
+
+	if( !CSocketUtils::Bind(_socket, CNetAddress::Wildcard(_addressFamily, 0)) )
 	{
 		FailConnect(Iocp::CloseReason::SocketError);
 		return false;
@@ -770,10 +815,9 @@ void CIocpSession::RegisterConnect(const CNetAddress& remoteAddr)
 	_connectEvent.Init();
 	_connectEvent.owner = GetIocpObjectPtr(); // 완료 통지까지 수명 보장 (Ref +1)
 
-	SOCKADDR_IN sockAddr = remoteAddr.GetSockAddr();
 	DWORD bytesSent = 0;
 
-	if( CSocketUtils::ConnectEx(_socket, reinterpret_cast<SOCKADDR*>(&sockAddr), sizeof(sockAddr),
+	if( CSocketUtils::ConnectEx(_socket, remoteAddr.GetSockAddr(), remoteAddr.GetSockAddrLen(),
 		nullptr, 0, &bytesSent, static_cast<LPOVERLAPPED>(&_connectEvent)) == FALSE )
 	{
 		int32 errorCode = ::WSAGetLastError();

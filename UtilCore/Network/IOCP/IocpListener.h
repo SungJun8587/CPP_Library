@@ -115,6 +115,14 @@ public:
     }
 
 public:
+    //***************************************************************************
+    // @brief Listen 소켓을 만들어 바인딩하고 AcceptEx 풀을 게시합니다.
+    // @param netAddr 리슨할 주소. IPv6 주소(예: CNetAddress::AnyV6())면 AF_INET6 듀얼스택 소켓으로 열립니다.
+    // @param sessionFactory 세션 생성 팩토리. AcceptEx는 Listen 소켓과 같은 family의 소켓을 요구하므로,
+    //        netAddr가 IPv6이면 팩토리가 만드는 세션의 소켓도 AF_INET6여야 합니다
+    //        (CIocpServerService는 CIocpSession::ScopedCreationFamily로 이를 맞춥니다. 리스너를 직접
+    //        쓰는 경우 팩토리 안에서 같은 방식으로 맞추십시오 — 어긋나면 AcceptEx가 실패해 재시도만 반복합니다).
+    //***************************************************************************
     bool    StartAccept(CIocpCoreRef iocpCore, CNetAddress netAddr, IocpSessionFactory sessionFactory, uint32 acceptPoolSize = Iocp::kDefaultAcceptPoolSize, OnAcceptCallback onAccept = nullptr);
 
     //***************************************************************************

@@ -68,9 +68,10 @@ class CSocketUtils
 {
 public:
 	// AcceptEx의 outputBuffer 중 로컬/원격 주소 저장용으로 각각 필요한 크기.
-	// MS 문서 규정: sockaddr_in 크기 + 16바이트 여유. 호출부(AcceptEx 인자,
+	// MS 문서 규정: 전송 계층의 최대 주소 크기 + 16바이트 여유. IPv6(sockaddr_in6)를 받을 수
+	// 있도록 가장 큰 주소 기준으로 잡는다(IPv4 전용이어도 동일 값 사용). 호출부(AcceptEx 인자,
 	// outputBuffer 총 크기 산정)에서 매직넘버 대신 이 상수를 참조할 것.
-	static constexpr DWORD kAcceptExAddrLen = sizeof(sockaddr_in) + 16;
+	static constexpr DWORD kAcceptExAddrLen = sizeof(sockaddr_in6) + 16;
 
 public:
 	static bool     Init();
@@ -79,12 +80,15 @@ public:
 
 public:
 	// ---------- 소켓 생성 ----------
-	static SOCKET   CreateSocket();
-	static SOCKET   CreateUdpSocket();
-	static SOCKET   CreateRioSocket();
-	static SOCKET   CreateRioUdpSocket();
+	// af: AF_INET(기본) 또는 AF_INET6. AF_INET6 소켓은 듀얼스택(IPV6_V6ONLY=0)으로 만들어
+	// 와일드카드(::)에 바인드하면 IPv4 상대도 v4-mapped 주소로 받는다.
+	static SOCKET   CreateSocket(int af = AF_INET);
+	static SOCKET   CreateUdpSocket(int af = AF_INET);
+	static SOCKET   CreateRioSocket(int af = AF_INET);
+	static SOCKET   CreateRioUdpSocket(int af = AF_INET);
 
 	// ---------- 옵션 ----------
+	static bool     SetIPv6Only(SOCKET socket, bool flag);
 	static bool     SetReuseAddress(SOCKET socket, bool flag);
 	static bool     SetExclusiveAddrUse(SOCKET socket, bool flag);
 	static bool     ApplyListenAddressMode(SOCKET socket, ListenAddressMode mode);
@@ -122,16 +126,16 @@ public:
 
 	// ---------- accept()/non-blocking (RIO blocking-accept 모델용) ----------
 	static bool     SetNonBlocking(SOCKET socket, bool nonBlocking);
-	static SOCKET   Accept(SOCKET listenSocket, sockaddr_in& outClientAddress);
+	static SOCKET   Accept(SOCKET listenSocket, CNetAddress& outClientAddress);
 
 	// ---------- IP 관련 함수 ----------
 	static bool     IPToAddr(const int af, const TCHAR* hostAddress, void* dest);
 	static bool     AddrToIP(const int af, const void* src, TCHAR* hostAddress, socklen_t size);
 	static void     IPv4ToIPv6(const struct in_addr ipv4, struct in6_addr& ipv6);
-	static bool     GetSockAddrIn(const TCHAR* hostName, const int port, std::list<addrinfo>& sockAddrList, const int family = AF_INET);
+	static bool     GetSockAddrIn(const TCHAR* hostName, const int port, std::list<addrinfo>& sockAddrList, const int family = AF_INET);	// IPv6까지 받으려면 AF_UNSPEC
 	static void     FreeSockAddrIn(std::list<addrinfo>& sockAddrList);	// GetSockAddrIn()이 할당한 ai_addr 사본 해제
-	static bool     GetPeerAddress(SOCKET socket, sockaddr_in& outAddress);
-	static bool     GetLocalAddress(SOCKET socket, sockaddr_in& outAddress);
+	static bool     GetPeerAddress(SOCKET socket, CNetAddress& outAddress);
+	static bool     GetLocalAddress(SOCKET socket, CNetAddress& outAddress);
 
 	// ---------- 에러 메시지 ----------
 	static const TCHAR* GetErrMsgToWinsockErrCodeEn(const int errorCode);

@@ -65,6 +65,36 @@ public:
 	bool			IsValid() const { return _socket != INVALID_SOCKET; }
 
 	//***************************************************************************
+	// @brief 세션 소켓의 주소 체계(AF_INET/AF_INET6)를 지정합니다.
+	// @param af AF_INET 또는 AF_INET6 (AF_INET6 소켓은 듀얼스택)
+	// @return 성공 시 true. 생성에 실패하면 false이며 기존 소켓은 그대로 유지됩니다.
+	// @details 이미 만들어진 세션의 소켓을 새 family로 교체합니다(소켓 생성·해제 비용이 한 번 더 듭니다).
+	//          서비스 계층은 이 함수 대신 ScopedCreationFamily로 처음부터 올바른 family의 소켓을 만듭니다.
+	//          I/O가 시작된 뒤(IOCP 등록·AcceptEx·ConnectAsync 이후)에는 호출하면 안 됩니다(소켓 핸들이 교체됨).
+	//***************************************************************************
+	bool			SetAddressFamily(int af);
+	int				GetAddressFamily() const { return _addressFamily; }
+
+	//***************************************************************************
+	// @brief 이 스코프 동안 같은 스레드에서 생성되는 CIocpSession의 소켓 family를 지정하는 RAII 객체.
+	// @details 세션 생성자는 사용자 코드(SessionFactory가 부르는 파생 클래스 생성자)라 family를 인자로
+	//          받을 수 없으므로, 서비스가 CreateSession() 호출을 이 객체로 감싸 처음부터 해당 family의
+	//          소켓을 만들게 합니다(AF_INET 소켓을 만들었다가 교체하는 낭비 방지).
+	//          스레드별(thread_local) 값이며 소멸 시 이전 값으로 복원됩니다.
+	//***************************************************************************
+	class ScopedCreationFamily
+	{
+	public:
+		explicit ScopedCreationFamily(int af) noexcept;
+		~ScopedCreationFamily();
+		ScopedCreationFamily(const ScopedCreationFamily&) = delete;
+		ScopedCreationFamily& operator=(const ScopedCreationFamily&) = delete;
+
+	private:
+		int _previous;
+	};
+
+	//***************************************************************************
 	// @brief 원격 클라이언트의 네트워크 주소(IP/Port)를 설정합니다.
 	// @param netAddr 설정할 CNetAddress 객체
 	//***************************************************************************
@@ -286,6 +316,7 @@ private:
 private:
 	uint64					_sessionId{ 0 };					// 고유 세션 ID
 	SOCKET					_socket = INVALID_SOCKET;			// 통신에 사용되는 WinSock 소켓 핸들
+	int						_addressFamily = AF_INET;			// _socket의 주소 체계 (SetAddressFamily() 참고)
 	CNetAddress				_netAddress;						// 원격 클라이언트의 IP 주소 및 포트 정보
 
 	std::atomic<bool>				_connected = false;							// 원자적(Atomic) 연산을 보장하는 세션 연결/해제 상태 플래그

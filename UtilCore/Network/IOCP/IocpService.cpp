@@ -65,7 +65,13 @@ bool CIocpServerService::Start()
 			if( service == nullptr )
 				return nullptr;
 
-			CSessionRef session = service->CreateSession();
+			// 서버 주소가 IPv6면 AcceptEx에 넘길 세션 소켓도 AF_INET6여야 한다 — 세션 생성 동안만 family를 지정해
+			// 처음부터 맞는 소켓을 만든다(listener 소켓과 family가 다르면 AcceptEx가 실패한다).
+			CSessionRef session;
+			{
+				CIocpSession::ScopedCreationFamily familyScope(service->GetNetAddress().IsIPv6() ? AF_INET6 : AF_INET);
+				session = service->CreateSession();
+			}
 			if( session == nullptr )
 				return nullptr;
 
@@ -294,7 +300,16 @@ CIocpSessionRef CIocpClientService::ConnectOneMoreSession()
 	if( _iocpCore == nullptr )
 		return nullptr;
 
-	CSessionRef session = CreateSession();
+	// 접속 대상은 SetRemoteAddress()로 바뀔 수 있으므로 한 번 읽어 이 연결 전체에 같은 주소를 쓴다.
+	const CNetAddress remote = GetRemoteAddress();
+
+	// 접속 대상이 IPv6면 세션 소켓도 AF_INET6여야 한다 — 세션 생성 동안만 family를 지정해
+	// 처음부터 맞는 소켓을 만든다(IOCP 등록 이후에는 소켓을 바꿀 수 없다).
+	CSessionRef session;
+	{
+		CIocpSession::ScopedCreationFamily familyScope(remote.IsIPv6() ? AF_INET6 : AF_INET);
+		session = CreateSession();
+	}
 	if( session == nullptr )
 		return nullptr;
 
@@ -305,8 +320,6 @@ CIocpSessionRef CIocpClientService::ConnectOneMoreSession()
 	if( _iocpCore->Register(iocpSession) == false )
 		return nullptr;
 
-	// 접속 대상은 SetRemoteAddress()로 바뀔 수 있으므로 한 번 읽어 이 연결 전체에 같은 주소를 쓴다.
-	const CNetAddress remote = GetRemoteAddress();
 	iocpSession->SetNetAddress(remote);
 
 	// 연결 완료를 기다리지 않고 즉시 추적 목록에 등록합니다. 연결이 실패하면

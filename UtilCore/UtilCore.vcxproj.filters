@@ -631,9 +631,6 @@
     <ClInclude Include="Image\Canvas.h">
       <Filter>Image</Filter>
     </ClInclude>
-    <ClInclude Include="Image\FileManager.h">
-      <Filter>Image</Filter>
-    </ClInclude>
     <ClInclude Include="Image\Quantize.h">
       <Filter>Image</Filter>
     </ClInclude>
@@ -1003,9 +1000,6 @@
       <Filter>Image</Filter>
     </ClCompile>
     <ClCompile Include="Image\Canvas.cpp">
-      <Filter>Image</Filter>
-    </ClCompile>
-    <ClCompile Include="Image\FileManager.cpp">
       <Filter>Image</Filter>
     </ClCompile>
     <ClCompile Include="Image\Quantize.cpp">

@@ -69,8 +69,10 @@ bool CIocpListener::StartAccept(CIocpCoreRef iocpCore, CNetAddress netAddr, Iocp
     if( _iocpCore == nullptr || _sessionFactory == nullptr )
         return false;
 
-    // 1. TCP Listen 소켓 생성
-    SOCKET listenSocket = CSocketUtils::CreateSocket();
+    // 1. TCP Listen 소켓 생성 — 주소가 IPv6면 AF_INET6(듀얼스택), 그 외에는 AF_INET.
+    //    (유효하지 않은 주소는 아래 Bind()에서 거부된다.) 수락될 세션 소켓의 family는
+    //    세션 팩토리가 같은 주소를 보고 맞춘다.
+    SOCKET listenSocket = CSocketUtils::CreateSocket(netAddr.IsIPv6() ? AF_INET6 : AF_INET);
     if( listenSocket == INVALID_SOCKET )
         return false;
 
@@ -400,11 +402,12 @@ void CIocpListener::ProcessAccept(AcceptEvent* acceptEvent)
     }
 
     // 2. 클라이언트 IP/Port 주소 추출
+    //    듀얼스택 리스너에서 IPv4 클라이언트는 v4-mapped 주소(::ffff:a.b.c.d)로 보고되므로
+    //    Unmap()해서 순수 IPv4 주소로 세션에 전달한다.
     CNetAddress netAddr;
-    SOCKADDR_IN sockAddr;
-    if( CSocketUtils::GetPeerAddress(sessionSocket, sockAddr) )
+    if( CSocketUtils::GetPeerAddress(sessionSocket, netAddr) )
     {
-        netAddr = CNetAddress(sockAddr);
+        netAddr = netAddr.Unmap();
     }
 
     // 3. 수락된 세션을 IOCP 코어에 등록

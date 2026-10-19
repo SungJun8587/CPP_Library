@@ -86,13 +86,12 @@ bool CRioSession::Init(uint64 sessionId, CRioCore* core, CRioBuffer* globalRecvB
 // @details 이 시점에 RIO 전용 소켓을 직접 생성한다(기존 동기 흐름에서는
 //          CRioClientService가 CSocketUtils::CreateRioSocket()으로 미리 만들어
 //          Init()에 넘겼지만, 비동기 흐름에서는 이 함수가 그 시점을 흡수한다).
-//          ConnectEx는 사전에 bind()된 소켓에서만 호출 가능하므로 와일드카드
-//          (0.0.0.0:0)로 바인딩한 뒤, 이 소켓을 dispatcher의 전용 IOCP에 연결하고
+//          소켓 family는 접속할 원격 주소의 family를 따른다(IPv6면 AF_INET6).
+//          ConnectEx는 사전에 bind()된 소켓에서만 호출 가능하므로 소켓 family에 맞는 와일드카드
+//          (0.0.0.0:0 또는 [::]:0)로 바인딩한 뒤, 이 소켓을 dispatcher의 전용 IOCP에 연결하고
 //          ConnectEx를 게시한다. 와일드카드 바인딩에 기본 생성된 CNetAddress()가
-//          아니라 CNetAddress(_T("0.0.0.0"), 0)을 명시적으로 쓰는 이유: 기본
-//          생성자는 SOCKADDR_IN을 전부 0으로 두어 sin_family도 0이 되고, 이러면
-//          AF_INET 소켓에 bind()가 실패한다(CNetAddress(ip, port) 생성자만
-//          sin_family=AF_INET을 명시적으로 세팅함 — NetAddress.h/.cpp 확인 후 발견/수정).
+//          아니라 CNetAddress::Wildcard()를 쓰는 이유: 기본 생성자는 family가 0이라
+//          bind()가 실패한다.
 //***************************************************************************
 bool CRioSession::ConnectAsync(CRioConnectDispatcher& dispatcher, uint64 sessionId, CRioCore* core,
     CRioBuffer* globalRecvBufferPool, const CNetAddress& remoteAddr)
@@ -105,7 +104,8 @@ bool CRioSession::ConnectAsync(CRioConnectDispatcher& dispatcher, uint64 session
         return false;
     }
 
-    SOCKET socket = CSocketUtils::CreateRioSocket();
+    const int family = remoteAddr.IsIPv6() ? AF_INET6 : AF_INET;
+    SOCKET socket = CSocketUtils::CreateRioSocket(family);
     if( socket == INVALID_SOCKET )
     {
         FailConnect(Rio::CloseReason::SocketError);
@@ -117,7 +117,7 @@ bool CRioSession::ConnectAsync(CRioConnectDispatcher& dispatcher, uint64 session
     _globalRecvBufferPool = globalRecvBufferPool;
     _sessionId = sessionId;
 
-    if( !CSocketUtils::Bind(socket, CNetAddress(_T("0.0.0.0"), 0)) )
+    if( !CSocketUtils::Bind(socket, CNetAddress::Wildcard(family, 0)) )
     {
         FailConnect(Rio::CloseReason::SocketError);
         return false;
@@ -156,11 +156,10 @@ void CRioSession::RegisterConnect(const CNetAddress& remoteAddr)
     // GetRioObjectPtr()와 동일한 aliasing 패턴으로 CRioSessionRef로 변환한다.
     _connectEvent.owner = CRioSessionRef(shared_from_this(), this);
 
-    SOCKADDR_IN sockAddr = remoteAddr.GetSockAddr();
     DWORD bytesSent = 0;
     SOCKET socket = GetSocket();
 
-    if( CSocketUtils::ConnectEx(socket, reinterpret_cast<SOCKADDR*>(&sockAddr), sizeof(sockAddr),
+    if( CSocketUtils::ConnectEx(socket, remoteAddr.GetSockAddr(), remoteAddr.GetSockAddrLen(),
         nullptr, 0, &bytesSent, static_cast<LPOVERLAPPED>(&_connectEvent)) == FALSE )
     {
         int32 errorCode = ::WSAGetLastError();

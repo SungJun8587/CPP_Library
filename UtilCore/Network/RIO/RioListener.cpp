@@ -86,8 +86,11 @@ bool CRioListener::StartAccept(CRioCoreRef rioCore, CNetAddress netAddr, RioSess
     _sessionFactory = std::move(sessionFactory);
     _onAcceptCallback = std::move(onAccept);
 
-    // 1. CSocketUtils를 이용한 RIO 전용 Listen 소켓 생성 (WSA_FLAG_REGISTERED_IO 적용)
-    SOCKET listenSocket = CSocketUtils::CreateRioSocket();
+    // 1. CSocketUtils를 이용한 RIO 전용 Listen 소켓 생성 (WSA_FLAG_REGISTERED_IO 적용).
+    //    주소가 IPv6면 AF_INET6(듀얼스택), 그 외에는 AF_INET (유효하지 않은 주소는 아래 Bind()에서 거부된다).
+    //    AcceptEx용 클라이언트 소켓도 같은 family여야 하므로 멤버에 보관한다.
+    _addressFamily = netAddr.IsIPv6() ? AF_INET6 : AF_INET;
+    SOCKET listenSocket = CSocketUtils::CreateRioSocket(_addressFamily);
     if( listenSocket == INVALID_SOCKET )
     {
         _rioCore.reset();
@@ -295,7 +298,7 @@ bool CRioListener::TryPostAccept(RioAcceptContext* context)
 
     // AcceptEx는 클라이언트 소켓이 미리 생성되어 있어야 하며, RIO 전용
     // 플래그가 필수다(이후 RIOCreateRequestQueue의 대상이 되므로).
-    SOCKET clientSocket = CSocketUtils::CreateRioSocket();
+    SOCKET clientSocket = CSocketUtils::CreateRioSocket(_addressFamily);
     if( clientSocket == INVALID_SOCKET )
         return false;
 
@@ -507,10 +510,14 @@ void CRioListener::ProcessAccept(RioAcceptContext* context, bool succeeded, DWOR
         &remoteSockAddrLen
     );
 
-    sockaddr_in clientAddr{};
-    if( remoteSockAddr != nullptr && remoteSockAddrLen >= sizeof(sockaddr_in) )
+    // 듀얼스택 리스너에서 IPv4 클라이언트는 v4-mapped 주소(::ffff:a.b.c.d)로 보고되므로
+    // Unmap()해서 순수 IPv4 주소로 전달한다. 파싱 실패 시 family가 없는 기본 주소로 둔다.
+    CNetAddress clientAddr;
+    if( remoteSockAddr != nullptr )
     {
-        ::memcpy(&clientAddr, remoteSockAddr, sizeof(sockaddr_in));
+        CNetAddress parsed = CNetAddress::FromSockAddr(remoteSockAddr, remoteSockAddrLen);
+        if( parsed.IsValid() )
+            clientAddr = parsed.Unmap();
     }
 
     // RIO Request Queue 생성 (이제 clientSocket이 WSA_FLAG_REGISTERED_IO 플래그를 가짐)
