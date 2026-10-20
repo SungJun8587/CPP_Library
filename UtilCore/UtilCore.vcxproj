@@ -76,6 +76,7 @@
     <ClInclude Include="Image\Checksum.h" />
     <ClInclude Include="Image\ColorSpace.h" />
     <ClInclude Include="Image\Deflate.h" />
+    <ClInclude Include="Image\GifAnimation.h" />
     <ClInclude Include="Image\GifCodec.h" />
     <ClInclude Include="Image\ICodec.h" />
     <ClInclude Include="Image\ImageCommon.h" />
@@ -255,6 +256,7 @@
     <ClCompile Include="Image\Checksum.cpp" />
     <ClCompile Include="Image\ColorSpace.cpp" />
     <ClCompile Include="Image\Deflate.cpp" />
+    <ClCompile Include="Image\GifAnimation.cpp" />
     <ClCompile Include="Image\GifCodec.cpp" />
     <ClCompile Include="Image\ImageFilters.cpp" />
     <ClCompile Include="Image\ImageIO.cpp" />

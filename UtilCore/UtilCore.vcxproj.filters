@@ -689,6 +689,9 @@
     <ClInclude Include="DB\DBAsyncRegistry.h">
       <Filter>DB</Filter>
     </ClInclude>
+    <ClInclude Include="Image\GifAnimation.h">
+      <Filter>Image</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">
@@ -1035,6 +1038,9 @@
     </ClCompile>
     <ClCompile Include="Network\HTTP\HttpConnPoolManager.cpp">
       <Filter>Network\HTTP</Filter>
+    </ClCompile>
+    <ClCompile Include="Image\GifAnimation.cpp">
+      <Filter>Image</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

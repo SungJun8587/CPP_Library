@@ -25,6 +25,13 @@ public:
 	{
 		ImageBuffer image;   // 이 시점에 화면에 보여야 할 합성된 RGBA8 이미지
 		int delayCs = 0;     // 다음 프레임까지의 지연시간(1/100초 단위, 0이면 미지정)
+
+		//***************************************************************************
+		// @brief 이 프레임을 보여줄 시간(ms)
+		// @details delayCs가 0~1(미지정 또는 10ms 이하)이면 브라우저 관례대로 100ms로 본다.
+		// @return 표시 시간(밀리초)
+		//***************************************************************************
+		int DelayMs() const { return (delayCs <= 1) ? 100 : delayCs * 10; }
 	};
 
 	//***************************************************************************
@@ -88,4 +95,4 @@ private:
 	static void RestoreRect(ImageBuffer& canvas, int left, int top, int w, int h, const ImageBuffer& saved);
 };
 
-#endif // UC_GIFCODEC_H
+#endif // ndef UC_GIFCODEC_H

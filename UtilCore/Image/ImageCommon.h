@@ -20,6 +20,7 @@
 #include <Image/ImageIO.h>
 #include <Image/ImageFilters.h>
 #include <Image/ImageProcessor.h>
+#include <Image/GifAnimation.h>
 #include <Image/Win32Draw.h>
 #include <Image/Sprite.h>
 #include <Image/Quantize.h>
