@@ -9,6 +9,7 @@
 
 #include <BaseRedefineDataType.h>
 #include <BaseMacro.h>
+#include <Util/FixedBufUtil.h>
 
 #include <openssl/evp.h>
 #include <openssl/rand.h>
@@ -103,31 +104,11 @@ namespace Crypto
 		//***************************************************************************
 		// @brief [신규] 16진수 문자열을 바이너리 데이터로 되돌립니다.
 		// @param outLen out에 쓸 바이트 수 — hex.size()가 outLen*2가 아니거나
-		//        16진수가 아닌 문자가 섞여 있으면 false(이 경우 out은 사용하지 말 것).
+		//        16진수가 아닌 문자가 섞여 있으면 false(이 경우 out은 변경되지 않는다).
 		//***************************************************************************
 		static bool FromHex(const std::string& hex, unsigned char* out, size_t outLen)
 		{
-			if( hex.size() != outLen * 2 )
-				return false;
-
-			auto hexVal = [](char c) -> int
-				{
-					if( c >= '0' && c <= '9' ) return c - '0';
-					if( c >= 'a' && c <= 'f' ) return c - 'a' + 10;
-					if( c >= 'A' && c <= 'F' ) return c - 'A' + 10;
-					return -1;
-				};
-
-			for( size_t i = 0; i < outLen; ++i )
-			{
-				const int hi = hexVal(hex[i * 2]);
-				const int lo = hexVal(hex[i * 2 + 1]);
-				if( hi < 0 || lo < 0 )
-					return false;
-
-				out[i] = static_cast<unsigned char>((hi << 4) | lo);
-			}
-			return true;
+			return FixedBuf::FromHex(hex, out, outLen);
 		}
 
 		//***************************************************************************
@@ -363,14 +344,7 @@ namespace Crypto
 		//***************************************************************************
 		static std::string toHex(const unsigned char* data, size_t length)
 		{
-			std::string result;
-			for( size_t i = 0; i < length; ++i )
-			{
-				char buf[3];
-				snprintf(buf, sizeof(buf), "%02x", data[i]);
-				result += buf;
-			}
-			return result;
+			return FixedBuf::ToHex(data, length);
 		}
 
 	private:

@@ -125,6 +125,7 @@ using namespace std;
 #include <Util/TextFieldParser.h>
 #include <Util/DelimitedRowFile.h> 
 #include <Util/ScopeExit.h>
+#include <Util/FixedBufUtil.h>
 
 #include <Job/JobCommon.h>
 

@@ -7,13 +7,19 @@
 #include <cstring>
 #include <algorithm>
 #include <vector>
+#include <cmath>
+#include <limits>
+#include <unordered_map>
 
 //***************************************************************************
-// @brief GIF87a/89a 이미지를 디코드하는 코덱(인코드는 미구현)
+// @brief GIF87a/89a 이미지를 디코드/인코드하는 코덱
 // @details 헤더/블록 파싱, GIF 전용 가변폭 LZW 압축 해제, 인터레이스 해제,
 //          Graphic Control Extension 기반 프레임 합성(디스포절 처리 포함)을
 //          전부 직접 구현한다. ICodec::Decode()는 첫 프레임만 반환하며,
 //          애니메이션 전체가 필요하면 DecodeAllFrames()를 사용한다.
+//          인코드는 팔레트 양자화(정확한 색 수가 256 이하면 무손실, 초과하면 median cut),
+//          GIF 전용 가변폭 LZW 압축, 애니메이션(NETSCAPE2.0 반복) 기록을 지원한다.
+//          GIF는 1비트 투명만 지원하므로 알파가 임계값 미만인 픽셀은 투명으로 기록한다.
 //***************************************************************************
 class GifCodec : public ICodec
 {
@@ -40,11 +46,24 @@ public:
 	//***************************************************************************
 	ImageFormat Format() const override { return ImageFormat::GIF; }
 
+	//***************************************************************************
+	// @brief 인코드 옵션
+	//***************************************************************************
+	struct EncodeOptions
+	{
+		int alphaThreshold = 128; // 알파가 이 값 미만인 픽셀은 투명으로 기록(GIF는 1비트 투명)
+		int maxColors = 256;      // 팔레트 최대 색상 수(2~256, 투명 색 포함)
+		int loopCount = 0;        // 반복 횟수(0이면 무한 반복). 프레임이 2개 이상일 때만 기록
+	};
+
 	bool CanDecode(const uint8_t* data, size_t size) const override;
 	ImageBuffer Decode(const uint8_t* data, size_t size) const override;
 	std::vector<uint8_t> Encode(const ImageBuffer& image) const override;
+	std::vector<uint8_t> Encode(const ImageBuffer& image, const EncodeOptions& options) const;
 
 	std::vector<Frame> DecodeAllFrames(const uint8_t* data, size_t size) const;
+	std::vector<uint8_t> EncodeFrames(const std::vector<Frame>& frames) const;
+	std::vector<uint8_t> EncodeFrames(const std::vector<Frame>& frames, const EncodeOptions& options) const;
 
 private:
 	//***************************************************************************

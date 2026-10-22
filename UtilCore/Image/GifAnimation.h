@@ -3,14 +3,11 @@
 #define UC_GIFANIMATION_H
 
 #include "GifCodec.h"
-#include "ImageProcessor.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <vector>
-#include <fstream>
-#include <utility>
 
 //***************************************************************************
 // @brief GIF 애니메이션 재생 상태(프레임 목록 + 현재 프레임)를 보관하는 공용 클래스
@@ -46,6 +43,12 @@ public:
 	// @details Empty()가 true일 때는 호출하면 안 된다.
 	//***************************************************************************
 	const ImageBuffer& Current() const { return m_frames[m_nCurrent].image; }
+
+	//***************************************************************************
+	// @brief i번째 프레임(합성 완료 이미지와 지연시간)
+	// @param i 프레임 위치(0 <= i < FrameCount())
+	//***************************************************************************
+	const GifCodec::Frame& FrameAt(size_t i) const { return m_frames[i]; }
 
 	int CurrentDelayMs() const;
 	void Advance();

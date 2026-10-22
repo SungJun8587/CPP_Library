@@ -2,6 +2,484 @@
 #include "pch.h"
 #include "GifCodec.h"
 
+namespace
+{
+	//***************************************************************************
+	// @brief 인코더 내부에서 쓰는 RGB 색상 하나
+	//***************************************************************************
+	struct EncRgb
+	{
+		uint8_t r; // Red 채널 값
+		uint8_t g; // Green 채널 값
+		uint8_t b; // Blue 채널 값
+	};
+
+	//***************************************************************************
+	// @brief 양자화용 색상 히스토그램 항목(고유 색상 + 사용 픽셀 수)
+	//***************************************************************************
+	struct EncColorCount
+	{
+		uint8_t c[3];   // R, G, B
+		uint32_t n;     // 이 색을 쓰는 픽셀 수
+	};
+
+	//***************************************************************************
+	// @brief 가변 길이 코드를 LSB 우선으로 바이트열에 쌓는 비트 패커
+	//***************************************************************************
+	class EncBitPacker
+	{
+	public:
+		//***************************************************************************
+		// @brief 코드 하나를 추가
+		// @param code 기록할 코드 값
+		// @param bits 코드 폭(비트, 최대 12)
+		//***************************************************************************
+		void Put(uint32_t code, int bits)
+		{
+			m_acc |= code << m_nBits;
+			m_nBits += bits;
+			while( m_nBits >= 8 )
+			{
+				m_bytes.push_back(static_cast<uint8_t>(m_acc & 0xFF));
+				m_acc >>= 8;
+				m_nBits -= 8;
+			}
+		}
+
+		//***************************************************************************
+		// @brief 남은 비트를 마지막 바이트로 내보냄
+		//***************************************************************************
+		void Flush()
+		{
+			if( m_nBits > 0 )
+			{
+				m_bytes.push_back(static_cast<uint8_t>(m_acc & 0xFF));
+				m_acc = 0;
+				m_nBits = 0;
+			}
+		}
+
+		// 지금까지 쌓은 바이트열
+		std::vector<uint8_t>& Bytes() { return m_bytes; }
+
+	private:
+		std::vector<uint8_t> m_bytes; // 쌓인 바이트열
+		uint32_t m_acc = 0;           // 아직 바이트로 내보내지 않은 비트 버퍼
+		int m_nBits = 0;              // m_acc에 들어 있는 비트 수
+	};
+
+	//***************************************************************************
+	// @brief 컬러 인덱스 시퀀스를 GIF 가변폭 LZW로 압축
+	// @details 사전이 가득 차면(4096) Clear 코드를 내보내고 초기화한다. 코드 폭 증가 시점은
+	//          디코더가 사전 항목을 한 박자 늦게 추가하는 규칙에 맞춰 있다.
+	// @param indices 컬러 인덱스(팔레트 인덱스) 시퀀스
+	// @param minCodeSize LZW 최소 코드 크기(2~8)
+	// @return 서브블록으로 나누기 전의 압축 바이트열
+	//***************************************************************************
+	std::vector<uint8_t> EncLzw(const std::vector<uint8_t>& indices, int minCodeSize)
+	{
+		const int clearCode = 1 << minCodeSize;
+		const int endCode = clearCode + 1;
+
+		constexpr int kHashBits = 13;                  // 사전 최대 4096개의 2배 이상
+		constexpr int kHashSize = 1 << kHashBits;
+		std::vector<int32_t> hashKey(kHashSize, -1);   // (접두 코드 << 8 | 다음 인덱스), 빈 칸은 -1
+		std::vector<int32_t> hashVal(kHashSize, 0);    // 해당 항목의 코드 번호
+
+		EncBitPacker packer;
+		int codeSize = minCodeSize + 1;
+		int nextCode = endCode + 1;
+
+		packer.Put(static_cast<uint32_t>(clearCode), codeSize);
+
+		if( indices.empty() )
+		{
+			packer.Put(static_cast<uint32_t>(endCode), codeSize);
+			packer.Flush();
+			return std::move(packer.Bytes());
+		}
+
+		int cur = indices[0];
+		for( size_t i = 1; i < indices.size(); ++i )
+		{
+			const int c = indices[i];
+			const int32_t key = (cur << 8) | c;
+
+			uint32_t h = (static_cast<uint32_t>(key) * 2654435761u) >> (32 - kHashBits);
+			while( hashKey[h] != -1 && hashKey[h] != key ) h = (h + 1) & (kHashSize - 1);
+
+			if( hashKey[h] == key )
+			{
+				cur = hashVal[h];
+				continue;
+			}
+
+			packer.Put(static_cast<uint32_t>(cur), codeSize);
+
+			const int added = nextCode++;
+			hashKey[h] = key;
+			hashVal[h] = added;
+			if( added == (1 << codeSize) && codeSize < 12 ) ++codeSize;
+
+			if( nextCode == 4096 )
+			{
+				packer.Put(static_cast<uint32_t>(clearCode), codeSize);
+				std::fill(hashKey.begin(), hashKey.end(), -1);
+				nextCode = endCode + 1;
+				codeSize = minCodeSize + 1;
+			}
+
+			cur = c;
+		}
+
+		packer.Put(static_cast<uint32_t>(cur), codeSize);
+
+		// 디코더는 마지막 코드를 읽은 뒤에도 사전 항목을 추가하며 코드 폭을 키울 수 있으므로
+		// End 코드는 그 폭에 맞춰 기록한다.
+		if( nextCode == (1 << codeSize) && codeSize < 12 ) ++codeSize;
+		packer.Put(static_cast<uint32_t>(endCode), codeSize);
+		packer.Flush();
+
+		return std::move(packer.Bytes());
+	}
+
+	//***************************************************************************
+	// @brief 색상 상자 하나의 통계(색 범위가 가장 넓은 축과 총 픽셀 수)를 계산
+	//***************************************************************************
+	struct EncBox
+	{
+		size_t b;       // 시작 위치(포함)
+		size_t e;       // 끝 위치(미포함)
+		uint64_t pop;   // 상자에 속한 총 픽셀 수
+		int axis;       // 범위가 가장 넓은 채널(0=R, 1=G, 2=B)
+		int range;      // 그 채널의 최대-최소
+	};
+
+	void EncBoxStat(const std::vector<EncColorCount>& cols, EncBox& box)
+	{
+		int lo[3] = { 255, 255, 255 };
+		int hi[3] = { 0, 0, 0 };
+		box.pop = 0;
+
+		for( size_t i = box.b; i < box.e; ++i )
+		{
+			box.pop += cols[i].n;
+			for( int k = 0; k < 3; ++k )
+			{
+				lo[k] = std::min<int>(lo[k], cols[i].c[k]);
+				hi[k] = std::max<int>(hi[k], cols[i].c[k]);
+			}
+		}
+
+		box.axis = 0;
+		box.range = hi[0] - lo[0];
+		for( int k = 1; k < 3; ++k )
+		{
+			if( hi[k] - lo[k] > box.range )
+			{
+				box.range = hi[k] - lo[k];
+				box.axis = k;
+			}
+		}
+	}
+
+	//***************************************************************************
+	// @brief median cut으로 고유 색상 목록을 target개 이하의 대표 색으로 줄임
+	// @param cols 고유 색상과 픽셀 수(내부에서 순서가 바뀜)
+	// @param target 만들 팔레트 크기
+	// @return 대표 색상 목록(상자별 픽셀 수 가중 평균)
+	//***************************************************************************
+	std::vector<EncRgb> EncMedianCut(std::vector<EncColorCount>& cols, size_t target)
+	{
+		std::vector<EncBox> boxes;
+		EncBox first = { 0, cols.size(), 0, 0, 0 };
+		EncBoxStat(cols, first);
+		boxes.push_back(first);
+
+		while( boxes.size() < target )
+		{
+			int best = -1;
+			double bestScore = -1.0;
+			for( size_t i = 0; i < boxes.size(); ++i )
+			{
+				const EncBox& bx = boxes[i];
+				if( bx.e - bx.b < 2 || bx.range == 0 ) continue;
+
+				const double score = bx.range * std::sqrt(static_cast<double>(bx.pop));
+				if( score > bestScore ) { bestScore = score; best = static_cast<int>(i); }
+			}
+			if( best < 0 ) break;
+
+			EncBox bx = boxes[best];
+			const int axis = bx.axis;
+			std::stable_sort(cols.begin() + bx.b, cols.begin() + bx.e,
+				[axis](const EncColorCount& a, const EncColorCount& b) { return a.c[axis] < b.c[axis]; });
+
+			// 픽셀 수 기준 중앙값에서 분할(양쪽 모두 1개 이상 보장)
+			size_t m = bx.b;
+			uint64_t acc = 0;
+			while( m < bx.e - 1 )
+			{
+				acc += cols[m].n;
+				++m;
+				if( acc * 2 >= bx.pop ) break;
+			}
+
+			EncBox lo = { bx.b, m, 0, 0, 0 };
+			EncBox hi = { m, bx.e, 0, 0, 0 };
+			EncBoxStat(cols, lo);
+			EncBoxStat(cols, hi);
+			boxes[best] = lo;
+			boxes.push_back(hi);
+		}
+
+		std::vector<EncRgb> palette;
+		palette.reserve(boxes.size());
+		for( const EncBox& bx : boxes )
+		{
+			uint64_t sum[3] = { 0, 0, 0 };
+			for( size_t i = bx.b; i < bx.e; ++i )
+				for( int k = 0; k < 3; ++k ) sum[k] += static_cast<uint64_t>(cols[i].c[k]) * cols[i].n;
+
+			EncRgb c;
+			c.r = static_cast<uint8_t>((sum[0] + bx.pop / 2) / bx.pop);
+			c.g = static_cast<uint8_t>((sum[1] + bx.pop / 2) / bx.pop);
+			c.b = static_cast<uint8_t>((sum[2] + bx.pop / 2) / bx.pop);
+			palette.push_back(c);
+		}
+		return palette;
+	}
+
+	//***************************************************************************
+	// @brief 팔레트에서 주어진 색과 가장 가까운(RGB 유클리드 거리) 항목의 인덱스
+	//***************************************************************************
+	int EncNearest(const std::vector<EncRgb>& palette, int r, int g, int b)
+	{
+		int best = 0;
+		int bestDist = std::numeric_limits<int>::max();
+		for( size_t i = 0; i < palette.size(); ++i )
+		{
+			const int dr = r - palette[i].r;
+			const int dg = g - palette[i].g;
+			const int db = b - palette[i].b;
+			const int d = dr * dr + dg * dg + db * db;
+			if( d < bestDist ) { bestDist = d; best = static_cast<int>(i); }
+		}
+		return best;
+	}
+
+	inline uint32_t EncKey(uint8_t r, uint8_t g, uint8_t b)
+	{
+		return (static_cast<uint32_t>(r) << 16) | (static_cast<uint32_t>(g) << 8) | b;
+	}
+
+	inline void EncPut16(std::vector<uint8_t>& out, int v)
+	{
+		out.push_back(static_cast<uint8_t>(v & 0xFF));
+		out.push_back(static_cast<uint8_t>((v >> 8) & 0xFF));
+	}
+
+	//***************************************************************************
+	// @brief 같은 크기의 RGBA 프레임들을 하나의 GIF89a 바이트열로 인코드
+	// @details 모든 프레임이 공통 팔레트(전역 컬러 테이블)를 쓴다. 투명 픽셀이 하나라도 있으면
+	//          팔레트 마지막에 투명 색 슬롯을 두고, 여러 프레임이면 프레임마다 화면 전체를
+	//          지우는 디스포절(2)을 지정해 각 프레임이 입력 그대로 보이게 한다.
+	// @param images 프레임 이미지 목록(모두 같은 크기)
+	// @param delaysCs 프레임별 지연시간(1/100초). images와 같은 개수
+	// @param opt 인코드 옵션
+	// @return GIF 파일 바이트열
+	//***************************************************************************
+	std::vector<uint8_t> EncImages(const std::vector<const ImageBuffer*>& images, const std::vector<int>& delaysCs, const GifCodec::EncodeOptions& opt)
+	{
+		if( images.empty() ) throw ImageException("GIF: no frames to encode");
+
+		const uint32_t width = images[0]->Width();
+		const uint32_t height = images[0]->Height();
+		if( width == 0 || height == 0 || width > 65535 || height > 65535 )
+			throw ImageException("GIF: invalid image size for encoding");
+
+		for( const ImageBuffer* img : images )
+		{
+			if( img->Width() != width || img->Height() != height )
+				throw ImageException("GIF: all frames must have the same size");
+		}
+
+		const int alphaThr = std::min(std::max(opt.alphaThreshold, 0), 255);
+		const int maxColors = std::min(std::max(opt.maxColors, 2), 256);
+
+		// 1) 고유 색상 히스토그램과 투명 픽셀 존재 여부
+		std::unordered_map<uint32_t, uint32_t> hist;
+		bool hasTrans = false;
+		for( const ImageBuffer* img : images )
+		{
+			for( uint32_t y = 0; y < height; ++y )
+			{
+				for( uint32_t x = 0; x < width; ++x )
+				{
+					const uint8_t* p = img->At(x, y);
+					if( p[3] < alphaThr ) hasTrans = true;
+					else ++hist[EncKey(p[0], p[1], p[2])];
+				}
+			}
+		}
+
+		// 2) 팔레트: 고유 색이 들어가면 그대로(무손실), 넘치면 median cut
+		const size_t cap = static_cast<size_t>(maxColors) - (hasTrans ? 1 : 0);
+
+		std::vector<EncColorCount> cols;
+		cols.reserve(hist.size());
+		for( const auto& kv : hist )
+		{
+			EncColorCount cc;
+			cc.c[0] = static_cast<uint8_t>(kv.first >> 16);
+			cc.c[1] = static_cast<uint8_t>(kv.first >> 8);
+			cc.c[2] = static_cast<uint8_t>(kv.first);
+			cc.n = kv.second;
+			cols.push_back(cc);
+		}
+		std::sort(cols.begin(), cols.end(), [](const EncColorCount& a, const EncColorCount& b) {
+			return EncKey(a.c[0], a.c[1], a.c[2]) < EncKey(b.c[0], b.c[1], b.c[2]);
+			});	// unordered_map 순서에 의존하지 않도록 정렬
+
+		std::vector<EncRgb> palette;
+		std::unordered_map<uint32_t, uint8_t> lut;	// 색상 -> 팔레트 인덱스
+		lut.reserve(cols.size());
+
+		if( cols.size() <= cap )
+		{
+			for( size_t i = 0; i < cols.size(); ++i )
+			{
+				EncRgb c = { cols[i].c[0], cols[i].c[1], cols[i].c[2] };
+				palette.push_back(c);
+				lut[EncKey(c.r, c.g, c.b)] = static_cast<uint8_t>(i);
+			}
+		}
+		else
+		{
+			std::vector<EncColorCount> work = cols;
+			palette = EncMedianCut(work, cap);
+			for( const EncColorCount& cc : cols )
+				lut[EncKey(cc.c[0], cc.c[1], cc.c[2])] = static_cast<uint8_t>(EncNearest(palette, cc.c[0], cc.c[1], cc.c[2]));
+		}
+
+		// 3) 컬러 테이블 크기(2의 거듭제곱)와 LZW 최소 코드 크기
+		const size_t nColors = palette.size();
+		const int transIndex = hasTrans ? static_cast<int>(nColors) : -1;
+		const size_t total = std::max<size_t>(nColors + (hasTrans ? 1 : 0), 2);
+
+		int sizeField = 0;
+		size_t tableSize = 2;
+		while( tableSize < total ) { tableSize <<= 1; ++sizeField; }
+		const int minCodeSize = std::max(2, sizeField + 1);
+
+		// 4) 헤더 + 논리 화면 + 전역 컬러 테이블
+		std::vector<uint8_t> out;
+		const char kSig[6] = { 'G', 'I', 'F', '8', '9', 'a' };
+		out.insert(out.end(), kSig, kSig + 6);
+		EncPut16(out, static_cast<int>(width));
+		EncPut16(out, static_cast<int>(height));
+		out.push_back(static_cast<uint8_t>(0x80 | (7 << 4) | sizeField));	// 전역 테이블 있음, 색 해상도 8비트
+		out.push_back(0);	// 배경색 인덱스
+		out.push_back(0);	// 픽셀 종횡비
+
+		for( size_t i = 0; i < tableSize; ++i )
+		{
+			if( i < nColors )
+			{
+				out.push_back(palette[i].r);
+				out.push_back(palette[i].g);
+				out.push_back(palette[i].b);
+			}
+			else
+			{
+				out.push_back(0);
+				out.push_back(0);
+				out.push_back(0);
+			}
+		}
+
+		// 5) 반복 횟수(NETSCAPE2.0) - 애니메이션일 때만
+		const bool bAnimated = images.size() > 1;
+		if( bAnimated )
+		{
+			const char kApp[11] = { 'N', 'E', 'T', 'S', 'C', 'A', 'P', 'E', '2', '.', '0' };
+			out.push_back(0x21);
+			out.push_back(0xFF);
+			out.push_back(0x0B);
+			out.insert(out.end(), kApp, kApp + 11);
+			out.push_back(0x03);
+			out.push_back(0x01);
+			EncPut16(out, std::min(std::max(opt.loopCount, 0), 65535));
+			out.push_back(0x00);
+		}
+
+		const int disposal = bAnimated ? (hasTrans ? 2 : 1) : 0;
+
+		// 6) 프레임: GCE + 이미지 디스크립터 + LZW 데이터
+		std::vector<uint8_t> indices(static_cast<size_t>(width) * height);
+		for( size_t f = 0; f < images.size(); ++f )
+		{
+			const ImageBuffer& img = *images[f];
+
+			uint32_t lastKey = 0;
+			uint8_t lastIdx = 0;
+			bool haveLast = false;
+
+			size_t pos = 0;
+			for( uint32_t y = 0; y < height; ++y )
+			{
+				for( uint32_t x = 0; x < width; ++x )
+				{
+					const uint8_t* p = img.At(x, y);
+					if( p[3] < alphaThr )
+					{
+						indices[pos++] = static_cast<uint8_t>(transIndex);
+						continue;
+					}
+
+					const uint32_t key = EncKey(p[0], p[1], p[2]);
+					if( !haveLast || key != lastKey )
+					{
+						auto it = lut.find(key);
+						lastIdx = (it != lut.end()) ? it->second : static_cast<uint8_t>(EncNearest(palette, p[0], p[1], p[2]));
+						lastKey = key;
+						haveLast = true;
+					}
+					indices[pos++] = lastIdx;
+				}
+			}
+
+			out.push_back(0x21);	// Graphic Control Extension
+			out.push_back(0xF9);
+			out.push_back(0x04);
+			out.push_back(static_cast<uint8_t>((disposal << 2) | (hasTrans ? 1 : 0)));
+			EncPut16(out, std::min(std::max(delaysCs[f], 0), 65535));
+			out.push_back(static_cast<uint8_t>(hasTrans ? transIndex : 0));
+			out.push_back(0x00);
+
+			out.push_back(0x2C);	// Image Descriptor(화면 전체, 지역 테이블/인터레이스 없음)
+			EncPut16(out, 0);
+			EncPut16(out, 0);
+			EncPut16(out, static_cast<int>(width));
+			EncPut16(out, static_cast<int>(height));
+			out.push_back(0x00);
+
+			out.push_back(static_cast<uint8_t>(minCodeSize));
+			const std::vector<uint8_t> packed = EncLzw(indices, minCodeSize);
+			for( size_t off = 0; off < packed.size(); off += 255 )
+			{
+				const size_t n = std::min<size_t>(255, packed.size() - off);
+				out.push_back(static_cast<uint8_t>(n));
+				out.insert(out.end(), packed.begin() + off, packed.begin() + off + n);
+			}
+			out.push_back(0x00);
+		}
+
+		out.push_back(0x3B);	// Trailer
+		return out;
+	}
+}
+
 //***************************************************************************
 // @brief 데이터가 GIF 시그니처("GIF87a" 또는 "GIF89a")로 시작하는지 확인
 // @param data 확인할 데이터 시작 주소
@@ -353,12 +831,61 @@ ImageBuffer GifCodec::Decode(const uint8_t* data, size_t size) const
 }
 
 //***************************************************************************
-// @brief GIF 인코딩은 지원하지 않으므로 항상 예외를 던짐
-// @return (예외를 던지므로 반환하지 않음)
+// @brief 이미지 한 장을 기본 옵션으로 GIF로 인코드
+// @param image 인코드할 RGBA8 이미지
+// @return GIF 파일 바이트열
 //***************************************************************************
-std::vector<uint8_t> GifCodec::Encode(const ImageBuffer&) const
+std::vector<uint8_t> GifCodec::Encode(const ImageBuffer& image) const
 {
-	throw ImageException("GIF: encoding not implemented (decode-only). PNG/BMP로 저장하세요.");
+	return Encode(image, EncodeOptions());
+}
+
+//***************************************************************************
+// @brief 이미지 한 장을 GIF로 인코드
+// @details 알파가 options.alphaThreshold 미만인 픽셀은 투명으로 기록한다(GIF는 1비트 투명).
+//          색이 256개(투명 포함)를 넘으면 median cut으로 줄인다.
+// @param image 인코드할 RGBA8 이미지
+// @param options 인코드 옵션
+// @return GIF 파일 바이트열
+//***************************************************************************
+std::vector<uint8_t> GifCodec::Encode(const ImageBuffer& image, const EncodeOptions& options) const
+{
+	std::vector<const ImageBuffer*> images(1, &image);
+	std::vector<int> delays(1, 0);
+	return EncImages(images, delays, options);
+}
+
+//***************************************************************************
+// @brief 프레임 목록을 기본 옵션으로 애니메이션 GIF로 인코드
+// @param frames 인코드할 프레임 목록(모두 같은 크기)
+// @return GIF 파일 바이트열
+//***************************************************************************
+std::vector<uint8_t> GifCodec::EncodeFrames(const std::vector<Frame>& frames) const
+{
+	return EncodeFrames(frames, EncodeOptions());
+}
+
+//***************************************************************************
+// @brief 프레임 목록을 애니메이션 GIF로 인코드
+// @details 각 Frame의 image는 그 시점에 화면에 보여야 할 합성 완료 이미지(화면 전체 크기)이고,
+//          delayCs는 다음 프레임까지의 지연시간(1/100초)이다.
+// @param frames 인코드할 프레임 목록(모두 같은 크기)
+// @param options 인코드 옵션
+// @return GIF 파일 바이트열
+//***************************************************************************
+std::vector<uint8_t> GifCodec::EncodeFrames(const std::vector<Frame>& frames, const EncodeOptions& options) const
+{
+	std::vector<const ImageBuffer*> images;
+	std::vector<int> delays;
+	images.reserve(frames.size());
+	delays.reserve(frames.size());
+
+	for( const Frame& fr : frames )
+	{
+		images.push_back(&fr.image);
+		delays.push_back(fr.delayCs);
+	}
+	return EncImages(images, delays, options);
 }
 
 //***************************************************************************

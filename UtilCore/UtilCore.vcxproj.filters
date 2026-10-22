@@ -692,6 +692,9 @@
     <ClInclude Include="Image\GifAnimation.h">
       <Filter>Image</Filter>
     </ClInclude>
+    <ClInclude Include="Util\FixedBufUtil.h">
+      <Filter>Util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">

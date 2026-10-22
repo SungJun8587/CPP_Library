@@ -212,6 +212,7 @@
     <ClInclude Include="Util\DirectoryUtil.h" />
     <ClInclude Include="Util\EncodingConvert.h" />
     <ClInclude Include="Util\FileStream.h" />
+    <ClInclude Include="Util\FixedBufUtil.h" />
     <ClInclude Include="Util\KeyedTable.h" />
     <ClInclude Include="Util\PercentCodec.h" />
     <ClInclude Include="Util\ScopeExit.h" />
