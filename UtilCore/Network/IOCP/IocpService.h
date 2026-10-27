@@ -88,6 +88,17 @@ public:
 	bool			IsEnforceMaxSessionCount() const noexcept { return _enforceMaxSessionCount.load(std::memory_order_relaxed); }
 
 	//***************************************************************************
+	// @brief 유휴 연결 타임아웃을 설정합니다 (기본값: 0 = 꺼짐).
+	// @param timeoutMs 마지막 I/O 활동(연결 완료, 수신 완료, 송신 완료) 이후 이 시간이 지난 세션을
+	//        Iocp::CloseReason::Idle로 종료합니다. 0이면 끕니다.
+	// @details 점검은 Iocp::kIdleSweepInterval마다 이뤄지므로 실제로는 타임아웃 + 점검 주기 이내에 끊깁니다.
+	//          Start() 전후 어느 때든 바꿀 수 있습니다. 수신이 거의 없는 정상 클라이언트(채팅 등)가 있는 서버는
+	//          클라이언트가 주기적으로 보내는 하트비트보다 충분히 길게 지정하십시오.
+	//***************************************************************************
+	void			SetIdleTimeout(uint32 timeoutMs) noexcept { _idleTimeoutMs.store(timeoutMs, std::memory_order_relaxed); }
+	uint32			GetIdleTimeout() const noexcept { return _idleTimeoutMs.load(std::memory_order_relaxed); }
+
+	//***************************************************************************
 	// @brief 현재 수락되어 해제 통지 전인 동시 접속 수를 반환합니다.
 	//***************************************************************************
 	int32			GetActiveSessionCount() const noexcept { return _activeSessionCount.load(std::memory_order_acquire); }
@@ -140,6 +151,12 @@ private:
 	void ScheduleSessionReap();
 
 	//***************************************************************************
+	// @brief 다음 유휴 세션 점검 tick을 예약합니다(self-rescheduling, reap 큐 공유).
+	// @details SetIdleTimeout()이 0이면 tick은 아무 일도 하지 않고 다음 tick만 예약합니다.
+	//***************************************************************************
+	void ScheduleIdleSweep();
+
+	//***************************************************************************
 	// @brief 세션 해제 통지(OnDisconnected) 시 호출되는 서버 전용 핸들러입니다.
 	// @param session 해제된 세션
 	// @details 세션 매니저와 서비스의 추적 목록(_sessions)에서 해당 세션을 즉시 제거하고,
@@ -163,6 +180,7 @@ private:
 	std::atomic<bool>		_enforceMaxSessionCount{ false };               // maxSessionCount를 실제 상한으로 적용할지 여부
 	std::atomic<int32>		_activeSessionCount{ 0 };                       // 수락되어 해제 통지 전인 동시 접속 수
 	std::atomic<uint64>		_rejectedSessionCount{ 0 };                     // 상한 초과로 거부한 연결 누계 (로그 샘플링용)
+	std::atomic<uint32>		_idleTimeoutMs{ 0 };                            // 유휴 연결 타임아웃 (0 = 꺼짐)
 };
 
 //***************************************************************************

@@ -12,8 +12,97 @@
 #include <Memory/Containers.h>
 #include <Thread/PlatformLock.h>
 
+#include <cassert>
+#include <chrono>
+#include <cstdlib>
+#include <thread>
 #include <utility>
 #include <atomic>
+
+#if defined(_MSC_VER)
+#include <intrin.h>
+#endif
+
+//***************************************************************************
+// @brief CDoubleBufferQueue 내부 대기 보조 함수 모음. (SpinLock 라이브러리에 의존하지 않는다.)
+//***************************************************************************
+namespace DoubleBufferDetail
+{
+    //***************************************************************************
+    // @brief 스핀 대기 중 CPU에 양보 힌트(pause/yield 명령)를 줍니다.
+    //***************************************************************************
+    inline void CpuRelax() noexcept
+    {
+#if defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_X64))
+        _mm_pause();
+#elif defined(_MSC_VER) && (defined(_M_ARM) || defined(_M_ARM64))
+        __yield();
+#elif defined(__i386__) || defined(__x86_64__)
+        __builtin_ia32_pause();
+#elif defined(__aarch64__) || defined(__arm__)
+        __asm__ __volatile__("yield");
+#endif
+    }
+
+    //***************************************************************************
+    // @brief 조건이 참인 동안 대기합니다. (지수 백오프 스핀 -> 스레드 양보 -> 짧은 슬립)
+    // @details 1) CPU pause를 1, 2, 4 ... 회(최대 Preset::MaxPauseBackoff 회)로 늘려 가며 재검사합니다.
+    //          2) 백오프가 상한에 도달하면 스레드를 양보하며 재검사하고, 양보가 Preset::MaxYieldCount 회를
+    //             넘으면 50us씩 슬립하며 재검사합니다. (기록 중인 Producer가 선점되어 오래 걸리는 경우에
+    //             CPU를 태우거나 같은 코어의 Producer를 굶기지 않기 위함)
+    // @tparam Preset MaxPauseBackoff / MaxYieldCount 정적 상수를 가진 대기 정책
+    // @tparam Pred   bool() 형태의 호출 가능 객체. true인 동안 대기
+    // @param stillWaiting 대기를 계속해야 하면 true를 반환하는 조건
+    //***************************************************************************
+    template <typename Preset, typename Pred>
+    inline void SpinWait(Pred&& stillWaiting) noexcept(noexcept(stillWaiting()))
+    {
+        int backoff = 1;
+        int yields = 0;
+
+        while( stillWaiting() )
+        {
+            if( backoff < static_cast<int>(Preset::MaxPauseBackoff) )
+            {
+                for( int i = 0; i < backoff; ++i )
+                    CpuRelax();
+                backoff <<= 1;
+            }
+            else if( yields < static_cast<int>(Preset::MaxYieldCount) )
+            {
+                ++yields;
+                std::this_thread::yield();
+            }
+            else
+            {
+                std::this_thread::sleep_for(std::chrono::microseconds(50));
+            }
+        }
+    }
+
+    //***************************************************************************
+    // @brief 단일 컨슈머 계약 위반을 릴리즈 빌드에서도 즉시 중단시킵니다.
+    //***************************************************************************
+    [[noreturn]] inline void FatalMultiConsumer() noexcept
+    {
+        assert(false && "CDoubleBufferQueue::SwapInto - Concurrent multi-consumer access detected!");
+        std::abort();
+    }
+}
+
+//***************************************************************************
+// @brief CDoubleBufferQueue 기본 대기 정책.
+// @details Preset 타입은 MaxPauseBackoff(스핀 백오프 상한)와 MaxYieldCount(양보 횟수 상한) 정적 상수만
+//          가지면 됩니다. 따라서 SpinLockPreset::LightWeight 등 기존 프리셋도 그대로 넘길 수 있습니다.
+//***************************************************************************
+namespace DoubleBufferWaitPreset
+{
+    struct Default
+    {
+        static constexpr int MaxPauseBackoff = 64;      // 한 번의 재검사 전에 반복하는 CPU pause 횟수의 상한
+        static constexpr int MaxYieldCount = 16;        // 스레드 양보 횟수 상한 (이후에는 짧은 슬립)
+    };
+}
 
 //***************************************************************************
 // @class CDoubleBufferQueue
@@ -28,6 +117,13 @@
 //  - 초고성능 로깅 시스템 (다중 스레드의 로그를 모아 일괄 플러시)
 //  - 초당 수만 건 발생하는 통계, 지표 수집, DB 비동기 결과 수거
 //  - 프로듀서 간 락 경합 최소화 (버퍼별 락 분할) 및 batch 재할당 최소화
+// 
+// 락과 대기 정책:
+//  - 버퍼별 락은 플랫폼 통합 락(PLock)이며 PLockGuard로 보호합니다.
+//    Windows에서는 SRWLock(독점), 그 외 플랫폼에서는 SpinLock으로 동작합니다.
+//  - Preset은 SwapInto()가 이전 버퍼의 Producer 퇴장을 기다릴 때의 대기 정책
+//    (스핀 백오프/양보 횟수)만 결정합니다. 버퍼 락의 종류와는 무관하며, SpinLock 라이브러리에
+//    의존하지 않습니다. (MaxPauseBackoff / MaxYieldCount 상수만 있으면 어떤 프리셋이든 사용 가능)
 // 
 // 패턴 최적화:
 //  - **MPSC(Multiple Producer, Single Consumer)** 환경에 최적화
@@ -51,7 +147,7 @@
 //    지점과 InFlightGuard 해제 시의 fetch_sub는 이 SC 관계에 참여하지 않으므로
 //    각각 acquire / release로 충분합니다.)
 //***************************************************************************
-template <typename T, typename Preset = SpinLockPreset::LightWeight>
+template <typename T, typename Preset = DoubleBufferWaitPreset::Default>
 class CDoubleBufferQueue
 {
 public:
@@ -122,7 +218,7 @@ public:
         bool expectedSwap = false;
         if( !m_isSwapping.compare_exchange_strong(expectedSwap, true, std::memory_order_acq_rel) )
         {
-            SPINLOCK_FATAL("CDoubleBufferQueue::SwapInto - Concurrent multi-consumer access detected!");
+            DoubleBufferDetail::FatalMultiConsumer();
         }
 
         // 스왑 작업 전반의 예외 안전성 보장 (스코프 이탈 시 소멸자에서 자동으로 m_isSwapping 해제)
@@ -134,7 +230,7 @@ public:
 
         // 이전 버퍼에 아직 기록 중인 Producer가 모두 빠질 때까지 대기.
         // 이 관찰 역시 위 admission SC 프로토콜의 일부이므로 seq_cst.
-        SpinLockDetail::SpinWait<Preset::MaxPauseBackoff, Preset::MaxYieldCount>(
+        DoubleBufferDetail::SpinWait<Preset>(
             [this, oldIdx]() noexcept
             {
                 return m_inFlight[oldIdx].load(std::memory_order_seq_cst) != 0;
@@ -225,7 +321,8 @@ private:
     {
     public:
         explicit SwapGuard(std::atomic<bool>& isSwapping) noexcept
-            : m_isSwapping(isSwapping) {
+            : m_isSwapping(isSwapping)
+        {
         }
 
         ~SwapGuard() noexcept
@@ -248,7 +345,7 @@ private:
     // @details
     // - 현재 writeIdx를 읽어 해당 버퍼에 삽입
     // - InFlightGuard로 Producer 카운터 관리
-    // - SpinLockGuard로 버퍼 락 보호
+    // - PLockGuard로 버퍼 락 보호
     //***************************************************************************
     template <typename U>
     void PushInternal(U&& item)
@@ -286,7 +383,7 @@ private:
                 continue;
 
             {
-                SpinLockGuard<Preset> lockGuard(m_bufferLock[idx], __FUNCTION__);
+                PLockGuard lockGuard(m_bufferLock[idx], __FUNCTION__);
 
                 m_buffer[idx].emplace_back(std::forward<Args>(args)...);
             }

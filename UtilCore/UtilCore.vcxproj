@@ -91,11 +91,13 @@
     <ClInclude Include="Image\Sprite.h" />
     <ClInclude Include="Image\Win32Draw.h" />
     <ClInclude Include="Job\GlobalQueue.h" />
+    <ClInclude Include="Job\MoveOnlyFunction.h" />
     <ClInclude Include="Job\Job.h" />
     <ClInclude Include="Job\JobCommon.h" />
     <ClInclude Include="Job\JobQueue.h" />
     <ClInclude Include="Job\JobRedefineDataType.h" />
     <ClInclude Include="Job\JobTimer.h" />
+    <ClInclude Include="Job\TimerHeap.h" />
     <ClInclude Include="JSON\RapidJSONUtil.h" />
     <ClInclude Include="Memory\Allocator.h" />
     <ClInclude Include="Memory\Containers.h" />

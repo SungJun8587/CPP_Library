@@ -53,10 +53,25 @@ public:
 public:
 	// CSession 공통 인터페이스 오버라이드
 	virtual void	Disconnect(const TCHAR* cause) override;
-	virtual bool	IsConnected() const override { return _connected.load(); }
+	virtual void	Abort() override;
+	virtual bool	IsConnected() const override { return _state.load(std::memory_order_acquire) == State::Connected; }
 	virtual SOCKET	GetSocket() const override { return _socket; }
 
-	void			Disconnect(Iocp::CloseReason reason);    // 오버로드된 안전한 종료 함수
+	//***************************************************************************
+	// @brief 지정된 사유로 정상 종료를 요청합니다 (멱등, Thread-safe).
+	// @details 첫 호출만 효력이 있다. 연결 완료 전이면 소켓을 닫고 즉시 통지하며, 연결 상태이면
+	//          DisconnectEx를 게시해 outstanding I/O가 모두 끝난 뒤 OnDisconnected()를 통지한다.
+	//          이미 종료가 시작됐거나 끝난 세션에 대한 호출은 무시된다.
+	//***************************************************************************
+	void			Disconnect(Iocp::CloseReason reason);
+
+	//***************************************************************************
+	// @brief 정상 종료의 완료를 기다리지 않고 소켓을 닫아 즉시 통지합니다 (Thread-safe).
+	// @details 서비스의 최종 정리 단계(워커 스레드가 이미 멈췄거나 응답 없는 피어)에서만 쓴다.
+	//          outstanding I/O를 기다리지 않으므로 다른 워커가 콜백을 실행 중이면 겹칠 수 있다.
+	//          이미 종료 사유가 기록된 세션이면 기존 사유를 유지한다.
+	//***************************************************************************
+	void			Abort(Iocp::CloseReason reason);
 
 	//***************************************************************************
 	// @brief 소켓 핸들이 유효한 상태인지 확인합니다.
@@ -149,6 +164,14 @@ public:
 	// @return uint64 고유 세션 ID
 	//***************************************************************************
 	uint64 GetSessionId() const noexcept { return _sessionId; }
+
+	//***************************************************************************
+	// @brief 마지막 I/O 활동 시각을 반환합니다 (::GetTickCount64() 기준, ms).
+	// @details 연결 완료(ProcessConnect), 수신 완료, 송신 완료 시 갱신됩니다. 송신 큐에 넣기만 한 것은
+	//          활동이 아닙니다 — 상대가 읽지 않아 WSASend가 완료되지 않는 세션도 유휴로 판정되게 하기 위함입니다.
+	//          CIocpSessionManager::DisconnectIdleSessions()가 사용합니다.
+	//***************************************************************************
+	uint64 GetLastActivityTick() const noexcept { return _lastActivityTick.load(std::memory_order_relaxed); }
 
 public:
 	void			ProcessConnect();	// CIocpListener의 OnAcceptCallback 등에서 연결 수락 완료 후 호출
@@ -249,6 +272,7 @@ private:
 	bool			EnqueueSend(CSendBufferRef* buffers, size_t count, uint64 totalBytes);
 
 	void			ApplySocketOptions() noexcept;	// _socketOptions를 소켓에 적용 (ProcessConnect()에서 OnConnected() 직전에 호출)
+	void			TouchActivity() noexcept { _lastActivityTick.store(::GetTickCount64(), std::memory_order_relaxed); }	// 마지막 I/O 활동 시각 갱신
 
 	// 이 completion 하나에 대응하는 outstanding I/O 카운트를 내리고 종료 통지 조건을 재확인합니다.
 	void			ReleaseIo() noexcept;
@@ -278,8 +302,8 @@ private:
 	//***************************************************************************
 	// @brief connect 실패 시 정리 전용 경로.
 	// @param reason 실패 사유
-	// @details _connected 상태와 무관하게 소켓을 닫고 OnDisconnected() 통지를 완료합니다.
-	//          Disconnect(Iocp::CloseReason)의 "미연결 상태 강제 종료" 경로와
+	// @details 현재 상태와 무관하게 세션을 Closed로 만들고, 소켓을 닫고 OnDisconnected() 통지를 완료합니다.
+	//          Disconnect(Iocp::CloseReason)의 "연결 완료 전 종료" 경로, Abort()와
 	//          _disconnectNotified CAS 가드를 공유하므로 어느 쪽이 먼저 실행되든 통지는
 	//          1회만 나갑니다(취소된 ConnectEx의 완료가 뒤늦게 도착해도 중복 통지 없음).
 	//***************************************************************************
@@ -294,15 +318,15 @@ private:
 	//          세 상태 변수는 seq_cst로만 접근합니다(서로 다른 두 원자 변수에 걸친
 	//          "나중에 만족시킨 쪽이 통지한다"는 인과관계를 단순하게 보장하기 위함).
 	//
-	//          [Process* 와의 순서] ProcessRecv/ProcessSend는 자신의 completion에 대응하는
-	//          _pendingIoCount 감소와 이 함수 호출을 함수가 끝날 때(OnRecv()/OnSend()와 다음 I/O
-	//          게시까지 마친 뒤) 수행합니다. 따라서 OnRecv()/OnSend()가 실행되는 동안에는 다른
-	//          스레드가 OnDisconnected()를 통지하지 못하고, 통지 이후에는 이 세션의 어떤
-	//          Process*도 콜백을 호출하지 않습니다(종료가 시작된 세션, 즉 IsConnected() == false이면
-	//          콜백 자체를 건너뜁니다). 이 보장의 예외는 Disconnect()의 강제 정리 경로입니다 —
-	//          미연결 세션, CNetService::Close(), Register* 실패 롤백, 사용자 코드의 중복
-	//          Disconnect() 호출은 이 카운트를 기다리지 않고 OnDisconnected()를 통지합니다
-	//          (연결 상태를 명시적 상태 머신으로 분리하는 개선은 보류).
+	//          [Process* 와의 순서] ProcessConnect/ProcessRecv/ProcessSend는 자신의 처리에 대응하는
+	//          _pendingIoCount 감소와 이 함수 호출을 함수가 끝날 때(OnConnected()/OnRecv()/OnSend()와
+	//          다음 I/O 게시까지 마친 뒤) 수행합니다. 따라서 이 콜백들이 실행되는 동안에는 다른
+	//          스레드가 OnDisconnected()를 통지하지 못하고(OnConnected()는 항상 OnDisconnected()보다
+	//          먼저 끝납니다), 통지 이후에는 이 세션의 어떤 Process*도 콜백을 호출하지 않습니다
+	//          (종료가 시작된 세션, 즉 IsConnected() == false이면 콜백 자체를 건너뜁니다).
+	//          Disconnect()는 멱등이라 중복 호출이나 Register* 실패 롤백이 통지 시점을 앞당기지
+	//          않습니다. 이 보장의 유일한 예외는 Abort()와 연결 완료 전 세션의 정리(FailConnect())
+	//          입니다 — outstanding I/O를 기다리지 않고 소켓을 닫아 즉시 통지합니다.
 	//
 	//          [알려진 잔여 레이스 — 의도적으로 미해결] RegisterRecv()/RegisterSend()의
 	//          "IsConnected() 체크 후 post" 사이의 극히 좁은 틈에 Disconnect()가 끼어들면,
@@ -314,12 +338,28 @@ private:
 	void			TryFinalizeDisconnect() noexcept;
 
 private:
+	//***************************************************************************
+	// 세션 생명주기 상태. 한 방향으로만 진행한다:
+	//   Created → Connected → Disconnecting → Closed, 또는 Created → Closed(연결 완료 전 종료/실패).
+	// 세션은 연결 사이클을 한 번만 겪는다 — Accept/Connect마다 팩토리가 새 세션을 만들고
+	// DisconnectEx는 소켓을 재사용하지 않는다(dwFlags = 0). 상태 전환은 모두 CAS(또는 종료 경로의
+	// 단방향 store)라 Disconnect()/ProcessConnect()/Abort()가 동시에 실행돼도 정확히 하나만 이긴다.
+	//***************************************************************************
+	enum class State : uint8
+	{
+		Created,		// 생성됨 — Accept/ConnectEx가 진행 중이며 아직 연결 완료 전
+		Connected,		// 연결 완료 — 송수신 가능
+		Disconnecting,	// Disconnect() 요청됨 — DisconnectEx와 outstanding I/O의 완료 대기
+		Closed			// 종료 통지 경로에 진입함 (소켓이 닫혔거나 닫히는 중)
+	};
+
 	uint64					_sessionId{ 0 };					// 고유 세션 ID
+	std::atomic<uint64>		_lastActivityTick{ 0 };				// 마지막 I/O 활동 시각 (GetLastActivityTick() 참고)
 	SOCKET					_socket = INVALID_SOCKET;			// 통신에 사용되는 WinSock 소켓 핸들
 	int						_addressFamily = AF_INET;			// _socket의 주소 체계 (SetAddressFamily() 참고)
 	CNetAddress				_netAddress;						// 원격 클라이언트의 IP 주소 및 포트 정보
 
-	std::atomic<bool>				_connected = false;							// 원자적(Atomic) 연산을 보장하는 세션 연결/해제 상태 플래그
+	std::atomic<State>				_state{ State::Created };					// 세션 생명주기 상태 (State 참고)
 	std::atomic<Iocp::CloseReason>	_closeReason{ Iocp::CloseReason::None };	// 세션 종료 사유 변수
 	SocketOptions					_socketOptions;								// 연결 완료 시 적용할 TCP 옵션 (SetSocketOptions() 참고)
 	std::atomic<bool>				_gracefulClose = false;						// 상대의 정상 종료(FIN)로 끝났는지 (WasGracefulClose() 참고)

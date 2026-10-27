@@ -47,6 +47,7 @@ public:
     void BeginCloseAllSessions();
     bool AreAllSessionsClosed() const;
     void RemoveClosedSessions();
+    size_t DisconnectIdleSessions(uint64 idleMs);
 
 private:
     using SessionMap = CClusterSpinUnorderedMap<uint64, CIocpSessionRef, Iocp::kSessionClusterCnt>;

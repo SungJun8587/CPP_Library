@@ -19,9 +19,7 @@ UtilCore의 IOCP 계층은 Windows 완료 포트(IOCP) 위에서 서버·클라�
 
 `Network` 폴더 바로 아래의 파일들은 IOCP와 RIO 두 엔진이 함께 쓰는 공통 계층이다. IOCP 세션·리스너는 `CSocketUtils`로 소켓을 만들고, 서비스는 `CNetAddress`를 들고 있으며, `CNetworkFactory`가 엔진에 맞는 서비스를 만든다. 패킷 규칙(`Packet.h`, `CPacketDispatcher`)은 엔진과 무관하다. `CNetService`·`CSession`·`CRingBuffer`는 뒤의 ‘클래스별 상세’에서 설명한다.
 
-![엔진 선택과 공통 기반 클래스 · 팩토리·소켓·주소·패킷](md_images/01/01-engine-common-base.png)
-
-*그림 1. 엔진 선택과 공통 기반 클래스 · 팩토리·소켓·주소·패킷* ([SVG](md_images/01/01-engine-common-base.svg))
+&#91;embedded content: 엔진 선택과 공통 기반 클래스 · 팩토리·소켓·주소·패킷\]
 
 ### 헤더 파일 구성 (NetworkCommon.h, NetworkRedefineDataType.h)
 
@@ -147,9 +145,7 @@ IOCP 계층은 `Network/` 밖의 UtilCore 공용 클래스 10여 개를 쓴다. 
 
 키를 해시해 N개 클러스터 중 하나를 고르고, 클러스터마다 해시맵과 읽기/쓰기 락을 하나씩 가진 맵이다. 서로 다른 클러스터에 접근하는 스레드는 락이 달라 서로 기다리지 않는다. IOCP에서는 `CIocpSessionManager`가 `CClusterSpinUnorderedMap<uint64, CIocpSessionRef, 16>`(`SessionMap`)로 세션을 SessionId에 맞춰 보관한다. 세션 수십만 개가 동시에 등록·조회·삭제될 때 단일 락 하나로 직렬화되는 것을 피하기 위한 구조다.
 
-![세션 맵 구조 · 16개 클러스터, 클러스터별 락](md_images/01/02-session-map-cluster.png)
-
-*그림 2. 세션 맵 구조 · 16개 클러스터, 클러스터별 락* ([SVG](md_images/01/02-session-map-cluster.svg))
+&#91;embedded content: 세션 맵 구조 · 16개 클러스터, 클러스터별 락\]
 
 서로 다른 SessionId가 다른 클러스터에 떨어지면 락이 겹치지 않아 동시에 진행된다. 전체 순회만 클러스터를 번호 순서로 차례로 잡는다.
 
@@ -285,7 +281,7 @@ IOCP에서의 사용처는 세 곳이다. 서버 서비스의 `_socketOptions`�
 | --- | --- | --- |
 | `Start()` | `make_unique<CDelayedTaskQueue>()`, `std::thread` 생성 후 `ProcessExpiredTasks()` 실행, `ScheduleSessionReap()` | Listener와 워커가 이미 돌고 있는 시점에 시작한다. 큐는 `Start()`마다 새로 만든다. 실패하면 `Close()`로 되돌리고 false를 반환한다. |
 | 주기 실행 | `Reserve(kSessionReapInterval = 30초, ...)` | 작업이 `RemoveClosedSessions()`를 호출하고 `ScheduleSessionReap()`를 다시 부른다. 세션 해제 통지 경로(`OnSessionDisconnected`)가 놓친 맵 항목을 정리하는 안전망이다. |
-| `Close()` 0단계 | `Stop()` 후 `_sessionReapThread.join()` | reap 스레드를 가장 먼저 멈춘다. 이후 `BeginCloseAllSessions`·`RemoveClosedSessions`를 직접 호출하는 동안 두 스레드가 같은 맵을 동시에 건드리지 않게 하려는 것이다. |
+| `Close()` 0단계 | `Stop()` 후 `_sessionReapThread.join()` | reap 스레드를 가장 먼저 멈춘다. 이후 `RemoveClosedSessions`를 직접 호출하는 동안 두 스레드가 같은 맵을 동시에 건드리지 않게 하려는 것이다. |
 
 ### CThreadManager
 
@@ -343,15 +339,11 @@ IOCP 계층의 메모리 할당은 대부분 `Memory/` 폴더를 거친다. 흐�
 
 서비스(`CIocpServerService`/`CIocpClientService`)가 `CIocpCore`를 공유하며 워커 풀과 리스너, 세션 매니저를 조립한다. 첫 번째 그림은 이 조립 관계, 두 번째 그림은 세션이 소유하는 객체와 상속 관계다.
 
-![IOCP 서비스 구성 · 7개 클래스](md_images/01/03-service-composition.png)
-
-*그림 3. IOCP 서비스 구성 · 7개 클래스* ([SVG](md_images/01/03-service-composition.svg))
+&#91;embedded content: IOCP 서비스 구성 · 7개 클래스\]
 
 서버 서비스만 리스너와 세션 매니저를 가지며, 서버·클라이언트 모두 자기 워커 풀을 가진다. 워커 풀은 코어의 `DispatchBatch`를 반복 호출한다.
 
-![세션 중심 클래스 관계 · 상속·소유](md_images/01/04-session-class-relations.png)
-
-*그림 4. 세션 중심 클래스 관계 · 상속·소유* ([SVG](md_images/01/04-session-class-relations.svg))
+&#91;embedded content: 세션 중심 클래스 관계 · 상속·소유\]
 
 세션은 수신 링버퍼와 이벤트 4종을 멤버로 직접 가지고, 송신 데이터는 `CSendBuffer`(8KB 청크 조각)로 큐에 쌓는다. 리스너는 `AcceptEvent` 풀을 따로 가진다.
 
@@ -475,7 +467,7 @@ IOCP 커널 오브젝트를 소유하고, 워커 스레드가 완료 통지를 �
 
 ### CSession / CIocpSession — 세션 (Session.h, IocpSession.h/.cpp)
 
-`CSession`은 `Disconnect`·`IsConnected`·`GetSocket`·`Send`를 순수 가상으로 선언하고, 해제 핸들러(`SetDisconnectHandler`)를 들고 있다. `CIocpSession`은 이것과 `CIocpObject`를 함께 상속해 실제 송수신과 종료를 담당한다. 콘텐츠 계층은 이 클래스를 상속해 `OnConnected`·`OnDisconnected`·`OnRecv`·`OnSend`를 구현한다.
+`CSession`은 `Disconnect`·`IsConnected`·`GetSocket`·`Send`를 순수 가상으로 선언하고, 정상 종료를 기다릴 수 없는 최종 정리 단계를 위한 `Abort`를 기본 구현이 있는 가상 함수(기본값은 `Disconnect`에 위임)로 선언한다. 해제 핸들러(`SetDisconnectHandler`)도 들고 있다. `CIocpSession`은 이것과 `CIocpObject`를 함께 상속해 실제 송수신과 종료를 담당하며 `Abort`를 즉시 닫도록 재정의한다. 콘텐츠 계층은 이 클래스를 상속해 `OnConnected`·`OnDisconnected`·`OnRecv`·`OnSend`를 구현한다.
 
 **멤버 변수**
 
@@ -484,7 +476,7 @@ IOCP 커널 오브젝트를 소유하고, 워커 스레드가 완료 통지를 �
 | `_sessionId` | `uint64` | 고유 세션 ID(0은 무효) |
 | `_socket` | `SOCKET` | WinSock 소켓. 생성자에서 만들고 소멸자에서 닫는다. |
 | `_netAddress` | `CNetAddress` | 상대 주소 |
-| `_connected` | `atomic<bool>` | 연결 상태. `Disconnect`가 true→false로 한 번만 바꾼다. |
+| `_state` | `atomic<State>` | 생명주기 상태. `Created` → `Connected` → `Disconnecting` → `Closed` 한 방향으로만 진행하고(연결 완료 전 종료는 `Created` → `Closed`), 전환은 모두 CAS라 `Disconnect`·`ProcessConnect`·`Abort`가 동시에 불려도 하나만 이긴다. |
 | `_closeReason` / `_gracefulClose` | `atomic<CloseReason>` / `atomic<bool>` | 종료 사유, 그리고 상대의 정상 종료(FIN)였는지 |
 | `_socketOptions` | `SocketOptions` | `noDelay`, `keepAlive`, `keepAliveIdleMs`(30000), `keepAliveIntervalMs`(10000). `ProcessConnect`에서 `OnConnected` 직전에 적용 |
 | `_pendingIoCount` | `atomic<int32>` | 완료를 기다리는 WSARecv + WSASend 수 |
@@ -511,13 +503,13 @@ IOCP 커널 오브젝트를 소유하고, 워커 스레드가 완료 통지를 �
 
 | 함수 | 설명 |
 | --- | --- |
-| `ProcessConnect()` | 연결 완료 시 상태(종료 사유·링버퍼·플래그·송신 큐)를 초기화하고, 소켓 옵션 적용 → `_connected = true` → `OnConnected()` → `RegisterRecv()`. 서버는 accept 콜백에서, 클라이언트는 `ProcessConnectEx` 끝에서 호출한다. |
+| `ProcessConnect()` | 소켓 옵션을 적용하고 자신을 완료 대기 I/O 하나로 센 뒤(`_pendingIoCount` +1), `Created` → `Connected` 전환에 성공한 쪽만 `OnConnected()` → `RegisterRecv()`를 진행한다. 그 전에 `Disconnect`/`Abort`가 세션을 닫았으면 아무것도 하지 않는다. 카운트는 함수가 끝날 때 풀리므로 `OnConnected()`는 항상 `OnDisconnected()`보다 먼저 끝난다. 서버는 accept 콜백에서, 클라이언트는 `ProcessConnectEx` 끝에서 호출한다. |
 | `ConnectAsync(remote)` | 연결 후보 소켓을 `0.0.0.0:0`에 Bind 한 뒤 `RegisterConnect`(ConnectEx). 실패 시 `FailConnect`. |
 | `ProcessConnectEx()` | `errorCode`·소켓 오류를 확인하고 `SetUpdateConnectContext` 후 `ProcessConnect` |
-| `Disconnect(CloseReason)` / `Disconnect(const TCHAR*)` | `_connected`이 이미 false면 `FailConnect`(아직 연결 전 실패 경로), 아니면 사유를 기록하고 `RegisterDisconnect`. 문자열 버전은 `ForcedClose`. |
+| `Disconnect(CloseReason)` / `Disconnect(const TCHAR*)` | 멱등이며 첫 호출만 효과가 있다. `Connected`면 `Disconnecting`으로 전환하고 사유를 기록한 뒤 `RegisterDisconnect`를 호출한다. `Created`(연결 완료 전)면 `Closed`로 전환하고 `FailConnect`로 소켓을 닫아 즉시 통지한다. `Disconnecting`·`Closed`면 무시한다. 문자열 버전은 `ForcedClose`. |
 | `RegisterDisconnect()` / `ProcessDisconnect()` | DisconnectEx 요청 / 완료 처리(`_disconnectCompleted = true` 후 `TryFinalizeDisconnect`) |
-| `TryFinalizeDisconnect()` | DisconnectEx 완료, `_pendingIoCount == 0`, 아직 통지 안 함 세 조건이 모두 맞을 때 한 번만 `OnDisconnected` → `CSession::OnDisconnected`(서비스의 `ReleaseSession`)를 호출한다. |
-| `FailConnect(reason)` | 연결 실패 경로의 종료. 소켓을 닫고 통지를 1회만 한다. |
+| `TryFinalizeDisconnect()` | DisconnectEx 완료, `_pendingIoCount == 0`, 아직 통지 안 함 세 조건이 모두 맞을 때 한 번만 상태를 `Closed`로 만들고 `OnDisconnected` → `CSession::OnDisconnected`(서비스의 `ReleaseSession`)를 호출한다. |
+| `FailConnect(reason)` / `Abort(reason)` · `Abort()` | 상태와 무관하게 세션을 `Closed`로 만들고 소켓을 닫아 즉시 통지한다. 통지는 `_disconnectNotified` 가드를 공유해 1회만 나가며, 이미 종료 사유가 기록된 세션은 최초 사유를 유지한다. `FailConnect`는 연결 완료 전 실패 경로이고, `Abort`는 서비스의 최종 정리 단계(워커가 이미 멈췄거나 피어가 응답하지 않는 경우)에서 outstanding I/O를 기다리지 않고 닫는 용도다. `Abort()`의 사유는 `ForcedClose`. |
 | `ReleaseIo()` | `_pendingIoCount`를 줄이고 `TryFinalizeDisconnect` 시도 |
 
 **수신 함수**
@@ -585,7 +577,7 @@ IOCP 커널 오브젝트를 소유하고, 워커 스레드가 완료 통지를 �
 | `Start()` (순수 가상) · `Close()` | 시작과 종료 |
 | `CreateSession()` · `AddSession()` · `ReleaseSession()` | 팩터리로 생성 · 목록에 추가 · 목록에서 제거(비면 대기자를 깨움) |
 | `GetSession(index)` · `GetSessionsSnapshot()` · `GetCurrentSessionCount()` | 조회 |
-| `CloseSessions(waitForDrain)` · `WaitForSessionsEmpty(timeout)` | 세션 일괄 종료와 해제 대기 |
+| `CloseSessions(waitForDrain)` · `WaitForSessionsEmpty(timeout)` | 세션 일괄 종료와 해제 대기. `waitForDrain`이 true면(워커가 멈춘 뒤의 최종 정리) 세션을 `Abort()`로 즉시 정리하고 목록이 빌 때까지 기다리며, false면 `Disconnect()`만 요청하고 대기하지 않는다. |
 
 **CIocpServerService**
 
@@ -597,7 +589,7 @@ IOCP 커널 오브젝트를 소유하고, 워커 스레드가 완료 통지를 �
 | `_enforceMaxSessionCount` · `_activeSessionCount` · `_rejectedSessionCount` | 상한 적용 여부, 동시 접속 수, 거부 누계 |
 | `_sessionReapQueue` / `_sessionReapThread` | 30초마다 닫힌 세션을 정리하는 지연 작업 큐와 전용 스레드 |
 | `Start()` | 워커 구동 → 리스너 `StartAccept` → reap 스레드 시작. 세션 팩터리는 세션에 해제 핸들러를 심고, accept 콜백은 상한 검사 → ID 발급 → 서비스·매니저 등록 → 소켓 옵션 → `ProcessConnect` 순이다. |
-| `Close()` | reap 정지 → 리스너 정지 → 전체 세션 종료 요청 → 최대 5초 해제 대기 → 닫힌 세션 정리 → 워커 정지 → `CNetService::Close` |
+| `Close()` | reap 정지 → 리스너 정지 → `CloseSessions(false)`로 종료 상태 진입과 전체 세션 종료 요청 → 최대 5초 해제 대기 → 닫힌 세션 정리 → 워커 정지 → `CNetService::Close`(남은 세션은 `Abort`로 정리) |
 | `OnSessionDisconnected` (private) | 매니저에서 제거, 동시 접속 수 감소, `ReleaseSession` |
 | `Set/GetSessionSocketOptions` · `SetEnforceMaxSessionCount` · `SetAcceptPoolSize` · `SetListenAddressMode` | 설정 함수. 리스너 생성 전에만 반영되는 것이 있다. |
 
@@ -670,17 +662,15 @@ IOCP 커널 오브젝트를 소유하고, 워커 스레드가 완료 통지를 �
 
 ### 세션 종료
 
-종료는 세 조건이 모두 맞을 때 한 번만 완료된다. 아래 그림이 그 순서다.
+세션은 `Created` → `Connected` → `Disconnecting` → `Closed`로 한 방향으로만 진행하고, 정상 종료는 세 조건이 모두 맞을 때 한 번만 완료된다. 아래 그림이 그 순서다. 연결 완료 전 세션의 `Disconnect`와 `Abort`는 이 조건을 기다리지 않고 소켓을 닫아 곧바로 통지한다.
 
-![세션 종료 통지 순서 · 조건 3개](md_images/01/05-session-close-order.png)
-
-*그림 5. 세션 종료 통지 순서 · 조건 3개* ([SVG](md_images/01/05-session-close-order.svg))
+&#91;embedded content: 세션 종료 통지 순서 · 조건 3개\]
 
 마지막 단계에서 `_disconnectNotified`를 한 번만 true로 바꾸는 스레드가 `OnDisconnected`를 실행하므로, 워커 여러 개가 같은 세션의 완료를 동시에 처리해도 통지는 중복되지 않는다.
 
 ### 서비스 종료
 
-1. **서버 `Close()`**: reap 정지 → 리스너 `Stop`(소켓 닫기, 재시도 스레드 대기) → `BeginCloseAllSessions` → 최대 5초 동안 세션 목록이 비기를 대기 → `RemoveClosedSessions` → 워커 정지 → `CNetService::Close`.
+1. **서버 `Close()`**: reap 정지 → 리스너 `Stop`(소켓 닫기, 재시도 스레드 대기) → `CloseSessions(false)`(`_closing`을 세워 이미 accept 콜백에 들어온 세션도 거부하고, 전체 세션에 `Disconnect` 요청) → 최대 5초 동안 세션 목록이 비기를 대기 → `RemoveClosedSessions` → 워커 정지 → `CNetService::Close`(그때까지 남은 세션은 `Abort`로 정리).
 2. **클라이언트 `Close()`**: 세션 종료 → 최대 5초 대기 → 워커 정지 → `CNetService::Close`.
 3. 워커는 반드시 세션 정리 뒤에 정지한다. 세션의 남은 I/O 완료 통지를 처리하는 것이 워커이기 때문이다.
 
@@ -988,7 +978,7 @@ iocpServer->SetSessionSocketOptions(opt);
 | `OnRecv` · `OnSend` · `OnConnected` · `OnDisconnected`는 워커 스레드에서 불린다 | 워커를 오래 막으면 다른 세션의 완료 처리가 지연된다. 훅 안에서 블로킹 호출을 피해야 한다. |
 | 세션당 수신 1개·송신 1개만 진행 | 수신은 `ProcessRecv`가 끝난 뒤에만 다시 걸리고, 송신은 `_sendRegistered`가 직렬화한다. 따라서 `OnRecv`는 한 세션에 대해 동시에 호출되지 않는다. |
 | `owner`는 완료 통지가 풀어 준다 | 모든 완료는 실패해도 반드시 `Dispatch`되어야 한다. 이벤트를 중단하거나 건너뛰면 세션이 영원히 해제되지 않는다. |
-| 마지막 종료 통지는 마지막 완료 통지가 실행한다 | `OnDisconnected` 시점에는 진행 중 I/O가 없다. 이 훅에서 세션 참조를 버리면 소멸해도 안전하다. |
+| 마지막 종료 통지는 마지막 완료 통지가 실행한다 | `OnDisconnected` 시점에는 진행 중 I/O가 없다(서비스 최종 정리의 Abort와 연결 완료 전 세션의 정리는 예외). 이 훅에서 세션 참조를 버리면 소멸해도 안전하다. |
 
 **알고 있어야 할 점**
 

@@ -58,7 +58,8 @@ void CNetService::Close()
 
 //***************************************************************************
 // @brief 세션 종료 공통 구현.
-// @param waitForDrain true면 _sessions가 빌 때까지 최대 kCloseWaitTimeout 대기
+// @param waitForDrain true면 세션을 Abort()로 즉시 정리하고 _sessions가 빌 때까지 최대 kCloseWaitTimeout 대기,
+//        false면 정상 종료(Disconnect())만 요청하고 대기하지 않는다.
 //***************************************************************************
 void CNetService::CloseSessions(bool waitForDrain)
 {
@@ -72,11 +73,19 @@ void CNetService::CloseSessions(bool waitForDrain)
 	//    안전하게 유효하다).
 	std::vector<CSessionRef> sessionsToClose = GetSessionsSnapshot();
 
-	// 2. 락 밖에서 Disconnect()를 호출한다. Disconnect()가 동기적으로
+	// 2. 락 밖에서 종료를 요청한다. Disconnect()/Abort()가 동기적으로
 	//    ReleaseSession()(같은 _lock)을 재진입하더라도, 이 스레드는 더 이상
 	//    _lock을 쥐고 있지 않으므로 안전하다.
+	//    대기하는 호출은 서비스의 최종 정리 단계로, 파생 서비스가 워커 스레드를 멈춘 뒤에 부른다 —
+	//    정상 종료(DisconnectEx)의 완료를 처리할 워커가 없으므로 Abort()로 즉시 정리한다.
+	//    대기하지 않는 호출은 워커가 살아 있는 동안의 종료 게시이므로 정상 종료를 요청한다.
 	for( const CSessionRef& session : sessionsToClose )
-		session->Disconnect(_T("NetService Close"));
+	{
+		if( waitForDrain )
+			session->Abort();
+		else
+			session->Disconnect(_T("NetService Close"));
+	}
 
 	sessionsToClose.clear();
 

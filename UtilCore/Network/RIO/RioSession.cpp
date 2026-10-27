@@ -238,6 +238,9 @@ void CRioSession::ProcessConnectEx()
     }
 
     // 위 검사와 Init() 사이에 종료가 요청된 경우: 이미 Active이므로 일반 종료 경로로 정리한다.
+    // Init()의 Active 저장과 이 재확인 사이를 순서화해, CancelPendingConnect()의 "플래그 저장 → 상태 재확인"과
+    // 맞물려 어느 한쪽은 반드시 상대의 저장을 본다.
+    std::atomic_thread_fence(std::memory_order_seq_cst);
     if( _connectCanceled.load(std::memory_order_acquire) )
     {
         Close(Rio::CloseReason::ForcedClose);
@@ -358,13 +361,20 @@ void CRioSession::Close(Rio::CloseReason reason) noexcept
 
         Rio::SessionState expected = Rio::SessionState::Active;
 
-        if( !_state.compare_exchange_strong(expected, Rio::SessionState::Closing, std::memory_order_acq_rel, std::memory_order_acquire) )
+        while( !_state.compare_exchange_strong(expected, Rio::SessionState::Closing, std::memory_order_acq_rel, std::memory_order_acquire) )
         {
-            if( expected == Rio::SessionState::Created )
-            {
-                CancelPendingConnect();
-            }
-            return;
+            if( expected != Rio::SessionState::Created )
+                return; // Closing/Closed — 이미 종료가 진행 중이거나 끝났다.
+
+            CancelPendingConnect();
+
+            // 취소 플래그를 세우는 사이에 ProcessConnectEx()가 Init()으로 세션을 Active로 만들고
+            // 자신의 _connectCanceled 재확인까지 마쳤다면 이 요청을 아무도 보지 못한다. 플래그를 세운 뒤
+            // 상태를 다시 읽어, 그 사이 Active가 됐으면 일반 종료 경로로 이어서 처리한다.
+            // (아직 Created면 플래그를 본 ConnectEx 완료 경로가, Closing/Closed면 진행 중인 종료가 처리한다.)
+            expected = _state.load(std::memory_order_acquire);
+            if( expected != Rio::SessionState::Active )
+                return;
         }
 
         _closeReason.store(reason, std::memory_order_release);
@@ -392,6 +402,10 @@ void CRioSession::Close(Rio::CloseReason reason) noexcept
 void CRioSession::CancelPendingConnect() noexcept
 {
     _connectCanceled.store(true, std::memory_order_release);
+
+    // 플래그 저장과 호출자(Close())의 이후 상태 재확인 사이를 완전 순서화한다. ProcessConnectEx()의
+    // "Init() → 플래그 재확인"과 짝을 이루는 저장-적재 쌍이라, 양쪽 모두 상대 저장을 놓치지 않으려면 필요하다.
+    std::atomic_thread_fence(std::memory_order_seq_cst);
 
     // 진행 중인 ConnectEx가 있으면 취소해 완료 통지가 곧바로 오게 한다.
     // 아직 게시 전이거나 이미 끝났다면 ERROR_NOT_FOUND로 무시되고, 이후의

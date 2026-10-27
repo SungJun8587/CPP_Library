@@ -156,6 +156,7 @@ bool CIocpServerService::Start()
 		CDelayedTaskQueue* const reapQueue = _sessionReapQueue.get();
 		_sessionReapThread = std::thread([reapQueue]() { reapQueue->ProcessExpiredTasks(); });
 		ScheduleSessionReap();
+		ScheduleIdleSweep();
 	}
 	catch( ... )
 	{
@@ -208,12 +209,34 @@ void CIocpServerService::ScheduleSessionReap()
 }
 
 //***************************************************************************
+// @brief 다음 유휴 세션 점검 tick을 예약합니다(self-rescheduling).
+//***************************************************************************
+void CIocpServerService::ScheduleIdleSweep()
+{
+	if( _sessionReapQueue == nullptr )
+		return;
+
+	_sessionReapQueue->Reserve(Iocp::kIdleSweepInterval, [this]()
+		{
+			const uint32 timeoutMs = _idleTimeoutMs.load(std::memory_order_relaxed);
+			if( timeoutMs != 0 )
+			{
+				const size_t count = _sessionManager.DisconnectIdleSessions(timeoutMs);
+				if( count != 0 )
+					LOG_INFO(_T("[CIocpServerService] idle sessions disconnected: count=%llu, timeout=%ums"), static_cast<uint64>(count), timeoutMs);
+			}
+
+			ScheduleIdleSweep();
+		});
+}
+
+//***************************************************************************
 // @brief 서버 종료 처리
 // @details
 // 순서:
 // 0. 세션 reap 스레드 정지
 // 1. Listener 정지 (신규 연결 차단)
-// 2. 세션 매니저의 모든 세션 종료 게시
+// 2. 서비스 종료 상태 진입 및 모든 세션 종료 게시
 // 3. 워커 스레드가 살아있는 동안 세션 해제 통지(OnDisconnected)가 모두 끝날 때까지 대기
 //    (Iocp::kCloseDrainTimeout 상한)
 // 4. 세션 매니저에 남은 해제 세션 정리
@@ -243,8 +266,10 @@ void CIocpServerService::Close()
 		_listener = nullptr;
 	}
 
-	// 2. 기존 세션 종료 게시
-	_sessionManager.BeginCloseAllSessions();
+	// 2. 서비스를 종료 상태로 전환하고 기존 세션의 종료를 게시한다. CloseSessions()가 _closing을 세워,
+	//    Listener::Stop() 시점에 이미 accept 콜백에 진입해 있던 세션도 AddSession()에서 거부·종료된다
+	//    (서비스 세션 목록은 세션 매니저 목록의 상위집합이다). 대기는 3단계에서 한다.
+	CloseSessions(false);
 
 	// 3. 세션 해제 통지가 실제로 끝날 때까지 대기 — pending I/O와 DisconnectEx의 완료
 	//    통지는 워커 스레드가 처리하므로 워커가 살아있는 동안에 해야 한다. 응답 없는
@@ -257,8 +282,8 @@ void CIocpServerService::Close()
 	// 5. 세션 정리가 끝난 뒤 워커 스레드 정지
 	_workers.Stop(_iocpCore.get());
 
-	// 6. 3번에서 끝내지 못한 세션이 있으면 CNetService::Close()가 Disconnect()의
-	//    강제 정리 경로로 마무리하고, 서비스의 세션이 0개가 될 때까지 대기한다.
+	// 6. 3번에서 끝내지 못한 세션이 있으면 CNetService::Close()가 Abort()로
+	//    마무리하고, 서비스의 세션이 0개가 될 때까지 대기한다.
 	CNetService::Close();
 }
 
@@ -393,8 +418,7 @@ bool CIocpClientService::Start()
 //    (Iocp::kCloseDrainTimeout 상한) — pending I/O와 DisconnectEx의 완료 통지는 워커가 처리하므로
 //    워커를 먼저 멈추면 끝나지 않는다.
 // 3. 세션 정리가 끝난 뒤 워커 스레드를 깨우고 Join
-// 4. 2번에서 끝내지 못한 세션(응답 없는 피어 등)은 CNetService::Close()가 Disconnect()의
-//    강제 정리 경로로 마무리한다. CNetService::Close() 자체는 상한 없이 대기하지만, 강제 정리
+// 4. 2번에서 끝내지 못한 세션(응답 없는 피어 등)은 CNetService::Close()가 Abort()로 마무리한다. CNetService::Close() 자체는 상한 없이 대기하지만, 강제 정리
 //    경로는 즉시 통지하므로 이 단계에서는 오래 걸리지 않는다.
 //***************************************************************************
 void CIocpClientService::Close()

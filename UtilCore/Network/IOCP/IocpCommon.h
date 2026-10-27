@@ -43,7 +43,8 @@ namespace Iocp
         RingBufferOverflow,     // 수신 링버퍼 오버플로우
         SendBufferOverflow,     // 송신 링버퍼 오버플로우
         InternalError,          // 기타 내부 처리 에러
-        ForcedClose             // 서버 측 또는 관리자에 의한 강제 종료
+        ForcedClose,            // 서버 측 또는 관리자에 의한 강제 종료
+        Idle                    // 유휴 시간 초과 (CIocpServerService::SetIdleTimeout)
     };
 
     //***************************************************************************
@@ -173,6 +174,13 @@ namespace Iocp
     //          세션 처리량/서버 규모에 맞춰 조정할 수 있는 기본값입니다.
     //***************************************************************************
     inline constexpr std::chrono::seconds kSessionReapInterval{ 30 };
+
+    //***************************************************************************
+    // @brief 서버 서비스가 유휴 세션을 점검하는 주기.
+    // @details CIocpServerService::SetIdleTimeout()으로 타임아웃을 켠 경우에만 의미가 있으며,
+    //          유휴 연결은 타임아웃 + 이 주기 이내에 끊깁니다.
+    //***************************************************************************
+    inline constexpr std::chrono::seconds kIdleSweepInterval{ 5 };
 }
 
 #endif // ndef UC_IOCPCOMMON_H

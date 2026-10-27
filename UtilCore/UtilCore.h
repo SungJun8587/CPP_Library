@@ -128,6 +128,7 @@ using namespace std;
 #include <Util/FixedBufUtil.h>
 
 #include <Job/JobCommon.h>
+#include <Job/TimerHeap.h>
 
 #include <Network/NetworkCommon.h>
 

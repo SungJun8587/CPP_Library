@@ -103,8 +103,9 @@ public:
 
 protected:
 	//***************************************************************************
-	// @brief 세션 종료 공통 구현. 락 밖에서 Disconnect()를 호출합니다.
-	// @param waitForDrain true면 _sessions가 빌 때까지(타임아웃 있음) 대기합니다.
+	// @brief 세션 종료 공통 구현. 락 밖에서 종료를 요청합니다.
+	// @param waitForDrain true면 Abort()로 즉시 정리하고 _sessions가 빌 때까지(타임아웃 있음) 대기합니다
+	//        (워커가 멈춘 뒤의 최종 정리용). false면 Disconnect()만 요청하고 대기하지 않습니다.
 	//***************************************************************************
 	void					CloseSessions(bool waitForDrain);
 

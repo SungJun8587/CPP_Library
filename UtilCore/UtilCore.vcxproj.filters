@@ -695,6 +695,12 @@
     <ClInclude Include="Util\FixedBufUtil.h">
       <Filter>Util</Filter>
     </ClInclude>
+    <ClInclude Include="Job\MoveOnlyFunction.h">
+      <Filter>Job</Filter>
+    </ClInclude>
+    <ClInclude Include="Job\TimerHeap.h">
+      <Filter>Job</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">

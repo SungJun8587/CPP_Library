@@ -8,10 +8,15 @@
 #define UC_JOB_H
 
 #include <Job/JobCommon.h>
+#include <Job/MoveOnlyFunction.h>
 
-#include <functional>
-
-using CallbackType = std::function<void()>;
+//***************************************************************************
+// @brief 작업 큐/타이머가 실행하는 콜백 타입.
+// @detail 이동 전용(move-only) 함수 객체이며, 캡처가 48바이트 이하이고 이동이 noexcept이면
+//         힙 할당 없이 객체 안에 저장됩니다. 그보다 크면 힙에 저장됩니다.
+//         복사할 수 없으므로 같은 콜백을 여러 작업으로 재사용하려면 호출마다 새 콜백을 만들어야 합니다.
+//***************************************************************************
+using CallbackType = CMoveOnlyFunction<void(), 48>;
 
 //***************************************************************************
 // @brief 비동기 작업을 캡슐화하여 실행하는 클래스입니다.
@@ -23,9 +28,10 @@ public:
 	//***************************************************************************
 	// @brief CJob 클래스의 생성자입니다.
 	// @detail 전달받은 콜백 함수로 작업을 초기화합니다.
-	// @param callback 실행할 콜백 함수
+	// @param callback 실행할 콜백 함수 (소유권이 이전됩니다)
 	//***************************************************************************
-	CJob(function<void()> callback) : _callback(move(callback)) {
+	CJob(CallbackType callback) : _callback(std::move(callback))
+	{
 
 	}
 	virtual ~CJob() = default;
@@ -34,12 +40,13 @@ public:
 	// @brief 저장된 작업을 실행합니다.
 	// @detail 내부에 등록된 콜백 함수를 호출하여 작업을 수행합니다.
 	//***************************************************************************
-	void Execute() {
+	void Execute()
+	{
 		_callback();
 	}
 
 private:
-	function<void()> _callback; // 실행할 콜백 함수 객체
+	CallbackType _callback; // 실행할 콜백 함수 객체
 };
 
 #endif // ndef UC_JOB_H

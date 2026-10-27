@@ -221,3 +221,51 @@ void CIocpSessionManager::RemoveClosedSessions()
         }
     }
 }
+
+//***************************************************************************
+// @brief 마지막 I/O 활동 이후 idleMs 이상 지난 연결 상태의 세션을 종료합니다.
+// @param idleMs 유휴 허용 시간(ms). 0이면 아무것도 하지 않습니다.
+// @return size_t 종료를 요청한 세션 수
+// @details Broadcast()와 같은 방식으로 ReadLock 아래에서 대상 스냅샷만 수집하고, Disconnect()는 락 밖에서
+//          호출합니다(Disconnect()가 같은 락을 잡는 해제 통지 경로와 교착되지 않도록).
+//          아직 연결 완료 전이거나 이미 종료가 시작된 세션(IsConnected() == false)은 대상이 아닙니다.
+//***************************************************************************
+size_t CIocpSessionManager::DisconnectIdleSessions(uint64 idleMs)
+{
+    if( idleMs == 0 )
+        return 0;
+
+    CVector<CIocpSessionRef> idleSessions;
+    const uint64 now = ::GetTickCount64();
+
+    for( INT32 i = 0; i < _sessions.GetClusterCnt(); ++i )
+    {
+        SessionMap::ReadLockGuardByIdx guard(_sessions, i, __FUNCTION__);
+        auto& objMap = _sessions.GetClusterMapByIdx(i);
+
+        for( auto const& pair : objMap )
+        {
+            const CIocpSessionRef& session = pair.second;
+            if( !session || !session->IsConnected() )
+                continue;
+
+            // 점검 중에 다른 스레드가 활동 시각을 now보다 나중 값으로 갱신할 수 있으므로,
+            // 부호 없는 뺄셈이 되감기지 않게 now가 더 클 때만 비교한다.
+            const uint64 last = session->GetLastActivityTick();
+            if( now > last && now - last >= idleMs )
+                idleSessions.push_back(session);
+        }
+    }
+
+    size_t disconnected = 0;
+    for( const auto& session : idleSessions )
+    {
+        if( session->IsConnected() )
+        {
+            session->Disconnect(Iocp::CloseReason::Idle);
+            ++disconnected;
+        }
+    }
+
+    return disconnected;
+}
