@@ -435,6 +435,13 @@ void COsInfo::DetectWindowsVersion()
 							m_nWinVersion = Windows11_22H2;
 						else if( dwBuildNumber == 22631 )
 							m_nWinVersion = Windows11_23H2;
+						// 25H2는 24H2 위에 enablement package로 빌드 번호만 올린 버전이고,
+						// 26H1은 신규 하드웨어 전용 릴리스(기준 빌드 28000)입니다.
+						// 알 수 없는 상위 빌드는 가장 가까운 하위 버전으로 귀속시킵니다.
+						else if( dwBuildNumber >= 28000 )
+							m_nWinVersion = Windows11_26H1;
+						else if( dwBuildNumber >= 26200 )
+							m_nWinVersion = Windows11_25H2;
 						else if( dwBuildNumber >= 26100 )
 							m_nWinVersion = Windows11_24H2;
 					}
@@ -853,6 +860,297 @@ void COsInfo::DetectWindowsEdition()
 			case PRODUCT_EDUCATION:
 				m_nWinEdition = Windows10Education_E;
 				break;
+			case PRODUCT_PROFESSIONAL_EMBEDDED:
+				m_nWinEdition = ProfessionalEmbedded;
+				break;
+			case PRODUCT_ENTERPRISE_EVALUATION:
+				m_nWinEdition = EnterpriseEvaluation;
+				break;
+			case PRODUCT_MULTIPOINT_STANDARD_SERVER:
+				m_nWinEdition = MultiPointStandardServer;
+				break;
+			case PRODUCT_MULTIPOINT_PREMIUM_SERVER:
+				m_nWinEdition = MultiPointPremiumServer;
+				break;
+			case PRODUCT_STANDARD_EVALUATION_SERVER:
+				m_nWinEdition = StandardServerEvaluation;
+				break;
+			case PRODUCT_DATACENTER_EVALUATION_SERVER:
+				m_nWinEdition = DatacenterServerEvaluation;
+				break;
+			case PRODUCT_ENTERPRISE_N_EVALUATION:
+				m_nWinEdition = Enterprise_N_Evaluation;
+				break;
+			case PRODUCT_EMBEDDED_AUTOMOTIVE:
+				m_nWinEdition = EmbeddedAutomotive;
+				break;
+			case PRODUCT_EMBEDDED_INDUSTRY_A:
+				m_nWinEdition = EmbeddedIndustryA;
+				break;
+			case PRODUCT_THINPC:
+				m_nWinEdition = ThinPC;
+				break;
+			case PRODUCT_EMBEDDED_A:
+				m_nWinEdition = EmbeddedA;
+				break;
+			case PRODUCT_EMBEDDED_INDUSTRY:
+				m_nWinEdition = EmbeddedIndustry;
+				break;
+			case PRODUCT_EMBEDDED_E:
+				m_nWinEdition = EmbeddedE;
+				break;
+			case PRODUCT_EMBEDDED_INDUSTRY_E:
+				m_nWinEdition = EmbeddedIndustryE;
+				break;
+			case PRODUCT_EMBEDDED_INDUSTRY_A_E:
+				m_nWinEdition = EmbeddedIndustryAE;
+				break;
+			case PRODUCT_STORAGE_WORKGROUP_EVALUATION_SERVER:
+				m_nWinEdition = StorageWorkgroupServerEvaluation;
+				break;
+			case PRODUCT_STORAGE_STANDARD_EVALUATION_SERVER:
+				m_nWinEdition = StorageStandardServerEvaluation;
+				break;
+			case PRODUCT_CORE_ARM:
+				m_nWinEdition = WindowsRT;
+				break;
+			case PRODUCT_CORE_N:
+				m_nWinEdition = Home_N;
+				break;
+			case PRODUCT_CORE_COUNTRYSPECIFIC:
+				m_nWinEdition = HomeCountrySpecific;
+				break;
+			case PRODUCT_CORE_SINGLELANGUAGE:
+				m_nWinEdition = HomeSingleLanguage;
+				break;
+			case PRODUCT_PROFESSIONAL_WMC:
+				m_nWinEdition = Professional_WMC;
+				break;
+			case PRODUCT_EMBEDDED_INDUSTRY_EVAL:
+				m_nWinEdition = EmbeddedIndustryEvaluation;
+				break;
+			case PRODUCT_EMBEDDED_INDUSTRY_E_EVAL:
+				m_nWinEdition = EmbeddedIndustryE_Evaluation;
+				break;
+			case PRODUCT_EMBEDDED_EVAL:
+				m_nWinEdition = EmbeddedEvaluation;
+				break;
+			case PRODUCT_EMBEDDED_E_EVAL:
+				m_nWinEdition = EmbeddedE_Evaluation;
+				break;
+			case PRODUCT_NANO_SERVER:
+				m_nWinEdition = NanoServer;
+				break;
+			case PRODUCT_CLOUD_STORAGE_SERVER:
+				m_nWinEdition = CloudStorageServer;
+				break;
+			case PRODUCT_CORE_CONNECTED:
+				m_nWinEdition = HomeConnected;
+				break;
+			case PRODUCT_PROFESSIONAL_STUDENT:
+				m_nWinEdition = ProfessionalStudent;
+				break;
+			case PRODUCT_CORE_CONNECTED_N:
+				m_nWinEdition = HomeConnected_N;
+				break;
+			case PRODUCT_PROFESSIONAL_STUDENT_N:
+				m_nWinEdition = ProfessionalStudent_N;
+				break;
+			case PRODUCT_CORE_CONNECTED_SINGLELANGUAGE:
+				m_nWinEdition = HomeConnectedSingleLanguage;
+				break;
+			case PRODUCT_CORE_CONNECTED_COUNTRYSPECIFIC:
+				m_nWinEdition = HomeConnectedCountrySpecific;
+				break;
+			case PRODUCT_CONNECTED_CAR:
+				m_nWinEdition = ConnectedCar;
+				break;
+			case PRODUCT_INDUSTRY_HANDHELD:
+				m_nWinEdition = IndustryHandheld;
+				break;
+			case PRODUCT_PPI_PRO:
+				m_nWinEdition = PPIPro;
+				break;
+			case PRODUCT_ARM64_SERVER:
+				m_nWinEdition = ARM64Server;
+				break;
+			case PRODUCT_EDUCATION_N:
+				m_nWinEdition = Education_N;
+				break;
+			case PRODUCT_IOTUAP:
+				m_nWinEdition = IoTCore;
+				break;
+			case PRODUCT_CLOUD_HOST_INFRASTRUCTURE_SERVER:
+				m_nWinEdition = CloudHostInfrastructureServer;
+				break;
+			case PRODUCT_ENTERPRISE_S:
+				m_nWinEdition = Enterprise_S;
+				break;
+			case PRODUCT_ENTERPRISE_S_N:
+				m_nWinEdition = Enterprise_S_N;
+				break;
+			case PRODUCT_PROFESSIONAL_S:
+				m_nWinEdition = Professional_S;
+				break;
+			case PRODUCT_PROFESSIONAL_S_N:
+				m_nWinEdition = Professional_S_N;
+				break;
+			case PRODUCT_ENTERPRISE_S_EVALUATION:
+				m_nWinEdition = Enterprise_S_Evaluation;
+				break;
+			case PRODUCT_ENTERPRISE_S_N_EVALUATION:
+				m_nWinEdition = Enterprise_S_N_Evaluation;
+				break;
+			case PRODUCT_HOLOGRAPHIC:
+				m_nWinEdition = Holographic;
+				break;
+			case PRODUCT_HOLOGRAPHIC_BUSINESS:
+				m_nWinEdition = HolographicBusiness;
+				break;
+			case PRODUCT_PRO_SINGLE_LANGUAGE:
+				m_nWinEdition = ProSingleLanguage;
+				break;
+			case PRODUCT_PRO_CHINA:
+				m_nWinEdition = ProChina;
+				break;
+			case PRODUCT_ENTERPRISE_SUBSCRIPTION:
+				m_nWinEdition = EnterpriseSubscription;
+				break;
+			case PRODUCT_ENTERPRISE_SUBSCRIPTION_N:
+				m_nWinEdition = EnterpriseSubscription_N;
+				break;
+			case PRODUCT_DATACENTER_NANO_SERVER:
+				m_nWinEdition = DatacenterNanoServer;
+				break;
+			case PRODUCT_STANDARD_NANO_SERVER:
+				m_nWinEdition = StandardNanoServer;
+				break;
+			case PRODUCT_DATACENTER_A_SERVER_CORE:
+				m_nWinEdition = DatacenterAServerCore;
+				break;
+			case PRODUCT_STANDARD_A_SERVER_CORE:
+				m_nWinEdition = StandardAServerCore;
+				break;
+			case PRODUCT_DATACENTER_WS_SERVER_CORE:
+				m_nWinEdition = DatacenterWSServerCore;
+				break;
+			case PRODUCT_STANDARD_WS_SERVER_CORE:
+				m_nWinEdition = StandardWSServerCore;
+				break;
+			case PRODUCT_UTILITY_VM:
+				m_nWinEdition = UtilityVM;
+				break;
+			case PRODUCT_DATACENTER_EVALUATION_SERVER_CORE:
+				m_nWinEdition = DatacenterServerCoreEvaluation;
+				break;
+			case PRODUCT_STANDARD_EVALUATION_SERVER_CORE:
+				m_nWinEdition = StandardServerCoreEvaluation;
+				break;
+			case PRODUCT_PRO_WORKSTATION:
+				m_nWinEdition = ProWorkstation;
+				break;
+			case PRODUCT_PRO_WORKSTATION_N:
+				m_nWinEdition = ProWorkstation_N;
+				break;
+			case PRODUCT_PRO_FOR_EDUCATION:
+				m_nWinEdition = ProEducation;
+				break;
+			case PRODUCT_PRO_FOR_EDUCATION_N:
+				m_nWinEdition = ProEducation_N;
+				break;
+			case PRODUCT_AZURE_SERVER_CORE:
+				m_nWinEdition = AzureServerCore;
+				break;
+			case PRODUCT_AZURE_NANO_SERVER:
+				m_nWinEdition = AzureNanoServer;
+				break;
+			case PRODUCT_ENTERPRISEG:
+				m_nWinEdition = Enterprise_G;
+				break;
+			case PRODUCT_ENTERPRISEGN:
+				m_nWinEdition = Enterprise_GN;
+				break;
+			case PRODUCT_SERVERRDSH:
+				m_nWinEdition = EnterpriseMultiSession;
+				break;
+			case PRODUCT_CLOUD:
+				m_nWinEdition = Cloud;
+				break;
+			case PRODUCT_CLOUDN:
+				m_nWinEdition = Cloud_N;
+				break;
+			case PRODUCT_HUBOS:
+				m_nWinEdition = SurfaceHub;
+				break;
+			case PRODUCT_ONECOREUPDATEOS:
+				m_nWinEdition = OneCoreUpdateOS;
+				break;
+			case PRODUCT_CLOUDE:
+				m_nWinEdition = Cloud_E;
+				break;
+			case PRODUCT_IOTOS:
+				m_nWinEdition = IoTOS;
+				break;
+			case PRODUCT_CLOUDEN:
+				m_nWinEdition = Cloud_EN;
+				break;
+			case PRODUCT_IOTEDGEOS:
+				m_nWinEdition = IoTEdgeOS;
+				break;
+			case PRODUCT_IOTENTERPRISE:
+				m_nWinEdition = IoTEnterprise;
+				break;
+			case PRODUCT_LITE:
+				m_nWinEdition = Lite;
+				break;
+			case PRODUCT_IOTENTERPRISES:
+				m_nWinEdition = IoTEnterprise_S;
+				break;
+			case PRODUCT_XBOX_SYSTEMOS:
+				m_nWinEdition = XboxSystemOS;
+				break;
+			case PRODUCT_XBOX_GAMEOS:
+				m_nWinEdition = XboxGameOS;
+				break;
+			case PRODUCT_XBOX_ERAOS:
+				m_nWinEdition = XboxEraOS;
+				break;
+			case PRODUCT_XBOX_DURANGOHOSTOS:
+				m_nWinEdition = XboxDurangoHostOS;
+				break;
+			case PRODUCT_XBOX_SCARLETTHOSTOS:
+				m_nWinEdition = XboxScarlettHostOS;
+				break;
+			case PRODUCT_XBOX_KEYSTONE:
+				m_nWinEdition = XboxKeystone;
+				break;
+			case PRODUCT_AZURE_SERVER_CLOUDHOST:
+				m_nWinEdition = AzureServerCloudHost;
+				break;
+			case PRODUCT_AZURE_SERVER_CLOUDMOS:
+				m_nWinEdition = AzureServerCloudMOS;
+				break;
+			case PRODUCT_CLOUDEDITIONN:
+				m_nWinEdition = CloudEdition_N;
+				break;
+			case PRODUCT_CLOUDEDITION:
+				m_nWinEdition = CloudEdition;
+				break;
+			case PRODUCT_AZURESTACKHCI_SERVER_CORE:
+				m_nWinEdition = AzureStackHCIServerCore;
+				break;
+			case PRODUCT_DATACENTER_SERVER_AZURE_EDITION:
+				m_nWinEdition = DatacenterServerAzureEdition;
+				break;
+			case PRODUCT_DATACENTER_SERVER_CORE_AZURE_EDITION:
+				m_nWinEdition = DatacenterServerCoreAzureEdition;
+				break;
+			case PRODUCT_UNLICENSED:
+				m_nWinEdition = Unlicensed;
+				break;
+			default:
+				m_nWinEdition = EditionUnknown;
+				break;
 			}
 			break;
 		}
@@ -966,6 +1264,8 @@ _tstring COsInfo::GetWindowsVersionDesc() const
 	case Windows11_22H2:          return _T("Windows 11 22H2");
 	case Windows11_23H2:          return _T("Windows 11 23H2");
 	case Windows11_24H2:          return _T("Windows 11 24H2");
+	case Windows11_25H2:          return _T("Windows 11 25H2");
+	case Windows11_26H1:          return _T("Windows 11 26H1");
 	default:                      return _T("Unknown");
 	}
 }
@@ -978,26 +1278,178 @@ _tstring COsInfo::GetWindowsEditionDesc() const
 {
 	switch( m_nWinEdition )
 	{
-	case Workstation:             return _T("Workstation Edition");
-	case Server:                  return _T("Server Edition");
-	case AdvancedServer:          return _T("Advanced Server Edition");
-	case Home:                    return _T("Home Edition");
-	case Ultimate:                return _T("Ultimate Edition");
-	case HomeBasic:               return _T("Home Basic Edition");
-	case HomePremium:             return _T("Home Premium Edition");
-	case Enterprise:              return _T("Enterprise Edition");
-	case HomeBasic_N:             return _T("Home Basic N Edition");
-	case Business:                return _T("Business Edition");
-	case StandardServer:          return _T("Standard Server Edition");
-	case EnterpriseServerCore:    return _T("Enterprise Server Core Edition");
-	case EnterpriseServerIA64:    return _T("Enterprise Server IA64 Edition");
-	case Business_N:              return _T("Business N Edition");
-	case WebServer:               return _T("Web Server Edition");
-	case ClusterServer:           return _T("Cluster Server Edition");
-	case HomeServer:              return _T("Home Server Edition");
-	case Professional:            return _T("Professional Edition");
-	case Windows10Home_E:         return _T("Home Edition");
-	case Windows10Education_E:    return _T("Education Edition");
-	default:                      return _T("Edition unknown Edition");
+	case Workstation:                       return _T("Workstation Edition");
+	case Server:                            return _T("Server Edition");
+	case AdvancedServer:                    return _T("Advanced Server Edition");
+	case Home:                              return _T("Home Edition");
+	case Ultimate:                          return _T("Ultimate Edition");
+	case HomeBasic:                         return _T("Home Basic Edition");
+	case HomePremium:                       return _T("Home Premium Edition");
+	case Enterprise:                        return _T("Enterprise Edition");
+	case HomeBasic_N:                       return _T("Home Basic N Edition");
+	case Business:                          return _T("Business Edition");
+	case StandardServer:                    return _T("Standard Server Edition");
+	case DatacenterServer:                  return _T("Datacenter Server Edition");
+	case SmallBusinessServer:               return _T("Small Business Server Edition");
+	case EnterpriseServer:                  return _T("Enterprise Server Edition");
+	case Starter:                           return _T("Starter Edition");
+	case DatacenterServerCore:              return _T("Datacenter Server Core Edition");
+	case StandardServerCore:                return _T("Standard Server Core Edition");
+	case EnterpriseServerCore:              return _T("Enterprise Server Core Edition");
+	case EnterpriseServerIA64:              return _T("Enterprise Server IA64 Edition");
+	case Business_N:                        return _T("Business N Edition");
+	case WebServer:                         return _T("Web Server Edition");
+	case ClusterServer:                     return _T("Cluster Server Edition");
+	case HomeServer:                        return _T("Home Server Edition");
+	case StorageExpressServer:              return _T("Storage Express Server Edition");
+	case StorageStandardServer:             return _T("Storage Standard Server Edition");
+	case StorageWorkgroupServer:            return _T("Storage Workgroup Server Edition");
+	case StorageEnterpriseServer:           return _T("Storage Enterprise Server Edition");
+	case ServerForSmallBusiness:            return _T("Server for Small Business Edition");
+	case SmallBusinessServerPremium:        return _T("Small Business Server Premium Edition");
+	case HomePremium_N:                     return _T("Home Premium N Edition");
+	case Enterprise_N:                      return _T("Enterprise N Edition");
+	case Ultimate_N:                        return _T("Ultimate N Edition");
+	case WebServerCore:                     return _T("Web Server Core Edition");
+	case MediumBusinessServerManagement:    return _T("Medium Business Server Management Edition");
+	case MediumBusinessServerSecurity:      return _T("Medium Business Server Security Edition");
+	case MediumBusinessServerMessaging:     return _T("Medium Business Server Messaging Edition");
+	case ServerFoundation:                  return _T("Server Foundation Edition");
+	case HomePremiumServer:                 return _T("Home Premium Server Edition");
+	case ServerForSmallBusiness_V:          return _T("Server for Small Business V Edition");
+	case StandardServer_V:                  return _T("Standard Server V Edition");
+	case DatacenterServer_V:                return _T("Datacenter Server V Edition");
+	case EnterpriseServer_V:                return _T("Enterprise Server V Edition");
+	case DatacenterServerCore_V:            return _T("Datacenter Server Core V Edition");
+	case StandardServerCore_V:              return _T("Standard Server Core V Edition");
+	case EnterpriseServerCore_V:            return _T("Enterprise Server Core V Edition");
+	case HyperV:                            return _T("Hyper-V Server Edition");
+	case StorageExpressServerCore:          return _T("Storage Express Server Core Edition");
+	case StorageStandardServerCore:         return _T("Storage Standard Server Core Edition");
+	case StorageWorkgroupServerCore:        return _T("Storage Workgroup Server Core Edition");
+	case StorageEnterpriseServerCore:       return _T("Storage Enterprise Server Core Edition");
+	case Starter_N:                         return _T("Starter N Edition");
+	case Professional:                      return _T("Professional Edition");
+	case Professional_N:                    return _T("Professional N Edition");
+	case SBSolutionServer:                  return _T("Small Business Solution Server Edition");
+	case ServerForSBSolution:               return _T("Server for Small Business Solutions Edition");
+	case StandardServerSolutions:           return _T("Standard Server Solutions Edition");
+	case StandardServerSolutionsCore:       return _T("Standard Server Solutions Core Edition");
+	case SBSolutionServer_EM:               return _T("Small Business Solution Server EM Edition");
+	case ServerForSBSolution_EM:            return _T("Server for Small Business Solutions EM Edition");
+	case SolutionEmbeddedServer:            return _T("Solution Embedded Server Edition");
+	case SolutionEmbeddedServerCore:        return _T("Solution Embedded Server Core Edition");
+	case SmallBusinessServerPremiumCore:    return _T("Small Business Server Premium Core Edition");
+	case EssentialBusinessServerMGMT:       return _T("Essential Business Server Management Edition");
+	case EssentialBusinessServerADDL:       return _T("Essential Business Server Additional Edition");
+	case EssentialBusinessServerMGMTSVC:    return _T("Essential Business Server Management Services Edition");
+	case EssentialBusinessServerADDLSVC:    return _T("Essential Business Server Additional Services Edition");
+	case ClusterServer_V:                   return _T("Cluster Server V Edition");
+	case Embedded:                          return _T("Embedded Edition");
+	case Starter_E:                         return _T("Starter E Edition");
+	case HomeBasic_E:                       return _T("Home Basic E Edition");
+	case HomePremium_E:                     return _T("Home Premium E Edition");
+	case Professional_E:                    return _T("Professional E Edition");
+	case Enterprise_E:                      return _T("Enterprise E Edition");
+	case Ultimate_E:                        return _T("Ultimate E Edition");
+	case Windows10Home_E:                   return _T("Home Edition");
+	case Windows10Education_E:              return _T("Education Edition");
+	case ProfessionalEmbedded:              return _T("Professional Embedded Edition");
+	case EnterpriseEvaluation:              return _T("Enterprise Evaluation Edition");
+	case MultiPointStandardServer:          return _T("MultiPoint Standard Server Edition");
+	case MultiPointPremiumServer:           return _T("MultiPoint Premium Server Edition");
+	case StandardServerEvaluation:          return _T("Standard Server Evaluation Edition");
+	case DatacenterServerEvaluation:        return _T("Datacenter Server Evaluation Edition");
+	case Enterprise_N_Evaluation:           return _T("Enterprise N Evaluation Edition");
+	case EmbeddedAutomotive:                return _T("Embedded Automotive Edition");
+	case EmbeddedIndustryA:                 return _T("Embedded Industry A Edition");
+	case ThinPC:                            return _T("ThinPC Edition");
+	case EmbeddedA:                         return _T("Embedded A Edition");
+	case EmbeddedIndustry:                  return _T("Embedded Industry Edition");
+	case EmbeddedE:                         return _T("Embedded E Edition");
+	case EmbeddedIndustryE:                 return _T("Embedded Industry E Edition");
+	case EmbeddedIndustryAE:                return _T("Embedded Industry A E Edition");
+	case StorageWorkgroupServerEvaluation:  return _T("Storage Workgroup Server Evaluation Edition");
+	case StorageStandardServerEvaluation:   return _T("Storage Standard Server Evaluation Edition");
+	case WindowsRT:                         return _T("Windows RT Edition");
+	case Home_N:                            return _T("Home N Edition");
+	case HomeCountrySpecific:               return _T("Home China Edition");
+	case HomeSingleLanguage:                return _T("Home Single Language Edition");
+	case Professional_WMC:                  return _T("Professional with Media Center Edition");
+	case EmbeddedIndustryEvaluation:        return _T("Embedded Industry Evaluation Edition");
+	case EmbeddedIndustryE_Evaluation:      return _T("Embedded Industry E Evaluation Edition");
+	case EmbeddedEvaluation:                return _T("Embedded Evaluation Edition");
+	case EmbeddedE_Evaluation:              return _T("Embedded E Evaluation Edition");
+	case NanoServer:                        return _T("Nano Server Edition");
+	case CloudStorageServer:                return _T("Cloud Storage Server Edition");
+	case HomeConnected:                     return _T("Home with Bing Edition");
+	case ProfessionalStudent:               return _T("Professional Student Edition");
+	case HomeConnected_N:                   return _T("Home with Bing N Edition");
+	case ProfessionalStudent_N:             return _T("Professional Student N Edition");
+	case HomeConnectedSingleLanguage:       return _T("Home with Bing Single Language Edition");
+	case HomeConnectedCountrySpecific:      return _T("Home with Bing China Edition");
+	case ConnectedCar:                      return _T("Connected Car Edition");
+	case IndustryHandheld:                  return _T("Industry Handheld Edition");
+	case PPIPro:                            return _T("PPI Pro Edition");
+	case ARM64Server:                       return _T("ARM64 Server Edition");
+	case Education_N:                       return _T("Education N Edition");
+	case IoTCore:                           return _T("IoT Core Edition");
+	case CloudHostInfrastructureServer:     return _T("Cloud Host Infrastructure Server Edition");
+	case Enterprise_S:                      return _T("Enterprise S Edition");
+	case Enterprise_S_N:                    return _T("Enterprise S N Edition");
+	case Professional_S:                    return _T("Professional S Edition");
+	case Professional_S_N:                  return _T("Professional S N Edition");
+	case Enterprise_S_Evaluation:           return _T("Enterprise S Evaluation Edition");
+	case Enterprise_S_N_Evaluation:         return _T("Enterprise S N Evaluation Edition");
+	case Holographic:                       return _T("Holographic Edition");
+	case HolographicBusiness:               return _T("Holographic Business Edition");
+	case ProSingleLanguage:                 return _T("Pro Single Language Edition");
+	case ProChina:                          return _T("Pro China Edition");
+	case EnterpriseSubscription:            return _T("Enterprise Subscription Edition");
+	case EnterpriseSubscription_N:          return _T("Enterprise Subscription N Edition");
+	case DatacenterNanoServer:              return _T("Datacenter Nano Server Edition");
+	case StandardNanoServer:                return _T("Standard Nano Server Edition");
+	case DatacenterAServerCore:             return _T("Datacenter A Server Core Edition");
+	case StandardAServerCore:               return _T("Standard A Server Core Edition");
+	case DatacenterWSServerCore:            return _T("Datacenter WS Server Core Edition");
+	case StandardWSServerCore:              return _T("Standard WS Server Core Edition");
+	case UtilityVM:                         return _T("Utility VM Edition");
+	case DatacenterServerCoreEvaluation:    return _T("Datacenter Server Core Evaluation Edition");
+	case StandardServerCoreEvaluation:      return _T("Standard Server Core Evaluation Edition");
+	case ProWorkstation:                    return _T("Pro for Workstations Edition");
+	case ProWorkstation_N:                  return _T("Pro for Workstations N Edition");
+	case ProEducation:                      return _T("Pro Education Edition");
+	case ProEducation_N:                    return _T("Pro Education N Edition");
+	case AzureServerCore:                   return _T("Azure Server Core Edition");
+	case AzureNanoServer:                   return _T("Azure Nano Server Edition");
+	case Enterprise_G:                      return _T("Enterprise G Edition");
+	case Enterprise_GN:                     return _T("Enterprise G N Edition");
+	case EnterpriseMultiSession:            return _T("Enterprise Multi-Session Edition");
+	case Cloud:                             return _T("Cloud Edition");
+	case Cloud_N:                           return _T("Cloud N Edition");
+	case SurfaceHub:                        return _T("Surface Hub Edition");
+	case OneCoreUpdateOS:                   return _T("OneCore Update OS Edition");
+	case Cloud_E:                           return _T("Cloud E Edition");
+	case IoTOS:                             return _T("IoT OS Edition");
+	case Cloud_EN:                          return _T("Cloud EN Edition");
+	case IoTEdgeOS:                         return _T("IoT Edge OS Edition");
+	case IoTEnterprise:                     return _T("IoT Enterprise Edition");
+	case Lite:                              return _T("Lite Edition");
+	case IoTEnterprise_S:                   return _T("IoT Enterprise S Edition");
+	case XboxSystemOS:                      return _T("Xbox System OS Edition");
+	case XboxGameOS:                        return _T("Xbox Game OS Edition");
+	case XboxEraOS:                         return _T("Xbox Era OS Edition");
+	case XboxDurangoHostOS:                 return _T("Xbox Durango Host OS Edition");
+	case XboxScarlettHostOS:                return _T("Xbox Scarlett Host OS Edition");
+	case XboxKeystone:                      return _T("Xbox Keystone Edition");
+	case AzureServerCloudHost:              return _T("Azure Server Cloud Host Edition");
+	case AzureServerCloudMOS:               return _T("Azure Server Cloud MOS Edition");
+	case CloudEdition_N:                    return _T("CloudEdition N Edition");
+	case CloudEdition:                      return _T("CloudEdition Edition");
+	case AzureStackHCIServerCore:           return _T("Azure Stack HCI Server Core Edition");
+	case DatacenterServerAzureEdition:      return _T("Datacenter Server Azure Edition");
+	case DatacenterServerCoreAzureEdition:  return _T("Datacenter Server Core Azure Edition");
+	case Unlicensed:                        return _T("Unlicensed Edition");
+	default:                                return _T("Unknown Edition");
 	}
 }

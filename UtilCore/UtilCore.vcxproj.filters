@@ -73,6 +73,9 @@
     <Filter Include="Image">
       <UniqueIdentifier>{828a3a25-d518-4a82-8968-58c71b01389d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="ConfigFile">
+      <UniqueIdentifier>{aaa8aeb0-d6c2-4c67-bd4c-d8002b486015}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Memory\Containers.h">
@@ -700,6 +703,24 @@
     </ClInclude>
     <ClInclude Include="Job\TimerHeap.h">
       <Filter>Job</Filter>
+    </ClInclude>
+    <ClInclude Include="ConfigFile\ConfigFieldCommon.h">
+      <Filter>ConfigFile</Filter>
+    </ClInclude>
+    <ClInclude Include="ConfigFile\ConfigFieldSpec.h">
+      <Filter>ConfigFile</Filter>
+    </ClInclude>
+    <ClInclude Include="ConfigFile\JSONConfigFieldReader.h">
+      <Filter>ConfigFile</Filter>
+    </ClInclude>
+    <ClInclude Include="ConfigFile\JSONConfigFieldWriter.h">
+      <Filter>ConfigFile</Filter>
+    </ClInclude>
+    <ClInclude Include="ConfigFile\XMLConfigFieldReader.h">
+      <Filter>ConfigFile</Filter>
+    </ClInclude>
+    <ClInclude Include="ConfigFile\XMLConfigFieldWriter.h">
+      <Filter>ConfigFile</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

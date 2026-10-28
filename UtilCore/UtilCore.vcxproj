@@ -24,6 +24,12 @@
     <ClInclude Include="BaseMacro.h" />
     <ClInclude Include="BaseRedefineDataType.h" />
     <ClInclude Include="BaseTLS.h" />
+    <ClInclude Include="ConfigFile\ConfigFieldCommon.h" />
+    <ClInclude Include="ConfigFile\ConfigFieldSpec.h" />
+    <ClInclude Include="ConfigFile\JSONConfigFieldReader.h" />
+    <ClInclude Include="ConfigFile\JSONConfigFieldWriter.h" />
+    <ClInclude Include="ConfigFile\XMLConfigFieldReader.h" />
+    <ClInclude Include="ConfigFile\XMLConfigFieldWriter.h" />
     <ClInclude Include="Containers\Map\ClusterSpinMap.h" />
     <ClInclude Include="Containers\Map\ClusterSpinUnorderedMap.h" />
     <ClInclude Include="Containers\Map\OrderedMap.h" />

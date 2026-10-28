@@ -152,7 +152,7 @@ inline T CRapidJSONUtil::Deserialize(const _tstring& key) const
 // @param key 설정할 JSON 멤버의 키 이름
 // @param value 설정할 데이터 값
 // @return 없음
-// @detail 동일 키의 멤버가 이미 존재하면 먼저 제거한 뒤, 전달된 값을 JSON 지원 타입으로
+// @detail 동일 키의 멤버가 이미 존재하면 그 위치에서 값을 교체하고, 전달된 값을 JSON 지원 타입으로
 //         변환(`ConvertToJSONValue`)하여 새 멤버로 추가합니다. 이 방식으로 "추가"가 아닌
 //         "설정(덮어쓰기)" 의미를 가지므로, operator[]/Proxy를 통해 같은 키에 반복 대입해도
 //         중복 멤버가 생기지 않습니다.
@@ -160,10 +160,8 @@ inline T CRapidJSONUtil::Deserialize(const _tstring& key) const
 template <typename T>
 inline void CRapidJSONUtil::AddValue(const _tstring& key, const T& value)
 {
-	RemoveMemberIfExists(key);
-	auto& allocator = _document.GetAllocator();
-	_tValue jsonKey(key.c_str(), (rapidjson::SizeType)key.length(), allocator);
-	_document.AddMember(jsonKey, ConvertToJSONValue(value), allocator);
+	_tValue jsonValue = ConvertToJSONValue(value);
+	SetMember(key, jsonValue);
 }
 
 //***************************************************************************
@@ -196,6 +194,9 @@ inline void CRapidJSONUtil::UpdateValue(const _tstring& key, const T& value)
 template <typename T>
 inline void CRapidJSONUtil::AddArray(const _tstring& key, const T& value)
 {
+	if( !_document.IsObject() )
+		_document.SetObject();
+
 	auto& allocator = _document.GetAllocator();
 	auto itr = _document.FindMember(key.c_str());
 	if( itr == _document.MemberEnd() )
@@ -206,7 +207,6 @@ inline void CRapidJSONUtil::AddArray(const _tstring& key, const T& value)
 	}
 	else if( !itr->value.IsArray() )
 	{
-		RecursiveRemove(itr->value);
 		itr->value.SetArray();
 	}
 	itr->value.PushBack(ConvertToJSONValue(value), allocator);
@@ -224,6 +224,9 @@ inline void CRapidJSONUtil::AddArray(const _tstring& key, const T& value)
 template <typename T>
 inline void CRapidJSONUtil::UpdateArrayAt(const _tstring& key, uint32 index, const T& value)
 {
+	if( !_document.IsObject() )
+		return;
+
 	auto itr = _document.FindMember(key.c_str());
 	if( itr != _document.MemberEnd() && itr->value.IsArray() && index < itr->value.Size() )
 	{
@@ -241,10 +244,10 @@ inline void CRapidJSONUtil::UpdateArrayAt(const _tstring& key, uint32 index, con
 template <typename T>
 inline T CRapidJSONUtil::GetValue(const _tstring& key, const T& defaultValue) const
 {
-	auto itr = _document.FindMember(key.c_str());
-	if( itr != _document.MemberEnd() && IsConvertible<T>(itr->value) )
+	const _tValue* found = FindValue(key);
+	if( found != nullptr && IsConvertible<T>(*found) )
 	{
-		return ConvertFromJSONValue<T>(itr->value);
+		return ConvertFromJSONValue<T>(*found);
 	}
 	return defaultValue;
 }
@@ -263,21 +266,14 @@ inline bool CRapidJSONUtil::IsConvertible(const _tValue& value) const
 {
 	using CleanT = std::decay_t<T>;
 
-	if constexpr( std::is_same_v<CleanT, int16> || std::is_same_v<CleanT, int32> )
+	if constexpr( is_json_integer_v<CleanT> )
 	{
-		return value.IsInt();
-	}
-	else if constexpr( std::is_same_v<CleanT, uint16> || std::is_same_v<CleanT, uint32> )
-	{
-		return value.IsUint();
-	}
-	else if constexpr( std::is_same_v<CleanT, int64> )
-	{
-		return value.IsInt64();
-	}
-	else if constexpr( std::is_same_v<CleanT, uint64> )
-	{
-		return value.IsUint64();
+		// 타입이 정수이고 대상 타입의 범위 안일 때만 변환 가능으로 본다.
+		// (범위 검사가 없으면 70000을 int16으로 읽을 때 조용히 잘린다)
+		if constexpr( std::is_signed_v<CleanT> )
+			return value.IsInt64() && value.GetInt64() >= static_cast<int64>((std::numeric_limits<CleanT>::min)()) && value.GetInt64() <= static_cast<int64>((std::numeric_limits<CleanT>::max)());
+		else
+			return value.IsUint64() && value.GetUint64() <= static_cast<uint64>((std::numeric_limits<CleanT>::max)());
 	}
 	else if constexpr( std::is_same_v<CleanT, float> || std::is_same_v<CleanT, double> )
 	{
@@ -312,20 +308,17 @@ inline bool CRapidJSONUtil::IsConvertible(const _tValue& value) const
 // @param key JSON 문서에 저장될 객체의 키 이름
 // @param object `ToJSON` 메서드를 지원하는 사용자 정의 클래스 객체
 // @return 없음
-// @detail 동일 키가 이미 존재하면 먼저 제거하여 중복 멤버 생성을 방지한 뒤, 새로운 JSON 객체를
+// @detail 동일 키가 이미 존재하면 그 위치에서 값만 교체하여(멤버 순서 유지) 중복 멤버 생성을 방지하고, 새로운 JSON 객체를
 //         생성하여 `ToJSON` 메서드로 멤버를 채우고 문서에 추가합니다.
 //***************************************************************************
 template <typename T>
 inline void CRapidJSONUtil::AddObject(const _tstring& key, const T& object)
 {
-	RemoveMemberIfExists(key);
-
 	auto& allocator = _document.GetAllocator();
 	_tValue jsonObject(rapidjson::kObjectType);
 	object.ToJSON(jsonObject, allocator);				// 사용자 정의 객체의 ToJSON 호출
 
-	_tValue jsonKey(key.c_str(), (rapidjson::SizeType)key.length(), allocator);
-	_document.AddMember(jsonKey, jsonObject, allocator);
+	SetMember(key, jsonObject);
 }
 
 //***************************************************************************
@@ -339,10 +332,10 @@ inline T CRapidJSONUtil::GetObject(const _tstring& key) const
 {
 	T obj;
 
-	auto itr = _document.FindMember(key.c_str());
-	if( itr != _document.MemberEnd() )
+	const _tValue* found = FindValue(key);
+	if( found != nullptr )
 	{
-		obj.FromJSON(itr->value);		// 사용자 정의 객체의 FromJSON 호출
+		obj.FromJSON(*found);		// 사용자 정의 객체의 FromJSON 호출
 	}
 
 	return obj;
@@ -353,22 +346,19 @@ inline T CRapidJSONUtil::GetObject(const _tstring& key) const
 // @param key JSON 배열로 저장될 키 이름
 // @param vec 직렬화할 기본 자료형 벡터 (`CVector<T>` 또는 `std::vector<T>`)
 // @return 없음
-// @detail 동일 키가 이미 존재하면 먼저 제거하여 중복 멤버 생성을 방지한 뒤, 벡터의 각 요소를
+// @detail 동일 키가 이미 존재하면 그 위치에서 값만 교체하여(멤버 순서 유지) 중복 멤버 생성을 방지하고, 벡터의 각 요소를
 //         순회하며 JSON 값으로 변환하여 하나의 JSON 배열에 담아 문서에 등록합니다.
 //***************************************************************************
 template <typename Container, typename ValueType>
 inline void CRapidJSONUtil::AddVector(const _tstring& key, const Container& vec)
 {
-	RemoveMemberIfExists(key);
-
 	auto& allocator = _document.GetAllocator();
 	_tValue jsonArray(rapidjson::kArrayType);
 	for( const auto& item : vec )
 	{
 		jsonArray.PushBack(ConvertToJSONValue(item), allocator);
 	}
-	_tValue jsonKey(key.c_str(), (rapidjson::SizeType)key.length(), allocator);
-	_document.AddMember(jsonKey, jsonArray, allocator);
+	SetMember(key, jsonArray);
 }
 
 //***************************************************************************
@@ -381,12 +371,12 @@ template <typename Container, typename ValueType>
 inline Container CRapidJSONUtil::GetVector(const _tstring& key) const
 {
 	Container result;
-	auto itr = _document.FindMember(key.c_str());
-	if( itr == _document.MemberEnd() || !itr->value.IsArray() )
+	const _tValue* found = FindValue(key);
+	if( found == nullptr || !found->IsArray() )
 	{
 		return result;
 	}
-	const auto& jsonArray = itr->value;
+	const auto& jsonArray = *found;
 	for( rapidjson::SizeType i = 0; i < jsonArray.Size(); ++i )
 	{
 		// 배열 내 개별 원소의 실제 타입이 ValueType과 다를 수 있으므로(예: 혼합 타입 배열,
@@ -404,14 +394,12 @@ inline Container CRapidJSONUtil::GetVector(const _tstring& key) const
 // @param key JSON 배열로 저장될 키 이름
 // @param vec 직렬화할 사용자 정의 객체 벡터 (`CVector<T>` 또는 `std::vector<T>`)
 // @return 없음
-// @detail 동일 키가 이미 존재하면 먼저 제거하여 중복 멤버 생성을 방지한 뒤, 벡터 내 각 객체의
+// @detail 동일 키가 이미 존재하면 그 위치에서 값만 교체하여(멤버 순서 유지) 중복 멤버 생성을 방지하고, 벡터 내 각 객체의
 //         `ToJSON` 메서드를 호출해 JSON 객체로 변환하고 배열에 누적하여 문서에 추가합니다.
 //***************************************************************************
 template <typename Container, typename ValueType>
 inline void CRapidJSONUtil::AddObjectVector(const _tstring& key, const Container& vec)
 {
-	RemoveMemberIfExists(key);
-
 	auto& allocator = _document.GetAllocator();
 	_tValue jsonArray(rapidjson::kArrayType);
 	for( const auto& item : vec )
@@ -421,8 +409,7 @@ inline void CRapidJSONUtil::AddObjectVector(const _tstring& key, const Container
 		jsonArray.PushBack(jsonObject, allocator);
 	}
 
-	_tValue jsonKey(key.c_str(), (rapidjson::SizeType)key.length(), allocator);
-	_document.AddMember(jsonKey, jsonArray, allocator);
+	SetMember(key, jsonArray);
 }
 
 //***************************************************************************
@@ -435,20 +422,20 @@ template <typename Container, typename ValueType>
 inline Container CRapidJSONUtil::GetObjectVector(const _tstring& key) const
 {
 	Container result;
-	auto itr = _document.FindMember(key.c_str());
-	if( itr == _document.MemberEnd() || !itr->value.IsArray() )
+	const _tValue* found = FindValue(key);
+	if( found == nullptr || !found->IsArray() )
 	{
 		return result;
 	}
 
-	const auto& jsonArray = itr->value;
+	const auto& jsonArray = *found;
 	for( rapidjson::SizeType i = 0; i < jsonArray.Size(); ++i )
 	{
 		const _tValue& jsonObject = jsonArray[i];
 
 		ValueType obj;
 		obj.FromJSON(jsonObject);	// 사용자 정의 객체의 FromJSON 호출
-		result.push_back(obj);
+		result.push_back(std::move(obj));
 	}
 	return result;
 }
@@ -458,14 +445,12 @@ inline Container CRapidJSONUtil::GetObjectVector(const _tstring& key) const
 // @param key JSON 객체로 저장될 키 이름
 // @param map 직렬화할 맵 데이터 (`CMap<Key, Value>` 또는 `std::map<Key, Value>`)
 // @return 없음
-// @detail 동일 키가 이미 존재하면 먼저 제거하여 중복 멤버 생성을 방지한 뒤, 맵의 모든 키-값
+// @detail 동일 키가 이미 존재하면 그 위치에서 값만 교체하여(멤버 순서 유지) 중복 멤버 생성을 방지하고, 맵의 모든 키-값
 //         쌍을 순회하며 각각 JSON 값으로 변환하여 하나의 JSON 객체 멤버로 추가합니다.
 //***************************************************************************
 template <typename MapContainer>
 inline void CRapidJSONUtil::AddMap(const _tstring& key, const MapContainer& map)
 {
-	RemoveMemberIfExists(key);
-
 	auto& allocator = _document.GetAllocator();
 	_tValue jsonObject(rapidjson::kObjectType);
 
@@ -479,8 +464,7 @@ inline void CRapidJSONUtil::AddMap(const _tstring& key, const MapContainer& map)
 		jsonObject.AddMember(jsonKey, jsonValue, allocator);
 	}
 
-	_tValue jsonKey(key.c_str(), (rapidjson::SizeType)key.length(), allocator);
-	_document.AddMember(jsonKey, jsonObject, allocator);
+	SetMember(key, jsonObject);
 }
 
 //***************************************************************************
@@ -496,13 +480,13 @@ inline MapContainer CRapidJSONUtil::GetMap(const _tstring& key) const
 	using KeyType = typename MapContainer::key_type;
 	using ValueType = typename MapContainer::mapped_type;
 
-	auto itr = _document.FindMember(key.c_str());
-	if( itr == _document.MemberEnd() || !itr->value.IsObject() )
+	const _tValue* found = FindValue(key);
+	if( found == nullptr || !found->IsObject() )
 	{
 		return result;
 	}
 
-	const auto& obj = itr->value;
+	const auto& obj = *found;
 	for( auto it = obj.MemberBegin(); it != obj.MemberEnd(); ++it )
 	{
 		// 값의 실제 타입이 ValueType과 다른 항목은 건너뛰어 GetInt()/GetString() 등의
@@ -511,7 +495,7 @@ inline MapContainer CRapidJSONUtil::GetMap(const _tstring& key) const
 		{
 			KeyType mapKey = ConvertFromJSONValue<KeyType>(it->name);
 			ValueType mapValue = ConvertFromJSONValue<ValueType>(it->value);
-			result[mapKey] = mapValue;
+			result[std::move(mapKey)] = std::move(mapValue);
 		}
 	}
 
@@ -523,14 +507,12 @@ inline MapContainer CRapidJSONUtil::GetMap(const _tstring& key) const
 // @param key JSON 객체로 저장될 키 이름
 // @param map 직렬화할 사용자 정의 객체 맵 (`CMap<Key, T>` 또는 `std::map<Key, T>`)
 // @return 없음
-// @detail 동일 키가 이미 존재하면 먼저 제거하여 중복 멤버 생성을 방지한 뒤, 맵의 각 항목에
+// @detail 동일 키가 이미 존재하면 그 위치에서 값만 교체하여(멤버 순서 유지) 중복 멤버 생성을 방지하고, 맵의 각 항목에
 //         대해 값을 JSON 객체로 변환하고 `ToJSON` 메서드를 호출하여 채운 뒤 추가합니다.
 //***************************************************************************
 template <typename MapContainer>
 inline void CRapidJSONUtil::AddObjectMap(const _tstring& key, const MapContainer& map)
 {
-	RemoveMemberIfExists(key);
-
 	auto& allocator = _document.GetAllocator();
 	_tValue jsonObject(rapidjson::kObjectType);
 
@@ -544,8 +526,7 @@ inline void CRapidJSONUtil::AddObjectMap(const _tstring& key, const MapContainer
 		jsonObject.AddMember(jsonMapKey, jsonMapValue, allocator);
 	}
 
-	_tValue jsonKey(key.c_str(), (rapidjson::SizeType)key.length(), allocator);
-	_document.AddMember(jsonKey, jsonObject, allocator);
+	SetMember(key, jsonObject);
 }
 
 //***************************************************************************
@@ -561,20 +542,20 @@ inline MapContainer CRapidJSONUtil::GetObjectMap(const _tstring& key) const
 	using KeyType = typename MapContainer::key_type;
 	using ValueType = typename MapContainer::mapped_type;
 
-	auto itr = _document.FindMember(key.c_str());
-	if( itr == _document.MemberEnd() || !itr->value.IsObject() )
+	const _tValue* found = FindValue(key);
+	if( found == nullptr || !found->IsObject() )
 	{
 		return result;
 	}
 
-	const auto& obj = itr->value;
+	const auto& obj = *found;
 	for( auto it = obj.MemberBegin(); it != obj.MemberEnd(); ++it )
 	{
 		KeyType mapKey = ConvertFromJSONValue<KeyType>(it->name);
 
 		ValueType mapValue;
 		mapValue.FromJSON(it->value);			// T 타입의 FromJSON 호출
-		result.emplace(mapKey, mapValue);
+		result.emplace(std::move(mapKey), std::move(mapValue));
 	}
 
 	return result;
@@ -589,29 +570,19 @@ inline MapContainer CRapidJSONUtil::GetObjectMap(const _tstring& key) const
 template <typename T>
 inline _tValue CRapidJSONUtil::ConvertToJSONValue(const T& value)
 {
-	if constexpr( std::is_same<T, int16>::value )
+	if constexpr( is_json_integer_v<T> )
 	{
-		return _tValue(value);
-	}
-	else if constexpr( std::is_same<T, uint16>::value )
-	{
-		return _tValue(value);
-	}
-	else if constexpr( std::is_same<T, int32>::value )
-	{
-		return _tValue(value);
-	}
-	else if constexpr( std::is_same<T, uint32>::value )
-	{
-		return _tValue(value);
-	}
-	else if constexpr( std::is_same<T, int64>::value )
-	{
-		return _tValue(value);
-	}
-	else if constexpr( std::is_same<T, uint64>::value )
-	{
-		return _tValue(value);
+		// 8~64비트 모든 정수형(long, unsigned long 포함)을 32/64비트로 정규화해 저장한다.
+		if constexpr( std::is_signed_v<T> )
+		{
+			if constexpr( sizeof(T) <= 4 ) return _tValue(static_cast<int32>(value));
+			else                           return _tValue(static_cast<int64>(value));
+		}
+		else
+		{
+			if constexpr( sizeof(T) <= 4 ) return _tValue(static_cast<uint32>(value));
+			else                           return _tValue(static_cast<uint64>(value));
+		}
 	}
 	else if constexpr( std::is_same<T, float>::value )
 	{
@@ -627,6 +598,9 @@ inline _tValue CRapidJSONUtil::ConvertToJSONValue(const T& value)
 	}
 	else if constexpr( std::is_same_v<typename std::decay<T>::type, TCHAR*> || std::is_same_v<typename std::decay<T>::type, const TCHAR*> )
 	{
+		// nullptr 문자열은 빈 문자열로 저장한다. (널 포인터를 그대로 넘기면 strlen에서 크래시)
+		if( value == nullptr )
+			return _tValue(_T(""), 0, _document.GetAllocator());
 		return _tValue(value, _document.GetAllocator());
 	}
 	else if constexpr( std::is_same_v<T, _tstring> )
@@ -681,29 +655,11 @@ inline T CRapidJSONUtil::ConvertFromJSONValue(const _tValue& value) const
 			"ConvertFromJSONValue<TCHAR*> is not allowed (dangling risk / GetString() returns const TCHAR*). "
 			"Use _tstring or const TCHAR* instead.");
 	}
-	else if constexpr( std::is_same<T, int16>::value )
+	else if constexpr( is_json_integer_v<T> )
 	{
-		return value.GetInt();
-	}
-	else if constexpr( std::is_same<T, uint16>::value )
-	{
-		return value.GetUint();
-	}
-	else if constexpr( std::is_same<T, int32>::value )
-	{
-		return value.GetInt();
-	}
-	else if constexpr( std::is_same<T, uint32>::value )
-	{
-		return value.GetUint();
-	}
-	else if constexpr( std::is_same<T, int64>::value )
-	{
-		return value.GetInt64();
-	}
-	else if constexpr( std::is_same<T, uint64>::value )
-	{
-		return value.GetUint64();
+		// 범위는 IsConvertible이 미리 검증한다. 직접 호출하는 쪽은 IsConvertible<T>로 먼저 확인할 것.
+		if constexpr( std::is_signed_v<T> ) return static_cast<T>(value.GetInt64());
+		else                                return static_cast<T>(value.GetUint64());
 	}
 	else if constexpr( std::is_same<T, float>::value )
 	{
@@ -723,7 +679,7 @@ inline T CRapidJSONUtil::ConvertFromJSONValue(const _tValue& value) const
 	}
 	else if constexpr( std::is_same_v<T, _tstring> )
 	{
-		return value.GetString();
+		return _tstring(value.GetString(), value.GetStringLength());		// 길이를 알고 있으므로 strlen을 피하고 널 문자가 있어도 잘리지 않는다
 	}
 	else if constexpr( is_vector<T>::value )
 	{

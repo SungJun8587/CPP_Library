@@ -10,6 +10,7 @@
 #include <BaseRedefineDataType.h>
 #include <BaseTLS.h>
 
+#include <Containers/Queue/SpinLockQueue.h>
 #include <Job/JobRedefineDataType.h>
 #include <Job/MoveOnlyFunction.h>
 #include <Job/Job.h>

@@ -9,7 +9,7 @@
 template <typename T>
 inline const CRapidXMLUtil& CRapidXMLUtil::operator=(const T& value)
 {
-    rapidxml::xml_node<char>* firstNode = _doc.first_node();
+    rapidxml::xml_node<char>* firstNode = FindRootElement();
     if( !firstNode ) return *this;
 
     rapidxml::xml_node<char>* node = firstNode->last_node();
@@ -17,7 +17,7 @@ inline const CRapidXMLUtil& CRapidXMLUtil::operator=(const T& value)
 
     if constexpr( std::is_arithmetic<T>::value )
     {
-        node->value(_doc.allocate_string(std::to_string(value).c_str()));
+        node->value(_doc.allocate_string(NumberToString(value).c_str()));
     }
     else if constexpr( std::is_same_v<T, _tstring> )
     {
@@ -153,17 +153,19 @@ inline T CRapidXMLUtil::Deserialize(const std::string& xml)
 
     if( xml.empty() ) return obj;
 
-    CVector<char> buffer(xml.begin(), xml.end());
-    buffer.push_back('\0');
+    // 파싱은 버퍼를 직접 가리키는 방식이라(in-situ) 함수가 끝난 뒤에도 문서가 유효하도록 버퍼를 멤버로 보관합니다.
+    // (지역 버퍼를 쓰면 반환 후 _doc이 해제된 메모리를 가리켜 이후 operator[] 읽기 등이 잘못된 메모리를 읽습니다.)
+    _xmlString.assign(xml);
 
     try
     {
-        _doc.parse<0>(&buffer[0]);
+        _doc.parse<0>(&_xmlString[0]);
     }
     catch( const parse_error& e )
     {
         _tcerr << _T("XML parse error : ") << e.what() << std::endl;
         _tcerr << _T("Location of error : ") << e.where<TCHAR>() << std::endl;
+        _doc.clear();
         return obj;
     }
 
@@ -175,7 +177,7 @@ inline T CRapidXMLUtil::Deserialize(const std::string& xml)
     }
 
     std::optional<T> result = ConvertFromXML<T>(_T(""));
-    return result.has_value() ? result.value() : obj;
+    return result.has_value() ? std::move(result.value()) : std::move(obj);
 }
 
 //***************************************************************************
@@ -218,15 +220,18 @@ inline void CRapidXMLUtil::AddVector(const Container& container, xml_node<>* par
     xml_node<>* containerNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TStringToUtf8(ptszTagName).c_str()));
     parent->append_node(containerNode);
 
+    // 원소마다 태그 이름을 UTF-8로 변환/할당하지 않고 한 번만 만들어 모든 Item 노드가 공유한다.
+    const char* itemTag = _doc.allocate_string(TStringToUtf8(ItemName).c_str());
+
     for( const auto& item : container )
     {
         if constexpr( std::is_arithmetic<ValueType>::value )
         {
-            AddValue(item, containerNode);
+            containerNode->append_node(_doc.allocate_node(node_type::node_element, itemTag, _doc.allocate_string(NumberToString(item).c_str())));
         }
         else if constexpr( std::is_same_v<ValueType, _tstring> )
         {
-            AddValue(item, containerNode);
+            containerNode->append_node(_doc.allocate_node(node_type::node_element, itemTag, _doc.allocate_string(TStringToUtf8(item).c_str())));
         }
     }
 }
@@ -258,7 +263,7 @@ inline void CRapidXMLUtil::GetVector(Container& container, xml_node<>* parent, c
             GetValue(item, node);
         }
 
-        container.push_back(item);
+        container.push_back(std::move(item));
     }
 }
 
@@ -274,10 +279,10 @@ inline void CRapidXMLUtil::AddObjectVector(const Container& container, xml_node<
     xml_node<>* containerNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TStringToUtf8(ptszTagName).c_str()));
     parent->append_node(containerNode);
 
-    std::string itemTagUtf8 = TStringToUtf8(ItemName);
+    const char* itemTagUtf8 = _doc.allocate_string(TStringToUtf8(ItemName).c_str());
     for( const auto& item : container )
     {
-        xml_node<>* classNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(itemTagUtf8.c_str()));
+        xml_node<>* classNode = _doc.allocate_node(node_type::node_element, itemTagUtf8);
         containerNode->append_node(classNode);
         item.ToXML(classNode, _doc);
     }
@@ -300,7 +305,7 @@ inline void CRapidXMLUtil::GetObjectVector(Container& container, xml_node<>* par
     {
         ValueType item;
         item.FromXML(node);
-        container.push_back(item);
+        container.push_back(std::move(item));
     }
 }
 
@@ -319,10 +324,10 @@ inline void CRapidXMLUtil::AddMap(const MapContainer& container, xml_node<>* par
     xml_node<>* containerNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TStringToUtf8(ptszTagName).c_str()));
     parent->append_node(containerNode);
 
-    std::string itemTagUtf8 = TStringToUtf8(ItemName);
+    const char* itemTagUtf8 = _doc.allocate_string(TStringToUtf8(ItemName).c_str());
     for( const auto& item : container )
     {
-        xml_node<>* itemNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(itemTagUtf8.c_str()));
+        xml_node<>* itemNode = _doc.allocate_node(node_type::node_element, itemTagUtf8);
         containerNode->append_node(itemNode);
 
         if constexpr( std::is_arithmetic<KeyType>::value || std::is_same_v<KeyType, _tstring> )
@@ -395,16 +400,18 @@ inline void CRapidXMLUtil::AddObjectMap(const MapContainer& container, xml_node<
     xml_node<>* containerNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TStringToUtf8(ptszTagName).c_str()));
     parent->append_node(containerNode);
 
-    std::string itemTagUtf8 = TStringToUtf8(ItemName);
+    const char* itemTagUtf8 = _doc.allocate_string(TStringToUtf8(ItemName).c_str());
+    const char* mapKeyTag = _doc.allocate_string(TStringToUtf8(MapKey).c_str());
+    const char* mapValueTag = _doc.allocate_string(TStringToUtf8(MapValue).c_str());
     for( const auto& item : container )
     {
-        xml_node<>* itemNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(itemTagUtf8.c_str()));
+        xml_node<>* itemNode = _doc.allocate_node(node_type::node_element, itemTagUtf8);
         containerNode->append_node(itemNode);
 
-        xml_node<>* node = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TStringToUtf8(MapKey).c_str()), _doc.allocate_string(TStringToUtf8(item.first).c_str()));
+        xml_node<>* node = _doc.allocate_node(node_type::node_element, mapKeyTag, _doc.allocate_string(TStringToUtf8(item.first).c_str()));
         itemNode->append_node(node);
 
-        xml_node<>* classNode = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TStringToUtf8(MapValue).c_str()));
+        xml_node<>* classNode = _doc.allocate_node(node_type::node_element, mapValueTag);
         itemNode->append_node(classNode);
         item.second.ToXML(classNode, _doc);
     }
@@ -437,7 +444,7 @@ inline void CRapidXMLUtil::GetObjectMap(MapContainer& container, xml_node<>* par
         xml_node<>* keyNode = node->first_node(keyTag.c_str());
         if( keyNode )
         {
-            key = Utf8ToTString(keyNode->value());
+            key = Utf8ToTString(XmlNodeText(keyNode));
         }
 
         xml_node<>* valueNode = node->first_node(valueTag.c_str());
@@ -459,7 +466,7 @@ inline void CRapidXMLUtil::GetObjectMap(MapContainer& container, xml_node<>* par
 template <typename T, typename std::enable_if<std::is_arithmetic<T>::value>::type*>
 inline void CRapidXMLUtil::AddValue(const T& value, xml_node<>* parent, const TCHAR* ptszTagName)
 {
-    xml_node<>* node = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TStringToUtf8(ptszTagName).c_str()), _doc.allocate_string(std::to_string(value).c_str()));
+    xml_node<>* node = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TStringToUtf8(ptszTagName).c_str()), _doc.allocate_string(NumberToString(value).c_str()));
     parent->append_node(node);
 }
 
@@ -474,8 +481,8 @@ inline void CRapidXMLUtil::GetValue(T& value, xml_node<>* node)
     // std::stod는 (1) 값이 빈 문자열이면 예외를 던지고 (2) 현재 전역 C 로케일
     // (setlocale로 변경될 수 있는)의 영향을 받습니다. _strtod_l은 실패 시 예외 없이
     // 0.0을 반환하고, 항상 고정된 "C" 로케일로 파싱하므로 벡터/맵 항목 파싱에 더 안전합니다.
-    if( node && node->value() )
-        value = static_cast<T>(_strtod_l(node->value(), nullptr, g_xmlNumericLocale));
+    if( node )
+        ParseNumber(XmlNodeText(node), value);
 }
 
 //***************************************************************************
@@ -486,7 +493,7 @@ inline void CRapidXMLUtil::GetValue(T& value, xml_node<>* node)
 template <typename T>
 inline void CRapidXMLUtil::BuildXMLNode(const _tstring& nodeName, const T& obj)
 {
-    xml_node<char>* root = _doc.first_node();
+    xml_node<char>* root = FindRootElement();
     if( !root )
     {
         root = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TStringToUtf8(RootName).c_str()));
@@ -587,7 +594,7 @@ inline std::optional<T> CRapidXMLUtil::ConvertFromXML(const _tstring& nodeName)
     // 쓰레기 값이 반환될 수 있습니다. 값 초기화로 항상 0/빈 상태에서 시작합니다.
     T value{};
 
-    xml_node<char>* root = _doc.first_node();
+    xml_node<char>* root = FindRootElement();
     if( !root ) return std::nullopt;        // 노드가 없거나 값이 없으면 std::nullopt 반환
 
     if constexpr( is_vector<T>::value )

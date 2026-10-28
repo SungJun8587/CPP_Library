@@ -250,7 +250,9 @@ typedef enum WindowsVersion
 	Windows11_21H2,
 	Windows11_22H2,
 	Windows11_23H2,
-	Windows11_24H2
+	Windows11_24H2,
+	Windows11_25H2,
+	Windows11_26H1
 } WindowsVersion;
 
 //***************************************************************************
@@ -337,7 +339,104 @@ typedef enum WindowsEdition
 	Enterprise_E,
 	Ultimate_E,
 	Windows10Home_E,
-	Windows10Education_E
+	Windows10Education_E,
+
+	ProfessionalEmbedded,
+	EnterpriseEvaluation,
+	MultiPointStandardServer,
+	MultiPointPremiumServer,
+	StandardServerEvaluation,
+	DatacenterServerEvaluation,
+	Enterprise_N_Evaluation,
+	EmbeddedAutomotive,
+	EmbeddedIndustryA,
+	ThinPC,
+	EmbeddedA,
+	EmbeddedIndustry,
+	EmbeddedE,
+	EmbeddedIndustryE,
+	EmbeddedIndustryAE,
+	StorageWorkgroupServerEvaluation,
+	StorageStandardServerEvaluation,
+	WindowsRT,
+	Home_N,
+	HomeCountrySpecific,
+	HomeSingleLanguage,
+	Professional_WMC,
+	EmbeddedIndustryEvaluation,
+	EmbeddedIndustryE_Evaluation,
+	EmbeddedEvaluation,
+	EmbeddedE_Evaluation,
+	NanoServer,
+	CloudStorageServer,
+	HomeConnected,
+	ProfessionalStudent,
+	HomeConnected_N,
+	ProfessionalStudent_N,
+	HomeConnectedSingleLanguage,
+	HomeConnectedCountrySpecific,
+	ConnectedCar,
+	IndustryHandheld,
+	PPIPro,
+	ARM64Server,
+	Education_N,
+	IoTCore,
+	CloudHostInfrastructureServer,
+	Enterprise_S,
+	Enterprise_S_N,
+	Professional_S,
+	Professional_S_N,
+	Enterprise_S_Evaluation,
+	Enterprise_S_N_Evaluation,
+	Holographic,
+	HolographicBusiness,
+	ProSingleLanguage,
+	ProChina,
+	EnterpriseSubscription,
+	EnterpriseSubscription_N,
+	DatacenterNanoServer,
+	StandardNanoServer,
+	DatacenterAServerCore,
+	StandardAServerCore,
+	DatacenterWSServerCore,
+	StandardWSServerCore,
+	UtilityVM,
+	DatacenterServerCoreEvaluation,
+	StandardServerCoreEvaluation,
+	ProWorkstation,
+	ProWorkstation_N,
+	ProEducation,
+	ProEducation_N,
+	AzureServerCore,
+	AzureNanoServer,
+	Enterprise_G,
+	Enterprise_GN,
+	EnterpriseMultiSession,
+	Cloud,
+	Cloud_N,
+	SurfaceHub,
+	OneCoreUpdateOS,
+	Cloud_E,
+	IoTOS,
+	Cloud_EN,
+	IoTEdgeOS,
+	IoTEnterprise,
+	Lite,
+	IoTEnterprise_S,
+	XboxSystemOS,
+	XboxGameOS,
+	XboxEraOS,
+	XboxDurangoHostOS,
+	XboxScarlettHostOS,
+	XboxKeystone,
+	AzureServerCloudHost,
+	AzureServerCloudMOS,
+	CloudEdition_N,
+	CloudEdition,
+	AzureStackHCIServerCore,
+	DatacenterServerAzureEdition,
+	DatacenterServerCoreAzureEdition,
+	Unlicensed
 } WindowsEdition;
 
 //***************************************************************************
@@ -374,7 +473,8 @@ public:
 	// @brief 감지된 Windows OS 버전을 반환합니다.
 	// @return WindowsVersion 감지된 OS 버전 열거형
 	//***************************************************************************
-	WindowsVersion GetWindowsVersion() const {
+	WindowsVersion GetWindowsVersion() const
+	{
 		return m_nWinVersion;
 	}
 
@@ -382,7 +482,8 @@ public:
 	// @brief 감지된 Windows 에디션 정보를 반환합니다.
 	// @return WindowsEdition 감지된 에디션 열거형
 	//***************************************************************************
-	WindowsEdition GetWindowsEdition() const {
+	WindowsEdition GetWindowsEdition() const
+	{
 		return m_nWinEdition;
 	}
 
@@ -390,7 +491,8 @@ public:
 	// @brief OS 주 버전(Major Version)을 반환합니다.
 	// @return DWORD 주 버전 번호
 	//***************************************************************************
-	DWORD GetMajorVersion() const {
+	DWORD GetMajorVersion() const
+	{
 		return m_Osvi.dwMajorVersion;
 	}
 
@@ -398,7 +500,8 @@ public:
 	// @brief OS 부 버전(Minor Version)을 반환합니다.
 	// @return DWORD 부 버전 번호
 	//***************************************************************************
-	DWORD GetMinorVersion() const {
+	DWORD GetMinorVersion() const
+	{
 		return m_Osvi.dwMinorVersion;
 	}
 
@@ -407,7 +510,8 @@ public:
 	// @param 없음
 	// @return DWORD 빌드 번호
 	//***************************************************************************
-	DWORD GetBuildNumber() const {
+	DWORD GetBuildNumber() const
+	{
 		return m_Osvi.dwBuildNumber;
 	}
 
@@ -415,7 +519,8 @@ public:
 	// @brief OS 플랫폼 ID를 반환합니다.
 	// @return DWORD 플랫폼 ID
 	//***************************************************************************
-	DWORD GetPlatformID() const {
+	DWORD GetPlatformID() const
+	{
 		return m_Osvi.dwPlatformId;
 	}
 
@@ -423,7 +528,8 @@ public:
 	// @brief 감지된 OS 설명 문자열을 반환합니다.
 	// @return const TCHAR* OS 설명 문자열 포인터
 	//***************************************************************************
-	const TCHAR* GetDescription() const {
+	const TCHAR* GetDescription() const
+	{
 		return m_tszDescription;
 	}
 
@@ -431,7 +537,8 @@ public:
 	// @brief 서비스 팩 및 빌드 정보 문자열을 반환합니다.
 	// @return const TCHAR* 서비스 팩 문자열 포인터
 	//***************************************************************************
-	const TCHAR* GetServicePack() const {
+	const TCHAR* GetServicePack() const
+	{
 		return m_tszServicePack;
 	}
 

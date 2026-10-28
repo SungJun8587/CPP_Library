@@ -99,6 +99,13 @@ using namespace std;
 #include <XML/RapidXMLUtil.h>
 #include <Crypto/CryptoUtil.h>
 
+#include <ConfigFile/ConfigFieldSpec.h>
+#include <ConfigFile/ConfigFieldCommon.h>
+#include <ConfigFile/XMLConfigFieldReader.h>
+#include <ConfigFile/XMLConfigFieldWriter.h>
+#include <ConfigFile/JSONConfigFieldReader.h>
+#include <ConfigFile/JSONConfigFieldWriter.h>
+
 #include <Util/CalculatedElapsedTime.h>
 #include <Util/IconvUtil.h>
 #include <Util/WinCharsetConv.h>

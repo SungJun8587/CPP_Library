@@ -14,6 +14,18 @@
 _locale_t g_xmlNumericLocale = _create_locale(LC_NUMERIC, "C");
 
 //***************************************************************************
+// @brief 텍스트를 T로 읽고, 숫자로 읽을 수 없으면 defaultValue를 돌려줍니다.
+// @detail atoi 계열은 "abc"를 조용히 0으로 만들고 범위를 넘으면 정의되지 않은 동작(int8/int16은 잘려서 wrap)이지만,
+//         CRapidXMLUtil::ParseNumber는 형식이 맞지 않으면 defaultValue를 유지하고 범위를 넘으면 가장 가까운 값으로 맞춥니다.
+//***************************************************************************
+template <typename T>
+static T ParseOr(const char* text, T defaultValue)
+{
+	CRapidXMLUtil::ParseNumber(text, defaultValue);
+	return defaultValue;
+}
+
+//***************************************************************************
 // @brief 특정 속성(Attribute)의 불리언(bool) 값을 읽어옵니다.
 // @param ptszKey 속성 키 이름
 // @param defaultValue 실패 시 반환할 기본값
@@ -44,7 +56,7 @@ int8 CXMLNode::GetInt8Attr(const TCHAR* ptszKey, int8 defaultValue)
 
 	xml_attribute<>* attr = _node->first_attribute(TStringToUtf8(ptszKey).c_str());
 	if( attr && attr->value() )
-		return static_cast<int8>(atoi(attr->value()));
+		return ParseOr<int8>(attr->value(), defaultValue);
 
 	return defaultValue;
 }
@@ -61,7 +73,7 @@ int16 CXMLNode::GetInt16Attr(const TCHAR* ptszKey, int16 defaultValue)
 
 	xml_attribute<>* attr = _node->first_attribute(TStringToUtf8(ptszKey).c_str());
 	if( attr && attr->value() )
-		return static_cast<int16>(atoi(attr->value()));
+		return ParseOr<int16>(attr->value(), defaultValue);
 
 	return defaultValue;
 }
@@ -78,7 +90,7 @@ int32 CXMLNode::GetInt32Attr(const TCHAR* ptszKey, int32 defaultValue)
 
 	xml_attribute<>* attr = _node->first_attribute(TStringToUtf8(ptszKey).c_str());
 	if( attr && attr->value() )
-		return atoi(attr->value());
+		return ParseOr<int32>(attr->value(), defaultValue);
 
 	return defaultValue;
 }
@@ -95,7 +107,7 @@ int64 CXMLNode::GetInt64Attr(const TCHAR* ptszKey, int64 defaultValue)
 
 	xml_attribute<>* attr = _node->first_attribute(TStringToUtf8(ptszKey).c_str());
 	if( attr && attr->value() )
-		return _atoi64(attr->value());
+		return ParseOr<int64>(attr->value(), defaultValue);
 
 	return defaultValue;
 }
@@ -112,7 +124,7 @@ float CXMLNode::GetFloatAttr(const TCHAR* ptszKey, float defaultValue)
 
 	xml_attribute<>* attr = _node->first_attribute(TStringToUtf8(ptszKey).c_str());
 	if( attr && attr->value() )
-		return static_cast<float>(_atof_l(attr->value(), g_xmlNumericLocale));
+		return ParseOr<float>(attr->value(), defaultValue);
 
 	return defaultValue;
 }
@@ -129,7 +141,7 @@ double CXMLNode::GetDoubleAttr(const TCHAR* ptszKey, double defaultValue)
 
 	xml_attribute<>* attr = _node->first_attribute(TStringToUtf8(ptszKey).c_str());
 	if( attr && attr->value() )
-		return _atof_l(attr->value(), g_xmlNumericLocale);
+		return ParseOr<double>(attr->value(), defaultValue);
 
 	return defaultValue;
 }
@@ -166,7 +178,7 @@ bool CXMLNode::GetBoolValue(bool defaultValue)
 {
 	if( _node == nullptr ) return defaultValue;
 
-	char* val = _node->value();
+	const char* val = XmlNodeText(_node);
 	if( val )
 		return (_stricmp(val, "true") == 0 || strcmp(val, "1") == 0);
 
@@ -182,9 +194,9 @@ int8 CXMLNode::GetInt8Value(int8 defaultValue)
 {
 	if( _node == nullptr ) return defaultValue;
 
-	char* val = _node->value();
+	const char* val = XmlNodeText(_node);
 	if( val )
-		return static_cast<int8>(atoi(val));
+		return ParseOr<int8>(val, defaultValue);
 
 	return defaultValue;
 }
@@ -198,9 +210,9 @@ int16 CXMLNode::GetInt16Value(int16 defaultValue)
 {
 	if( _node == nullptr ) return defaultValue;
 
-	char* val = _node->value();
+	const char* val = XmlNodeText(_node);
 	if( val )
-		return static_cast<int16>(atoi(val));
+		return ParseOr<int16>(val, defaultValue);
 
 	return defaultValue;
 }
@@ -214,9 +226,9 @@ int32 CXMLNode::GetInt32Value(int32 defaultValue)
 {
 	if( _node == nullptr ) return defaultValue;
 
-	char* val = _node->value();
+	const char* val = XmlNodeText(_node);
 	if( val )
-		return static_cast<int32>(atoi(val));
+		return ParseOr<int32>(val, defaultValue);
 
 	return defaultValue;
 }
@@ -230,9 +242,9 @@ int64 CXMLNode::GetInt64Value(int64 defaultValue)
 {
 	if( _node == nullptr ) return defaultValue;
 
-	char* val = _node->value();
+	const char* val = XmlNodeText(_node);
 	if( val )
-		return static_cast<int64>(_atoi64(val));
+		return ParseOr<int64>(val, defaultValue);
 
 	return defaultValue;
 }
@@ -246,9 +258,9 @@ float CXMLNode::GetFloatValue(float defaultValue)
 {
 	if( _node == nullptr ) return defaultValue;
 
-	char* val = _node->value();
+	const char* val = XmlNodeText(_node);
 	if( val )
-		return static_cast<float>(_atof_l(val, g_xmlNumericLocale));
+		return ParseOr<float>(val, defaultValue);
 
 	return defaultValue;
 }
@@ -262,9 +274,9 @@ double CXMLNode::GetDoubleValue(double defaultValue)
 {
 	if( _node == nullptr ) return defaultValue;
 
-	char* val = _node->value();
+	const char* val = XmlNodeText(_node);
 	if( val )
-		return ::_atof_l(val, g_xmlNumericLocale);
+		return ParseOr<double>(val, defaultValue);
 
 	return defaultValue;
 }
@@ -279,7 +291,7 @@ const TCHAR* CXMLNode::GetStringValue(const TCHAR* defaultValue)
 {
 	if( _node == nullptr ) return defaultValue;
 
-	char* val = _node->value();
+	const char* val = XmlNodeText(_node);
 	if( val )
 	{
 		// 노드가 존재하면(텍스트가 빈 문자열이더라도) 그 값을 그대로 반환합니다.
@@ -341,7 +353,16 @@ CRapidXMLUtil::CRapidXMLUtil(const _tstring& xmlData)
 	_xmlString = TStringToUtf8(xmlData);
 	if( !_xmlString.empty() )
 	{
-		_doc.parse<0>(&_xmlString[0]);
+		try
+		{
+			_doc.parse<0>(&_xmlString[0]);
+		}
+		catch( const parse_error& e )
+		{
+			// 생성자에서 예외가 새어 나가지 않도록 ParseFromFile과 같이 오류를 알리고 빈 문서로 둔다.
+			_tcerr << _T("XML parse error : ") << e.what() << std::endl;
+			_doc.clear();
+		}
 	}
 }
 
@@ -351,11 +372,61 @@ CRapidXMLUtil::CRapidXMLUtil(const _tstring& xmlData)
 //***************************************************************************
 CRapidXMLUtil::CRapidXMLUtil(const CRapidXMLUtil& other)
 {
-	_xmlString = other._xmlString;
-	if( !_xmlString.empty() )
+	CopyDocument(other);
+}
+
+//***************************************************************************
+// @brief 대입 연산자. 현재 문서를 비우고 other의 문서를 깊은 복사합니다.
+// @detail 기본 대입 연산자는 xml_document(메모리 풀)를 멤버 단위로 복사해 풀을 공유하므로 사용할 수 없습니다.
+//***************************************************************************
+CRapidXMLUtil& CRapidXMLUtil::operator=(const CRapidXMLUtil& other)
+{
+	if( this != &other )
 	{
-		_doc.parse<0>(&_xmlString[0]);
+		_doc.clear();
+		_xmlString.clear();
+		CopyDocument(other);
 	}
+	return *this;
+}
+
+//***************************************************************************
+// @brief other의 문서 트리를 이 객체의 메모리 풀로 깊은 복사합니다.
+// @detail 파일/문자열에서 파싱한 문서뿐 아니라 AddNode 등으로 코드에서 만든 문서도 복사됩니다.
+//         (원문 문자열을 다시 파싱하는 방식은 코드로 만든 문서에서 빈 문서가 됩니다.)
+//         rapidxml::clone_node는 이름/값 포인터만 복사하므로 원본이 사라지면 dangling이 되어 쓰지 않고,
+//         문자열을 이 문서의 풀로 복사하는 CloneNode를 사용합니다.
+//***************************************************************************
+void CRapidXMLUtil::CopyDocument(const CRapidXMLUtil& other)
+{
+	for( const xml_node<>* node = other._doc.first_node(); node != nullptr; node = node->next_sibling() )
+		_doc.append_node(CloneNode(node));
+}
+
+//***************************************************************************
+// @brief 노드(자식, 속성 포함)를 이 문서의 메모리 풀로 깊은 복사합니다.
+//***************************************************************************
+xml_node<>* CRapidXMLUtil::CloneNode(const xml_node<>* source)
+{
+	auto copy = [this](const char* text, size_t size) -> char*
+		{
+			if( size == 0 )
+				return nullptr;
+			char* result = _doc.allocate_string(nullptr, size + 1);
+			std::memcpy(result, text, size);
+			result[size] = '\0';
+			return result;
+		};
+
+	xml_node<>* node = _doc.allocate_node(source->type(), copy(source->name(), source->name_size()), copy(source->value(), source->value_size()));
+
+	for( const xml_attribute<>* attr = source->first_attribute(); attr != nullptr; attr = attr->next_attribute() )
+		node->append_attribute(_doc.allocate_attribute(copy(attr->name(), attr->name_size()), copy(attr->value(), attr->value_size())));
+
+	for( const xml_node<>* child = source->first_node(); child != nullptr; child = child->next_sibling() )
+		node->append_node(CloneNode(child));
+
+	return node;
 }
 
 //***************************************************************************
@@ -376,19 +447,29 @@ CRapidXMLUtil::~CRapidXMLUtil()
 //***************************************************************************
 bool CRapidXMLUtil::ParseFromFile(const _tstring& filename, OUT CXMLNode& root)
 {
-	std::ifstream file(filename, std::ios::binary);
+	std::ifstream file(filename, std::ios::binary | std::ios::ate);
 	if( !file.is_open() )
 	{
 		_tcerr << _T("Failed to open file for reading: ") << filename << std::endl;
 		return false;
 	}
 
-	std::stringstream buffer;
-	buffer << file.rdbuf();
-	_xmlString = buffer.str();
-	if( _xmlString.empty() ) return false;
+	// 파일 크기만큼 한 번에 읽는다. (stringstream을 거치면 파일 전체를 두 번 더 복사한다)
+	const std::streamsize size = file.tellg();
+	if( size <= 0 )
+		return false;
 
+	// 파싱한 문서가 이 버퍼를 직접 가리키므로, 파싱이 끝나기 전에 기존 문서부터 비운다.
 	_doc.clear();
+	_xmlString.assign(static_cast<size_t>(size), '\0');
+	file.seekg(0, std::ios::beg);
+	if( !file.read(&_xmlString[0], size) )
+	{
+		_xmlString.clear();
+		_tcerr << _T("Failed to read file: ") << filename << std::endl;
+		return false;
+	}
+
 	try
 	{
 		_doc.parse<0>(&_xmlString[0]);
@@ -396,10 +477,11 @@ bool CRapidXMLUtil::ParseFromFile(const _tstring& filename, OUT CXMLNode& root)
 	catch( const parse_error& e )
 	{
 		_tcerr << _T("XML parse error : ") << e.what() << std::endl;
+		_doc.clear();
 		return false;
 	}
 
-	root = CXMLNode(_doc.first_node());
+	root = CXMLNode(FindRootElement());
 
 	return true;
 }
@@ -411,8 +493,10 @@ bool CRapidXMLUtil::ParseFromFile(const _tstring& filename, OUT CXMLNode& root)
 //***************************************************************************
 bool CRapidXMLUtil::SaveFile(const _tstring& filename)
 {
-	_xmlString.clear();
-	rapidxml::print(std::back_inserter(_xmlString), _doc);
+	// _xmlString은 ParseFromFile이 파싱한 문서가 이름/값을 가리키는 원본 버퍼일 수 있다.
+	// 여기에 출력하면 문서가 읽는 중인 문자열이 덮어써지거나 재할당으로 해제되므로 지역 문자열을 쓴다.
+	std::string xmlText;
+	rapidxml::print(std::back_inserter(xmlText), _doc);
 
 	std::ofstream file(filename);
 	if( !file.is_open() )
@@ -421,10 +505,12 @@ bool CRapidXMLUtil::SaveFile(const _tstring& filename)
 		return false;
 	}
 
-	file << _xmlString;
+	file << xmlText;
+	file.flush();
+	const bool ok = file.good();
 	file.close();
 
-	return true;
+	return ok;
 }
 
 //***************************************************************************
@@ -435,7 +521,8 @@ bool CRapidXMLUtil::SaveFile(const _tstring& filename)
 //***************************************************************************
 bool CRapidXMLUtil::SaveFileToXML(const _tstring& filename, const _tstring& xmlData)
 {
-	_xmlString = TStringToUtf8(xmlData);
+	// SaveFile과 같은 이유로 문서의 원본 버퍼(_xmlString)를 건드리지 않는다.
+	const std::string xmlText = TStringToUtf8(xmlData);
 
 	std::ofstream file(filename);
 	if( !file.is_open() )
@@ -444,10 +531,12 @@ bool CRapidXMLUtil::SaveFileToXML(const _tstring& filename, const _tstring& xmlD
 		return false;
 	}
 
-	file << _xmlString;
+	file << xmlText;
+	file.flush();
+	const bool ok = file.good();
 	file.close();
 
-	return true;
+	return ok;
 }
 
 //***************************************************************************
@@ -466,10 +555,17 @@ void CRapidXMLUtil::PrintXML() const
 //***************************************************************************
 void CRapidXMLUtil::XMLDeclaration()
 {
+	// 선언은 문서의 맨 앞에 한 번만 있어야 한다. (뒤에 붙이면 유효하지 않은 XML이 되고, 중복 호출하면 선언이 여러 개가 된다)
+	for( xml_node<>* node = _doc.first_node(); node != nullptr; node = node->next_sibling() )
+	{
+		if( node->type() == rapidxml::node_type::node_declaration )
+			return;
+	}
+
 	rapidxml::xml_node<>* header = _doc.allocate_node(rapidxml::node_type::node_declaration);
 	header->append_attribute(_doc.allocate_attribute("version", "1.0"));
 	header->append_attribute(_doc.allocate_attribute("encoding", "utf-8"));
-	_doc.append_node(header);
+	_doc.prepend_node(header);
 }
 
 //***************************************************************************
@@ -494,7 +590,7 @@ xml_node<>* CRapidXMLUtil::AddNode(xml_node<>* parentNode, const _tstring& nodeN
 //***************************************************************************
 void CRapidXMLUtil::RemoveNode(const _tstring& nodeName)
 {
-	xml_node<char>* root = _doc.first_node(TStringToUtf8(RootName).c_str());
+	xml_node<char>* root = FindRootElement();
 	if( !root )
 	{
 		_tcout << _T("Root node not found") << std::endl;
@@ -611,8 +707,22 @@ void CRapidXMLUtil::AddCDataValue(const _tstring& str, xml_node<>* parent, const
 {
 	if( parent == nullptr || ptszTagName == nullptr ) return;
 
-	xml_node<>* node = _doc.allocate_node(node_type::node_cdata, _doc.allocate_string(TStringToUtf8(ptszTagName).c_str()), _doc.allocate_string(TStringToUtf8(str).c_str()));
+	// node_cdata 노드는 출력할 때 이름이 버려지고 <![CDATA[...]]>만 나오므로, 태그 요소를 만들고 그 아래에 CDATA를 둔다.
+	xml_node<>* node = _doc.allocate_node(node_type::node_element, _doc.allocate_string(TStringToUtf8(ptszTagName).c_str()));
 	parent->append_node(node);
+
+	// CDATA 안에 "]]>"가 있으면 섹션이 거기서 끝나 버리므로 "]]" 뒤에서 나누어 여러 섹션으로 기록한다.
+	const std::string text = TStringToUtf8(str);
+	size_t begin = 0;
+	for( ;; )
+	{
+		const size_t pos = text.find("]]>", begin);
+		const size_t end = pos == std::string::npos ? text.size() : pos + 2;
+		node->append_node(_doc.allocate_node(node_type::node_cdata, nullptr, _doc.allocate_string(text.substr(begin, end - begin).c_str())));
+		if( pos == std::string::npos )
+			break;
+		begin = end;
+	}
 }
 
 //***************************************************************************
@@ -622,9 +732,9 @@ void CRapidXMLUtil::AddCDataValue(const _tstring& str, xml_node<>* parent, const
 //***************************************************************************
 void CRapidXMLUtil::GetValue(_tstring& str, xml_node<>* node)
 {
-	if( node && node->value() )
+	if( node )
 	{
-		str = Utf8ToTString(node->value());
+		str = Utf8ToTString(XmlNodeText(node));
 	}
 }
 
@@ -636,11 +746,8 @@ void CRapidXMLUtil::RemoveNodeRecursive(xml_node<char>* node)
 {
 	if( node == nullptr ) return;
 
-	while( node->first_node() )
-	{
-		RemoveNodeRecursive(node->first_node());
-	}
-
+	// rapidxml은 메모리를 풀이 소유하므로 부모에서 떼어내면 하위 노드까지 함께 트리에서 빠진다.
+	// (자식을 하나씩 재귀로 먼저 떼어낼 필요가 없다)
 	if( node->parent() )
 	{
 		node->parent()->remove_node(node);

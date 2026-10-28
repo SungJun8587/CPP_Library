@@ -14,7 +14,11 @@
 #include <fstream>
 #include <sstream>
 #include <locale.h>
+#include <limits>
 #include <type_traits>
+#include <charconv>
+#include <cstdlib>
+#include <cstring>
 
 #include <BaseRedefineDataType.h> 
 #include <Util/EncodingConvert.h>
@@ -36,6 +40,46 @@ using namespace rapidxml;
 // 생성되며, 프로세스 전역 로케일 설정(setlocale)과 무관하게 항상 동일한 소수점
 // 구분자로 파싱/포맷팅되도록 보장합니다.
 extern _locale_t g_xmlNumericLocale;
+
+//***************************************************************************
+// @brief 요소의 텍스트를 돌려줍니다. CDATA 섹션과 여러 조각으로 나뉜 텍스트도 이어 붙여 줍니다.
+// @detail rapidxml은 요소의 value()를 첫 번째 "텍스트" 노드에서만 채우므로, <a><![CDATA[x]]></a>의
+//         a->value()는 빈 문자열이고 CDATA가 여러 섹션이면 첫 조각만 보입니다.
+//         텍스트 조각이 하나뿐이면 문서 안의 문자열을 그대로 가리키고, 여러 개면 스레드별 버퍼에 이어 붙여
+//         돌려줍니다(같은 스레드의 다음 XmlNodeText 호출 전까지만 유효하므로 바로 변환해서 쓸 것).
+//         항상 널 종료된 문자열이며 node가 nullptr이면 빈 문자열입니다.
+//***************************************************************************
+inline const char* XmlNodeText(const rapidxml::xml_node<>* node)
+{
+	if( node == nullptr )
+		return "";
+
+	const rapidxml::xml_node<>* first = nullptr;
+	int parts = 0;
+	for( const rapidxml::xml_node<>* child = node->first_node(); child != nullptr; child = child->next_sibling() )
+	{
+		if( child->type() == rapidxml::node_type::node_cdata || child->type() == rapidxml::node_type::node_data )
+		{
+			if( first == nullptr )
+				first = child;
+			++parts;
+		}
+	}
+
+	if( parts == 0 )
+		return node->value();		// 자식 없이 값만 가진 노드 (코드로 만든 문서) 또는 빈 요소
+	if( parts == 1 )
+		return first->value();
+
+	thread_local std::string joined;
+	joined.clear();
+	for( const rapidxml::xml_node<>* child = first; child != nullptr; child = child->next_sibling() )
+	{
+		if( child->type() == rapidxml::node_type::node_cdata || child->type() == rapidxml::node_type::node_data )
+			joined.append(child->value(), child->value_size());
+	}
+	return joined.c_str();
+}
 
 //***************************************************************************
 // @class CXMLNode
@@ -65,7 +109,7 @@ public:
 	{
 	}
 
-	bool IsValid()
+	bool IsValid() const
 	{
 		return _node != nullptr;
 	}
@@ -118,18 +162,22 @@ public:
 	CRapidXMLUtil();
 	CRapidXMLUtil(const _tstring& xmlData);
 	CRapidXMLUtil(const CRapidXMLUtil& other);
+	CRapidXMLUtil& operator=(const CRapidXMLUtil& other);
 	~CRapidXMLUtil();
 
-	rapidxml::xml_document<>& GetDocument() {
+	rapidxml::xml_document<>& GetDocument()
+	{
 		return _doc;
 	}
 
-	xml_node<char>* GetRootNode() {
-		// 첫 번째 노드를 가져와서 root 노드를 반환
-		return _doc.first_node();
+	// 루트 요소를 반환합니다. XML 선언(<?xml ...?>)이나 주석이 앞에 있어도 첫 번째 "요소"를 찾습니다.
+	xml_node<char>* GetRootNode()
+	{
+		return FindRootElement();
 	}
 
-	void Clear() {
+	void Clear()
+	{
 		_doc.clear();
 	}
 
@@ -166,7 +214,8 @@ public:
 
 		// = 연산자 오버로딩(값 설정)
 		template <typename T>
-		Proxy& operator=(const T& value) {
+		Proxy& operator=(const T& value)
+		{
 			// 중첩 클래스는 바깥 클래스의 private 멤버에 접근할 수 있으므로,
 			// 반환값을 쓰지 않는 이 경로는 굳이 문서 전체를 문자열로 직렬화하는
 			// ConvertToXML 대신 트리만 구성하는 BuildXMLNode를 직접 호출합니다.
@@ -175,15 +224,18 @@ public:
 		}
 
 		// T() 연산자 오버로딩(값 읽기)
+		// 루트가 없어 변환할 수 없으면 예외(std::bad_optional_access) 대신 기본값 T()를 돌려줍니다.
 		template <typename T>
-		operator T() const { return _xmlUtil.ConvertFromXML<T>(_nodeName).value(); }
+		operator T() const { return _xmlUtil.ConvertFromXML<T>(_nodeName).value_or(T{}); }
 	};
 
-	Proxy operator[](const TCHAR* key) {
+	Proxy operator[](const TCHAR* key)
+	{
 		return Proxy(*this, key);
 	}
 
-	Proxy operator[](const _tstring& key) {
+	Proxy operator[](const _tstring& key)
+	{
 		return operator[](key.c_str());
 	}
 
@@ -264,7 +316,7 @@ public:
 	{
 		std::string nodeName = TStringToUtf8(ptszTagName);
 
-		xml_node<>* node = doc.allocate_node(node_type::node_element, doc.allocate_string(nodeName.c_str()), doc.allocate_string(std::to_string(value).c_str()));
+		xml_node<>* node = doc.allocate_node(node_type::node_element, doc.allocate_string(nodeName.c_str()), doc.allocate_string(NumberToString(value).c_str()));
 		parent->append_node(node);
 	}
 
@@ -286,21 +338,119 @@ public:
 	{
 		if constexpr( std::is_arithmetic<T>::value )
 		{
-			// _strtod_l은 std::stod와 달리 변환할 수 없는 입력(빈 문자열 등)에 대해
-			// 예외를 던지지 않고 0.0을 반환하며, 전역 로케일(setlocale) 설정과
-			// 무관하게 항상 "C" 로케일 기준으로 파싱합니다.
-			if( node && node->value() )
-				value = static_cast<T>(_strtod_l(node->value(), nullptr, g_xmlNumericLocale));
+			if( node )
+				ParseNumber(XmlNodeText(node), value);
 		}
 		else if constexpr( std::is_same_v<T, _tstring> )
 		{
-			if( node ) value = Utf8ToTString(node->value());
+			if( node ) value = Utf8ToTString(XmlNodeText(node));
+		}
+	}
+
+	//***************************************************************************
+	// @brief 숫자를 로케일과 무관하게 텍스트로 바꿉니다.
+	// @detail std::to_string은 현재 C 로케일을 따르고(소수점이 ','가 될 수 있음) 실수를 소수 6자리로 잘라
+	//         0.1f가 "0.100000", 1e-9가 "0.000000"이 됩니다. std::to_chars는 로케일과 무관하며 실수는 다시 읽었을 때
+	//         같은 값이 되는 가장 짧은 표현을 만듭니다. bool은 "1"/"0"입니다.
+	//***************************************************************************
+	template <typename T>
+	static std::string NumberToString(T value)
+	{
+		static_assert(std::is_arithmetic<T>::value, "NumberToString: arithmetic type only");
+
+		if constexpr( std::is_same_v<T, bool> )
+		{
+			return value ? "1" : "0";
+		}
+		else
+		{
+			char buffer[64];
+			std::to_chars_result r{};
+			if constexpr( std::is_floating_point_v<T> )
+				r = std::to_chars(buffer, buffer + sizeof(buffer), value);
+			else if constexpr( std::is_signed_v<T> )
+				r = std::to_chars(buffer, buffer + sizeof(buffer), static_cast<long long>(value));
+			else
+				r = std::to_chars(buffer, buffer + sizeof(buffer), static_cast<unsigned long long>(value));
+			return std::string(buffer, r.ptr);
+		}
+	}
+
+	//***************************************************************************
+	// @brief 텍스트를 숫자로 바꿉니다. 형식이 맞지 않으면 value를 건드리지 않습니다.
+	// @detail 정수는 정수 파서로 읽어 2^53을 넘는 int64/uint64도 정확합니다(double을 거치면 하위 비트를 잃음).
+	//         "5.0"이나 "1e3"처럼 실수 형태로 적힌 정수도 받아들이며, 범위를 벗어나면 가장 가까운 값으로 맞춥니다.
+	//         실수는 항상 "C" 로케일로 읽고, bool은 true/false/숫자를 받습니다.
+	//***************************************************************************
+	template <typename T>
+	static void ParseNumber(const char* text, T& value)
+	{
+		if( text == nullptr || *text == '\0' )
+			return;
+
+		char* end = nullptr;
+		if constexpr( std::is_same_v<T, bool> )
+		{
+			if( _stricmp(text, "true") == 0 ) { value = true; return; }
+			if( _stricmp(text, "false") == 0 ) { value = false; return; }
+			const double d = _strtod_l(text, &end, g_xmlNumericLocale);
+			if( end != text ) value = d != 0.0;
+		}
+		else if constexpr( std::is_same_v<T, float> )
+		{
+			const float f = _strtof_l(text, &end, g_xmlNumericLocale);
+			if( end != text ) value = f;
+		}
+		else if constexpr( std::is_floating_point_v<T> )
+		{
+			const double d = _strtod_l(text, &end, g_xmlNumericLocale);
+			if( end != text ) value = static_cast<T>(d);
+		}
+		else
+		{
+			// 정수: 먼저 정수 파서로 읽고, 뒤에 소수점/지수가 이어지면 실수로 다시 읽는다.
+			const bool isSigned = std::is_signed_v<T>;
+			long long sn = 0;
+			unsigned long long un = 0;
+			if( isSigned ) sn = std::strtoll(text, &end, 10);
+			else           un = std::strtoull(text, &end, 10);
+			if( end == text )
+				return;
+
+			if( *end == '.' || *end == 'e' || *end == 'E' )
+			{
+				const double d = _strtod_l(text, nullptr, g_xmlNumericLocale);
+				if( isSigned )
+					sn = d <= -9223372036854775808.0 ? (std::numeric_limits<long long>::min)() : (d >= 9223372036854775808.0 ? (std::numeric_limits<long long>::max)() : static_cast<long long>(d));
+				else
+					un = d <= 0.0 ? 0 : (d >= 18446744073709551616.0 ? (std::numeric_limits<unsigned long long>::max)() : static_cast<unsigned long long>(d));
+			}
+
+			if( isSigned )
+				value = static_cast<T>(sn < static_cast<long long>((std::numeric_limits<T>::min)()) ? (std::numeric_limits<T>::min)() : (sn > static_cast<long long>((std::numeric_limits<T>::max)()) ? (std::numeric_limits<T>::max)() : sn));
+			else
+				value = static_cast<T>(un > static_cast<unsigned long long>((std::numeric_limits<T>::max)()) ? (std::numeric_limits<T>::max)() : un);
 		}
 	}
 
 private:
+	// 선언/주석을 건너뛴 첫 번째 요소 (없으면 nullptr)
+	xml_node<>* FindRootElement()
+	{
+		for( xml_node<>* node = _doc.first_node(); node != nullptr; node = node->next_sibling() )
+		{
+			if( node->type() == node_type::node_element )
+				return node;
+		}
+		return nullptr;
+	}
+
 	// 재귀 호출마다 attName의 UTF-8 변환을 반복하지 않도록, 이미 변환된 문자열을 받는 내부 헬퍼
 	void RemoveAttributeUtf8(xml_node<>* node, const std::string& utf8AttName);
+
+	// other의 문서 트리를 이 문서의 메모리 풀로 깊은 복사 (복사 생성/대입에서 사용)
+	void CopyDocument(const CRapidXMLUtil& other);
+	xml_node<>* CloneNode(const xml_node<>* source);
 
 	// obj를 문서 트리에 채워 넣기만 하고 문자열로 직렬화하지 않는 내부 헬퍼.
 	// ConvertToXML은 문자열 결과가 필요한 호출자를 위해 이 함수 뒤에 직렬화를 1회 수행하고,

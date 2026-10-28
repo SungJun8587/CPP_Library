@@ -13,6 +13,7 @@
 #include <vector>
 #include <map>
 #include <type_traits>
+#include <limits>
 
 #include "rapidjson/document.h"
 #include "rapidjson/writer.h"
@@ -57,8 +58,8 @@ typedef PrettyWriter<StringBuffer, UTF8<>, UTF8<>> _tPrettyWriter;
 typedef GenericArray<true, Value> _tArray;
 #endif
 
-// 신뢰할 수 없는 JSON을 재귀적으로 정리(RecursiveRemove)할 때 스택 오버플로우를
-// 방지하기 위한 최대 재귀 깊이. 필요 시 조정 가능.
+// 예전 RecursiveRemove(재귀 정리)의 최대 재귀 깊이. 기본 allocator(메모리 풀)에서는 값을 지울 때
+// 하위 값을 따로 정리할 필요가 없어 RecursiveRemove를 제거했으므로 현재는 사용하지 않습니다. (하위 호환용으로 남김)
 static constexpr int RAPIDJSONUTIL_MAX_RECURSION_DEPTH = 256;
 
 //***************************************************************************
@@ -79,6 +80,16 @@ public:
     // @param other 복사할 대상 CRapidJSONUtil 객체 참조
     //***************************************************************************
     CRapidJSONUtil(const CRapidJSONUtil& other);
+
+    //***************************************************************************
+    // @brief 이동 생성/대입. JSON 트리를 복사하지 않고 소유권만 넘깁니다.
+    // @detail 복사 생성자/대입 연산자를 직접 선언하면 컴파일러가 이동 연산을 자동으로 만들지 않아,
+    //         값 반환/컨테이너 저장/std::pair 전달 때마다 트리 전체가 깊은 복사됩니다.
+    //         rapidjson::GenericDocument의 이동은 원본의 allocator를 비워 이후 사용 시 문제가 되므로,
+    //         이동한 뒤 원본은 빈 JSON 객체 상태로 되돌려 계속 사용할 수 있게 합니다.
+    //***************************************************************************
+    CRapidJSONUtil(CRapidJSONUtil&& other) noexcept;
+    CRapidJSONUtil& operator=(CRapidJSONUtil&& other) noexcept;
 
     //***************************************************************************
     // @brief 내부 래핑된 JSON 문서 객체 참조를 반환합니다.
@@ -271,11 +282,8 @@ private:
     void Print_DebugInfo(const TCHAR* ptszFormat, ...);
 
     //***************************************************************************
-    // @brief 지정한 키의 멤버가 이미 존재하면 재귀적으로 정리한 뒤 제거합니다.
-    // @detail Add* 계열 함수들이 "추가"가 아니라 "설정(덮어쓰기)" 의미로 동작하도록
-    //         호출 전에 기존 동일 키 멤버를 제거해 rapidjson::AddMember가 중복 키를
-    //         만들지 않게 합니다. HasMember/FindMember를 한 번만 사용하여
-    //         불필요한 이중 탐색을 피합니다.
+    // @brief 지정한 키의 멤버가 존재하면 제거합니다. (나머지 멤버의 상대 순서는 유지)
+    // @detail FindMember를 한 번만 사용하여 존재 검사와 제거를 함께 처리합니다.
     //***************************************************************************
     void RemoveMemberIfExists(const _tstring& key);
 
@@ -305,7 +313,19 @@ private:
     template <typename T>
     bool IsConvertible(const _tValue& value) const;
 
-    void RecursiveRemove(_tValue& value, int depth = 0);
+    //***************************************************************************
+    // @brief 키로 멤버 값을 찾습니다. 문서가 객체가 아니거나 키가 없으면 nullptr.
+    // @detail rapidjson의 FindMember는 객체가 아닌 값에서 호출하면(Parse 실패 직후, 배열 루트 등)
+    //         릴리스 빌드에서 어서션 없이 잘못된 메모리를 읽으므로 Get* 계열은 이 함수를 통해 접근합니다.
+    //***************************************************************************
+    const _tValue* FindValue(const _tstring& key) const;
+
+    //***************************************************************************
+    // @brief 키의 값을 설정합니다. 이미 있으면 같은 위치에서 값만 교체하고(멤버 순서 유지, O(1)),
+    //        없으면 끝에 추가합니다. 문서가 객체가 아니면 빈 객체로 초기화한 뒤 설정합니다.
+    // @param value 설정할 값 (이동됩니다)
+    //***************************************************************************
+    void SetMember(const _tstring& key, _tValue& value);
 
     //***************************************************************************
     // @brief 벡터 타입 확인
@@ -360,6 +380,14 @@ private:
     //***************************************************************************
     template <typename T>
     struct dependent_false : std::false_type {};
+
+    //***************************************************************************
+    // @brief JSON 정수로 다루는 정수형 (bool과 문자 타입은 제외)
+    // @detail int8/uint8/int16/uint16/int32/uint32/int64/uint64뿐 아니라 long, unsigned long(DWORD) 등도 포함합니다.
+    //***************************************************************************
+    template <typename T>
+    static constexpr bool is_json_integer_v = std::is_integral_v<T> && !std::is_same_v<T, bool>
+        && !std::is_same_v<T, char> && !std::is_same_v<T, wchar_t> && !std::is_same_v<T, char16_t> && !std::is_same_v<T, char32_t>;
 
 private:
     // NOTE: allocator는 더 이상 참조 멤버로 보관하지 않습니다. 참조 멤버가 있으면
