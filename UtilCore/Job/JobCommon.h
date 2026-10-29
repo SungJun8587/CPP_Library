@@ -7,7 +7,9 @@
 #ifndef UC_JOBCOMMON_H
 #define UC_JOBCOMMON_H
 
+#include <BaseDefine.h>
 #include <BaseRedefineDataType.h>
+#include <BaseMacro.h>
 #include <BaseTLS.h>
 
 #include <Containers/Queue/SpinLockQueue.h>

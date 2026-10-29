@@ -7,7 +7,7 @@
 #ifndef UC_RIOCORE_H
 #define UC_RIOCORE_H
 
-#include <Network/RIO/RioCommon.h>
+#include <Network/RIO/RioDefine.h>
 #include <Network/RIO/RioEvent.h>
 #include <Network/RIO/RioEventPool.h>
 

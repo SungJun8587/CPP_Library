@@ -9,7 +9,7 @@
 
 #include <Memory/Containers.h>
 #include <Memory/ObjectPool.h>
-#include <Network/IOCP/IocpCommon.h>
+#include <Network/IOCP/IocpDefine.h>
 
 #include <array>
 #include <utility>

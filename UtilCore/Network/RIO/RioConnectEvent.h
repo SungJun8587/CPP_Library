@@ -10,7 +10,7 @@
 #include <WinSock2.h>
 #include <memory>
 
-#include <Network/RIO/RioCommon.h>
+#include <Network/RIO/RioDefine.h>
 #include <Network/RIO/RioSession.h>
 
 //***************************************************************************

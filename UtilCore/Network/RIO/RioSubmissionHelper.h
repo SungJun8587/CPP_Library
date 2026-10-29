@@ -7,7 +7,7 @@
 #ifndef UC_RIOSUBMISSIONHELPER_H
 #define UC_RIOSUBMISSIONHELPER_H
 
-#include <Network/RIO/RioCommon.h>
+#include <Network/RIO/RioDefine.h>
 #include <Network/RIO/RioEvent.h>
 #include <Network/RIO/RioObject.h>
 #include <Network/RIO/RioCore.h>

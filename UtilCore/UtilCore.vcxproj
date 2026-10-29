@@ -109,6 +109,7 @@
     <ClInclude Include="Memory\Containers.h" />
     <ClInclude Include="Memory\MemBuffer.h" />
     <ClInclude Include="Memory\Memory.h" />
+    <ClInclude Include="Memory\MemoryCommon.h" />
     <ClInclude Include="Memory\MemoryPool.h" />
     <ClInclude Include="Memory\ObjectPool.h" />
     <ClInclude Include="Memory\RawAllocator.h" />
@@ -136,7 +137,7 @@
     <ClInclude Include="Network\HTTP\MultipartFormParser.h" />
     <ClInclude Include="Network\HTTP\MultipartStreamParser.h" />
     <ClInclude Include="Network\HTTP\TlsFilter.h" />
-    <ClInclude Include="Network\IOCP\IocpCommon.h" />
+    <ClInclude Include="Network\IOCP\IocpDefine.h" />
     <ClInclude Include="Network\IOCP\IocpCore.h" />
     <ClInclude Include="Network\IOCP\IocpEvent.h" />
     <ClInclude Include="Network\IOCP\IocpListener.h" />
@@ -155,7 +156,7 @@
     <ClInclude Include="Network\PacketDispatcher.h" />
     <ClInclude Include="Network\RingBuffer.h" />
     <ClInclude Include="Network\RIO\RioBuffer.h" />
-    <ClInclude Include="Network\RIO\RioCommon.h" />
+    <ClInclude Include="Network\RIO\RioDefine.h" />
     <ClInclude Include="Network\RIO\RioConnectDispatcher.h" />
     <ClInclude Include="Network\RIO\RioConnectEvent.h" />
     <ClInclude Include="Network\RIO\RioCore.h" />

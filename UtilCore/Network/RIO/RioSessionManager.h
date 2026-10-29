@@ -7,8 +7,8 @@
 #ifndef UC_RIOSESSIONMANAGER_H
 #define UC_RIOSESSIONMANAGER_H
 
-#include <Network/RIO/RioCommon.h>
 #include <Containers/Map/ClusterSpinUnorderedMap.h>
+#include <Network/RIO/RioDefine.h>
 
 #include <vector>
 #include <memory>

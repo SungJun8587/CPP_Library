@@ -16,7 +16,9 @@
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "mswsock.lib")
 
+#include <BaseDefine.h>
 #include <BaseRedefineDataType.h>
+#include <BaseMacro.h>
 #include <BaseTLS.h>
 
 #include <Thread/CacheAlignment.h>
@@ -41,7 +43,7 @@
 #include <Network/PacketDispatcher.h>
 
 #if defined(USE_NETWORK_IOCP)
-#include <Network/IOCP/IocpCommon.h>
+#include <Network/IOCP/IocpDefine.h>
 #include <Network/IOCP/SendBuffer.h>
 #include <Network/IOCP/IocpEvent.h>
 #include <Network/IOCP/IocpCore.h>
@@ -54,7 +56,7 @@
 
 #if defined(USE_NETWORK_RIO)
 #include <Containers/Stack/LockFreeSlotStack.h>
-#include <Network/RIO/RioCommon.h>
+#include <Network/RIO/RioDefine.h>
 #include <Network/RIO/RioObject.h>
 #include <Network/RIO/RioEvent.h>
 #include <Network/RIO/RioEventPool.h>

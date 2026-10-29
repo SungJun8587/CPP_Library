@@ -7,9 +7,9 @@
 #ifndef UC_IOCPSESSIONMANAGER_H
 #define UC_IOCPSESSIONMANAGER_H
 
-#include <Network/IOCP/IocpCommon.h>
-#include <Network/IOCP/IocpSession.h>
 #include <Containers/Map/ClusterSpinUnorderedMap.h>
+#include <Network/IOCP/IocpDefine.h>
+#include <Network/IOCP/IocpSession.h>
 
 #include <memory>
 #include <atomic>

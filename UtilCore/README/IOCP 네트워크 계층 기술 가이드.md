@@ -311,6 +311,8 @@ IOCP에서의 사용처는 세 곳이다. 서버 서비스의 `_socketOptions`�
 
 IOCP 계층의 메모리 할당은 대부분 `Memory/` 폴더를 거친다. 흐름은 ‘할당 유틸(`xnew`·`MakeShared`·`StlAllocator`·`CObjectPool`) → `PoolAllocator` → 전역 `CMemory`(크기별 `CMemoryPool` + 스레드 로컬 캐시) → `RawAllocator`(malloc 계열)’이다.
 
+`Memory/` 폴더의 헤더는 `MemoryCommon.h` 하나로 묶여 있다. `BaseDefine.h`·`BaseRedefineDataType.h`·`BaseMacro.h`·`BaseTLS.h`를 먼저 포함한 뒤 `RawAllocator`, `Allocator`, `MemoryPool`, `Memory`, `ObjectPool`, `Containers` 순서로 포함한다.
+
 | 클래스/함수 | 파일 | 설명 | IOCP에서 쓰이는 곳 |
 | --- | --- | --- | --- |
 | `BaseAllocator` | `Memory/Allocator.h` | `RawAllocator`로 직접 할당하는 최하위 클래스. 데이터 멤버·가상 함수가 없고, 상속하면 `operator new/delete`가 이를 거친다. | `CRingBuffer`가 상속한다. |
@@ -357,7 +359,7 @@ IOCP 계층의 메모리 할당은 대부분 `Memory/` 폴더를 거친다. 흐�
 
 | 파일 | 구분 | 선언 | 역할과 구현 내용 |
 | --- | --- | --- | --- |
-| `IocpCommon.h` | 공통 정의 | `Iocp::EventType`, `Iocp::CloseReason`, 상수 | 헤더만 있는 공통 정의. 수신 버퍼 10,240B(`BUFFER_SIZE_DEFAULT`), 배치 64(`kBatchSize`), 세션 맵 클러스터 16(`kSessionClusterCnt`), 송신 청크 8,192B, 수락 재시도 10ms\~1,000ms, 세션 reap 30초, 종료 대기 5초 등의 상수를 둔다. |
+| `IocpDefine.h` | 공통 정의 | `Iocp::EventType`, `Iocp::CloseReason`, 상수 | 헤더만 있는 공통 정의. 수신 버퍼 10,240B(`BUFFER_SIZE_DEFAULT`), 배치 64(`kBatchSize`), 세션 맵 클러스터 16(`kSessionClusterCnt`), 송신 청크 8,192B, 수락 재시도 10ms\~1,000ms, 세션 reap 30초, 유휴 점검 5초, 종료 대기 5초 등의 상수를 둔다. |
 | `IocpCore.h/.cpp` | 완료 포트 | `CIocpObject`, `CIocpCore` | 완료 포트 래퍼. `.cpp`에는 `Register`(소켓을 포트에 연결), `Dispatch`, `DispatchBatch`(`GetQueuedCompletionStatusEx`), `ProcessOverlappedResult`가 있다. |
 | `IocpEvent.h/.cpp` | 이벤트 | `CIocpEvent`, `ConnectEvent`, `DisconnectEvent`, `AcceptEvent`, `RecvEvent`, `SendEvent` | `OVERLAPPED`를 상속한 이벤트 구조체. `.cpp`는 `CIocpEvent` 생성자와 `Init`(OVERLAPPED 초기화)뿐이고, 나머지는 헤더에 있다. |
 | `IocpListener.h/.cpp` | 수락 | `CIocpListener` | 수락기. `StartAccept`·`Stop`·`CloseSocket`, 완료 처리(`Dispatch`→`ProcessAccept`), AcceptEx 재등록(`RegisterAccept`), 실패 시 지수 백오프 재시도(`HandleAcceptFailure`·`CalcRetryDelayMs`·`ScheduleRetry`·`FinishRetry`)를 구현한다. |
@@ -368,14 +370,14 @@ IOCP 계층의 메모리 할당은 대부분 `Memory/` 폴더를 거친다. 흐�
 | `SendBuffer.h/.cpp` | 버퍼 | `CSendBuffer`, `CSendBufferChunk`, `CSendBufferManager`, `LSendBufferChunk` | 송신 버퍼. 청크에서 조각을 떼어 쓰는 `Open`·`Close`·`Reset`과 스레드별 현재 청크(`thread_local LSendBufferChunk`)를 관리하는 `CSendBufferManager::Open`·`GetChunk`가 있다. |
 | `RecvBuffer.h/.cpp` | 버퍼 | `CRecvBuffer` | 단위 버퍼 기반 수신 버퍼(`Clean`·`OnRead`·`OnWrite`). 세션이 쓰지 않고 `CRingBuffer`를 쓴다. |
 
-### 공통 정의 (IocpCommon.h)
+### 공통 정의 (IocpDefine.h)
 
 `Iocp` 네임스페이스에 열거형과 상수를 모아 둔다.
 
 | 이름 | 종류 | 설명 |
 | --- | --- | --- |
 | `EventType` | enum | `Connect`, `Disconnect`, `Accept`, `Recv`, `Send` — 이벤트 종류 식별 |
-| `CloseReason` | enum | `None`, `RemoteClosed`, `SocketError`, `ReceivePostFailed`, `SendPostFailed`, `RingBufferOverflow`, `SendBufferOverflow`, `InternalError`, `ForcedClose` — 세션 종료 사유 |
+| `CloseReason` | enum | `None`, `RemoteClosed`, `SocketError`, `ReceivePostFailed`, `SendPostFailed`, `RingBufferOverflow`, `SendBufferOverflow`, `InternalError`, `ForcedClose`, `Idle` — 세션 종료 사유(`Idle`은 유휴 시간 초과) |
 | `BUFFER_SIZE_DEFAULT` | 10240 | 세션 수신 링버퍼 기본 크기 |
 | `kBatchSize` | 64 | `DispatchBatch` 1회에 수거하는 최대 완료 수 |
 | `kSessionClusterCnt` | 16 | 세션 매니저 맵의 클러스터(락) 개수 |
@@ -390,6 +392,7 @@ IOCP 계층의 메모리 할당은 대부분 `Memory/` 폴더를 거친다. 흐�
 | `kDequeueFailureBackoffMs` | 10 | 일시적 수거 실패 뒤 짧은 대기 |
 | `kCloseDrainTimeout` | 5초 | 서비스 Close 시 세션 해제를 기다리는 상한 |
 | `kSessionReapInterval` | 30초 | 닫힌 세션 정리 주기 |
+| `kIdleSweepInterval` | 5초 | 유휴 세션 점검 주기. SetIdleTimeout을 켠 경우에만 의미가 있다 |
 
 ### CIocpObject — IOCP 등록 대상 인터페이스 (IocpCore.h)
 
@@ -591,7 +594,7 @@ IOCP 커널 오브젝트를 소유하고, 워커 스레드가 완료 통지를 �
 | `Start()` | 워커 구동 → 리스너 `StartAccept` → reap 스레드 시작. 세션 팩터리는 세션에 해제 핸들러를 심고, accept 콜백은 상한 검사 → ID 발급 → 서비스·매니저 등록 → 소켓 옵션 → `ProcessConnect` 순이다. |
 | `Close()` | reap 정지 → 리스너 정지 → `CloseSessions(false)`로 종료 상태 진입과 전체 세션 종료 요청 → 최대 5초 해제 대기 → 닫힌 세션 정리 → 워커 정지 → `CNetService::Close`(남은 세션은 `Abort`로 정리) |
 | `OnSessionDisconnected` (private) | 매니저에서 제거, 동시 접속 수 감소, `ReleaseSession` |
-| `Set/GetSessionSocketOptions` · `SetEnforceMaxSessionCount` · `SetAcceptPoolSize` · `SetListenAddressMode` | 설정 함수. 리스너 생성 전에만 반영되는 것이 있다. |
+| `Set/GetSessionSocketOptions` · `SetEnforceMaxSessionCount` · `SetAcceptPoolSize` · `SetListenAddressMode` · `SetIdleTimeout` | 설정 함수. 리스너 생성 전에만 반영되는 것이 있다. |
 
 **CIocpClientService**
 
@@ -987,4 +990,5 @@ iocpServer->SetSessionSocketOptions(opt);
 - **송신 크기**: `Send`의 `size`는 `uint16`이라 1회 65,535바이트가 상한이다. 이보다 큰 데이터는 호출 측이 나눠서 보낸다.
 - **송신 큐 상한**: `SetMaxSendQueueBytes`를 정하지 않으면(기본 0) 느린 클라이언트 하나가 서버 메모리를 계속 쓸 수 있다.
 - **세션 상한**: `SetEnforceMaxSessionCount(true)`를 해야 `maxSessionCount`가 실제 상한으로 적용된다. 기본은 적용하지 않는다.
+- **유휴 타임아웃**: `SetIdleTimeout(ms)`로 켠다(0이면 꺼짐). 켜면 `kIdleSweepInterval`(5초)마다 세션을 점검해, 송수신 완료가 타임아웃 동안 없던 세션을 `CloseReason::Idle`로 끊는다. 유휴 연결은 타임아웃 + 5초 이내에 정리된다.
 - **플랫폼**: Windows 전용(IOCP·AcceptEx·ConnectEx·DisconnectEx). Windows 빌드는 이 문서를 쓰면서 실행해 보지 못했다(소스만 읽어 정리).

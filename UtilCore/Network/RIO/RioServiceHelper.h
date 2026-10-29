@@ -7,7 +7,7 @@
 #ifndef UC_RIOSERVICEHELPER_H
 #define UC_RIOSERVICEHELPER_H
 
-#include <Network/RIO/RioCommon.h>
+#include <Network/RIO/RioDefine.h>
 #include <Network/RIO/RioCore.h>
 #include <Network/RIO/RioEventPool.h>
 #include <Network/RIO/RioBuffer.h>

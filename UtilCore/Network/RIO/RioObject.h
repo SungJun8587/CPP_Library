@@ -7,7 +7,7 @@
 #ifndef UC_RIOOBJECT_H
 #define UC_RIOOBJECT_H
 
-#include <Network/RIO/RioCommon.h>
+#include <Network/RIO/RioDefine.h>
 #include <Network/RIO/RioEvent.h>
 
 class CRioEvent;

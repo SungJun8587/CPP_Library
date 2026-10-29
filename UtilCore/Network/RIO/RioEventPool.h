@@ -8,7 +8,7 @@
 #define UC_RIOEVENTPOOL_H
 
 #include <Memory/Containers.h>
-#include <Network/RIO/RioCommon.h>
+#include <Network/RIO/RioDefine.h>
 #include <Network/RIO/RioEvent.h>
 #include <Network/RIO/RioObject.h>
 

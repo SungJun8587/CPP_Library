@@ -56,13 +56,7 @@ using namespace std;
 #include <Util/Log.h>
 #include <Util/ConsoleUtil.h>
 
-#include <Memory/RawAllocator.h>
-#include <Memory/Allocator.h>
-#include <Memory/MemoryPool.h>
-#include <Memory/Memory.h>
-#include <Memory/ObjectPool.h>
-#include <Memory/Containers.h>
-
+#include <Memory/MemoryCommon.h>
 #include <Memory/Singleton.h>
 #include <Memory/MemBuffer.h>
 #include <Memory/RefCountable.h>

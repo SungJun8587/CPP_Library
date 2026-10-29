@@ -9,7 +9,7 @@
 
 #include <Network/NetAddress.h>
 #include <Network/SocketUtils.h>
-#include <Network/IOCP/IocpCommon.h>
+#include <Network/IOCP/IocpDefine.h>
 #include <Network/IOCP/IocpCore.h>
 #include <Network/IOCP/IocpEvent.h>
 

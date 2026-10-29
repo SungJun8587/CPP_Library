@@ -7,9 +7,9 @@
 #ifndef UC_IOCPEVENT_H
 #define UC_IOCPEVENT_H
 
-#include <Network/IOCP/IocpCommon.h>
-#include <Network/NetworkRedefineDataType.h>
 #include <Memory/Containers.h>
+#include <Network/NetworkRedefineDataType.h>
+#include <Network/IOCP/IocpDefine.h>
 
 //***************************************************************************
 // @class IocpEvent

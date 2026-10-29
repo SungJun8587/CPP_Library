@@ -7,7 +7,7 @@
 #ifndef UC_IOCPWORKERPOOL_H
 #define UC_IOCPWORKERPOOL_H
 
-#include <Network/IOCP/IocpCommon.h>
+#include <Network/IOCP/IocpDefine.h>
 #include <Network/IOCP/IocpCore.h>
 #include <Thread/ThreadManager.h>
 

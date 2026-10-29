@@ -7,7 +7,7 @@
 #ifndef UC_RIOCONNECTDISPATCHER_H
 #define UC_RIOCONNECTDISPATCHER_H
 
-#include <Network/RIO/RioCommon.h>
+#include <Network/RIO/RioDefine.h>
 #include <Network/RIO/RioSession.h>
 #include <Network/RIO/RioConnectEvent.h>
 

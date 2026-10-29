@@ -7,7 +7,7 @@
 #ifndef UC_RIOBUFFER_H
 #define UC_RIOBUFFER_H
 
-#include <Network/RIO/RioCommon.h>
+#include <Network/RIO/RioDefine.h>
 #include <Containers/Stack/LockFreeSlotStack.h>
 
 //***************************************************************************

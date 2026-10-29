@@ -325,7 +325,7 @@
     <ClInclude Include="Containers\Stack\LockFreeSlotStack.h">
       <Filter>Containers\Stack</Filter>
     </ClInclude>
-    <ClInclude Include="Network\IOCP\IocpCommon.h">
+    <ClInclude Include="Network\IOCP\IocpDefine.h">
       <Filter>Network\IOCP</Filter>
     </ClInclude>
     <ClInclude Include="Network\IOCP\IocpCore.h">
@@ -346,7 +346,7 @@
     <ClInclude Include="Network\RIO\RioBuffer.h">
       <Filter>Network\RIO</Filter>
     </ClInclude>
-    <ClInclude Include="Network\RIO\RioCommon.h">
+    <ClInclude Include="Network\RIO\RioDefine.h">
       <Filter>Network\RIO</Filter>
     </ClInclude>
     <ClInclude Include="Network\RIO\RioCore.h">
@@ -721,6 +721,9 @@
     </ClInclude>
     <ClInclude Include="ConfigFile\XMLConfigFieldWriter.h">
       <Filter>ConfigFile</Filter>
+    </ClInclude>
+    <ClInclude Include="Memory\MemoryCommon.h">
+      <Filter>Memory</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

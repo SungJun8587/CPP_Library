@@ -1,11 +1,11 @@
 ﻿
 //***************************************************************************
-// RioCommon.h: Common header file for Rio including macros, constants, and types.
+// RioDefine.h : Common header file for Rio including macros, constants, and types.
 //
 //***************************************************************************
 
-#ifndef UC_RIOCOMMON_H
-#define UC_RIOCOMMON_H
+#ifndef UC_RIODEFINE_H
+#define UC_RIODEFINE_H
 
 //***************************************************************************
 // @brief Windows 헤더 빌드 최적화 (불필요한 API 헤더 포함 제외)
@@ -22,8 +22,9 @@
 #endif
 
 #include <winsock2.h>
-#include <BaseRedefineDataType.h>
 #include <chrono>
+
+#include <BaseRedefineDataType.h>
 
 namespace Rio
 {
@@ -380,4 +381,4 @@ namespace Rio
     inline constexpr std::chrono::seconds kSessionReapInterval{ 30 };
 }
 
-#endif // ndef UC_RIOCOMMON_H
+#endif // ndef UC_RIODEFINE_H

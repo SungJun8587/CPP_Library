@@ -7,7 +7,7 @@
 #ifndef UC_IOCPCORE_H
 #define UC_IOCPCORE_H
 
-#include <Network/IOCP/IocpCommon.h>
+#include <Network/IOCP/IocpDefine.h>
 #include <Network/IOCP/IocpEvent.h>
 
 #pragma comment(lib, "ntdll.lib")

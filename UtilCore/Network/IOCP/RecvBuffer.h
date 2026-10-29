@@ -7,7 +7,7 @@
 #ifndef UC_RECVBUFFER_H
 #define UC_RECVBUFFER_H
 
-#include <Network/IOCP/IocpCommon.h>
+#include <Network/IOCP/IocpDefine.h>
 
 //***************************************************************************
 // @class RecvBuffer

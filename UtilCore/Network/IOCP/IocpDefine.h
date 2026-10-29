@@ -1,16 +1,16 @@
 ﻿
 //***************************************************************************
-// IocpCommon.h: Common header file for Iocp including macros, constants, and types.
+// IocpDefine.h : Common header file for Iocp including macros, constants, and types.
 //
 //***************************************************************************
 
-#ifndef UC_IOCPCOMMON_H
-#define UC_IOCPCOMMON_H
+#ifndef UC_IOCPDEFINE_H
+#define UC_IOCPDEFINE_H
 
 #include <winsock2.h>
-#include <BaseRedefineDataType.h>
-
 #include <chrono>
+
+#include <BaseRedefineDataType.h>
 
 namespace Iocp
 {
@@ -183,4 +183,4 @@ namespace Iocp
     inline constexpr std::chrono::seconds kIdleSweepInterval{ 5 };
 }
 
-#endif // ndef UC_IOCPCOMMON_H
+#endif // ndef UC_IOCPDEFINE_H
