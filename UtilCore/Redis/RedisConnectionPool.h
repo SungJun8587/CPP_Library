@@ -10,6 +10,7 @@
 #include <Network/IOCP/IocpCore.h>
 #include <Redis/RedisRedefineDataType.h>
 #include <Redis/RedisClient.h>
+#include <Redis/RedisHelper.h>
 
 #include <vector>
 #include <queue>
@@ -19,7 +20,6 @@
 #include <condition_variable>
 #include <unordered_map>
 #include <chrono>
-#include <random>
 
 //***************************************************************************
 // @brief 여러 개의 CRedisClient 연결 객체를 동시 분배/관리하는 커넥션 풀 클래스
@@ -91,9 +91,12 @@ public:
 	//        적용된다
 	// @param nPoolSize 생성할 커넥션 개수
 	// @param nReconnectIntervalSec 격리 큐를 훑어 재연결을 시도하는 주기(초)
+	// @param strUserId ACL 사용자 이름(비어 있으면 `AUTH <password>`)
+	// @param strPassword 비밀번호(비어 있으면 인증 생략). 재연결된 커넥션에도 동일하게 적용된다
 	// @return 성공 여부 (true: 성공, false: 실패)
 	//***************************************************************************
-	bool        Init(const std::string& strIP, const uint16 nPort, const int32 nDbIndex, const int32 nPoolSize, const int32 nReconnectIntervalSec = 3);
+	bool        Init(const std::string& strIP, const uint16 nPort, const int32 nDbIndex, const int32 nPoolSize, const int32 nReconnectIntervalSec = Redis::kDefaultReconnectIntervalSec,
+		const std::string& strUserId = std::string(), const std::string& strPassword = std::string());
 
 	//***************************************************************************
 	// @brief 재연결 스레드를 정지시키고 모든 커넥션을 끊어 풀 리소스를 정리함
@@ -111,7 +114,7 @@ public:
 	//         fnCallback은 절대 호출되지 않는다(대기 큐 포화, 또는 풀
 	//         미초기화).
 	//***************************************************************************
-	bool        SendCommand(const CVector<std::string>& vecArgs, RedisCallback fnCallback);
+	bool        SendCommand(const CVector<std::string>& vecArgs, RedisResponseHandler fnCallback);
 
 private:
 	//***************************************************************************
@@ -132,17 +135,46 @@ private:
 	//        중이던 요청을 반납받은 커넥션에 바로 태우는" 경로가 공유하는
 	//        공통 로직.
 	//***************************************************************************
-	void                DispatchOnClient(CRedisClientRef pClient, const CVector<std::string>& vecArgs, RedisCallback fnCallback);
+	void                DispatchOnClient(CRedisClientRef pClient, const CVector<std::string>& vecArgs, RedisResponseHandler fnCallback);
+
+	//***************************************************************************
+	// @brief 대기 큐에서 kPendingTimeoutMs를 넘긴 요청을 꺼내 연결 오류로 완료시킴
+	// @details Redis가 오래 죽어 있으면 대기 큐의 요청은 재연결될 때까지 콜백이 오지 않고,
+	//          복구된 뒤에는 한참 전의 요청이 뒤늦게 실행된다. 호출부(세션 로직, 재시도 헬퍼)가
+	//          결과를 기다리는 시간에 상한을 두기 위해, 재연결 스레드가 매 점검마다 기한이 지난
+	//          요청을 "ERR connection closed (pending timeout)"으로 끝낸다. 이 문자열은
+	//          IsRedisConnectionError()가 연결 오류로 분류하므로 SendCommandWithRetry가 재시도한다.
+	//          콜백은 _lock 밖에서, 이 함수를 부른 스레드(재연결 스레드)에서 호출된다.
+	//***************************************************************************
+	void                ExpirePendingCommands();
+
+	//***************************************************************************
+	// @brief 명령 응답이 kPoolCommandTimeoutMs를 넘도록 오지 않는 커넥션을 끊음
+	// @details 서버가 응답 없이 멈추거나 경로가 반열림 상태가 되면 명령 콜백이 오지 않아 그 커넥션은
+	//          풀로 돌아오지 못하고 호출부도 영원히 기다린다(TCP keepalive는 유휴 연결용이라 수 분 뒤에야
+	//          감지). 재연결 스레드가 점검마다 이런 커넥션을 Disconnect()하면 대기 콜백이
+	//          "ERR connection closed (command timeout)"으로 끝나고 커넥션은 격리 큐를 거쳐 재연결된다.
+	//***************************************************************************
+	void                DisconnectStalledClients();
 
 	void                StartReconnectLoop();
 	void                StopReconnectLoop();
 	void                ReconnectLoop();
+
+	//***************************************************************************
+	// @brief 재연결 스레드를 즉시 깨워 격리 큐를 점검하게 함
+	// @details 끊긴 커넥션이 격리 큐로 들어가는 순간 호출해, 다음 점검 주기(수 초)를 기다리지 않고
+	//          바로 재접속을 시도하게 한다. 반복 실패는 클라이언트별 지수 백오프가 막는다.
+	//***************************************************************************
+	void                WakeReconnect();
 
 private:
 	CIocpCoreRef                    _iocpCore;               // IOCP 코어 참조
 	std::string                     _strIP;                  // 연결 대상 IP
 	uint16                          _nPort = 0;              // 연결 대상 포트
 	int32                           _nDbIndex = 0;           // 각 커넥션이 접속 직후 SELECT로 고정할 논리 DB 인덱스(0이면 생략)
+	std::string                     _strUserId;              // 접속 직후 AUTH에 쓸 ACL 사용자 이름(비면 생략)
+	std::string                     _strPassword;            // 접속 직후 AUTH에 쓸 비밀번호(비면 인증 생략). 로그에 남기지 않는다
 
 	std::mutex                      _lock;					  // 풀 동기화 락 (_vecAllClients/_queueFree/_queueBroken/_queuePending 공용)
 	CVector<CRedisClientRef>		_vecAllClients;          // 생성된 전체 클라이언트 리스트
@@ -158,11 +190,13 @@ private:
 	struct TPendingCommand
 	{
 		CVector<std::string>	vecArgs;
-		RedisCallback			fnCallback;
+		RedisResponseHandler	fnCallback;
+		int64					nEnqueuedMs = 0;			// 대기 시작 시각(ptime::MonotonicNowMillis) — 오래 기다린 요청을 에러로 끝내는 기준
 	};
-	static constexpr size_t		kMaxPendingCommands = 2000;	// 이 이상 쌓이면 새 요청은 진짜로 실패 처리
 	CQueue<TPendingCommand>			_queuePending;				// 풀이 바닥났을 때 대기 중인 요청들
 
+	std::atomic<int64>              _nLastRejectLogMs{ 0 };  // 대기 큐 포화 로그를 마지막으로 남긴 시각(steady 기준 ms) — 로그 폭주 방지
+	std::atomic<int64>              _nRejectedSinceLog{ 0 };	// 마지막 포화 로그 이후 거부된 요청 수
 	std::atomic<bool>               _bInitialized{ false };  // 풀 초기화 여부 플래그
 
 	//***************************************************************************
@@ -184,11 +218,12 @@ private:
 	//***************************************************************************
 	// @brief 재연결 전용 스레드 및 동기화 객체
 	//***************************************************************************
-	int32                           _nReconnectIntervalSec = 3;	// 재연결 스레드가 격리 큐를 훑는 주기 (초 단위)
+	int32                           _nReconnectIntervalSec = Redis::kDefaultReconnectIntervalSec;	// 재연결 스레드가 격리 큐를 훑는 주기 (초 단위)
 	std::thread                     _reconnectThread;				// 격리 큐 재연결을 담당하는 전용 스레드
 	std::mutex                      _reconnectLock;				// _reconnectCv 대기/신호 전달 전용 뮤텍스
 	std::condition_variable         _reconnectCv;					// 재연결 주기 대기 및 즉시 종료 신호 수신용 조건 변수
 	std::atomic<bool>               _stopping{ false };			// 재연결 스레드 정지 요청 여부 플래그
+	bool                            _bReconnectWake = false;		// 커넥션이 격리 큐로 들어와 즉시 점검이 필요함 — _reconnectLock으로 보호
 
 	//***************************************************************************
 	// @brief 클라이언트별 재연결 지수 백오프 상태
@@ -203,12 +238,7 @@ private:
 	//          ReconnectLoop() 쪽 접근이 전혀 없다는 게 보장된다 — 그래서
 	//          별도 락이 필요 없다.
 	//***************************************************************************
-	struct TReconnectBackoffState
-	{
-		int32                                   nFailCount = 0;		// 연속 재연결 실패 횟수
-		std::chrono::steady_clock::time_point   nextRetryTime{};	// 이 시각 이전에는 재시도를 건너뜀
-	};
-	std::unordered_map<CRedisClient*, TReconnectBackoffState> _reconnectBackoffMap;	// 클라이언트 포인터 → 백오프 상태
+	std::unordered_map<CRedisClient*, Redis::SReconnectBackoff> _reconnectBackoffMap;	// 클라이언트 포인터 → 백오프 상태(구조체는 RedisHelper.h)
 };
 
 #endif // ndef UC_REDISCONNECTIONPOOL_H

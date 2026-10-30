@@ -8,7 +8,7 @@
 #define UC_REDISSERVERHEARTBEAT_H
 
 #include <Redis/RedisService.h>
-#include <Util/DateTimeUtil.h>
+#include <Redis/RedisScript.h>
 
 #include <string>
 #include <thread>
@@ -38,6 +38,10 @@
 //     매 주기 갱신은 updatedAt/sessionCount만 쓰지 않고 등록 필드 전체를 HSET으로
 //     다시 쓴다. Redis 장애/재시작이나 TTL 만료로 키가 사라졌다가 복구돼도
 //     일부 필드만 가진 불완전한 항목이 아니라 완전한 등록 정보로 되살아난다.
+//
+// 원자성:
+//     등록(HSET)과 TTL(EXPIRE)은 EVALSHA로 보내는 스크립트 하나(CRedisScript)에서
+//     함께 실행된다. 둘 사이에 실패나 연결 끊김이 끼어 TTL 없는 키가 남을 수 없다.
 //
 // 정상 종료 시:
 //     Stop()이 heartbeat 스레드를 즉시 멈춘 뒤 DEL로 키를 바로 지워, TTL
@@ -109,13 +113,16 @@ public:
 
 	//***************************************************************************
 	// @brief heartbeat 스레드를 정지시키고 Redis에서 등록 키를 즉시 삭제합니다.
-	// @details 중복 호출에 안전(idempotent)합니다.
+	// @details 중복 호출에 안전(idempotent)합니다. Start()가 성공한 적이 없으면 DEL을 보내지 않습니다.
+	//          DEL은 응답을 기다리지 않고 보냅니다 — 서비스를 곧바로 해제하면 전송 전에 끊길 수
+	//          있으며, 그 경우 TTL 만료가 정리합니다.
 	//***************************************************************************
 	void Stop();
 
 private:
 	void			RegisterInitial();
-	void			BuildRegistrationArgs(CVector<std::string>& args, int64 nowMs) const;
+	void			BuildRegistrationArgv(CVector<std::string>& argv, int64 nowMs) const;
+	void			PublishRegistration();
 	void			SendHeartbeat();
 	void			HeartbeatLoop();
 	std::string		BuildKey() const;
@@ -130,6 +137,7 @@ private:
 	int32					_ttlSec = 15;				// Start()에서 넘겨받아 저장 — EXPIRE에 매번 이 값을 씀
 	int32					_heartbeatIntervalSec = 5;	// Start()에서 넘겨받아 저장 — HeartbeatLoop()의 대기 주기로 씀
 	int64					_startedAtMs = 0;			// Start() 시각(epoch ms) — 매 갱신의 HSET에 같은 값으로 기록됨
+	bool					_bStarted = false;			// Start()가 성공해 등록 키가 있는지 — Stop()이 DEL을 보낼지 판단 (Start/Stop 호출 스레드만 접근)
 
 	SessionCountProvider	_sessionCountProvider;	// 설정 안 하면(nullptr) sessionCount 필드는 항상 0
 

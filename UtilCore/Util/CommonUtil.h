@@ -490,6 +490,20 @@ inline _tstring ExceptionToString(const std::exception& e)
 #endif
 }
 
+//***************************************************************************
+// @brief TCHAR 문자열 포인터를 std::string으로 변환합니다(nullptr 허용).
+// @param ptsz 변환할 TCHAR 문자열 (nullptr이면 빈 문자열)
+// @return 변환된 std::string (TStringToString()과 같은 인코딩 규칙)
+// @details ServerConnectInfo의 TCHAR 고정 버퍼(_tszDBHost 등)를 std::string을 받는
+//          API(Redis 등)에 넘길 때 UNICODE/멀티바이트 빌드 모두에서 쓴다.
+//***************************************************************************
+inline std::string TCharToString(const TCHAR* ptsz)
+{
+	if( ptsz == nullptr ) return std::string();
+
+	return TStringToString(ptsz);
+}
+
 // 데이터베이스 연결 및 텍스트 파싱 관련 함수 선언
 void		GetDBDSNString(TCHAR* ptszDSN, const EDBClass dbClass, const TCHAR* ptszDSNDriver, const TCHAR* ptszDBHost, const unsigned int nPort, const TCHAR* ptszDBUserId, const TCHAR* ptszDBPasswd, const TCHAR* ptszDBName);
 

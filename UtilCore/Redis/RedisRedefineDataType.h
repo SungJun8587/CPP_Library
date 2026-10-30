@@ -11,5 +11,6 @@
 
 USING_SHARED_PTR(CRedisClient);
 USING_SHARED_PTR(CRedisConnectionPool);
+USING_SHARED_PTR(CRedisSubscriber);
 
 #endif // ndef UC_REDISREDEFINEDATATYPE_H

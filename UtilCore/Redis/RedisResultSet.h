@@ -25,7 +25,7 @@
 //
 // 특징:
 //      - RedisValue의 ERedisType 응답 형태(SimpleString, BulkString, Integer, Array 등)를 완벽 대응
-//      - Boost 라이브러리 없이 C++ 표준 라이브러리(std::stoll 등)만 활용하여 변환
+//      - Boost 라이브러리 없이 C++ 표준 라이브러리(std::from_chars 기반 Redis::ParseInteger)만 활용하여 변환
 //      - TCHAR/MultiByte 변환 지원으로 유니코드/아스키 환경 모두 대응
 //
 // 사용 예시 (Usage Example):
@@ -91,6 +91,15 @@ public:
 	INT32 GetRankInfoRetCount() const;
 
 	//***************************************************************************
+	// @brief 원본 응답이 에러였는지 확인합니다 (서버 에러 응답 또는 연결 오류).
+	// @details 에러 응답은 데이터를 담지 않으므로 IsEmpty()==true가 되어 "정상적인 빈
+	//          결과"와 겉으로 구분되지 않는다. 둘을 가려야 하는 호출부는 IsEmpty()보다
+	//          먼저 IsError()를 본다. 에러 문자열 자체가 필요하면 RedisValue::strVal을 직접
+	//          읽거나, 연결 오류만 가리려면 IsRedisConnectionError()를 쓴다.
+	//***************************************************************************
+	bool IsError() const { return _bError; }
+
+	//***************************************************************************
 	// @brief 결과 집합이 비어있는지 여부를 확인합니다.
 	// @return bool true: 비어있음, false: 데이터 존재함
 	//***************************************************************************
@@ -103,7 +112,12 @@ public:
 	size_t GetSize() const { return _vecResultSplit.size(); }
 
 private:
+	template<typename T>
+	bool ReadInteger(T& Dest);	// 정수형 GetData() 공용 구현
+
+private:
 	UINT                    _readCursor;      // 순차 데이터 읽기 커서 위치
+	bool                    _bError = false;  // 원본 응답이 ERedisType::Error였는지
 	CVector<std::string>	_vecResultSplit;  // 문자열로 분할 및 보관된 결과 목록
 };
 

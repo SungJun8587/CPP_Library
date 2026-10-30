@@ -6,20 +6,60 @@
 
 #include "pch.h"
 #include "RedisConnectionPool.h"
+#include <Redis/RedisHelper.h>
+#include <Util/DateTimeUtil.h>
+#include <algorithm>
+#include <vector>
+#include <thread>
+#include <atomic>
 
 namespace
 {
-	// 클라이언트별 재연결 지수 백오프 기본값. COdbcConnPool::TReconnectConfig의
-	// 기본값과 동일한 값을 사용해 두 풀의 재연결 체감 동작을 맞춘다.
-	// [수정 — 주석 정확도] 이 값들은 "이 시각이 지나기 전엔 재시도 자체를
-	// 안 함"이라는 최소 대기 시간일 뿐이다 — 실제 재시도 시점은 재연결
-	// 스윕 주기(_nReconnectIntervalSec, 기본 3초)에 맞춰서만 확인되므로,
-	// 정확히 500ms/1초/2초 뒤에 재시도한다는 뜻이 아니라 "다음 스윕에서
-	// 재시도할지 말지를 가르는 기준선"으로 보는 게 정확하다.
-	constexpr int64 RECONNECT_BACKOFF_BASE_MS = 500;		// 최초 재시도 최소 대기 시간
-	constexpr int64 RECONNECT_BACKOFF_MAX_MS = 30000;		// 재시도 최소 대기 시간 상한선
-	constexpr int32 RECONNECT_BACKOFF_MAX_SHIFT = 6;		// 백오프 지수 증가 횟수 상한
-	constexpr int32 RECONNECT_BACKOFF_JITTER_MS = 250;		// 동시 재시도 충돌 방지를 위한 지터 최대값
+	// ConnectClientsParallel()의 클라이언트별 결과
+	constexpr char kConnectNotTried = 0;	// 시도하지 못함(종료 요청 등)
+	constexpr char kConnectOk = 1;
+	constexpr char kConnectFailed = 2;
+
+	//***************************************************************************
+	// @brief 클라이언트들을 동시에 접속시킴 (Init()과 재연결 스윕 공용)
+	// @param vecResult vecClients와 같은 크기로 미리 kConnectNotTried로 채워 둔 결과 배열
+	// @param pStop 널이 아니면 true가 된 뒤에는 새 클라이언트의 접속을 시작하지 않는다
+	// @details 순차로 하면 Redis가 느리거나 응답이 없을 때 걸리는 시간이 (클라이언트 수 x 접속 제한)만큼
+	//          늘어난다. 워커 수는 Redis::kMaxConnectWorkers로 상한을 둬 한꺼번에 소켓을 쏟지 않는다.
+	//          호출 스레드도 워커 하나로 일한다.
+	//***************************************************************************
+	void ConnectClientsParallel(const CVector<CRedisClientRef>& vecClients, std::vector<char>& vecResult,
+		const std::string& strIP, const uint16 nPort, const int32 nDbIndex, const std::string& strUserId, const std::string& strPassword,
+		const std::atomic<bool>* pStop)
+	{
+		const int32 nCount = static_cast<int32>(vecClients.size());
+		const int32 nWorkers = (nCount < Redis::kMaxConnectWorkers) ? nCount : Redis::kMaxConnectWorkers;
+		std::atomic<int32> nNext{ 0 };
+
+		auto fnWork = [&]() {
+			for( ;; )
+			{
+				if( pStop != nullptr && pStop->load() )
+					break;
+
+				const int32 i = nNext.fetch_add(1, std::memory_order_relaxed);
+				if( i >= nCount )
+					break;
+
+				const bool bOk = vecClients[static_cast<size_t>(i)]->Connect(strIP, nPort, nDbIndex, Redis::kConnectTimeoutMs, strUserId, strPassword);
+				vecResult[static_cast<size_t>(i)] = bOk ? kConnectOk : kConnectFailed;
+			}
+			};
+
+		std::vector<std::thread> vecWorkers;
+		vecWorkers.reserve(static_cast<size_t>((nWorkers > 1) ? nWorkers - 1 : 0));
+		for( int32 w = 1; w < nWorkers; ++w )
+			vecWorkers.emplace_back(fnWork);
+
+		fnWork();
+		for( auto& worker : vecWorkers )
+			worker.join();
+	}
 }
 
 //***************************************************************************
@@ -53,7 +93,8 @@ CRedisConnectionPool::~CRedisConnectionPool()
 // @param nReconnectIntervalSec 격리 큐를 훑어 재연결을 시도하는 주기(초)
 // @return 성공 여부 (true: 성공, false: 실패)
 //***************************************************************************
-bool CRedisConnectionPool::Init(const std::string& strIP, const uint16 nPort, const int32 nDbIndex, const int32 nPoolSize, const int32 nReconnectIntervalSec)
+bool CRedisConnectionPool::Init(const std::string& strIP, const uint16 nPort, const int32 nDbIndex, const int32 nPoolSize, const int32 nReconnectIntervalSec,
+	const std::string& strUserId, const std::string& strPassword)
 {
 	// [추가 — 버그 수정] nPoolSize가 0 이하면 즉시 실패시킨다. 예전엔
 	// 이 값을 검증 안 해서, 0을 넘기면 for 루프가 한 번도 안 돌고
@@ -89,22 +130,47 @@ bool CRedisConnectionPool::Init(const std::string& strIP, const uint16 nPort, co
 		_strIP = strIP;
 		_nPort = nPort;
 		_nDbIndex = nDbIndex;
-		_nReconnectIntervalSec = (nReconnectIntervalSec > 0) ? nReconnectIntervalSec : 3;
+		_strUserId = strUserId;
+		_strPassword = strPassword;
+		_nReconnectIntervalSec = (nReconnectIntervalSec > 0) ? nReconnectIntervalSec : Redis::kDefaultReconnectIntervalSec;
 	}
 
-	for( int32 i = 0; i < nPoolSize; ++i )
+	// 커넥션들을 동시에 맺는다(ConnectClientsParallel). 일부만 실패해도 풀은 열린다 - 실패한
+	// 클라이언트는 격리 큐로 보내 재연결 스레드가 이어서 붙인다. 전부 실패해야(= 주소/인증 설정
+	// 오류 가능성이 큰 경우) Init이 실패한다.
+	CVector<CRedisClientRef> vecClients(static_cast<size_t>(nPoolSize));
+	std::vector<char>        vecConnected(static_cast<size_t>(nPoolSize), kConnectNotTried);
+	for( auto& pClient : vecClients )
+		pClient = std::make_shared<CRedisClient>(_iocpCore);
+
+	ConnectClientsParallel(vecClients, vecConnected, strIP, nPort, nDbIndex, strUserId, strPassword, nullptr);
+
+	int32 nConnected = 0;
 	{
-		auto pClient = std::make_shared<CRedisClient>(_iocpCore);
-		if( !pClient->Connect(strIP, nPort, nDbIndex) )
-		{
-			Clear();
-			return false;
-		}
-
 		std::lock_guard<std::mutex> lock(_lock);
-		_vecAllClients.push_back(pClient);
-		_queueFree.push(pClient);
+		for( int32 i = 0; i < nPoolSize; ++i )
+		{
+			_vecAllClients.push_back(vecClients[static_cast<size_t>(i)]);
+			if( vecConnected[static_cast<size_t>(i)] == kConnectOk )
+			{
+				_queueFree.push(vecClients[static_cast<size_t>(i)]);
+				++nConnected;
+			}
+			else
+			{
+				_queueBroken.push(vecClients[static_cast<size_t>(i)]);
+			}
+		}
 	}
+
+	if( nConnected == 0 )
+	{
+		Clear();
+		return false;
+	}
+
+	if( nConnected < nPoolSize )
+		LOG_ERROR(_T("CRedisConnectionPool::Init: %d/%d 커넥션만 연결됨 - 나머지는 재연결 스레드가 이어서 시도"), static_cast<int>(nConnected), static_cast<int>(nPoolSize));
 
 	_bInitialized = true;
 
@@ -136,6 +202,7 @@ void CRedisConnectionPool::Clear()
 	StopReconnectLoop();
 
 	CVector<CRedisClientRef> clientsToDisconnect;
+	CVector<TPendingCommand> pendingToFail;
 	{
 		std::lock_guard<std::mutex> lock(_lock);
 
@@ -153,13 +220,13 @@ void CRedisConnectionPool::Clear()
 		while( !_queueBroken.empty() )
 			_queueBroken.pop();
 
-		// [추가] 대기 중이던 요청들도 정리한다 — 풀 자체가 사라지는 상황이라
-		// 콜백을 나중에 부를 방법이 없다(이 콜백들이 기대하는 커넥션/풀
-		// 자체가 없어짐). 조용히 버린다 — 호출부들은 이미 서버 종료/재초기화
-		// 같은 특수 상황에서만 이 경로를 타므로, 남은 요청에 대한 응답을
-		// 더 이상 기다리지 않는다고 가정한다.
+		// 대기 중이던 요청은 락 밖에서 연결 오류로 완료시킨다 — 콜백이 영원히 오지 않는 요청이
+		// 남지 않게 하기 위함이다. 이 풀로 다시 보내는 재시도는 풀이 비초기화 상태라 거부된다.
 		while( !_queuePending.empty() )
+		{
+			pendingToFail.push_back(std::move(_queuePending.front()));
 			_queuePending.pop();
+		}
 
 		// 재연결 스레드는 이미 위에서 정지·조인되었으므로(StopReconnectLoop()),
 		// 이 시점에는 아무도 이 맵을 건드리지 않는다 — 락 없이 바로 비워도 안전하다.
@@ -180,6 +247,12 @@ void CRedisConnectionPool::Clear()
 	{
 		if( pClient )
 			pClient->Disconnect();
+	}
+
+	for( auto& pending : pendingToFail )
+	{
+		if( pending.fnCallback )
+			pending.fnCallback(Redis::MakeError(Redis::kErrPoolCleared));
 	}
 }
 
@@ -225,6 +298,7 @@ void CRedisConnectionPool::PushConnection(CRedisClientRef pClient, uint64 genera
 		if( !pClient->IsConnected() )
 		{
 			_queueBroken.push(pClient);
+			WakeReconnect(); // 다음 점검 주기를 기다리지 않고 바로 재접속을 시도하게 한다
 			return;
 		}
 
@@ -258,10 +332,10 @@ void CRedisConnectionPool::PushConnection(CRedisClientRef pClient, uint64 genera
 //          운영 중에는 fnCallback이 정확히 한 번 호출된다(성공 응답,
 //          또는 연결 끊김/전송 실패로 인한 에러 값). 단,
 //          CRedisConnectionPool::Clear()가 실행되면 그 시점에 대기 큐
-//          (_queuePending)에 남아있던 미전송 명령은 lifecycle 종료를
-//          위해 조용히 폐기되며 fnCallback은 호출되지 않는다 — Clear()는
-//          서버 종료/재초기화 같은 특수 상황에서만 호출된다는 전제
-//          (클래스 문서 상단 "lifecycle 계약" 참고) 하의 설계 선택이다.
+//          (_queuePending)에 남아있던 미전송 명령은 "ERR connection closed (pool cleared)"로
+//          완료된다. 대기 큐에서 kPendingTimeoutMs를 넘긴 요청은 재연결 스레드가
+//          "ERR connection closed (pending timeout)"으로 완료한다. 즉 true를 반환한
+//          요청의 콜백은 항상 호출된다.
 // @details [수정 — 버그 수정: TOCTOU] 외부 리뷰로 발견된 문제 — 예전엔
 //          "Free 큐에서 꺼내기"(PopConnection())와 "없으면 대기 큐에 넣기"가
 //          서로 다른 _lock 구간이었다. 그 사이에 다른 스레드의
@@ -271,7 +345,7 @@ void CRedisConnectionPool::PushConnection(CRedisClientRef pClient, uint64 genera
 //          못하고 방치되는 경합이 있었다. 이제 "Free에서 꺼내기 OR 대기
 //          큐에 넣기"를 하나의 _lock 구간에서 원자적으로 결정한다.
 //***************************************************************************
-bool CRedisConnectionPool::SendCommand(const CVector<std::string>& vecArgs, RedisCallback fnCallback)
+bool CRedisConnectionPool::SendCommand(const CVector<std::string>& vecArgs, RedisResponseHandler fnCallback)
 {
 	if( !_bInitialized ) return false;
 
@@ -294,6 +368,7 @@ bool CRedisConnectionPool::SendCommand(const CVector<std::string>& vecArgs, Redi
 			}
 
 			_queueBroken.push(std::move(pCandidate));
+			WakeReconnect();
 		}
 
 		if( !pClient )
@@ -309,13 +384,23 @@ bool CRedisConnectionPool::SendCommand(const CVector<std::string>& vecArgs, Redi
 			// 이제 대기 큐에 넣어두고 true를 반환한다 — PushConnection()이
 			// 커넥션을 돌려받는 즉시 이 큐에서 꺼내 처리한다. 대기 큐
 			// 자체가 무한정 쌓이는 것만은 막아야 하므로 상한을 둔다.
-			if( _queuePending.size() >= kMaxPendingCommands )
+			if( _queuePending.size() >= Redis::kMaxPendingCommands )
 			{
-				LOG_ERROR(_T("CRedisConnectionPool::SendCommand: 대기 큐 포화(상한 %d) — 요청 거부"), static_cast<int>(kMaxPendingCommands));
+				// 포화 상태에서는 요청마다 로그를 남기면 로그 자체가 병목이 된다 — 초당 한 번만 남기고
+				// 그 사이 거부된 건수를 함께 적는다.
+				_nRejectedSinceLog.fetch_add(1, std::memory_order_relaxed);
+				const int64 nNowMs = ptime::MonotonicNowMillis();
+				int64 nLastMs = _nLastRejectLogMs.load(std::memory_order_relaxed);
+				if( nNowMs - nLastMs >= 1000 && _nLastRejectLogMs.compare_exchange_strong(nLastMs, nNowMs) )
+				{
+					const int64 nRejected = _nRejectedSinceLog.exchange(0, std::memory_order_relaxed);
+					LOG_ERROR(_T("CRedisConnectionPool::SendCommand: 대기 큐 포화(상한 %d) — 요청 거부(최근 %lld건)"),
+						static_cast<int>(Redis::kMaxPendingCommands), static_cast<long long>(nRejected));
+				}
 				return false;
 			}
 
-			_queuePending.push(TPendingCommand{ vecArgs, std::move(fnCallback) });
+			_queuePending.push(TPendingCommand{ vecArgs, std::move(fnCallback), ptime::MonotonicNowMillis() });
 			return true;
 		}
 	}
@@ -334,7 +419,7 @@ bool CRedisConnectionPool::SendCommand(const CVector<std::string>& vecArgs, Redi
 //          PushConnection()이 호출될 때, 그 사이 Clear()/재Init()으로
 //          세대가 바뀌었으면 옛 세대의 콜백으로 간주해 걸러낸다.
 //***************************************************************************
-void CRedisConnectionPool::DispatchOnClient(CRedisClientRef pClient, const CVector<std::string>& vecArgs, RedisCallback fnCallback)
+void CRedisConnectionPool::DispatchOnClient(CRedisClientRef pClient, const CVector<std::string>& vecArgs, RedisResponseHandler fnCallback)
 {
 	// 풀이 소멸 중이면(Clear()가 재연결 스레드를 조인하는 동안 그 스레드가 대기 중이던
 	// 요청을 전송하는 경우) shared_from_this()는 bad_weak_ptr를 던진다. weak_from_this()는
@@ -343,7 +428,7 @@ void CRedisConnectionPool::DispatchOnClient(CRedisClientRef pClient, const CVect
 	std::weak_ptr<CRedisConnectionPool> weakSelf = weak_from_this();
 	const uint64 generation = _generation.load(std::memory_order_acquire);
 
-	auto fnWrappedCallback = [weakSelf, pClient, fnCallback = std::move(fnCallback), generation](const RedisValue& res) {
+	auto fnWrappedCallback = [weakSelf, pClient, fnCallback = std::move(fnCallback), generation](RedisValue&& res) {
 		// [추가 — 방어적 하드닝] 사용자 콜백(fnCallback)이 예외를 던지면
 		// 원래는 이 람다 자체가 중간에 끊겨서 아래 PushConnection()이
 		// 실행되지 않는다 — 그러면 이 커넥션이 풀로 영원히 반납되지 않고
@@ -353,7 +438,7 @@ void CRedisConnectionPool::DispatchOnClient(CRedisClientRef pClient, const CVect
 		try
 		{
 			if( fnCallback )
-				fnCallback(res);
+				fnCallback(std::move(res));
 		}
 		catch( const std::exception& e )
 		{
@@ -384,10 +469,84 @@ void CRedisConnectionPool::DispatchOnClient(CRedisClientRef pClient, const CVect
 }
 
 //***************************************************************************
+// @brief 대기 큐에서 기한이 지난 요청을 연결 오류로 완료시킴 (RedisConnectionPool.h 선언부 참고)
+//***************************************************************************
+void CRedisConnectionPool::ExpirePendingCommands()
+{
+	CVector<TPendingCommand> expired;
+	{
+		const int64 nNowMs = ptime::MonotonicNowMillis();
+		std::lock_guard<std::mutex> lock(_lock);
+
+		// 대기 큐는 도착 순서(= 대기 시작 시각 순서)이므로 앞에서부터 기한이 지난 것만 꺼내면 된다.
+		while( !_queuePending.empty()
+			&& nNowMs - _queuePending.front().nEnqueuedMs >= Redis::kPendingTimeoutMs )
+		{
+			expired.push_back(std::move(_queuePending.front()));
+			_queuePending.pop();
+		}
+	}
+
+	if( expired.empty() )
+		return;
+
+	LOG_ERROR(_T("CRedisConnectionPool: 대기 큐에서 %dms를 넘긴 요청 %d건을 연결 오류로 종료"), static_cast<int>(Redis::kPendingTimeoutMs), static_cast<int>(expired.size()));
+
+	for( auto& pending : expired )
+	{
+		if( pending.fnCallback )
+			pending.fnCallback(Redis::MakeError(Redis::kErrPendingTimeout));
+	}
+}
+
+//***************************************************************************
+// @brief 응답이 제한 시간 안에 오지 않는 커넥션을 끊음 (RedisConnectionPool.h 선언부 참고)
+//***************************************************************************
+void CRedisConnectionPool::DisconnectStalledClients()
+{
+	// 락 안에서는 "무응답으로 멈춘 커넥션"만 골라낸다(전체 목록을 매번 복사하지 않는다). 경과 시간 조회는
+	// 원자적 읽기라 락이 필요 없고, Disconnect()는 대기 콜백 → PushConnection()(_lock)으로 이어지므로 락 밖에서 호출한다.
+	CVector<CRedisClientRef> vecStalled;
+	{
+		std::lock_guard<std::mutex> lock(_lock);
+		for( const auto& pClient : _vecAllClients )
+		{
+			if( pClient->GetPendingCommandAgeMs() >= Redis::kPoolCommandTimeoutMs )
+				vecStalled.push_back(pClient);
+		}
+	}
+
+	for( auto& pClient : vecStalled )
+	{
+		LOG_ERROR(_T("CRedisConnectionPool: 명령 응답 없음 %lldms 초과 — 커넥션을 끊고 재연결합니다"), static_cast<long long>(Redis::kPoolCommandTimeoutMs));
+
+		pClient->Disconnect(ERedisDisconnectReason::CommandTimeout);
+	}
+}
+
+//***************************************************************************
+// @brief 재연결 스레드를 즉시 깨워 격리 큐를 점검하게 함
+// @details 커넥션이 격리 큐로 들어가는 순간 호출한다. 호출 스레드가 _lock을 쥔 채여도 안전하다
+//          (_lock -> _reconnectLock 순서로만 잡으며, 반대 순서로 잡는 곳이 없다).
+//***************************************************************************
+void CRedisConnectionPool::WakeReconnect()
+{
+	{
+		std::lock_guard<std::mutex> lock(_reconnectLock);
+		_bReconnectWake = true;
+	}
+	_reconnectCv.notify_one();
+}
+
+//***************************************************************************
 // @brief 재연결 스레드를 시작함
 //***************************************************************************
 void CRedisConnectionPool::StartReconnectLoop()
 {
+	{
+		std::lock_guard<std::mutex> lock(_reconnectLock);
+		_bReconnectWake = false;
+	}
 	_stopping.store(false);
 	_reconnectThread = std::thread([this]() { ReconnectLoop(); });
 }
@@ -400,6 +559,11 @@ void CRedisConnectionPool::StopReconnectLoop()
 	if( _stopping.exchange(true) )
 		return; // 이미 정지 중이거나 정지됨
 
+	// 대기 뮤텍스를 한 번 거친 뒤 알린다. 스레드가 조건을 검사하고 대기에 들어가기 직전에 알림이
+	// 끼면 유실되어, join이 점검 주기만큼 지연될 수 있기 때문이다.
+	{
+		std::lock_guard<std::mutex> lock(_reconnectLock);
+	}
 	_reconnectCv.notify_all();
 
 	if( _reconnectThread.joinable() )
@@ -422,123 +586,133 @@ void CRedisConnectionPool::StopReconnectLoop()
 void CRedisConnectionPool::ReconnectLoop()
 {
 	const int32 reconnectIntervalSec = _nReconnectIntervalSec;
+	bool bRecheckSoon = false;
 
 	while( !_stopping.load() )
 	{
+		// 이번 대기 시간: 점검 주기(또는 재점검 주기)와, 대기 큐에서 가장 오래된 요청의 남은 만료 시간 중 작은 값.
+		// 만료 점검이 주기에만 의존하면 대기 제한(kPendingTimeoutMs)이 최대 한 주기만큼 늦게 적용된다.
+		// _lock은 _reconnectLock을 잡기 전에 잡고 놓는다(SendCommand()가 _lock → _reconnectLock 순서로 잡는다).
+		int64 nWaitMs = bRecheckSoon ? static_cast<int64>(Redis::kReconnectRecheckMs) : static_cast<int64>(reconnectIntervalSec) * 1000;
 		{
-			std::unique_lock<std::mutex> guard(_reconnectLock);
-			const bool stoppedDuringWait = _reconnectCv.wait_for(
-				guard,
-				std::chrono::seconds(reconnectIntervalSec),
-				[this] { return _stopping.load(); });
-
-			if( stoppedDuringWait )
-				break; // StopReconnectLoop() 요청으로 깨어남
+			std::lock_guard<std::mutex> lock(_lock);
+			if( !_queuePending.empty() )
+			{
+				const int64 nRemainMs = Redis::kPendingTimeoutMs - (ptime::MonotonicNowMillis() - _queuePending.front().nEnqueuedMs);
+				nWaitMs = (std::min)(nWaitMs, (std::max)(nRemainMs, static_cast<int64>(Redis::kReconnectRecheckMs)));
+			}
 		}
 
-		// _reconnectLock은 오직 주기 대기(wait_for)를 위한 것이다. 실제
-		// 재연결 시도(connect, 클라이언트당 최대 connectTimeoutMs 블로킹)는
-		// 락을 놓은 채로 수행해, 서버 장애 등으로 대량 재연결이 진행 중일
-		// 때도 StopReconnectLoop()이 다음 클라이언트 처리 전 시점에서 곧바로
-		// 빠져나올 수 있게 한다(그렇지 않으면 종료 자체가 풀 크기만큼 지연됨).
+		{
+			std::unique_lock<std::mutex> guard(_reconnectLock);
+			_reconnectCv.wait_for(guard, std::chrono::milliseconds(nWaitMs), [this] { return _stopping.load() || _bReconnectWake; });
+
+			if( _stopping.load() )
+				break; // StopReconnectLoop() 요청으로 깨어남
+
+			_bReconnectWake = false;
+		}
+		bRecheckSoon = false;
+
+		// 재연결을 기다리며 오래 대기 중인 요청을 먼저 에러로 끝낸다.
+		ExpirePendingCommands();
+		DisconnectStalledClients();
+
+		// _reconnectLock은 오직 주기 대기(wait_for)를 위한 것이다. 실제 재연결 시도(connect,
+		// 클라이언트당 최대 kConnectTimeoutMs 블로킹)는 풀 락(_lock) 밖에서 수행해 다른 스레드의
+		// 대여/반납을 막지 않는다.
 		CVector<CRedisClientRef> vecBroken;
 		{
 			std::lock_guard<std::mutex> lock(_lock);
 			while( !_queueBroken.empty() )
 			{
-				vecBroken.push_back(_queueBroken.front());
+				vecBroken.push_back(std::move(_queueBroken.front()));
 				_queueBroken.pop();
 			}
 		}
 
+		CVector<CRedisClientRef> vecRetry;		// 이번 스윕에서 접속을 시도할 클라이언트
+		CVector<CRedisClientRef> vecDeferred;	// 이번에는 건너뛰고 격리 큐로 되돌릴 클라이언트
+		const int64 nNowMs = ptime::MonotonicNowMillis();
+
 		for( auto& pClient : vecBroken )
 		{
+			// 종료 요청이 들어온 경우 남은 클라이언트는 다시 격리 큐로 되돌려 다음 기회에 재시도되게 한다.
 			if( _stopping.load() )
 			{
-				// 종료 요청이 들어온 경우 남은 클라이언트는 다시 격리 큐로
-				// 되돌려 다음 기회에 재시도되게 하고 이번 순회는 즉시 접는다.
-				std::lock_guard<std::mutex> lock(_lock);
-				_queueBroken.push(pClient);
+				vecDeferred.push_back(std::move(pClient));
 				continue;
 			}
 
-			auto& backoffState = _reconnectBackoffMap[pClient.get()];
-			const auto now = std::chrono::steady_clock::now();
-
-			if( backoffState.nFailCount > 0 && now < backoffState.nextRetryTime )
+			// 아직 백오프 대기 시간이 지나지 않음 - 이번 스윕에서는 건너뛴다.
+			Redis::SReconnectBackoff& backoffState = _reconnectBackoffMap[pClient.get()];
+			if( backoffState.ShouldSkip(nNowMs) )
 			{
-				// 아직 백오프 대기 시간이 지나지 않음 — 이번 스윕에서는
-				// 건너뛰고 격리 큐로 그대로 되돌린다.
-				std::lock_guard<std::mutex> lock(_lock);
-				_queueBroken.push(pClient);
+				vecDeferred.push_back(std::move(pClient));
 				continue;
 			}
 
-			// closesocket() 이후에도 그 소켓에 걸려있던 WSARecv/WSASend의
-			// 완료 통지가 IOCP 큐를 아직 안 빠져나왔을 수 있다 — 이 상태에서
-			// Connect()를 불러 같은 _recvEvent/_sendEvent(OVERLAPPED 메모리)를
-			// 재사용해버리면, 나중에 도착하는 그 stale completion이 새
-			// 연결의 것으로 오인되어 처리될 위험이 있다(외부 리뷰로 발견).
-			// 이번 스윕에서는 재시도 실패로 취급하지 않고(백오프를 증가시키지
-			// 않고) 그냥 건너뛴다 — 다음 스윕쯤엔 그 completion이 처리돼
-			// 있을 가능성이 높다.
+			// closesocket() 이후에도 그 소켓에 걸려있던 WSARecv/WSASend의 완료 통지가 IOCP 큐를 아직
+			// 안 빠져나왔을 수 있다 - 이 상태에서 Connect()를 불러 같은 _recvEvent/_sendEvent
+			// (OVERLAPPED 메모리)를 재사용하면, 나중에 도착하는 stale completion이 새 연결의 것으로
+			// 오인될 위험이 있다. 재시도 실패로 취급하지 않고(백오프를 늘리지 않고) 건너뛰되, 완료
+			// 통지는 곧 비워지므로 일반 점검 주기를 기다리지 않고 짧게 다시 본다.
 			if( !pClient->HasNoOutstandingIo() )
 			{
-				std::lock_guard<std::mutex> lock(_lock);
-				_queueBroken.push(pClient);
+				bRecheckSoon = true;
+				vecDeferred.push_back(std::move(pClient));
 				continue;
 			}
 
-			// [추가] Connect()는 블로킹(수 초까지) 호출이라, 시작 전에
-			// generation을 미리 읽어둔다 — 정상적인 lifecycle 계약에서는
-			// Connect() 도중 Clear()가 동시에 실행되지 않지만, 오래 걸리는
-			// Connect() 도중 세대가 바뀌는 극단적인 경우까지 방어한다
-			// (Connect() 완료 후 다시 읽으면 그 사이 세대가 바뀐 값을
-			// 볼 수 있음).
+			vecRetry.push_back(std::move(pClient));
+		}
+
+		if( !vecRetry.empty() )
+		{
+			// Connect()는 블로킹(수 초까지) 호출이라, 시작 전에 generation을 미리 읽어둔다 - 정상적인
+			// lifecycle 계약에서는 Connect() 도중 Clear()가 동시에 실행되지 않지만, 오래 걸리는 Connect()
+			// 도중 세대가 바뀌는 극단적인 경우까지 방어한다.
 			const uint64 reconnectGeneration = _generation.load(std::memory_order_acquire);
 
-			if( pClient->Connect(_strIP, _nPort, _nDbIndex) )
+			// 순차로 시도하면 서버가 응답하지 않을 때 스윕 하나가 (끊긴 커넥션 수 x 접속 제한)만큼 걸려,
+			// 그동안 대기 큐 만료 점검이 멈춘다. Init()과 같이 동시에 맺는다.
+			std::vector<char> vecResult(vecRetry.size(), kConnectNotTried);
+			ConnectClientsParallel(vecRetry, vecResult, _strIP, _nPort, _nDbIndex, _strUserId, _strPassword, &_stopping);
+
+			const int64 nDoneMs = ptime::MonotonicNowMillis();
+			for( size_t i = 0; i < vecRetry.size(); ++i )
 			{
-				_reconnectBackoffMap.erase(pClient.get());
+				CRedisClientRef& pClient = vecRetry[i];
 
-				// [수정 — 버그 수정] 예전엔 여기서 그냥 _queueFree에 바로
-				// push했다 — 그 사이 대기 큐(_queuePending)에 쌓여있던
-				// 요청이 있어도 아무도 그걸 꺼내 처리해주지 않는 버그였다
-				// (대기 큐 소비 로직은 PushConnection()에만 있었으므로).
-				// PushConnection()을 거치도록 통일해서, 재연결 성공 즉시
-				// 대기 중이던 요청이 있으면 바로 처리되게 한다.
-				PushConnection(pClient, reconnectGeneration);
+				if( vecResult[i] == kConnectOk )
+				{
+					_reconnectBackoffMap.erase(pClient.get());
+
+					// 대기 큐에 쌓여있던 요청이 있으면 바로 처리되도록 PushConnection()을 거친다.
+					PushConnection(std::move(pClient), reconnectGeneration);
+					continue;
+				}
+
+				if( vecResult[i] == kConnectFailed )
+				{
+					// 지수 백오프 + 지터: 실패할수록 다음 시도까지 더 오래 기다려, 서버가 오래 죽어있는 동안
+					// 스윕 주기마다 무의미하게 두드리는 것을 막는다(계산은 Redis::ComputeReconnectBackoffMs).
+					_reconnectBackoffMap[pClient.get()].OnFail(nDoneMs, Redis::kReconnectBackoffJitterMs);
+				}
+
+				// 실패했거나 종료 요청으로 시도하지 못한 클라이언트는 격리 큐로 되돌린다.
+				vecDeferred.push_back(std::move(pClient));
 			}
-			else
-			{
-				// COdbcConnPool::ScheduleRetry()와 동일한 방식의 지수 백오프 +
-				// 지터: 실패할수록 다음 시도까지 더 오래 기다려, 서버가 오래
-				// 죽어있는 동안 스윕 주기마다 무의미하게 두드리는 것을 막는다.
-				backoffState.nFailCount++;
 
-				// [수정 — off-by-one] 예전엔 nShift에 nFailCount를 그대로
-				// 써서 1차 실패부터 500<<1=1000ms가 됐다 — RECONNECT_BACKOFF_BASE_MS
-				// 자체가 이미 "최초 재시도 대기 시간"이라는 이름인데, 실제로는
-				// 그 두 배부터 시작하는 불일치였다(외부 리뷰로 발견). nFailCount-1을
-				// 써야 1차 실패=500ms, 2차=1000ms, 3차=2000ms... 로 이름과
-				// 일치한다.
-				const int32 nShift = std::min(backoffState.nFailCount - 1, RECONNECT_BACKOFF_MAX_SHIFT);
-				int64 nDelayMs = std::min<int64>(RECONNECT_BACKOFF_BASE_MS << nShift, RECONNECT_BACKOFF_MAX_MS);
+			// 접속 시도에 시간이 걸렸을 수 있으므로 대기 큐 만료를 한 번 더 점검한다.
+			ExpirePendingCommands();
+		}
 
-				thread_local std::mt19937 rng(std::random_device{}());
-				std::uniform_int_distribution<int32> jitterDist(0, RECONNECT_BACKOFF_JITTER_MS);
-				nDelayMs += jitterDist(rng);
-
-				// [추가] 지터를 더한 뒤 다시 한번 상한으로 클램프한다 —
-				// 그렇지 않으면 지터(최대 250ms)만큼 RECONNECT_BACKOFF_MAX_MS를
-				// 살짝 넘길 수 있었다(사소하지만, 상한이라는 이름과 어긋남).
-				nDelayMs = std::min<int64>(nDelayMs, RECONNECT_BACKOFF_MAX_MS);
-
-				backoffState.nextRetryTime = now + std::chrono::milliseconds(nDelayMs);
-
-				std::lock_guard<std::mutex> lock(_lock);
-				_queueBroken.push(pClient);
-			}
+		if( !vecDeferred.empty() )
+		{
+			std::lock_guard<std::mutex> lock(_lock);
+			for( auto& pClient : vecDeferred )
+				_queueBroken.push(std::move(pClient));
 		}
 	}
 }

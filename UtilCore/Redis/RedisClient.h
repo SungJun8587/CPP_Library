@@ -11,7 +11,6 @@
 #include <Network/RingBuffer.h>
 #include <Redis/RedisParser.h>
 
-#include <queue>
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
@@ -73,24 +72,6 @@
 //          내부 상태(std::string)에 대한 data race였다. 이제 _recvLock으로
 //          이 둘을 직렬화한다.
 //***************************************************************************
-//***************************************************************************
-// @brief Disconnect()가 호출된 사유를 구분하는 열거형.
-// @details 대기 중이던 콜백은 이 사유에 대응하는 에러 문자열(RedisValue::strVal)을
-//          받는다. 진짜 TCP 연결 끊김과, 수신 데이터를 RESP로 해석하지 못해
-//          스스로 연결을 끊은 경우(ProtocolError)를 호출부가 구분할 수 있도록
-//          사유를 나눴다. 문자열은 CRedisClient::DisconnectReasonToString()
-//          한 곳에서만 만든다.
-//***************************************************************************
-enum class ERedisDisconnectReason
-{
-	ConnectionClosedRecv,		// recv completion이 0바이트로 도착 — 진짜 TCP 연결 끊김
-	ConnectionClosedSend,		// send completion이 0바이트로 도착 — 진짜 TCP 연결 끊김
-	SendFailed,					// WSASend() 게시 자체가 실패
-	ProtocolError,				// RESP 파싱 실패 — 네트워크 문제가 아니라 수신 데이터 해석 실패
-	RecvRegistrationFailed,		// 다음 WSARecv 재등록(RegisterRecv()) 실패
-	Generic						// 그 외 일반적인 종료(소멸자, Connect() 실패 등 — 콜백이 없거나 사유 구분이 중요하지 않은 경우)
-};
-
 class CRedisClient : public CIocpObject, public std::enable_shared_from_this<CRedisClient>
 {
 public:
@@ -121,8 +102,9 @@ public:
 	virtual void Dispatch(class CIocpEvent* iocpEvent, int32 numOfBytes = 0) override;
 
 	//***************************************************************************
-	// @brief Redis 서버에 TCP 소켓 연결을 수행하고, IOCP 등록 및 논리 DB 선택까지 마침
-	// @param strIP 서버 IP 주소
+	// @brief Redis 서버에 TCP 소켓 연결을 수행하고, IOCP 등록, 인증(AUTH), 논리 DB 선택까지 마침
+	// @param strIP 서버 주소. IP 문자열(IPv4/IPv6) 또는 DNS 이름. 이름은 getaddrinfo()로 해석하며
+	//        (블로킹) 결과 주소를 순서대로 시도한다
 	// @param nPort 서버 포트 번호
 	// @param nDbIndex 접속 직후 SELECT로 고정할 Redis 논리 DB 인덱스. 0(기본 DB)이면
 	//        SELECT를 생략해 접속 지연을 줄인다. 재연결 시에도 동일 인자로 다시
@@ -132,9 +114,13 @@ public:
 	//        호출이므로, 소켓을 일시적으로 논블로킹으로 전환해 이 시간만큼만 대기한
 	//        뒤 결과를 확인한다. 이후의 실제 송수신은 WSASend/WSARecv 기반
 	//        Overlapped I/O로 처리되므로 이 전환은 connect 단계에만 영향을 준다
+	// @param strUserId ACL 사용자 이름(Redis 6+). 비어 있으면 `AUTH <password>`로 보낸다
+	// @param strPassword 비밀번호. 비어 있으면 인증을 건너뛴다. 인증은 SELECT보다 먼저 하며,
+	//        재연결 때도 같은 인자로 다시 호출되므로 재연결된 커넥션도 항상 인증된다
 	// @return 성공 여부 (true: 성공, false: 실패 또는 타임아웃)
 	//***************************************************************************
-	bool        Connect(const std::string& strIP, const uint16 nPort, const int32 nDbIndex = 0, const int32 nConnectTimeoutMs = 3000);
+	bool        Connect(const std::string& strIP, const uint16 nPort, const int32 nDbIndex = 0, const int32 nConnectTimeoutMs = Redis::kConnectTimeoutMs,
+		const std::string& strUserId = std::string(), const std::string& strPassword = std::string());
 
 	//***************************************************************************
 	// @brief 소켓 연결을 종료하고 대기 중인 콜백 및 리소스를 정리함
@@ -172,6 +158,8 @@ public:
 	// @return 즉시 전송 등록 성공 여부 (true: 성공, false: 실패 — 이 경우에도
 	//         fnCallback은 이미 또는 곧 에러 값으로 호출된다)
 	//***************************************************************************
+	bool        SendCommand(const CVector<std::string>& vecArgs, RedisResponseHandler fnCallback);
+
 	//***************************************************************************
 	// @brief [추가] 이 클라이언트에 지금 걸려있는 모든 비동기 I/O(WSARecv +
 	//        WSASend)의 완료 통지를 전부 받았는지 여부를 반환합니다.
@@ -185,13 +173,33 @@ public:
 	//***************************************************************************
 	bool        HasNoOutstandingIo() const { return _pendingIoCount.load(std::memory_order_seq_cst) == 0; }
 
-	bool        SendCommand(const CVector<std::string>& vecArgs, RedisCallback fnCallback);
+	//***************************************************************************
+	// @brief 응답을 기다리는 명령이 있으면 그 명령을 보낸 뒤 지난 시간(ms)을, 없으면 0을 반환함
+	// @details 서버가 응답 없이 멈추거나 경로가 반열림 상태가 되면 콜백이 오지 않아 연결이
+	//          풀로 돌아오지 못한다. 풀이 이 값으로 응답 지연을 감지해 연결을 끊는다.
+	//***************************************************************************
+	int64       GetPendingCommandAgeMs() const;
+
+	//***************************************************************************
+	// @brief 이 연결을 구독(Pub/Sub) 모드로 쓰기 위해 push 메시지 콜백을 지정함
+	// @details 지정하면 서버가 자발적으로 보내는 ["message", ...] / ["pmessage", ...]
+	//          배열은 SendCommand()의 응답 콜백을 소비하지 않고 이 콜백으로만
+	//          전달된다. 그 외 응답(SUBSCRIBE/UNSUBSCRIBE 확인, PING 응답, 에러)은
+	//          기존대로 미완료 SendCommand()의 콜백을 완료시킨다.
+	//          Connect() 전에 한 번만 호출해야 하며, 연결 후에는 바꾸지 않는다
+	//          (IOCP 스레드가 락 없이 읽는다). 콜백은 IOCP 워커 스레드에서
+	//          수신 순서대로 호출된다.
+	// @details 구독 모드 연결에서는 SUBSCRIBE 하나가 채널 수만큼 확인 응답을
+	//          돌려주므로, 한 명령에 채널 하나씩만 보내야 응답 하나가 명령 하나에
+	//          대응한다. 초과 확인 응답은 대기 콜백이 없으면 버려진다.
+	//***************************************************************************
+	void        SetPushCallback(RedisPushCallback fnPushCallback) { _fnPushCallback = std::move(fnPushCallback); }
 
 
 private:
 	bool        RegisterRecv();
 	void        ProcessRecv(DWORD dwBytesTransferred);
-	void        OnReceiptResponse(const RedisValue& value);
+	void        OnReceiptResponse(RedisValue&& value);
 
 	//***************************************************************************
 	// @brief _pendingSendBuffers의 _sendOffset 위치부터 나머지를 WSASend(Scatter-Gather)로 등록함
@@ -222,6 +230,16 @@ private:
 	void        CleanupSocketAndParser(SOCKET hOldSocket);
 
 	//***************************************************************************
+	// @brief [추가] ERedisDisconnectReason을 콜백에 전달할 RedisValue::strVal
+	//        문자열로 변환함.
+	// @details Disconnect()가 이 함수 하나만 거쳐서 문자열을 만들도록
+	//          일원화한다 — 문구를 바꿀 일이 생겨도 여기 한 곳만 고치면
+	//          되고, 호출부마다 문자열을 직접 만들지 않으므로 오타/불일치
+	//          여지가 없다.
+	//***************************************************************************
+	static const char* DisconnectReasonToString(ERedisDisconnectReason reason);
+
+	//***************************************************************************
 	// @brief 접속 직후 이 커넥션이 사용할 논리 DB를 SELECT 명령으로 고정함
 	// @details SendCommand()는 비동기이므로, Connect()가 "연결 및 DB 선택까지
 	//          끝난 뒤"의 결과를 그대로 돌려줄 수 있도록 내부적으로
@@ -232,17 +250,9 @@ private:
 	// @param nTimeoutMs 응답을 기다릴 최대 시간(ms)
 	// @return 성공 여부 (true: SELECT 성공, false: 실패 또는 타임아웃)
 	//***************************************************************************
-	//***************************************************************************
-	// @brief [추가] ERedisDisconnectReason을 콜백에 전달할 RedisValue::strVal
-	//        문자열로 변환함.
-	// @details Disconnect()가 이 함수 하나만 거쳐서 문자열을 만들도록
-	//          일원화한다 — 문구를 바꿀 일이 생겨도 여기 한 곳만 고치면
-	//          되고, 호출부마다 문자열을 직접 만들지 않으므로 오타/불일치
-	//          여지가 없다.
-	//***************************************************************************
-	static const char* DisconnectReasonToString(ERedisDisconnectReason reason);
-
 	bool        SelectDb(const int32 nDbIndex, const int32 nTimeoutMs);
+	bool        Authenticate(const std::string& strUserId, const std::string& strPassword, const int32 nTimeoutMs);
+	bool        SendCommandAndWait(const CVector<std::string>& vecArgs, const int32 nTimeoutMs);
 
 private:
 	std::atomic<SOCKET>     _socket;				// 소켓 핸들 (동시 Disconnect() 호출 시 정확히 한 번만 close되도록 atomic exchange로 관리)
@@ -269,7 +279,9 @@ private:
 	// 클래스 문서 상단의 "콜백 0회 실행 경합" 설명 참고. 큐가 아니라 단일
 	// 필드인 이유도 같은 설명 참고(한 시점에 미완료 SendCommand는 하나뿐).
 	std::mutex              _commandLock;			// _pendingCallback/_pendingSendBuffers/_sendOffset/_sendTotalSize 동기화
-	RedisCallback			_pendingCallback;		// 응답을 기다리는 중인 콜백 (한 시점에 최대 1개)
+	std::atomic<int64>		_nCommandStartMs{ 0 };	// _pendingCallback을 등록한 시각(steady 기준 ms, 없으면 0) — GetPendingCommandAgeMs()용
+	RedisResponseHandler	_pendingCallback;		// 응답을 기다리는 중인 콜백 (한 시점에 최대 1개)
+	RedisPushCallback		_fnPushCallback;		// 구독 모드 push(message/pmessage) 수신 콜백 — Connect() 전에 SetPushCallback()으로 설정
 
 	CVector<CSendBufferRef>	_pendingSendBuffers;	// 현재 전송 중인 명령의 송신 버퍼들 (순서대로 이어 붙인 전체가 명령 하나, 부분 전송 이어 보내기용) — _commandLock으로 보호
 	uint32					_sendOffset = 0;		// _pendingSendBuffers 전체(명령 하나) 중 이미 보낸 바이트 수 — _commandLock으로 보호

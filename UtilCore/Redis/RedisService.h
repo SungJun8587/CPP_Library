@@ -9,12 +9,16 @@
 
 #include <ServerConnectInfo.h>
 #include <Redis/RedisRedefineDataType.h>
+#include <Redis/RedisProtocol.h>
 #include <Redis/RedisConnectionPool.h>
+#include <Redis/RedisSubscriber.h>
 #include <Job/JobQueue.h>
 #include <Containers/Map/ClusterSpinUnorderedMap.h>
 #include <Util/EncodingConvert.h>
 
 #include <atomic>
+#include <mutex>
+#include <unordered_map>
 #include <utility>
 
 //***************************************************************************
@@ -106,8 +110,62 @@ public:
 	//***************************************************************************
 	bool SendCommand(const int16 nNodeId, const CVector<std::string>& vecArgs, RedisCallback fnMainThreadCallback);
 
+	//***************************************************************************
+	// @brief SendCommand()를 노드 지정 없이 호출했을 때 쓰이는 기본 노드 ID를 반환함
+	//***************************************************************************
+	int16 GetDefaultNodeId() const { return _nDefaultNodeId.load(std::memory_order_acquire); }
+
+	//***************************************************************************
+	// @brief 기본 노드의 채널로 메시지를 발행함(PUBLISH)
+	// @param strChannel 발행할 채널 이름
+	// @param strMessage 메시지 본문
+	// @param fnMainThreadCallback 응답 콜백(생략 가능). 응답은 메시지를 받은 구독자 수(Integer)다
+	// @return 전송 성공 여부 (SendCommand()와 같음)
+	// @details 발행은 일반 요청-응답 연결(풀)로 나가고, 구독 전용 연결과는 무관하다.
+	//***************************************************************************
+	bool Publish(const std::string& strChannel, const std::string& strMessage, RedisCallback fnMainThreadCallback = nullptr);
+	bool Publish(const int16 nNodeId, const std::string& strChannel, const std::string& strMessage, RedisCallback fnMainThreadCallback = nullptr);
+
+	//***************************************************************************
+	// @brief 채널을 구독함. 메시지 콜백은 생성자에 넘긴 JobQueue를 처리하는 스레드에서 호출됨
+	// @param nNodeId 구독할 노드 ID(생략하면 기본 노드)
+	// @return 등록 성공 여부 (false: 노드 없음, 빈 채널, null 콜백, 구독 연결 생성 실패)
+	// @details 노드마다 구독 전용 연결이 하나씩 있고, 그 노드에 대한 첫 구독 호출 때
+	//          만들어진다(Init()에서는 만들지 않는다). 연결이 끊기면 자동으로 다시
+	//          접속해 등록된 구독을 복구하지만, 단절 중에 발행된 메시지는 받을 수 없다.
+	//          자세한 계약은 CRedisSubscriber를 참고.
+	//***************************************************************************
+	bool Subscribe(const std::string& strChannel, RedisMessageCallback fnCallback);
+	bool Subscribe(const int16 nNodeId, const std::string& strChannel, RedisMessageCallback fnCallback);
+
+	//***************************************************************************
+	// @brief 채널 구독을 해제함
+	// @return 해제할 구독이 있었는지 여부
+	//***************************************************************************
+	bool Unsubscribe(const std::string& strChannel);
+	bool Unsubscribe(const int16 nNodeId, const std::string& strChannel);
+
+	//***************************************************************************
+	// @brief 글롭 패턴(예: "Chat:*")으로 구독하거나 해제함
+	// @details 콜백에는 패턴이 아니라 메시지가 발행된 실제 채널 이름이 전달된다.
+	//***************************************************************************
+	bool PSubscribe(const std::string& strPattern, RedisMessageCallback fnCallback);
+	bool PSubscribe(const int16 nNodeId, const std::string& strPattern, RedisMessageCallback fnCallback);
+	bool PUnsubscribe(const std::string& strPattern);
+	bool PUnsubscribe(const int16 nNodeId, const std::string& strPattern);
+
+	//***************************************************************************
+	// @brief 모든 노드의 구독 연결을 닫고 구독 목록을 비움
+	// @details 서버 종료 시 JobQueue 소비를 멈추기 전에 호출하면, 닫힌 뒤에는
+	//          메시지 콜백이 더 쌓이지 않는다. 소멸자에서도 호출된다.
+	//***************************************************************************
+	void ShutdownSubscribers();
+
 private:
 	CRedisConnectionPoolRef	FindPool(const int16 nNodeId);
+
+	// 노드의 구독 연결을 찾는다. bCreate가 true면 없을 때 Init()에 저장해 둔 노드 정보로 만든다.
+	CRedisSubscriberRef		FindSubscriber(const int16 nNodeId, const bool bCreate);
 
 private:
 	CIocpCoreRef				_iocpCore;			// 노드별 풀을 만들 때 넘겨줄 IOCP 코어 참조
@@ -120,6 +178,11 @@ private:
 	TPoolMap					_poolMap;			// 노드 ID → 커넥션 풀
 
 	std::atomic<int16>			_nDefaultNodeId{ 0 };	// SendCommand()를 노드 지정 없이 호출했을 때 쓰이는 기본 노드 ID
+
+	// 구독 연결은 노드별로 첫 Subscribe() 호출 때 만들어진다(드물게 쓰이는 경로라 단일 뮤텍스로 충분).
+	std::mutex					_subscriberLock;							// _redisNodeVec/_subscriberMap 보호
+	CVector<CRedisNode>			_redisNodeVec;								// Init()에 넘겨받은 노드 목록(구독 연결 생성용)
+	std::unordered_map<int16, CRedisSubscriberRef>	_subscriberMap;			// 노드 ID → 구독 연결
 };
 
 #endif // ndef UC_REDISSERVICE_H

@@ -6,39 +6,7 @@
 
 #include "pch.h"
 #include "RedisParser.h"
-
-namespace
-{
-	//***************************************************************************
-	// @brief [추가 — 버그 수정] 문자열 전체가 정확히 정수인지 확인하며 변환함.
-	// @details std::stoll()은 문자열 앞부분만 숫자면 나머지를 조용히 무시하고
-	//          성공 처리한다(예: "123abc" -> 123, 남은 "abc"는 무시됨) — RESP
-	//          헤더 라인이 이런 식으로 손상된 경우에도 잘못된 값을 정상
-	//          파싱된 것처럼 받아들이는 문제가 있었다(외부 리뷰로 발견).
-	//          std::stoll의 pos 출력 인자로 실제 소비한 문자 수를 확인해서,
-	//          문자열 전체를 다 안 썼으면 실패로 처리한다.
-	//***************************************************************************
-	bool ParseInt64Strict(const std::string& str, int64& outValue)
-	{
-		if( str.empty() )
-			return false;
-
-		try
-		{
-			size_t nPos = 0;
-			long long value = std::stoll(str, &nPos, 10);
-			if( nPos != str.size() )
-				return false;
-
-			outValue = static_cast<int64>(value);
-			return true;
-		}
-		catch( const std::exception& )
-		{
-			return false;
-		}
-	}
-}
+#include <Redis/RedisHelper.h>
 
 //***************************************************************************
 // Construction/Destruction
@@ -65,6 +33,7 @@ CRedisParser::~CRedisParser()
 void CRedisParser::Reset()
 {
 	_pendingBuffer.clear();
+	_nMinBytesNeeded = 0;
 }
 
 //***************************************************************************
@@ -79,7 +48,7 @@ bool CRedisParser::Feed(const char* pBuffer, const int32 nBytes)
 	if( pBuffer == nullptr || nBytes <= 0 ) return true;
 
 	const size_t nBytesSize = static_cast<size_t>(nBytes);
-	if( nBytesSize > kMaxPendingBufferSize - _pendingBuffer.size() )
+	if( nBytesSize > Redis::kMaxPendingBufferSize - _pendingBuffer.size() )
 		return false;
 
 	_pendingBuffer.append(pBuffer, nBytesSize);
@@ -101,6 +70,11 @@ ERedisParseResult CRedisParser::TryParse(RedisValue& outValue)
 {
 	if( _pendingBuffer.empty() ) return ERedisParseResult::NeedMoreData;
 
+	// 직전 시도에서 알아낸 필요 바이트 수에 아직 못 미치면 다시 파싱해도 같은 결과다.
+	if( _pendingBuffer.size() < _nMinBytesNeeded )
+		return ERedisParseResult::NeedMoreData;
+	_nMinBytesNeeded = 0;
+
 	RedisValue parsedValue;
 	int32 nOffset = 0;
 
@@ -120,7 +94,7 @@ ERedisParseResult CRedisParser::TryParse(RedisValue& outValue)
 // @param nOffset 읽기 오프셋 위치 (입출력)
 // @param outValue 파싱 결과 객체 (출력) — TryParse()가 넘기는 임시 객체이므로
 //        이 함수 안에서는 실패해도 그대로 둬도 안전하다(호출부가 폐기함).
-// @param nDepth 지금까지의 중첩 깊이 — kMaxParseDepth 초과 시 ProtocolError.
+// @param nDepth 지금까지의 중첩 깊이 — Redis::kMaxParseDepth 초과 시 ProtocolError.
 // @return Success/NeedMoreData/ProtocolError
 //***************************************************************************
 ERedisParseResult CRedisParser::ParseValue(const char* pBuffer, const int32 nSize, int32& nOffset, RedisValue& outValue, const int32 nDepth)
@@ -128,7 +102,7 @@ ERedisParseResult CRedisParser::ParseValue(const char* pBuffer, const int32 nSiz
 	if( nOffset >= nSize ) return ERedisParseResult::NeedMoreData;
 
 	// [추가 — 방어 강화] 중첩 배열의 재귀 깊이 제한 — 스택 오버플로 방지.
-	if( nDepth > kMaxParseDepth )
+	if( nDepth > Redis::kMaxParseDepth )
 		return ERedisParseResult::ProtocolError;
 
 	int32 nSavedOffset = nOffset;
@@ -149,19 +123,19 @@ ERedisParseResult CRedisParser::ParseValue(const char* pBuffer, const int32 nSiz
 		case '+': // Simple String
 		{
 			outValue.eType = ERedisType::SimpleString;
-			outValue.strVal = strLine;
+			outValue.strVal = std::move(strLine);
 			return ERedisParseResult::Success;
 		}
 		case '-': // Error
 		{
 			outValue.eType = ERedisType::Error;
-			outValue.strVal = strLine;
+			outValue.strVal = std::move(strLine);
 			return ERedisParseResult::Success;
 		}
 		case ':': // Integer
 		{
 			int64 i64Value = 0;
-			if( !ParseInt64Strict(strLine, i64Value) )
+			if( !Redis::ParseInteger(strLine, i64Value) )
 			{
 				nOffset = nSavedOffset;
 				return ERedisParseResult::ProtocolError;
@@ -174,7 +148,7 @@ ERedisParseResult CRedisParser::ParseValue(const char* pBuffer, const int32 nSiz
 		case '$': // Bulk String
 		{
 			int64 i64Len = 0;
-			if( !ParseInt64Strict(strLine, i64Len) )
+			if( !Redis::ParseInteger(strLine, i64Len) )
 			{
 				nOffset = nSavedOffset;
 				return ERedisParseResult::ProtocolError;
@@ -185,7 +159,7 @@ ERedisParseResult CRedisParser::ParseValue(const char* pBuffer, const int32 nSiz
 			// 있어서 사실상 상한 역할을 못 했다. kMaxPendingBufferSize를
 			// 직접 상한으로 쓴다 — 정상적인 Redis 응답이라면 이보다 큰
 			// 단일 Bulk String을 보낼 일이 없다.
-			if( i64Len < -1 || i64Len > static_cast<int64>(kMaxPendingBufferSize) )
+			if( i64Len < -1 || i64Len > static_cast<int64>(Redis::kMaxPendingBufferSize) )
 			{
 				nOffset = nSavedOffset;
 				return ERedisParseResult::ProtocolError;
@@ -197,6 +171,8 @@ ERedisParseResult CRedisParser::ParseValue(const char* pBuffer, const int32 nSiz
 
 			if( nSize - nOffset < i64Len + 2 )
 			{
+				// 이 값은 헤더 뒤로 i64Len + 2바이트가 더 와야 완성된다 — 그 전에는 재파싱할 필요가 없다.
+				_nMinBytesNeeded = static_cast<size_t>(nOffset) + static_cast<size_t>(i64Len) + 2;
 				nOffset = nSavedOffset;
 				return ERedisParseResult::NeedMoreData;
 			}
@@ -219,7 +195,7 @@ ERedisParseResult CRedisParser::ParseValue(const char* pBuffer, const int32 nSiz
 		case '*': // Array
 		{
 			int64 i64Count = 0;
-			if( !ParseInt64Strict(strLine, i64Count) )
+			if( !Redis::ParseInteger(strLine, i64Count) )
 			{
 				nOffset = nSavedOffset;
 				return ERedisParseResult::ProtocolError;
@@ -239,13 +215,15 @@ ERedisParseResult CRedisParser::ParseValue(const char* pBuffer, const int32 nSiz
 			// 제한한다 — 예전엔 nSize(가변적이고 최대 16MB까지 커질 수
 			// 있는 값)로만 제한해서, 그 안에서는 매우 큰 개수를 선언할 수
 			// 있었다(예: 4바이트짜리 최소 원소로 채운다 해도 수백만 개).
-			if( i64Count > kMaxArrayElements )
+			if( i64Count > Redis::kMaxArrayElements )
 			{
 				nOffset = nSavedOffset;
 				return ERedisParseResult::ProtocolError;
 			}
 
-			outValue.arrayVal.reserve(static_cast<size_t>(i64Count));
+			// 원소는 최소 4바이트(":0\r\n")이므로 남은 데이터로 가능한 개수까지만 미리 잡는다 —
+			// 선언된 개수만큼 매 시도마다 할당하지 않게 한다.
+			outValue.arrayVal.reserve(static_cast<size_t>((std::min)(i64Count, static_cast<int64>((nSize - nOffset) / 4 + 1))));
 			for( int64 i = 0; i < i64Count; ++i )
 			{
 				RedisValue elem;

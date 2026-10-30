@@ -19,14 +19,6 @@
 //          기다리는 상태가 될 수 있었다(외부 리뷰로 발견). 이제 셋으로
 //          나눠서, ProtocolError일 때만 호출부가 연결을 끊도록 한다.
 //***************************************************************************
-enum class ERedisParseResult
-{
-	Success,		// RESP 값 하나를 완전히 파싱함
-	NeedMoreData,	// 데이터가 부족하여 추가 수신이 필요함 — 정상적인 상황
-	ProtocolError	// RESP 형식이 잘못됨 — 호출부는 이 연결을 끊어야 한다
-};
-
-//***************************************************************************
 // @brief RESP 프로토콜 스트림 파싱을 담당하는 클래스
 // @details 소켓으로부터 수신된 원시 바이트를 Feed()로 누적하고, TryParse()를
 //          반복 호출하여 누적된 버퍼 안에 완성되어 있는 RESP 값들을 순서대로
@@ -108,19 +100,15 @@ private:
 	ERedisParseResult ReadLine(const char* pBuffer, const int32 nSize, int32& nOffset, std::string& strLine);
 
 private:
-	// 미완성 RESP 스트림의 최대 누적 크기. 프로젝트에서 다루는 Redis 응답의
-	// 최대 크기(예: 대화 기록 HMGET 응답 등)에 맞춰 조정 가능.
-	static constexpr size_t kMaxPendingBufferSize = 16 * 1024 * 1024;
-
-	// 하나의 배열이 가질 수 있는 최대 원소 수 — 악의적/손상된 스트림의
-	// 대량 reserve() 시도를 막는다.
-	static constexpr int64 kMaxArrayElements = 4096;
-
-	// 중첩 배열의 최대 재귀 깊이 — 스택 오버플로 방지.
-	static constexpr int32 kMaxParseDepth = 64;
+	// 파서 한계값(kMaxPendingBufferSize/kMaxArrayElements/kMaxParseDepth)은 RedisDefine.h의 Redis 네임스페이스에 있다.
 
 private:
 	std::string _pendingBuffer;		// 미완성 패킷 버퍼링 (누적 버퍼의 유일한 소유자)
+
+	// 직전 TryParse()가 NeedMoreData로 끝났을 때, 그 값을 완성하는 데 최소한 필요한 누적 바이트 수.
+	// 큰 Bulk String이 여러 조각으로 도착하는 동안 매 조각마다 처음부터 다시 파싱(문자열 복사 포함)하는
+	// 낭비를 막는다. 누적 버퍼는 Feed()로만 늘어나고 Success일 때만 줄어들어, 이 값 미만이면 재시도가 무의미하다.
+	size_t _nMinBytesNeeded = 0;
 };
 
 #endif // ndef UC_REDISPARSER_H

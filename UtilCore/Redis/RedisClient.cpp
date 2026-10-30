@@ -6,20 +6,162 @@
 
 #include "pch.h"
 #include "RedisClient.h"
+#include <Redis/RedisHelper.h>
+#include <Util/DateTimeUtil.h>
 
-// tcp_keepalive 구조체 / SIO_KEEPALIVE_VALS 정의 — Connect()의 keepalive
-// 설정에서 사용. winsock2.h는 pch.h에서 이미 포함됐다고 가정한다(WSASocket
-// 등을 이미 이 파일에서 쓰고 있으므로).
-#include <mstcpip.h>
+#include <ws2tcpip.h>
+#include <Network/SocketUtils.h>
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <cstring>
+#include <memory>
+#include <mutex>
+#include <thread>
 #include <vector>
 
 namespace
 {
-	// 대형 명령을 한 번 인코딩할 때 쓰는 스레드 로컬 임시 버퍼가 이 크기를 넘게 커지면 사용 후 해제한다.
-	constexpr size_t kScratchRetainLimit = 1u << 20;
+	//***************************************************************************
+	// @brief getaddrinfo() 결과를 소유하는 공유 상태 (소멸 시 freeaddrinfo)
+	//***************************************************************************
+	struct SResolveState
+	{
+		std::mutex              lock;
+		std::condition_variable cv;
+		bool                    bDone = false;
+		int                     nResult = -1;
+		ADDRINFOA* pList = nullptr;
+
+		~SResolveState()
+		{
+			if( pList )
+				::freeaddrinfo(pList);
+		}
+	};
+
+	//***************************************************************************
+	// @brief 호스트 이름을 주소 목록으로 풀되, DNS가 응답하지 않아도 nTimeoutMs를 넘겨 블로킹하지 않음
+	// @details getaddrinfo()는 자체 타임아웃이 없어 DNS 서버가 죽으면 수십 초 막힌다. IP 문자열이면
+	//          AI_NUMERICHOST로 DNS 없이 즉시 풀고(일반적 경로, 스레드 생성 없음), 이름이면 도우미
+	//          스레드에서 풀어 조건변수로 기다린다. 시간 안에 못 끝나면 도우미 스레드는 그대로 두고
+	//          (결과는 공유 상태가 늦게 해제) 실패를 돌려준다.
+	// @return 성공 시 주소 목록을 소유한 상태(pList != nullptr), 실패/타임아웃이면 nullptr
+	//***************************************************************************
+	std::shared_ptr<SResolveState> ResolveWithTimeout(const std::string& strHost, const std::string& strPort, const ADDRINFOA& hints, const int32 nTimeoutMs)
+	{
+		auto pState = std::make_shared<SResolveState>();
+
+		ADDRINFOA numericHints = hints;
+		numericHints.ai_flags |= AI_NUMERICHOST;
+		if( ::getaddrinfo(strHost.c_str(), strPort.c_str(), &numericHints, &pState->pList) == 0 && pState->pList != nullptr )
+			return pState;
+		pState->pList = nullptr;
+
+		// DNS가 오래 죽어 있으면 시간 초과된 해석 스레드가 getaddrinfo 안에서 계속 남는다. 재연결 시도마다
+		// 하나씩 쌓이지 않도록 동시에 살아 있는 해석 스레드 수에 상한을 둔다(넘으면 이번 시도는 바로 실패).
+		static std::atomic<int32> s_nActiveResolvers{ 0 };
+		if( s_nActiveResolvers.fetch_add(1) >= Redis::kMaxActiveResolvers )
+		{
+			s_nActiveResolvers.fetch_sub(1);
+			return nullptr;
+		}
+
+		try
+		{
+			std::thread([pState, strHost, strPort, hints]() {
+				ADDRINFOA* pList = nullptr;
+				const int nResult = ::getaddrinfo(strHost.c_str(), strPort.c_str(), &hints, &pList);
+				{
+					std::lock_guard<std::mutex> lock(pState->lock);
+					pState->nResult = nResult;
+					pState->pList = (nResult == 0) ? pList : nullptr;
+					pState->bDone = true;
+				}
+				pState->cv.notify_all();
+				s_nActiveResolvers.fetch_sub(1);
+				}).detach();
+		}
+		catch( const std::exception& )
+		{
+			s_nActiveResolvers.fetch_sub(1);
+			return nullptr;
+		}
+
+		std::unique_lock<std::mutex> lock(pState->lock);
+		if( !pState->cv.wait_for(lock, std::chrono::milliseconds(nTimeoutMs), [&] { return pState->bDone; }) )
+			return nullptr;
+
+		return (pState->nResult == 0 && pState->pList != nullptr) ? pState : nullptr;
+	}
+
+	//***************************************************************************
+	// @brief 주소 하나에 대해 소켓을 만들어 타임아웃을 두고 연결함
+	// @details connect() 동안 무한정 블로킹되는 것을 막기 위해 소켓을 잠깐 논블로킹으로 전환하고
+	//          select()로 상한 시간을 건다. 결과 확인 후 블로킹 모드로 되돌린다(이후 송수신은
+	//          Overlapped I/O이므로 이 전환은 여기서만 의미를 가진다). 반환 전까지 소켓 핸들은
+	//          이 함수의 지역 값이라 다른 스레드가 볼 수 없다.
+	// @return 연결된 소켓(블로킹 모드). 실패하면 INVALID_SOCKET(소켓은 닫힘)
+	//***************************************************************************
+	SOCKET ConnectWithTimeout(const ADDRINFOA& addr, const int32 nTimeoutMs)
+	{
+		SOCKET hSocket = ::WSASocket(addr.ai_family, addr.ai_socktype, addr.ai_protocol, NULL, 0, WSA_FLAG_OVERLAPPED);
+		if( hSocket == INVALID_SOCKET )
+			return INVALID_SOCKET;
+
+		u_long ulNonBlocking = 1;
+		if( ::ioctlsocket(hSocket, FIONBIO, &ulNonBlocking) != 0 )
+		{
+			// 논블로킹 전환이 실패하면 이후 connect()가 타임아웃을 무시하고 무한정 블로킹될 수 있다.
+			::closesocket(hSocket);
+			return INVALID_SOCKET;
+		}
+
+		bool bConnected = false;
+		if( ::connect(hSocket, addr.ai_addr, static_cast<int>(addr.ai_addrlen)) == 0 )
+		{
+			bConnected = true;
+		}
+		else if( ::WSAGetLastError() == WSAEWOULDBLOCK )
+		{
+			// Winsock 특성: 논블로킹 connect()가 실패로 끝나면 소켓이 writefds가 아니라
+			// exceptfds 쪽에 표시된다. exceptfds를 함께 넘기지 않으면 즉시 거부(RST)되는
+			// 연결조차 select()가 타임아웃까지 잡아먹는다.
+			fd_set writeSet;
+			FD_ZERO(&writeSet);
+			FD_SET(hSocket, &writeSet);
+
+			fd_set exceptSet;
+			FD_ZERO(&exceptSet);
+			FD_SET(hSocket, &exceptSet);
+
+			TIMEVAL tv;
+			tv.tv_sec = nTimeoutMs / 1000;
+			tv.tv_usec = (nTimeoutMs % 1000) * 1000;
+
+			if( ::select(0, nullptr, &writeSet, &exceptSet, &tv) > 0 && !FD_ISSET(hSocket, &exceptSet) )
+			{
+				int32 nSockError = 0;
+				int32 nOptLen = sizeof(nSockError);
+				if( ::getsockopt(hSocket, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&nSockError), &nOptLen) == 0
+					&& nSockError == 0 )
+				{
+					bConnected = true;
+				}
+			}
+		}
+
+		u_long ulBlocking = 0;
+		if( !bConnected || ::ioctlsocket(hSocket, FIONBIO, &ulBlocking) != 0 )
+		{
+			::closesocket(hSocket);
+			return INVALID_SOCKET;
+		}
+
+		return hSocket;
+	}
 
 	//***************************************************************************
 	// @brief RESP로 인코딩한 명령 하나를 송신 버퍼 하나 이상에 담습니다.
@@ -71,7 +213,7 @@ namespace
 			offset += pieceSize;
 		}
 
-		if( scratch.capacity() > kScratchRetainLimit )
+		if( scratch.capacity() > Redis::kScratchRetainLimit )
 			std::vector<char>().swap(scratch);
 
 		if( !success )
@@ -119,7 +261,7 @@ namespace
 // @param iocpCore IOCP 코어 참조 객체
 //***************************************************************************
 CRedisClient::CRedisClient(CIocpCoreRef iocpCore)
-	: _socket(INVALID_SOCKET), _iocpCore(iocpCore), _recvBuffer(DATABASE_BUFFER_SIZE)
+	: _socket(INVALID_SOCKET), _iocpCore(iocpCore), _recvBuffer(Redis::kRecvBufferSize)
 {
 }
 
@@ -139,7 +281,7 @@ CRedisClient::~CRedisClient()
 // @param nConnectTimeoutMs connect()/SELECT 응답 대기 최대 시간(ms)
 // @return 성공 여부 (true: 성공, false: 실패)
 //***************************************************************************
-bool CRedisClient::Connect(const std::string& strIP, const uint16 nPort, const int32 nDbIndex, const int32 nConnectTimeoutMs)
+bool CRedisClient::Connect(const std::string& strIP, const uint16 nPort, const int32 nDbIndex, const int32 nConnectTimeoutMs, const std::string& strUserId, const std::string& strPassword)
 {
 	if( _socket.load(std::memory_order_acquire) != INVALID_SOCKET ) return false;
 
@@ -171,113 +313,54 @@ bool CRedisClient::Connect(const std::string& strIP, const uint16 nPort, const i
 	if( nConnectTimeoutMs <= 0 )
 		return false;
 
-	SOCKET hSocket = ::WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
-	if( hSocket == INVALID_SOCKET ) return false;
+	// 호스트는 IP 문자열뿐 아니라 DNS 이름도 받는다(IPv4/IPv6). getaddrinfo()는 자체 타임아웃이 없어
+	// ResolveWithTimeout()으로 감싼다(전체 접속 제한 시간에 포함).
+	// 결과의 주소를 순서대로 시도하되, 전체 시간은 nConnectTimeoutMs를 넘지 않게 남은 시간으로 자른다.
+	ADDRINFOA hints = {};
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_protocol = IPPROTO_TCP;
 
-	SOCKADDR_IN serverAddr = {};
-	serverAddr.sin_family = AF_INET;
-	serverAddr.sin_port = ::htons(nPort);
-	// [추가] inet_pton 반환값을 확인한다 — 예전엔 무시하고 있어서, 잘못된
-	// IP 문자열(오타, 빈 문자열 등)이 들어와도 serverAddr.sin_addr가
-	// 초기화 안 된 채(혹은 이전 호출의 잔여값) 그대로 connect()를
-	// 시도해버릴 수 있었다. 1이 아니면 변환 실패다.
-	if( ::inet_pton(AF_INET, strIP.c_str(), &serverAddr.sin_addr) != 1 )
-	{
-		::closesocket(hSocket);
+	const std::string strPort = std::to_string(nPort);
+	const int64 nDeadlineMs = ptime::MonotonicNowMillis() + nConnectTimeoutMs;
+
+	// 이름 해석도 전체 접속 제한 시간(nConnectTimeoutMs)에 포함된다.
+	auto pResolved = ResolveWithTimeout(strIP, strPort, hints, nConnectTimeoutMs);
+	if( !pResolved )
 		return false;
+
+	SOCKET hSocket = INVALID_SOCKET;
+	for( const ADDRINFOA* pAddr = pResolved->pList; pAddr != nullptr; pAddr = pAddr->ai_next )
+	{
+		const int64 remaining = nDeadlineMs - ptime::MonotonicNowMillis();
+		if( remaining <= 0 )
+			break;
+
+		hSocket = ConnectWithTimeout(*pAddr, static_cast<int32>(remaining));
+		if( hSocket != INVALID_SOCKET )
+			break;
 	}
 
-	// connect() 동안 무한정 블로킹되는 것을 막기 위해, 소켓을 잠깐
-	// 논블로킹으로 전환하고 select()로 상한 시간을 건다. 결과 확인 후
-	// 다시 블로킹 모드로 복원한다(이후 실제 송수신은 Overlapped I/O이므로
-	// 이 전환은 여기서만 의미를 가진다). 이 시점에는 아직 _socket에
-	// 값을 채우지 않은 로컬 핸들이라 다른 스레드가 볼 수 없으므로,
-	// atomic 없이 그냥 지역 변수로 다룬다.
-	u_long ulNonBlocking = 1;
-	if( ::ioctlsocket(hSocket, FIONBIO, &ulNonBlocking) != 0 )
-	{
-		// 논블로킹 전환 자체가 실패하면 이후 connect()가 블로킹 모드로
-		// 호출되어 nConnectTimeoutMs를 무시하고 무한정 블로킹될 위험이
-		// 있다 — 여기서 바로 실패 처리한다.
-		::closesocket(hSocket);
+	if( hSocket == INVALID_SOCKET )
 		return false;
-	}
-
-	bool bConnected = false;
-	if( ::connect(hSocket, reinterpret_cast<SOCKADDR*>(&serverAddr), sizeof(serverAddr)) == 0 )
-	{
-		bConnected = true;
-	}
-	else if( ::WSAGetLastError() == WSAEWOULDBLOCK )
-	{
-		// Winsock 특성: 논블로킹 connect()가 실패로 끝나면 소켓이 writefds가
-		// 아니라 exceptfds 쪽에 표시된다. exceptfds를 함께 넘기지 않으면
-		// 즉시 거부(RST)되는 연결조차 select()가 타임아웃까지 잡아먹는다.
-		fd_set writeSet;
-		FD_ZERO(&writeSet);
-		FD_SET(hSocket, &writeSet);
-
-		fd_set exceptSet;
-		FD_ZERO(&exceptSet);
-		FD_SET(hSocket, &exceptSet);
-
-		TIMEVAL tv;
-		tv.tv_sec = nConnectTimeoutMs / 1000;
-		tv.tv_usec = (nConnectTimeoutMs % 1000) * 1000;
-
-		if( ::select(0, nullptr, &writeSet, &exceptSet, &tv) > 0 && !FD_ISSET(hSocket, &exceptSet) )
-		{
-			int32 nSockError = 0;
-			int32 nOptLen = sizeof(nSockError);
-			if( ::getsockopt(hSocket, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&nSockError), &nOptLen) == 0
-				&& nSockError == 0 )
-			{
-				bConnected = true;
-			}
-		}
-	}
-
-	u_long ulBlocking = 0;
-	if( ::ioctlsocket(hSocket, FIONBIO, &ulBlocking) != 0 )
-	{
-		// 블로킹 모드 복원 실패 — 이 소켓을 그대로 쓰면 이후 WSARecv/WSASend
-		// (Overlapped I/O이므로 블로킹/논블로킹 모드 자체엔 크게 안 좌우되긴
-		// 하지만) 상태가 불확실해지므로 안전하게 실패 처리한다.
-		::closesocket(hSocket);
-		return false;
-	}
-
-	if( !bConnected )
-	{
-		::closesocket(hSocket);
-		return false;
-	}
 
 	// 여기서부터 _socket에 실제 값을 채운다 — 이 이후에야 GetHandle()/
 	// IsConnected()가 유효한 핸들을 보게 되고, Disconnect()도 이 값을
 	// 회수 대상으로 인식한다.
 	_socket.store(hSocket, std::memory_order_release);
 
-	// TCP keepalive를 켠다. 풀의 커넥션은 요청이 없는 동안 오래 놀 수 있는데,
-	// 그 사이 경로상의 장비(방화벽/NAT/로드밸런서 등)가 idle 연결을 조용히
-	// 정리하면 양쪽 모두 모른 채로 있다가 다음 명령을 보낼 때에야 실패로
-	// 발견한다. Windows 기본 keepalive는 2시간 idle 뒤에야 동작하므로
-	// WSAIoctl(SIO_KEEPALIVE_VALS)로 30초 idle 후 10초 간격으로 프로브하도록
-	// 재정의한다. 설정에 실패해도 연결 자체는 쓸 수 있으므로 치명적인
-	// 에러로 취급하지 않는다.
-	{
-		tcp_keepalive keepaliveSettings{};
-		keepaliveSettings.onoff = 1;
-		keepaliveSettings.keepalivetime = 30000;		// 30초 idle 후 첫 프로브
-		keepaliveSettings.keepaliveinterval = 10000;	// 이후 10초 간격으로 재프로브
+	// 소켓 옵션을 적용한다. 실패해도 연결 자체는 쓸 수 있으므로 치명적인 에러로 취급하지 않는다.
+	//  - TCP_NODELAY: 명령은 한 번에 보내지만, 큰 명령이 여러 세그먼트로 나뉘거나 부분 전송을 이어 보낼 때
+	//    Nagle 알고리즘이 마지막 조각을 앞 조각의 ACK까지(수십~수백 ms) 붙잡을 수 있다. 요청-응답 연결이라
+	//    합쳐 보낼 이득도 없으므로 끈다.
+	//  - keepalive: 풀의 커넥션은 요청이 없는 동안 오래 놀 수 있는데, 그 사이 경로상의 장비(방화벽/NAT/
+	//    로드밸런서 등)가 idle 연결을 조용히 정리하면 양쪽 모두 모른 채로 있다가 다음 명령을 보낼 때에야 실패로
+	//    발견한다. Windows 기본값은 2시간 idle 뒤에야 동작하므로 짧게 재정의한다.
+	if( !CSocketUtils::SetNoDelay(hSocket, true) )
+		LOG_ERROR(_T("CRedisClient::Connect: TCP_NODELAY 설정 실패(에러=%d) — 계속 진행"), ::WSAGetLastError());
 
-		DWORD dwBytesReturned = 0;
-		if( ::WSAIoctl(hSocket, SIO_KEEPALIVE_VALS, &keepaliveSettings, sizeof(keepaliveSettings),
-			nullptr, 0, &dwBytesReturned, nullptr, nullptr) == SOCKET_ERROR )
-		{
-			LOG_ERROR(_T("CRedisClient::Connect: SIO_KEEPALIVE_VALS 설정 실패(에러=%d) — keepalive 없이 계속 진행"), ::WSAGetLastError());
-		}
-	}
+	if( !CSocketUtils::SetKeepAlive(hSocket, true, Redis::kKeepAliveIdleMs, Redis::kKeepAliveIntervalMs) )
+		LOG_ERROR(_T("CRedisClient::Connect: keepalive 설정 실패(에러=%d) — keepalive 없이 계속 진행"), ::WSAGetLastError());
 
 	if( !_iocpCore->Register(shared_from_this()) )
 	{
@@ -295,6 +378,14 @@ bool CRedisClient::Connect(const std::string& strIP, const uint16 nPort, const i
 	// 0(Redis 기본 DB)이면 SELECT를 보낼 필요가 없으므로 생략해 접속 지연을
 	// 줄인다. 재연결(ReconnectLoop) 시에도 동일한 인자로 다시 호출되므로,
 	// 재연결된 커넥션도 항상 같은 DB를 바라보게 된다.
+	// 비밀번호가 있으면 SELECT보다 먼저 인증한다(인증 전에는 다른 명령이 거부된다).
+	// 재연결(ReconnectLoop) 때도 같은 인자로 다시 호출되므로 재연결된 커넥션도 항상 인증된다.
+	if( !strPassword.empty() && !Authenticate(strUserId, strPassword, nConnectTimeoutMs) )
+	{
+		Disconnect();
+		return false;
+	}
+
 	if( nDbIndex > 0 && !SelectDb(nDbIndex, nConnectTimeoutMs) )
 	{
 		Disconnect();
@@ -321,26 +412,27 @@ void CRedisClient::CleanupSocketAndParser(SOCKET hOldSocket)
 }
 
 //***************************************************************************
-// @brief 소켓 연결을 종료하고 대기 중인 콜백 및 리소스를 정리함
-// @return 성공 여부 (true: 성공)
-//***************************************************************************
-//***************************************************************************
 // @brief ERedisDisconnectReason을 콜백에 전달할 문자열로 변환함
 //***************************************************************************
 const char* CRedisClient::DisconnectReasonToString(ERedisDisconnectReason reason)
 {
 	switch( reason )
 	{
-	case ERedisDisconnectReason::ConnectionClosedRecv:		return "ERR connection closed (recv 0 bytes)";
-	case ERedisDisconnectReason::ConnectionClosedSend:		return "ERR connection closed (send 0 bytes)";
-	case ERedisDisconnectReason::SendFailed:				return "ERR send failed";
-	case ERedisDisconnectReason::ProtocolError:			return "ERR protocol error";
-	case ERedisDisconnectReason::RecvRegistrationFailed:	return "ERR recv registration failed";
+	case ERedisDisconnectReason::ConnectionClosedRecv:		return Redis::kErrConnectionClosedRecv;
+	case ERedisDisconnectReason::ConnectionClosedSend:		return Redis::kErrConnectionClosedSend;
+	case ERedisDisconnectReason::SendFailed:				return Redis::kErrSendFailed;
+	case ERedisDisconnectReason::ProtocolError:			return Redis::kErrProtocolError;
+	case ERedisDisconnectReason::RecvRegistrationFailed:	return Redis::kErrRecvRegistrationFailed;
+	case ERedisDisconnectReason::CommandTimeout:			return Redis::kErrCommandTimeout;
 	case ERedisDisconnectReason::Generic:
-	default:												return "ERR connection closed";
+	default:												return Redis::kErrConnectionClosed;
 	}
 }
 
+//***************************************************************************
+// @brief 소켓 연결을 종료하고 대기 중인 콜백 및 리소스를 정리함
+// @return 성공 여부 (true: 성공)
+//***************************************************************************
 bool CRedisClient::Disconnect(ERedisDisconnectReason reason)
 {
 	// _socket을 원자적으로 회수한다. exchange에서 실제로 유효한 핸들을
@@ -359,11 +451,12 @@ bool CRedisClient::Disconnect(ERedisDisconnectReason reason)
 	// 묶는다 — RedisClient.h 상단 "콜백 0회 실행 경합" 설명 참고. 락을
 	// 잡은 채로 콜백을 호출하면 콜백 내부에서 이 객체를 다시 건드릴 경우
 	// 데드락 위험이 있으므로, 콜백을 로컬로 옮겨온 뒤 락 밖에서 호출한다.
-	RedisCallback fnPendingCallback;
+	RedisResponseHandler fnPendingCallback;
 	{
 		std::lock_guard<std::mutex> lock(_commandLock);
 		fnPendingCallback = std::move(_pendingCallback);
 		_pendingCallback = nullptr;
+		_nCommandStartMs.store(0, std::memory_order_release);
 		_pendingSendBuffers.clear();
 		_sendOffset = 0;
 		_sendTotalSize = 0;
@@ -373,10 +466,7 @@ bool CRedisClient::Disconnect(ERedisDisconnectReason reason)
 
 	if( fnPendingCallback )
 	{
-		RedisValue disconnectedVal;
-		disconnectedVal.eType = ERedisType::Error;
-		disconnectedVal.strVal = DisconnectReasonToString(reason);
-		fnPendingCallback(disconnectedVal);
+		fnPendingCallback(Redis::MakeError(DisconnectReasonToString(reason)));
 	}
 
 	return true;
@@ -396,7 +486,7 @@ bool CRedisClient::Disconnect(ERedisDisconnectReason reason)
 //          콜백 회수와 절대 겹치지 않게 한다 — 콜백은 항상 어느 한쪽에서만
 //          발견되어 정확히 한 번 호출된다.
 //***************************************************************************
-bool CRedisClient::SendCommand(const CVector<std::string>& vecArgs, RedisCallback fnCallback)
+bool CRedisClient::SendCommand(const CVector<std::string>& vecArgs, RedisResponseHandler fnCallback)
 {
 	const char* pszErrorMsg = nullptr; // non-null이면 락 밖에서 이 메시지로 fnCallback을 에러 호출
 
@@ -408,7 +498,7 @@ bool CRedisClient::SendCommand(const CVector<std::string>& vecArgs, RedisCallbac
 			// 이 시점에 이미 끊겨있으면 콜백을 등록할 기회조차 없다(따라서
 			// Disconnect()의 드레인 대상이 될 수도 없다) — 락을 빠져나간
 			// 뒤 아래에서 직접, 정확히 한 번 호출한다.
-			pszErrorMsg = "ERR connection closed";
+			pszErrorMsg = Redis::kErrConnectionClosed;
 		}
 		else if( _pendingCallback )
 		{
@@ -421,7 +511,7 @@ bool CRedisClient::SendCommand(const CVector<std::string>& vecArgs, RedisCallbac
 			// 호출이 생겼을 때 기존 명령의 _pendingSendBuffers/_sendOffset
 			// 등을 조용히 덮어쓰는 대신 바로 드러난다.
 			LOG_ERROR(_T("CRedisClient::SendCommand: 이미 미완료 명령이 있는 상태에서 재호출됨 — 계약 위반"));
-			pszErrorMsg = "ERR command already in flight";
+			pszErrorMsg = Redis::kErrCommandInFlight;
 		}
 		else
 		{
@@ -432,14 +522,22 @@ bool CRedisClient::SendCommand(const CVector<std::string>& vecArgs, RedisCallbac
 			// 명령은 BuildSendBuffers()가 여러 SendBuffer로 나눠 담는다.
 			uint32 nCmdSize = CRedisCommandBuilder::CalcEncodedSize(vecArgs);
 			CVector<CSendBufferRef> sendBuffers;
-			if( !BuildSendBuffers(vecArgs, nCmdSize, sendBuffers) )
+			if( nCmdSize == 0 )
+			{
+				// 인코딩 크기가 Redis::kMaxCommandSize를 넘는다 — 콜백을 등록하지 않았으므로 락 밖에서 직접 에러로 호출한다.
+				pszErrorMsg = Redis::kErrCommandTooLarge;
+			}
+			else if( !BuildSendBuffers(vecArgs, nCmdSize, sendBuffers) )
 			{
 				// 송신 버퍼를 확보하지 못했다 — 콜백을 등록하지 않았으므로 락 밖에서 직접 에러로 호출한다.
-				pszErrorMsg = "ERR send buffer allocation failed";
+				pszErrorMsg = Redis::kErrSendBufferAllocation;
 			}
 			else
 			{
-				_pendingCallback = fnCallback;
+				// 콜백은 복사하지 않고 넘긴다 — 이 시점부터 호출은 응답 수신/Disconnect() 경로가 맡고,
+				// 아래 DoSend() 실패 경로에서만 다시 회수해(fnCallback = std::move(_pendingCallback)) 에러로 호출한다.
+				_pendingCallback = std::move(fnCallback);
+				_nCommandStartMs.store(ptime::MonotonicNowMillis(), std::memory_order_release);
 
 				// 직전 명령의 송신 완료 통지(WSASend completion)가 아직 처리되지 않았다면
 				// (_pendingSendBuffers가 남아 있음) _sendEvent를 다시 쓸 수 없다. 응답이 송신 완료
@@ -462,7 +560,10 @@ bool CRedisClient::SendCommand(const CVector<std::string>& vecArgs, RedisCallbac
 				// DoSend() 실패 — 방금 등록한 콜백을 이 락 안에서 직접
 				// 회수해 스스로 정리한다(아직 _commandLock 안이므로
 				// Disconnect()가 끼어들어 이 콜백을 가져갈 수 없다).
+				// 락 밖에서 에러로 호출할 수 있게 fnCallback으로 되돌려 놓는다.
+				fnCallback = std::move(_pendingCallback);
 				_pendingCallback = nullptr;
+				_nCommandStartMs.store(0, std::memory_order_release);
 				_pendingSendBuffers.clear();
 				_sendOffset = 0;
 				_sendTotalSize = 0;
@@ -476,17 +577,14 @@ bool CRedisClient::SendCommand(const CVector<std::string>& vecArgs, RedisCallbac
 				SOCKET hOldSocket = _socket.exchange(INVALID_SOCKET, std::memory_order_acq_rel);
 				CleanupSocketAndParser(hOldSocket);
 
-				pszErrorMsg = "ERR connection closed";
+				pszErrorMsg = Redis::kErrConnectionClosed;
 			}
 		}
 	}
 
 	if( pszErrorMsg && fnCallback )
 	{
-		RedisValue disconnectedVal;
-		disconnectedVal.eType = ERedisType::Error;
-		disconnectedVal.strVal = pszErrorMsg;
-		fnCallback(disconnectedVal);
+		fnCallback(Redis::MakeError(pszErrorMsg));
 	}
 
 	return false;
@@ -532,6 +630,15 @@ bool CRedisClient::DoSend()
 	}
 
 	return true;
+}
+
+//***************************************************************************
+// @brief 응답 대기 중인 명령의 경과 시간(ms)을 반환함 (없으면 0)
+//***************************************************************************
+int64 CRedisClient::GetPendingCommandAgeMs() const
+{
+	const int64 nStartMs = _nCommandStartMs.load(std::memory_order_acquire);
+	return (nStartMs == 0) ? 0 : (ptime::MonotonicNowMillis() - nStartMs);
 }
 
 //***************************************************************************
@@ -822,9 +929,9 @@ void CRedisClient::ProcessRecv(DWORD dwBytesTransferred)
 		}
 	}
 
-	for( const RedisValue& val : parsedValues )
+	for( RedisValue& val : parsedValues )
 	{
-		OnReceiptResponse(val);
+		OnReceiptResponse(std::move(val));
 	}
 
 	if( bProtocolError )
@@ -851,29 +958,44 @@ void CRedisClient::ProcessRecv(DWORD dwBytesTransferred)
 // @details [수정] 큐가 아니라 단일 _pendingCallback을 _commandLock으로
 //          보호된 상태에서 회수한다 — RedisClient.h 상단 설명 참고.
 //***************************************************************************
-void CRedisClient::OnReceiptResponse(const RedisValue& value)
+void CRedisClient::OnReceiptResponse(RedisValue&& value)
 {
-	RedisCallback fnCallback;
+	// 구독 모드: ["message", ...] / ["pmessage", ...] 배열은 명령에 대한 응답이
+	// 아니라 서버가 보낸 push이므로, 대기 중인 명령 콜백을 건드리지 않고
+	// push 콜백으로만 보낸다. 그렇지 않으면 메시지가 SUBSCRIBE 확인 응답보다
+	// 먼저 도착했을 때 확인 응답용 콜백이 메시지에 소비된다.
+	if( _fnPushCallback && value.eType == ERedisType::Array && !value.arrayVal.empty() )
+	{
+		const std::string& strKind = value.arrayVal[0].strVal;
+		if( strKind == "message" || strKind == "pmessage" )
+		{
+			_fnPushCallback(std::move(value));
+			return;
+		}
+	}
+
+	RedisResponseHandler fnCallback;
 
 	{
 		std::lock_guard<std::mutex> lock(_commandLock);
 		fnCallback = std::move(_pendingCallback);
 		_pendingCallback = nullptr;
+		_nCommandStartMs.store(0, std::memory_order_release);
 	}
 
 	if( fnCallback )
 	{
-		fnCallback(value);
+		fnCallback(std::move(value));
 	}
 }
 
 //***************************************************************************
-// @brief SelectDb()가 SendCommand()의 비동기 콜백 결과를 동기 대기로 바꾸기
+// @brief SendCommandAndWait()가 SendCommand()의 비동기 콜백 결과를 동기 대기로 바꾸기
 //        위해 사용하는 완료 신호 상태
 //***************************************************************************
 namespace
 {
-	struct SSelectDbState
+	struct SSyncCommandState
 	{
 		std::mutex              lock;
 		std::condition_variable cv;
@@ -883,22 +1005,17 @@ namespace
 }
 
 //***************************************************************************
-// @brief 접속 직후 이 커넥션이 사용할 논리 DB를 SELECT 명령으로 고정함
+// @brief 접속 직후 쓰는 명령(AUTH/SELECT)을 보내고 응답을 동기로 기다림
+// @return 에러가 아닌 응답을 제한 시간 안에 받았는지 여부
+// @details SendCommand()는 반환값과 무관하게 콜백을 정확히 한 번 호출한다(즉시 실패든,
+//          나중에 응답으로든, Disconnect()로 인한 에러로든) — 그래서 반환값을 보고
+//          조기 판단할 필요 없이 항상 완료를 기다리면 충분하다.
 //***************************************************************************
-bool CRedisClient::SelectDb(const int32 nDbIndex, const int32 nTimeoutMs)
+bool CRedisClient::SendCommandAndWait(const CVector<std::string>& vecArgs, const int32 nTimeoutMs)
 {
-	auto pState = std::make_shared<SSelectDbState>();
+	auto pState = std::make_shared<SSyncCommandState>();
 
-	CVector<std::string> args;
-	args.push_back("SELECT");
-	args.push_back(std::to_string(nDbIndex));
-
-	// [수정] SendCommand()는 이제 반환값과 무관하게 콜백을 정확히 한 번
-	// 호출한다(즉시 실패든, 나중에 응답으로든, Disconnect()로 인한
-	// 에러로든) — 그래서 반환값을 보고 "콜백이 아예 안 불릴 테니 기다릴
-	// 필요도 없다"고 조기 판단할 필요가 없다. 항상 완료를 기다리면
-	// 충분하다.
-	SendCommand(args, [pState](const RedisValue& res) {
+	SendCommand(vecArgs, [pState](const RedisValue& res) {
 		{
 			std::lock_guard<std::mutex> lock(pState->lock);
 			pState->bSuccess = (res.eType != ERedisType::Error);
@@ -911,4 +1028,32 @@ bool CRedisClient::SelectDb(const int32 nDbIndex, const int32 nTimeoutMs)
 	pState->cv.wait_for(guard, std::chrono::milliseconds(nTimeoutMs), [pState] { return pState->bDone; });
 
 	return pState->bDone && pState->bSuccess;
+}
+
+//***************************************************************************
+// @brief 접속 직후 이 커넥션이 사용할 논리 DB를 SELECT 명령으로 고정함
+//***************************************************************************
+bool CRedisClient::SelectDb(const int32 nDbIndex, const int32 nTimeoutMs)
+{
+	return SendCommandAndWait(Redis::MakeArgs("SELECT", std::to_string(nDbIndex)), nTimeoutMs);
+}
+
+//***************************************************************************
+// @brief AUTH 명령으로 인증함
+// @param strUserId ACL 사용자 이름. 비어 있으면 `AUTH <password>`(기본 사용자)로 보낸다
+// @param strPassword 비밀번호. 로그에 남기지 않는다
+//***************************************************************************
+bool CRedisClient::Authenticate(const std::string& strUserId, const std::string& strPassword, const int32 nTimeoutMs)
+{
+	CVector<std::string> args;
+	args.push_back("AUTH");
+	if( !strUserId.empty() )
+		args.push_back(strUserId);
+	args.push_back(strPassword);
+
+	const bool bOk = SendCommandAndWait(args, nTimeoutMs);
+	if( !bOk )
+		LOG_ERROR(_T("CRedisClient::Authenticate: AUTH 실패(비밀번호 오류이거나 응답 없음)"));
+
+	return bOk;
 }

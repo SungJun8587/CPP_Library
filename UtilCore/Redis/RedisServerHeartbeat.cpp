@@ -6,6 +6,19 @@
 
 #include "pch.h"
 #include "RedisServerHeartbeat.h"
+#include <Redis/RedisHelper.h>
+#include <Util/DateTimeUtil.h>
+
+namespace
+{
+	// 등록과 TTL 갱신을 한 번에 — HSET만 성공하고 EXPIRE가 빠져 키가 TTL 없이 남는 순간이 없다.
+	// KEYS[1]=등록 키, ARGV[1]=TTL(초), ARGV[2..]=필드/값 쌍. EVALSHA로 전송된다(CRedisScript).
+	const CRedisScript kRegisterScript(
+		"redis.call('HSET', KEYS[1], unpack(ARGV, 2))\n"
+		"redis.call('EXPIRE', KEYS[1], ARGV[1])\n"
+		"return 1");
+
+}
 
 //***************************************************************************
 // @brief CRedisServerHeartbeat 생성자
@@ -34,7 +47,7 @@ CRedisServerHeartbeat::~CRedisServerHeartbeat()
 
 //***************************************************************************
 // @brief Redis 등록 키를 생성합니다.
-// @return "Server:{serverGroupId}:{serverChannelId}" 형식의 키 문자열
+// @return "{serverName}:{serverGroupId}:{serverChannelId}" 형식의 키 문자열
 //***************************************************************************
 std::string CRedisServerHeartbeat::BuildKey() const
 {
@@ -42,22 +55,22 @@ std::string CRedisServerHeartbeat::BuildKey() const
 }
 
 //***************************************************************************
-// @brief 등록 키의 전체 필드를 쓰는 HSET 명령 인자를 만듭니다.
+// @brief 등록 스크립트의 ARGV(TTL + 전체 필드/값 쌍)를 만듭니다.
 // @details 최초 등록과 매 주기 갱신이 같은 필드 집합을 쓰므로, 키가 사라진 뒤
 //          갱신이 키를 다시 만들더라도 항상 완전한 등록 정보가 된다.
 //***************************************************************************
-void CRedisServerHeartbeat::BuildRegistrationArgs(CVector<std::string>& args, const int64 nowMs) const
+void CRedisServerHeartbeat::BuildRegistrationArgv(CVector<std::string>& argv, const int64 nowMs) const
 {
-	args.push_back("HSET");
-	args.push_back(BuildKey());
-	args.push_back("serverName");	args.push_back(_serverName);
-	args.push_back("serverGroupId");	args.push_back(_serverGroupId);
-	args.push_back("serverChannelId");	args.push_back(_serverChannelId);
-	args.push_back("port");		args.push_back(std::to_string(_port));
-	args.push_back("pid");			args.push_back(std::to_string(static_cast<int64>(::GetCurrentProcessId())));
-	args.push_back("sessionCount");	args.push_back(std::to_string(_sessionCountProvider ? _sessionCountProvider() : 0));
-	args.push_back("startedAt");	args.push_back(std::to_string(_startedAtMs));
-	args.push_back("updatedAt");	args.push_back(std::to_string(nowMs));
+	argv.reserve(argv.size() + 17);
+	argv.push_back(std::to_string(_ttlSec));
+	argv.push_back("serverName");	argv.push_back(_serverName);
+	argv.push_back("serverGroupId");	argv.push_back(_serverGroupId);
+	argv.push_back("serverChannelId");	argv.push_back(_serverChannelId);
+	argv.push_back("port");		argv.push_back(std::to_string(_port));
+	argv.push_back("pid");			argv.push_back(std::to_string(static_cast<int64>(::GetCurrentProcessId())));
+	argv.push_back("sessionCount");	argv.push_back(std::to_string(_sessionCountProvider ? _sessionCountProvider() : 0));
+	argv.push_back("startedAt");	argv.push_back(std::to_string(_startedAtMs));
+	argv.push_back("updatedAt");	argv.push_back(std::to_string(nowMs));
 }
 
 //***************************************************************************
@@ -95,6 +108,7 @@ bool CRedisServerHeartbeat::Start(int32 ttlSec, int32 heartbeatIntervalSec)
 	RegisterInitial();
 
 	_thread = std::thread([this]() { HeartbeatLoop(); });
+	_bStarted = true;
 	return true;
 }
 
@@ -106,93 +120,59 @@ void CRedisServerHeartbeat::Stop()
 	if( _stopping.exchange(true) )
 		return; // 이미 정지 중이거나 정지됨 — 중복 호출 안전
 
+	// 대기 뮤텍스를 한 번 거친 뒤 알린다. 스레드가 조건(_stopping)을 검사하고 대기에 들어가기
+	// 직전에 알림이 끼면 유실되어, join이 heartbeat 주기만큼 지연될 수 있기 때문이다.
+	{
+		std::lock_guard<std::mutex> lock(_lock);
+	}
 	_cv.notify_all();
 
 	if( _thread.joinable() )
 		_thread.join();
 
+	// Start()가 성공한 적이 없으면 등록한 키가 없다 — 같은 이름의 다른 인스턴스 키를 지우지 않도록 건너뛴다.
+	if( !_bStarted )
+		return;
+	_bStarted = false;
+
 	// 정상 종료 시 등록 키를 즉시 지워 TTL 만료를 기다리지 않고 디스커버리
-	// 목록에서 바로 빠지도록 한다. 이 호출이 실패해도 TTL이 결국 정리해주므로
-	// 치명적이지 않다.
+	// 목록에서 바로 빠지도록 한다. 이 호출은 응답을 기다리지 않는다 — 서비스(풀)를 곧바로
+	// 해제하면 전송되기 전에 끊길 수 있고, 그 경우에도 TTL이 결국 정리해주므로 치명적이지 않다.
 	if( _redisService != nullptr )
 	{
-		CVector<std::string> args;
-		args.push_back("DEL");
-		args.push_back(BuildKey());
-
-		_redisService->SendCommand(args, [](const RedisValue& /*res*/) {});
+		_redisService->SendCommand(Redis::MakeArgs("DEL", BuildKey()), [](const RedisValue& /*res*/) {});
 	}
 }
 
 //***************************************************************************
 // @brief 서버 정보를 Redis Hash로 최초 등록하고 TTL을 설정합니다.
-// @details [수정 — 버그 수정: use-after-free 위험] 예전엔 HSET 완료 콜백이
-//          [this, key, ttlSec]를 캡처해서, 콜백 안에서 EXPIRE를 걸 때
-//          "_redisService->SendCommand(...)"라고 썼다 — 이건 암묵적으로
-//          this->_redisService에 접근하는 것과 같다. 이 HSET은 Start()가
-//          호출되는 시점에 곧바로 비동기로 걸리는데, 그 응답이 오기 전에
-//          이 CRedisServerHeartbeat 객체 자체가 소멸되면(예: 서버 시작
-//          직후 어떤 이유로 바로 종료되는 경우) 콜백이 이미 죽은 this를
-//          통해 멤버에 접근하게 된다 — ~CRedisServerHeartbeat()가 부르는
-//          Stop()은 heartbeat *스레드*만 join할 뿐, 이렇게 이미 날아간
-//          개별 Redis 요청까지 기다려주지는 않는다(SendHeartbeat()의
-//          콜백들은 애초에 아무것도 캡처하지 않아 이 문제가 없었는데,
-//          이 함수만 그랬다). _redisService(비소유 raw pointer)를 로컬
-//          변수로 복사해서 그 값 자체를 캡처하도록 바꿨다 — 이러면
-//          콜백이 this가 아니라 포인터 값 하나에만 의존하므로, this가
-//          먼저 소멸돼도 안전하다(다만 _redisService가 가리키는 객체
-//          자체의 수명은 여전히 호출부가 보장해야 한다 — 이 클래스의
-//          원래 raw pointer 계약 그대로).
+// @details 등록(HSET)과 TTL(EXPIRE)을 하나의 스크립트로 보내므로, 응답을 기다렸다가
+//          EXPIRE를 따로 거는 콜백이 없다 — 객체가 먼저 소멸해도 건드릴 멤버가 없다.
 //***************************************************************************
 void CRedisServerHeartbeat::RegisterInitial()
 {
-	const std::string key = BuildKey();
-
-	CVector<std::string> args;
-	BuildRegistrationArgs(args, ptime::NowMillis());
-
-	const int32 ttlSec = _ttlSec;
-	CRedisService* redisService = _redisService; // [수정] this 대신 이 값 자체를 캡처
-
-	// HSET 완료 콜백 안에서 EXPIRE를 게시 — HSET이 실패한 채로 TTL만 걸려
-	// "내용 없는" 키가 남는 것을 피하기 위함. (RedisValue의 성공/에러 판별
-	// API가 이 헤더만으론 확인이 안 돼, 여기선 HSET 콜백이 왔다는 것 자체를
-	// "완료됨"으로 보고 무조건 EXPIRE를 건다 — 프로젝트에 에러 체크 메서드가
-	// 있다면 이 콜백 안에서 감싸는 것을 권장한다. TODO)
-	redisService->SendCommand(args, [redisService, key, ttlSec](const RedisValue& /*res*/)
-		{
-			CVector<std::string> expireArgs;
-			expireArgs.push_back("EXPIRE");
-			expireArgs.push_back(key);
-			expireArgs.push_back(std::to_string(ttlSec));
-
-			redisService->SendCommand(expireArgs, [](const RedisValue& /*res*/) {});
-		});
+	PublishRegistration();
 }
 
 //***************************************************************************
-// @brief 등록 정보 전체 재기록(HSET) + TTL 갱신(EXPIRE)을 게시합니다.
-// @details 두 커맨드는 서로 다른 왕복(RTT)이라 완전한 원자성은 없다(HSET
-//          성공, EXPIRE 실패 시 TTL이 이번 틱엔 안 갱신될 수 있음). 다만
-//          heartbeat 자체가 짧은 주기로 반복되므로 다음 틱에서 자연히
-//          복구된다 — Lua 스크립트/MULTI로 원자화할 실익이 낮다고 판단해
-//          단순한 2회 SendCommand()로 구현했다.
+// @brief 등록 정보 전체 재기록(HSET) + TTL 갱신(EXPIRE)을 스크립트 하나로 게시합니다.
+// @details 키가 TTL 만료나 Redis 재시작으로 사라졌더라도 이 스크립트가 완전한 등록
+//          정보로 복원한다. 두 명령이 한 스크립트 안에서 원자적으로 실행된다.
 //***************************************************************************
 void CRedisServerHeartbeat::SendHeartbeat()
 {
-	const std::string key = BuildKey();
+	PublishRegistration();
+}
 
-	// 갱신마다 등록 필드 전체를 다시 쓴다 — 키가 TTL 만료나 Redis 재시작으로 사라졌더라도
-	// 이 HSET이 완전한 등록 정보로 복원한다.
-	CVector<std::string> hsetArgs;
-	BuildRegistrationArgs(hsetArgs, ptime::NowMillis());
-	_redisService->SendCommand(hsetArgs, [](const RedisValue& /*res*/) {});
+//***************************************************************************
+// @brief 등록 스크립트를 실행합니다(RegisterInitial/SendHeartbeat 공통).
+//***************************************************************************
+void CRedisServerHeartbeat::PublishRegistration()
+{
+	CVector<std::string> argv;
+	BuildRegistrationArgv(argv, ptime::NowMillis());
 
-	CVector<std::string> expireArgs;
-	expireArgs.push_back("EXPIRE");
-	expireArgs.push_back(key);
-	expireArgs.push_back(std::to_string(_ttlSec));
-	_redisService->SendCommand(expireArgs, [](const RedisValue& /*res*/) {});
+	kRegisterScript.Run(*_redisService, { BuildKey() }, argv);
 }
 
 //***************************************************************************

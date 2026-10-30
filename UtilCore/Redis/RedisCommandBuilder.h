@@ -7,10 +7,11 @@
 #ifndef UC_REDISCOMMANDBUILDER_H
 #define UC_REDISCOMMANDBUILDER_H
 
+#include <cstring>
 #include <string>
 #include <vector>
-#include <sstream>
-#include <cstdio>
+
+#include <Redis/RedisDefine.h>
 
 //***************************************************************************
 // @brief Redis 인자 리스트를 RESP 프로토콜 규격 커맨드로 변환하는 정적 유틸리티 클래스
@@ -49,35 +50,39 @@ public:
 	// @brief 명령어 인자 리스트를 RESP Format 문자열로 변환함
 	// @param vecArgs Redis 명령어 및 인자 리스트
 	// @return RESP 규격으로 직렬화된 문자열
-	// @details 로깅/디버깅 용도의 간편 버전이라 std::ostringstream을 그대로
-	//          둔다 — 실제 송신 경로(CalcEncodedSize/Encode)는 이 함수를
-	//          안 거친다.
+	// @details 로깅/디버깅 용도의 간편 버전이다 — 실제 송신 경로는 송신 버퍼에 직접 쓰는
+	//          CalcEncodedSize()/Encode()를 쓴다. 이 함수도 같은 두 함수로 만들어
+	//          인코딩 규칙이 한 곳에만 있게 한다. 크기 한도를 넘으면 빈 문자열을 반환한다.
 	//***************************************************************************
 	static std::string Build(const CVector<std::string>& vecArgs)
 	{
-		std::ostringstream oss;
-		oss << "*" << vecArgs.size() << "\r\n";
-		for( const auto& strArg : vecArgs )
-		{
-			oss << "$" << strArg.size() << "\r\n" << strArg << "\r\n";
-		}
-		return oss.str();
+		const uint32 nSize = CalcEncodedSize(vecArgs);
+		if( nSize == 0 )
+			return std::string();
+
+		std::string strResult(nSize, '\0');
+		Encode(vecArgs, strResult.data());
+		return strResult;
 	}
 
 	//***************************************************************************
 	// @brief Encode()가 필요로 하는 인코딩 결과의 정확한 바이트 크기를 계산함
 	// @param vecArgs Redis 명령어 및 인자 리스트
-	// @return 인코딩 결과 바이트 크기
+	// @return 인코딩 결과 바이트 크기. Redis::kMaxCommandSize를 넘으면 0(정상 명령은 최소 4바이트라 0과 겹치지 않는다)
 	//***************************************************************************
 	static uint32 CalcEncodedSize(const CVector<std::string>& vecArgs)
 	{
-		uint32 nSize = HeaderLen('*', vecArgs.size());
+		uint64 nSize = HeaderLen('*', vecArgs.size());
 		for( const auto& strArg : vecArgs )
 		{
 			nSize += HeaderLen('$', strArg.size());
-			nSize += static_cast<uint32>(strArg.size()) + 2; // 데이터 + \r\n
+			nSize += static_cast<uint64>(strArg.size()) + 2; // 데이터 + \r\n
+
+			// uint32로 되감겨 실제보다 작은 버퍼에 Encode()가 쓰는 일이 없도록 누적하면서 상한을 확인한다.
+			if( nSize > Redis::kMaxCommandSize )
+				return 0;
 		}
-		return nSize;
+		return static_cast<uint32>(nSize);
 	}
 
 	//***************************************************************************

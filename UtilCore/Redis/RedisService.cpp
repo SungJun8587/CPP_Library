@@ -6,19 +6,8 @@
 
 #include "pch.h"
 #include "RedisService.h"
-
-//***************************************************************************
-// @brief TCHAR 문자열을 std::string으로 변환함(UNICODE 빌드 대응)
-//***************************************************************************
-namespace
-{
-	std::string TCharToString(const TCHAR* ptsz)
-	{
-		if( ptsz == nullptr ) return std::string();
-
-		return TStringToString(ptsz);
-	}
-}
+#include <Redis/RedisHelper.h>
+#include <Util/CommonUtil.h>
 
 //***************************************************************************
 // Construction/Destruction
@@ -42,6 +31,7 @@ CRedisService::CRedisService(CIocpCoreRef iocpCore, CJobQueueRef pJobQueue)
 //***************************************************************************
 CRedisService::~CRedisService()
 {
+	ShutdownSubscribers();
 }
 
 //***************************************************************************
@@ -116,7 +106,8 @@ bool CRedisService::Init(CVector<CRedisNode> redisNodeVec, const int32 nPoolSize
 	for( const auto& node : redisNodeVec )
 	{
 		auto pPool = std::make_shared<CRedisConnectionPool>(_iocpCore);
-		if( !pPool->Init(TCharToString(node._tszDBHost), node._nPort, static_cast<int32>(node._nDbIndex), nPoolSize) )
+		if( !pPool->Init(TCharToString(node._tszDBHost), node._nPort, static_cast<int32>(node._nDbIndex), nPoolSize, Redis::kDefaultReconnectIntervalSec,
+			TCharToString(node._tszDBUserId), TCharToString(node._tszDBPasswd)) )
 		{
 			// [추가] 실패 원인을 바로 알 수 있도록 노드 정보를 로그에 남긴다.
 			LOG_ERROR(_T("CRedisService::Init: failed to initialize Redis pool. nodeId(%d), host(%s), port(%d), db(%d)"),
@@ -143,13 +134,18 @@ bool CRedisService::Init(CVector<CRedisNode> redisNodeVec, const int32 nPoolSize
 		}
 	}
 
-	// [수정] release로 — _poolMap 반영이 끝난 뒤 이 값을 세운다는 순서
-	// 자체는 원래도 지켜지고 있었지만(_poolMap은 이미 스스로 스레드 세이프),
-	// 다른 스레드가 이 store를 관찰하면 그 이전의 _poolMap 반영도 함께
-	// 관찰된다는 의도를 relaxed보다 release/acquire 페어로 더 명확히
-	// 드러낸다. _poolMap 자체의 재초기화 원자성(클래스 문서 상단 "lifecycle
-	// 계약" 참고)과는 별개의 문제다.
-	_nDefaultNodeId.store(redisNodeVec[0]._nID, std::memory_order_release);
+	// 이전 Init()에서 만든 구독 연결은 노드 정보가 바뀔 수 있으므로 닫고, 새 노드 목록을 보관한다.
+	// 구독 연결은 첫 Subscribe() 호출 때 새로 만들어진다.
+	const int16 nDefaultNodeId = redisNodeVec[0]._nID;
+	ShutdownSubscribers();
+	{
+		std::lock_guard<std::mutex> lock(_subscriberLock);
+		_redisNodeVec = std::move(redisNodeVec);
+	}
+
+	// release — _poolMap 반영이 끝난 뒤 이 값을 세운다. 이 store를 acquire로 읽은 스레드는 그 이전의
+	// _poolMap 반영도 함께 관찰한다.
+	_nDefaultNodeId.store(nDefaultNodeId, std::memory_order_release);
 	return true;
 }
 
@@ -158,7 +154,7 @@ bool CRedisService::Init(CVector<CRedisNode> redisNodeVec, const int32 nPoolSize
 //***************************************************************************
 bool CRedisService::SendCommand(const CVector<std::string>& vecArgs, RedisCallback fnMainThreadCallback)
 {
-	return SendCommand(_nDefaultNodeId.load(std::memory_order_acquire), vecArgs, fnMainThreadCallback);
+	return SendCommand(_nDefaultNodeId.load(std::memory_order_acquire), vecArgs, std::move(fnMainThreadCallback));
 }
 
 //***************************************************************************
@@ -171,18 +167,198 @@ bool CRedisService::SendCommand(const int16 nNodeId, const CVector<std::string>&
 
 	std::weak_ptr<CJobQueue> weakJobQueue = _jobQueue;
 
-	auto fnIocpCallback = [weakJobQueue, fnMainThreadCallback](const RedisValue& res) {
+	// 이 콜백은 클라이언트 계약상 정확히 한 번만 호출되므로, 사용자 콜백을 복사하지 않고 move한다
+	// (콜백이 캡처한 문자열/shared_ptr을 명령마다 여러 번 깊은 복사하지 않기 위함).
+	// 응답 값도 rvalue로 받아 JobQueue 작업에 move한다(클라이언트가 파싱한 값이 복사 없이 사용자 콜백까지 간다).
+	auto fnIocpCallback = [weakJobQueue, fnUserCallback = std::move(fnMainThreadCallback)](RedisValue&& res) mutable {
 		if( auto pJobQueue = weakJobQueue.lock() )
 		{
-			// CJobQueue의 DoAsync를 활용하여 로직 스레드 큐로 작업 이관 및 복사 최적화
-			pJobQueue->DoAsync([fnMainThreadCallback, res = std::move(res)]() mutable {
-				if( fnMainThreadCallback )
-					fnMainThreadCallback(res);
+			pJobQueue->DoAsync([fnUserCallback = std::move(fnUserCallback), res = std::move(res)]() mutable {
+				if( fnUserCallback )
+					fnUserCallback(res);
 				});
 		}
 		};
 
-	return pPool->SendCommand(vecArgs, fnIocpCallback);
+	return pPool->SendCommand(vecArgs, std::move(fnIocpCallback));
+}
+
+//***************************************************************************
+// @brief 기본 노드의 채널로 메시지를 발행함
+//***************************************************************************
+bool CRedisService::Publish(const std::string& strChannel, const std::string& strMessage, RedisCallback fnMainThreadCallback)
+{
+	return Publish(_nDefaultNodeId.load(std::memory_order_acquire), strChannel, strMessage, std::move(fnMainThreadCallback));
+}
+
+//***************************************************************************
+// @brief 지정한 노드의 채널로 메시지를 발행함(PUBLISH 명령을 일반 풀로 전송)
+//***************************************************************************
+bool CRedisService::Publish(const int16 nNodeId, const std::string& strChannel, const std::string& strMessage, RedisCallback fnMainThreadCallback)
+{
+	if( strChannel.empty() )
+		return false;
+
+	return SendCommand(nNodeId, Redis::MakeArgs("PUBLISH", strChannel, strMessage), std::move(fnMainThreadCallback));
+}
+
+//***************************************************************************
+// @brief 채널 구독(기본 노드)
+//***************************************************************************
+bool CRedisService::Subscribe(const std::string& strChannel, RedisMessageCallback fnCallback)
+{
+	return Subscribe(_nDefaultNodeId.load(std::memory_order_acquire), strChannel, std::move(fnCallback));
+}
+
+//***************************************************************************
+// @brief 채널 구독(지정 노드). 노드의 구독 연결이 없으면 만든다.
+//***************************************************************************
+bool CRedisService::Subscribe(const int16 nNodeId, const std::string& strChannel, RedisMessageCallback fnCallback)
+{
+	CRedisSubscriberRef pSubscriber = FindSubscriber(nNodeId, true);
+	if( !pSubscriber )
+		return false;
+
+	return pSubscriber->Subscribe(strChannel, std::move(fnCallback));
+}
+
+//***************************************************************************
+// @brief 채널 구독 해제(기본 노드)
+//***************************************************************************
+bool CRedisService::Unsubscribe(const std::string& strChannel)
+{
+	return Unsubscribe(_nDefaultNodeId.load(std::memory_order_acquire), strChannel);
+}
+
+//***************************************************************************
+// @brief 채널 구독 해제(지정 노드). 구독 연결이 없으면 해제할 것도 없으므로 false
+//***************************************************************************
+bool CRedisService::Unsubscribe(const int16 nNodeId, const std::string& strChannel)
+{
+	CRedisSubscriberRef pSubscriber = FindSubscriber(nNodeId, false);
+	if( !pSubscriber )
+		return false;
+
+	return pSubscriber->Unsubscribe(strChannel);
+}
+
+//***************************************************************************
+// @brief 패턴 구독(기본 노드)
+//***************************************************************************
+bool CRedisService::PSubscribe(const std::string& strPattern, RedisMessageCallback fnCallback)
+{
+	return PSubscribe(_nDefaultNodeId.load(std::memory_order_acquire), strPattern, std::move(fnCallback));
+}
+
+//***************************************************************************
+// @brief 패턴 구독(지정 노드)
+//***************************************************************************
+bool CRedisService::PSubscribe(const int16 nNodeId, const std::string& strPattern, RedisMessageCallback fnCallback)
+{
+	CRedisSubscriberRef pSubscriber = FindSubscriber(nNodeId, true);
+	if( !pSubscriber )
+		return false;
+
+	return pSubscriber->PSubscribe(strPattern, std::move(fnCallback));
+}
+
+//***************************************************************************
+// @brief 패턴 구독 해제(기본 노드)
+//***************************************************************************
+bool CRedisService::PUnsubscribe(const std::string& strPattern)
+{
+	return PUnsubscribe(_nDefaultNodeId.load(std::memory_order_acquire), strPattern);
+}
+
+//***************************************************************************
+// @brief 패턴 구독 해제(지정 노드)
+//***************************************************************************
+bool CRedisService::PUnsubscribe(const int16 nNodeId, const std::string& strPattern)
+{
+	CRedisSubscriberRef pSubscriber = FindSubscriber(nNodeId, false);
+	if( !pSubscriber )
+		return false;
+
+	return pSubscriber->PUnsubscribe(strPattern);
+}
+
+//***************************************************************************
+// @brief 모든 노드의 구독 연결을 닫고 보관 목록을 비움
+//***************************************************************************
+void CRedisService::ShutdownSubscribers()
+{
+	std::unordered_map<int16, CRedisSubscriberRef> subscribers;
+	{
+		std::lock_guard<std::mutex> lock(_subscriberLock);
+		subscribers.swap(_subscriberMap);
+	}
+
+	// Shutdown()은 재연결 스레드를 join하므로 락 밖에서 호출한다.
+	for( auto& kv : subscribers )
+	{
+		if( kv.second )
+			kv.second->Shutdown();
+	}
+}
+
+//***************************************************************************
+// @brief 노드의 구독 연결을 찾음. bCreate이면 없을 때 Init()에 보관한 노드 정보로 만듦
+// @details 연결 생성(접속)은 블로킹 connect를 포함하므로 락을 잡은 채 하지 않는다.
+//          동시에 두 스레드가 만들면 먼저 맵에 넣은 쪽이 이기고 나머지는 닫는다.
+//***************************************************************************
+CRedisSubscriberRef CRedisService::FindSubscriber(const int16 nNodeId, const bool bCreate)
+{
+	CRedisNode node;
+	bool bNodeFound = false;
+	{
+		std::lock_guard<std::mutex> lock(_subscriberLock);
+
+		auto it = _subscriberMap.find(nNodeId);
+		if( it != _subscriberMap.end() )
+			return it->second;
+
+		if( !bCreate )
+			return nullptr;
+
+		for( const auto& item : _redisNodeVec )
+		{
+			if( item._nID == nNodeId )
+			{
+				node = item;
+				bNodeFound = true;
+				break;
+			}
+		}
+	}
+
+	if( !bNodeFound )
+		return nullptr;
+
+	auto pNew = std::make_shared<CRedisSubscriber>(_iocpCore, _jobQueue);
+	if( !pNew->Init(TCharToString(node._tszDBHost), node._nPort, Redis::kSubscriberReconnectIntervalSec, TCharToString(node._tszDBUserId), TCharToString(node._tszDBPasswd)) )
+	{
+		LOG_ERROR(_T("CRedisService::FindSubscriber: failed to initialize subscriber. nodeId(%d), host(%s), port(%d)"),
+			node._nID, node._tszDBHost, node._nPort);
+		return nullptr;
+	}
+
+	CRedisSubscriberRef pExisting;
+	{
+		std::lock_guard<std::mutex> lock(_subscriberLock);
+
+		auto it = _subscriberMap.find(nNodeId);
+		if( it == _subscriberMap.end() )
+		{
+			_subscriberMap[nNodeId] = pNew;
+			return pNew;
+		}
+
+		pExisting = it->second;
+	}
+
+	// 다른 스레드가 먼저 만들었다 — 이쪽은 락 밖에서 닫고 그쪽을 쓴다.
+	pNew->Shutdown();
+	return pExisting;
 }
 
 //***************************************************************************

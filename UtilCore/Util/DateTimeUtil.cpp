@@ -12,6 +12,10 @@
 #include "pch.h"
 #include "DateTimeUtil.h"
 
+#include <sstream>
+#include <iomanip>
+#include <thread>
+
 //***************************************************************************
 // Windows 전용 (SYSTEMTIME / TIMESTAMP_STRUCT / SQL_TIMESTAMP_STRUCT)
 //***************************************************************************
@@ -572,6 +576,17 @@ namespace ptime
 	int64 MonotonicNowMicros()
 	{
 		return std::chrono::duration_cast<std::chrono::microseconds>(
+			SteadyClock::now().time_since_epoch()).count();
+	}
+
+	//***************************************************************************
+	// @brief 단조 증가 클럭(steady_clock) 기준 현재 시각을 밀리초 단위 정수로 반환합니다.
+	// @detail 타임아웃·경과 시간 비교용입니다. 절대 시각이 아니며 기준점(epoch)은 구현 정의입니다.
+	// @return steady_clock epoch 이후 경과 밀리초
+	//***************************************************************************
+	int64 MonotonicNowMillis()
+	{
+		return std::chrono::duration_cast<std::chrono::milliseconds>(
 			SteadyClock::now().time_since_epoch()).count();
 	}
 

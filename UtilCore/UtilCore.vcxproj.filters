@@ -725,6 +725,21 @@
     <ClInclude Include="Memory\MemoryCommon.h">
       <Filter>Memory</Filter>
     </ClInclude>
+    <ClInclude Include="Redis\RedisDefine.h">
+      <Filter>Redis</Filter>
+    </ClInclude>
+    <ClInclude Include="Redis\RedisSubscriber.h">
+      <Filter>Redis</Filter>
+    </ClInclude>
+    <ClInclude Include="Redis\RedisHelper.h">
+      <Filter>Redis</Filter>
+    </ClInclude>
+    <ClInclude Include="Redis\RedisRetry.h">
+      <Filter>Redis</Filter>
+    </ClInclude>
+    <ClInclude Include="Redis\RedisScript.h">
+      <Filter>Redis</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">
@@ -1074,6 +1089,15 @@
     </ClCompile>
     <ClCompile Include="Image\GifAnimation.cpp">
       <Filter>Image</Filter>
+    </ClCompile>
+    <ClCompile Include="Redis\RedisSubscriber.cpp">
+      <Filter>Redis</Filter>
+    </ClCompile>
+    <ClCompile Include="Redis\RedisRetry.cpp">
+      <Filter>Redis</Filter>
+    </ClCompile>
+    <ClCompile Include="Redis\RedisScript.cpp">
+      <Filter>Redis</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
