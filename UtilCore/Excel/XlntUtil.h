@@ -7,17 +7,41 @@
 #ifndef UC_XLNTUTIL_H
 #define UC_XLNTUTIL_H
 
+#include <charconv>
+#include <stdexcept>
+#include <string>
 #include <tuple>
+#include <type_traits>
 #include <vector>
 #include <xlnt/xlnt.hpp>
 
 #include <BaseRedefineDataType.h>
 #include <Util/EncodingConvert.h>
 
+#include "XlntDefine.h"
+
 #pragma comment(lib, LIB_NAME("xlnt"))
 
 namespace Xlnt
 {
+	//***************************************************************************
+	// @brief xlnt 셀 하나를 타입(숫자/문자열/불리언)을 보존한 SCell로 바꿉니다.
+	// @detail 숫자는 NumberText 규칙의 원문으로, 날짜 서식이 적용된 숫자는 ISO 8601 문자열로 바꿉니다.
+	//         CXlntWorkbookReader가 쓰는 변환이며, 셀 읽기는 모두 이 규칙을 따릅니다.
+	// @param cell 읽을 셀
+	// @return 변환된 SCell (값이 없으면 Empty)
+	//***************************************************************************
+	SCell ToSCell(const xlnt::cell& cell);
+
+	//***************************************************************************
+	// @brief 셀 값을 문자열로 읽습니다. (ReadCell, Deserialize가 사용)
+	// @detail xlnt의 cell::to_string()은 숫자 셀에서 값을 잃습니다(12345.678이 빈 문자열, 1.5e300이 쓰레기 문자열). 숫자 셀은
+	//         ToSCell과 같은 표기(5, 0.1, 1.5e+300)로 돌려주고, 그 외 타입은 to_string()을 그대로 씁니다.
+	// @param cell 읽을 셀
+	// @return 셀 값 문자열
+	//***************************************************************************
+	std::string CellText(const xlnt::cell& cell);
+
 	// Helper: std::tuple의 각 요소를 반복적으로 처리
 	template <typename Tuple, typename Func, std::size_t... Is>
 	void for_each_impl(Tuple&& tuple, Func&& func, std::index_sequence<Is...>)
@@ -38,7 +62,8 @@ namespace Xlnt
 	//         엑셀 행 데이터(std::vector<std::string>)와의 상호 변환 기능을 제공합니다.
 	//***************************************************************************
 	template <typename... Fields>
-	struct ExcelSerializable {
+	struct ExcelSerializable
+	{
 		using FieldTuple = std::tuple<Fields...>;
 		FieldTuple fields; // 필드 데이터를 저장하는 튜플
 
@@ -90,6 +115,13 @@ namespace Xlnt
 			{
 				return value;
 			}
+			else if constexpr( std::is_floating_point_v<T> )
+			{
+				// std::to_string(double)은 소수점 6자리로 잘라 값이 바뀐다. 다시 읽었을 때 같은 값이 되는 최단 표기를 쓴다.
+				char buf[64];
+				const auto r = std::to_chars(buf, buf + sizeof(buf), value);
+				return std::string(buf, r.ptr);
+			}
 			else
 			{
 				return std::to_string(value);
@@ -99,17 +131,29 @@ namespace Xlnt
 		template <typename T>
 		static void from_string(const std::string& str, T& value)
 		{
-			if constexpr( std::is_integral_v<T> )
-			{
-				value = std::stoi(str);
-			}
-			else if constexpr( std::is_floating_point_v<T> )
-			{
-				value = std::stof(str);
-			}
-			else if constexpr( std::is_same_v<T, std::string> )
+			if constexpr( std::is_same_v<T, std::string> )
 			{
 				value = str;
+			}
+			else if( str.empty() )
+			{
+				// 값이 없는 셀은 필드 기본값을 그대로 둔다. (빈 문자열을 숫자로 바꾸려 하면 예외가 된다)
+			}
+			else if constexpr( std::is_same_v<T, bool> )
+			{
+				value = (str == "1" || str == "true" || str == "TRUE" || str == "True");
+			}
+			else if constexpr( std::is_arithmetic_v<T> )
+			{
+				// stoi/stof는 int/float 범위로 잘라 64비트 값과 double 정밀도를 잃고 "12abc"도 12로 받는다.
+				// 필드 타입 그대로, 문자열 전체가 맞을 때만 받는다.
+				const char* first = str.data();
+				const char* last = first + str.size();
+				const auto r = std::from_chars(first, last, value);
+				if( r.ec != std::errc() || r.ptr != last )
+				{
+					throw std::runtime_error("셀 값을 숫자로 바꿀 수 없습니다: '" + str + "'");
+				}
 			}
 		}
 	};
@@ -124,6 +168,13 @@ namespace Xlnt
 	public:
 		CXlntUtil();
 		~CXlntUtil();
+
+		// 현재 워크시트는 워크북 내부를 가리키는 핸들이라, 워크북을 복사하면 복사본의 핸들이 원본을 가리켜 원본이 사라진 뒤 해제된
+		// 메모리를 읽게 됩니다. 복사는 막고 이동만 허용합니다. (워크북 내부 객체의 주소가 그대로여서 핸들이 유효합니다)
+		CXlntUtil(const CXlntUtil&) = delete;
+		CXlntUtil& operator=(const CXlntUtil&) = delete;
+		CXlntUtil(CXlntUtil&&) noexcept = default;
+		CXlntUtil& operator=(CXlntUtil&&) noexcept = default;
 
 		//***************************************************************************
 		// @brief 관리 중인 워크북 참조를 반환합니다.
@@ -183,7 +234,7 @@ namespace Xlnt
 		// @brief 현재 시트의 이름을 반환합니다.
 		// @return 현재 시트 이름
 		//***************************************************************************
-		std::string GetCurrentSheetName() const { return _worksheet.title(); }
+		std::string GetCurrentSheetName() const { return _worksheet == nullptr ? std::string() : _worksheet.title(); }
 
 		//***************************************************************************
 		// @brief 모든 시트의 이름 목록을 반환합니다.
@@ -210,6 +261,7 @@ namespace Xlnt
 
 		//***************************************************************************
 		// @brief 지정한 셀에 와이드 문자열 값을 씁니다. (std::wstring)
+		// @detail 항상 UTF-8로 변환해서 기록합니다. isCastUtf8는 std::string 오버로드와 모양을 맞추기 위한 값이며 사용하지 않습니다.
 		// @param cell_ref 셀 참조 주소 (예: "A1")
 		// @param value 기록할 와이드 문자열 값
 		// @param isCastUtf8 UTF-8 캐스팅 여부 (기본값: false)
@@ -218,6 +270,7 @@ namespace Xlnt
 
 		//***************************************************************************
 		// @brief 지정한 행과 열 번호의 셀에 와이드 문자열 값을 씁니다. (std::wstring)
+		// @detail 항상 UTF-8로 변환해서 기록합니다. isCastUtf8는 std::string 오버로드와 모양을 맞추기 위한 값이며 사용하지 않습니다.
 		// @param row 행 번호
 		// @param col 열 번호
 		// @param value 기록할 와이드 문자열 값

@@ -740,6 +740,15 @@
     <ClInclude Include="Redis\RedisScript.h">
       <Filter>Redis</Filter>
     </ClInclude>
+    <ClInclude Include="Excel\XlntWorkbookReader.h">
+      <Filter>Excel</Filter>
+    </ClInclude>
+    <ClInclude Include="Excel\XlntDefine.h">
+      <Filter>Excel</Filter>
+    </ClInclude>
+    <ClInclude Include="Excel\XlntWorkbookWriter.h">
+      <Filter>Excel</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Memory\MemBuffer.cpp">
@@ -1098,6 +1107,12 @@
     </ClCompile>
     <ClCompile Include="Redis\RedisScript.cpp">
       <Filter>Redis</Filter>
+    </ClCompile>
+    <ClCompile Include="Excel\XlntWorkbookReader.cpp">
+      <Filter>Excel</Filter>
+    </ClCompile>
+    <ClCompile Include="Excel\XlntWorkbookWriter.cpp">
+      <Filter>Excel</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

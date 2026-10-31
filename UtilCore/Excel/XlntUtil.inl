@@ -16,7 +16,7 @@ namespace Xlnt
 	template <typename T>
 	void CXlntUtil::Serialize(const std::vector<T>& data, const bool isCastUtf8)
 	{
-		if( _worksheet.title().empty() )
+		if( _worksheet == nullptr )
 		{
 			throw std::runtime_error("Active sheet is not set.");
 		}
@@ -64,17 +64,23 @@ namespace Xlnt
 	{
 		std::vector<T> result;
 
-		if( _worksheet.title().empty() )
+		if( _worksheet == nullptr )
 		{
 			throw std::runtime_error("Active sheet is not set.");
 		}
 
-		for( uint32 row = 2; row <= _worksheet.highest_row(); ++row )
+		// 범위는 한 번만 읽고, 없는 셀은 만들지 않고 빈 문자열로 둔다. (worksheet::cell()은 셀을 만들어 시트를 바꾼다)
+		const uint32 lastRow = _worksheet.highest_row();
+		const uint32 lastColumn = _worksheet.highest_column().index;
+
+		for( uint32 row = 2; row <= lastRow; ++row )
 		{
 			std::vector<std::string> excel_row;
-			for( uint32 col = 1; col <= _worksheet.highest_column(); ++col )
+			excel_row.reserve(lastColumn);
+			for( uint32 col = 1; col <= lastColumn; ++col )
 			{
-				excel_row.push_back(_worksheet.cell(col, row).to_string());
+				const xlnt::cell_reference ref(col, row);
+				excel_row.push_back(_worksheet.has_cell(ref) ? CellText(_worksheet.cell(ref)) : std::string());
 			}
 
 			T obj;

@@ -73,6 +73,9 @@
     <ClInclude Include="DB\OdbcAsyncSrv.h" />
     <ClInclude Include="DB\OdbcConnPool.h" />
     <ClInclude Include="EXCEL\XlntUtil.h" />
+    <ClInclude Include="Excel\XlntWorkbookReader.h" />
+    <ClInclude Include="Excel\XlntWorkbookWriter.h" />
+    <ClInclude Include="Excel\XlntDefine.h" />
     <ClInclude Include="GcpService\Base64UrlUtil.h" />
     <ClInclude Include="GcpService\GcpAuthHttpClient.h" />
     <ClInclude Include="GcpService\GcpServiceAccountAuth.h" />
@@ -266,6 +269,8 @@
     <ClCompile Include="DB\OdbcAsyncSrv.cpp" />
     <ClCompile Include="DB\OdbcConnPool.cpp" />
     <ClCompile Include="EXCEL\XlntUtil.cpp" />
+    <ClCompile Include="Excel\XlntWorkbookReader.cpp" />
+    <ClCompile Include="Excel\XlntWorkbookWriter.cpp" />
     <ClCompile Include="Image\BmpCodec.cpp" />
     <ClCompile Include="Image\Canvas.cpp" />
     <ClCompile Include="Image\Checksum.cpp" />

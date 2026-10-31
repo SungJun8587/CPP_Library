@@ -176,6 +176,9 @@ using namespace std;
 #include <System/SoftwareInfo.h>
 
 #include <Excel/XlntUtil.h>
+#include <Excel/XlntDefine.h>
+#include <Excel/XlntWorkbookWriter.h>
+#include <Excel/XlntWorkbookReader.h>
 
 #include <ServerConnectInfo.h>
 #include <ServerConfig.h>

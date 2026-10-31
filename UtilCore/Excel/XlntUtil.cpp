@@ -7,13 +7,198 @@
 #include "pch.h"
 #include "XlntUtil.h"
 
+#include <algorithm>
+#include <charconv>
+#include <cmath>
+#include <cstdio>
+
 namespace Xlnt
 {
+	namespace
+	{
+		//***************************************************************************
+		// @brief 워크시트 핸들이 시트를 가리키는지 확인합니다.
+		// @detail xlnt::worksheet는 내부 구현체 포인터만 가진 핸들이라, 기본 생성되었거나 시트가 제거된 뒤에는
+		//         비어 있으며 이때 title() 등을 호출하면 예외가 아니라 널 역참조가 됩니다.
+		//***************************************************************************
+		void RequireSheet(const xlnt::worksheet& sheet)
+		{
+			if( sheet == nullptr )
+			{
+				throw std::runtime_error("활성화된 시트가 없습니다.");
+			}
+		}
+
+		//***************************************************************************
+		// @brief 범위를 병합합니다. 이미 병합된 범위와 일부만 겹치면 예외, 똑같은 범위면 아무것도 하지 않습니다.
+		// @detail 겹치게 병합하거나 같은 범위를 중복 병합하면 xlnt는 그대로 저장하고, 엑셀은 그 파일을 "복구"해야 열립니다.
+		//***************************************************************************
+		void MergeRange(xlnt::worksheet& sheet, const xlnt::range_reference& range)
+		{
+			RequireSheet(sheet);
+
+			const auto left = range.top_left().column_index();
+			const auto right = range.bottom_right().column_index();
+			const auto top = range.top_left().row();
+			const auto bottom = range.bottom_right().row();
+
+			for( const xlnt::range_reference& merged : sheet.merged_ranges() )
+			{
+				const bool disjoint = merged.bottom_right().column_index() < left || merged.top_left().column_index() > right ||
+					merged.bottom_right().row() < top || merged.top_left().row() > bottom;
+				if( disjoint )
+				{
+					continue;
+				}
+
+				if( merged == range )
+				{
+					return;
+				}
+				throw std::runtime_error("이미 병합된 범위와 겹칩니다: " + merged.to_string());
+			}
+
+			sheet.merge_cells(range);
+		}
+
+		//***************************************************************************
+		// @brief UTF-8 문자열 값을 셀에 씁니다. 빈 문자열이면 셀의 기존 값을 지웁니다.
+		// @detail 빈 값을 무시하고 return 하면 이미 값이 있는 셀을 빈 값으로 덮어쓸 수 없고, 반대로 빈 값을 쓰려고
+		//         새 셀을 만들 필요도 없으므로, 셀이 있을 때만 값을 지웁니다.
+		//***************************************************************************
+		void PutCell(xlnt::worksheet& sheet, const xlnt::cell_reference& ref, const std::string& utf8Value)
+		{
+			RequireSheet(sheet);
+
+			// 범위를 넘는 셀은 엑셀이 열지 못하는 파일이 되고, 긴 문자열은 xlnt가 조용히 잘라낸다.
+			if( ref.row() > static_cast<xlnt::row_t>(XLSX_MAX_ROW) || ref.column_index() > XLSX_MAX_COLUMN )
+			{
+				throw std::runtime_error("셀 좌표가 xlsx 범위를 벗어났습니다.");
+			}
+			// xlnt는 UTF-8 바이트 기준 32767을 넘는 문자열을 조용히 자르고, 한글 등은 글자 중간에서 잘려 저장이 실패한다.
+			if( utf8Value.size() > XLSX_MAX_CELL_TEXT_BYTES )
+			{
+				throw std::runtime_error("문자열이 " + std::to_string(XLSX_MAX_CELL_TEXT_BYTES) + "바이트(UTF-8)를 넘습니다 (" + std::to_string(utf8Value.size()) + "바이트).");
+			}
+
+			if( utf8Value.empty() )
+			{
+				if( sheet.has_cell(ref) )
+				{
+					sheet.cell(ref).clear_value();
+				}
+				return;
+			}
+
+			sheet.cell(ref).value(utf8Value);
+		}
+
+		//***************************************************************************
+		// @brief 숫자 셀 값을 SCell의 숫자 원문 표기로 바꿉니다.
+		// @detail 정수 모양(1e15 미만)은 정수 문자열로, 그 외는 다시 읽었을 때 같은 값이 되는 최단 표기로 만듭니다.
+		//         SCell::Num은 '.', 'e', 'E'가 없으면 정수로 취급하므로 이 규칙이면 해석이 달라지지 않습니다.
+		//***************************************************************************
+		std::string NumberText(double v)
+		{
+			char buf[64];
+
+			if( v == std::floor(v) && std::fabs(v) < XLSX_EXACT_INTEGER_LIMIT )
+			{
+				if( v == 0 )
+					return "0";
+				std::snprintf(buf, sizeof(buf), "%.0f", v);
+				return buf;
+			}
+
+			// 1e15 이상의 정수 모양 값은 지수 표기로 만든다. 엑셀은 15자리까지만 정확히 저장하므로 긴 자릿수가
+			// 정수 문자열처럼 보이면(123456789012345680) 없던 정밀도가 있는 것처럼 보인다.
+			const bool integral = (v == std::floor(v));
+			const auto r = integral ? std::to_chars(buf, buf + sizeof(buf), v, std::chars_format::scientific)
+				: std::to_chars(buf, buf + sizeof(buf), v);
+			return std::string(buf, r.ptr);
+		}
+	}
+
+	//***************************************************************************
+	// @brief xlnt 셀 하나를 타입을 보존한 SCell로 바꿉니다.
+	// @detail 숫자는 cell.to_string()이 아니라 value<double>()로 읽습니다. xlnt의 숫자 to_string은 1.5e300처럼
+	//         큰 값에서 고정 크기 버퍼를 넘겨 쓰레기 문자열을 만듭니다.
+	//***************************************************************************
+	SCell ToSCell(const xlnt::cell& cell)
+	{
+		SCell out;
+
+		switch( cell.data_type() )
+		{
+		case xlnt::cell_type::empty:
+			break;
+
+		case xlnt::cell_type::boolean:
+			out.kind = SCell::Bool;
+			out.boolean = cell.value<bool>();
+			break;
+
+		case xlnt::cell_type::number:
+			if( cell.is_date() && cell.value<double>() >= 1.0 && cell.value<double>() < XLSX_MAX_DATE_SERIAL )
+			{
+				// 날짜 서식이 적용된 숫자는 문자열로 읽는다. 엑셀은 "3-5" 같은 입력을 날짜로 바꿔 버리는데,
+				// 이를 일련번호(45356)로 조용히 받으면 잘못된 데이터가 그대로 들어간다. 숫자 필드에서는 오류가 된다.
+				out.kind = SCell::Str;
+				out.text = cell.value<xlnt::datetime>().to_iso_string();	// 일련번호처럼 보이지 않는 ISO 8601 표기
+			}
+			else if( cell.is_date() && cell.value<double>() >= 0.0 && cell.value<double>() < 1.0 )
+			{
+				// 시간만 있는 값(0.5 = 12:00)은 날짜 부분이 없으므로 "HH:MM:SS"로 읽는다. (날짜로 바꾸면 1899-12-31T12:00:00 같은 값이 된다)
+				const long long seconds = std::llround(cell.value<double>() * 86400.0) % 86400;
+				char buf[16];
+				std::snprintf(buf, sizeof(buf), "%02lld:%02lld:%02lld", seconds / 3600, (seconds / 60) % 60, seconds % 60);
+				out.kind = SCell::Str;
+				out.text = buf;
+			}
+			else
+			{
+				out.kind = SCell::Num;
+				out.text = NumberText(cell.value<double>());
+			}
+			break;
+
+		case xlnt::cell_type::inline_string:
+		case xlnt::cell_type::shared_string:
+		case xlnt::cell_type::formula_string:
+		case xlnt::cell_type::date:
+		case xlnt::cell_type::error:
+		default:
+			out.kind = SCell::Str;
+			out.text = cell.to_string();
+			break;
+		}
+
+		return out;
+	}
+
+	//***************************************************************************
+	// @brief 셀 값을 문자열로 읽습니다. 숫자 셀은 NumberText 규칙으로 바꿉니다.
+	// @detail xlnt의 cell::to_string()은 숫자 셀에서 12345.678을 빈 문자열로, 1.5e300을 잘린 쓰레기 문자열로 돌려줍니다.
+	//         숫자는 value<double>()로 읽어 바꾸고, 그 외 타입은 to_string()을 그대로 씁니다.
+	//***************************************************************************
+	std::string CellText(const xlnt::cell& cell)
+	{
+		if( cell.data_type() == xlnt::cell_type::number && !cell.is_date() )
+		{
+			return NumberText(cell.value<double>());
+		}
+		return cell.to_string();
+	}
+
 	//***************************************************************************
 	// Construction/Destruction 
 	//***************************************************************************
 
-	CXlntUtil::CXlntUtil() {}
+	CXlntUtil::CXlntUtil()
+	{
+		// 기본 워크북은 시트가 하나 있으므로 처음부터 그 시트를 현재 시트로 둔다. (비워 두면 ActiveSheet 호출 전 쓰기/읽기가 널 역참조)
+		_worksheet = _workbook.active_sheet();
+	}
 
 	CXlntUtil::~CXlntUtil() {}
 
@@ -24,14 +209,21 @@ namespace Xlnt
 	//***************************************************************************
 	void CXlntUtil::OpenExcel(const _tstring& filePath)
 	{
+		// load()는 기존 시트를 먼저 지운다. 그 뒤 실패하면 이전 워크시트 핸들이 해제된 메모리를 가리키게 되므로 먼저 비운다.
+		_worksheet = xlnt::worksheet();
+
 		try
 		{
-			// file_path가 std::filesystem::path 혹은 string 계열일 때 TStringToString 활용 가능
 #ifdef _UNICODE
-			_workbook.load(TStringToString(filePath));
-#else
+			// 와이드 경로는 xlnt가 그대로 열 수 있으므로 한글 경로도 안전하다. (TStringToString은 ANSI일 수 있어 쓰지 않는다)
 			_workbook.load(filePath);
+#else
+			// xlnt의 char 경로는 UTF-8로 해석된다. 한글 경로가 깨지지 않도록 ANSI에서 변환해 넘긴다.
+			_workbook.load(AnsiToUtf8(filePath));
 #endif
+
+			// 로드한 워크북의 현재 시트를 따라간다. (이전 워크북의 시트 핸들이 남아 있으면 안 된다)
+			_worksheet = _workbook.sheet_count() > 0 ? _workbook.active_sheet() : xlnt::worksheet();
 		}
 		catch( const std::exception& e )
 		{
@@ -48,8 +240,21 @@ namespace Xlnt
 	{
 		try
 		{
-			_worksheet = _workbook.create_sheet();	// 시트 생성
-			_worksheet.title(sheetName);			// 시트명 변경
+			// 이름이 잘못됐거나 중복이면 title()이 예외를 던지는데, 그 전에 만든 시트가 남고 현재 시트도 바뀌어 있으면 안 된다.
+			// 실패하면 만든 시트를 지우고 현재 시트를 되돌린다.
+			const xlnt::worksheet previous = _worksheet;
+			xlnt::worksheet created = _workbook.create_sheet();	// 시트 생성
+			try
+			{
+				created.title(sheetName);						// 시트명 변경
+			}
+			catch( ... )
+			{
+				_workbook.remove_sheet(created);
+				_worksheet = previous;
+				throw;
+			}
+			_worksheet = created;
 		}
 		catch( const std::exception& e )
 		{
@@ -64,12 +269,19 @@ namespace Xlnt
 	//***************************************************************************
 	void CXlntUtil::RenameSheet(const std::string& newSheetName)
 	{
+		RequireSheet(_worksheet);
+
+		if( _worksheet.title() == newSheetName )
+		{
+			return;
+		}
+
 		if( _workbook.contains(newSheetName) )
 		{
 			throw std::runtime_error("시트 이름이 이미 존재합니다: " + newSheetName);
 		}
 
-		_worksheet = _workbook.active_sheet();
+		// 워크북의 active_sheet()가 아니라 ActiveSheet()로 지정한 현재 시트의 이름을 바꾼다.
 		_worksheet.title(newSheetName);			// 시트명 변경
 	}
 
@@ -94,6 +306,11 @@ namespace Xlnt
 	//***************************************************************************
 	void CXlntUtil::ActiveSheet(const uint32 sheetIndex)
 	{
+		if( sheetIndex >= _workbook.sheet_count() )
+		{
+			throw std::runtime_error("시트 인덱스가 범위를 벗어났습니다: " + std::to_string(sheetIndex));
+		}
+
 		_workbook.active_sheet(sheetIndex);
 		_worksheet = _workbook.active_sheet();
 	}
@@ -105,27 +322,46 @@ namespace Xlnt
 	//***************************************************************************
 	void CXlntUtil::RemoveSheet(const std::string& sheetName)
 	{
-		try
+		const std::vector<std::string> titles = GetSheetNames();
+		for( uint32 index = 0; index < titles.size(); ++index )
 		{
-			_workbook.remove_sheet(_workbook.sheet_by_title(sheetName));
+			if( titles[index] == sheetName )
+			{
+				RemoveSheet(index);
+				return;
+			}
 		}
-		catch( const std::exception& e )
-		{
-			throw std::runtime_error("시트를 삭제할 수 없습니다: " + std::string(e.what()));
-		}
+
+		throw std::runtime_error("시트를 삭제할 수 없습니다: 시트가 존재하지 않습니다: " + sheetName);
 	}
 
 	//***************************************************************************
 	// @brief 인덱스로 시트를 제거합니다.
-	// @detail 지정한 인덱스의 워크시트를 활성화한 후 워크북에서 삭제합니다.
+	// @detail 지정한 인덱스의 워크시트를 워크북에서 삭제합니다. 삭제한 시트가 현재 시트였다면
+	//         같은 위치(마지막이었으면 그 앞)의 시트로 현재 시트를 옮깁니다.
+	//         워크시트는 워크북 내부 구현체를 가리키는 핸들이라, 제거한 시트의 핸들을 그대로 두면
+	//         이후 접근이 해제된 메모리를 읽게 됩니다.
 	// @param sheetIndex 제거할 시트 인덱스
 	//***************************************************************************
 	void CXlntUtil::RemoveSheet(const uint32 sheetIndex)
 	{
 		try
 		{
-			_workbook.active_sheet(sheetIndex);
-			_workbook.remove_sheet(_workbook.active_sheet());
+			if( sheetIndex >= _workbook.sheet_count() )
+			{
+				throw std::runtime_error("시트 인덱스가 범위를 벗어났습니다: " + std::to_string(sheetIndex));
+			}
+
+			xlnt::worksheet target = _workbook.sheet_by_index(sheetIndex);
+			const bool wasCurrent = (_worksheet == target);
+
+			_workbook.remove_sheet(target);
+
+			if( wasCurrent )
+			{
+				const std::size_t count = _workbook.sheet_count();
+				_worksheet = count > 0 ? _workbook.sheet_by_index(sheetIndex < count ? sheetIndex : count - 1) : xlnt::worksheet();
+			}
 		}
 		catch( const std::exception& e )
 		{
@@ -157,19 +393,9 @@ namespace Xlnt
 	//***************************************************************************
 	void CXlntUtil::WriteCell(const std::string& cell_ref, const std::string& value, const bool isCastUtf8)
 	{
-		if( value.size() < 1 ) return;
-
 		try
 		{
-			if( isCastUtf8 )
-			{
-				// AnsiToUtf8 활용
-				_worksheet.cell(cell_ref).value(AnsiToUtf8(value));
-			}
-			else
-			{
-				_worksheet.cell(cell_ref).value(value);
-			}
+			PutCell(_worksheet, xlnt::cell_reference(cell_ref), isCastUtf8 ? AnsiToUtf8(value) : value);
 		}
 		catch( const std::exception& e )
 		{
@@ -187,18 +413,9 @@ namespace Xlnt
 	//***************************************************************************
 	void CXlntUtil::WriteCell(const uint32 row, const uint32 col, const std::string& value, const bool isCastUtf8)
 	{
-		if( value.size() < 1 ) return;
-
 		try
 		{
-			if( isCastUtf8 )
-			{
-				_worksheet.cell(col, row).value(AnsiToUtf8(value));
-			}
-			else
-			{
-				_worksheet.cell(col, row).value(value);
-			}
+			PutCell(_worksheet, xlnt::cell_reference(col, row), isCastUtf8 ? AnsiToUtf8(value) : value);
 		}
 		catch( const std::exception& e )
 		{
@@ -208,27 +425,17 @@ namespace Xlnt
 
 	//***************************************************************************
 	// @brief 셀 참조 주소(문자열)를 이용해 셀에 와이드 문자열 값을 씁니다.
-	// @detail Wstring 형태의 값을 지정된 인코딩 규칙에 맞게 변환하여 셀에 기록합니다.
+	// @detail 와이드 문자열은 항상 UTF-8로 변환해서 기록합니다. (xlnt 문자열은 UTF-8이라 ANSI로 바꾸면 한글이 깨집니다)
+	//         isCastUtf8는 std::string 오버로드와 시그니처를 맞추기 위한 값이며 사용하지 않습니다.
 	// @param cell_ref 셀 참조 주소 (예: "A1")
 	// @param value 기록할 와이드 문자열 값
 	// @param isCastUtf8 UTF-8 캐스팅 여부 (기본값: false)
 	//***************************************************************************
 	void CXlntUtil::WriteCell(const std::string& cell_ref, const std::wstring& value, const bool isCastUtf8)
 	{
-		if( value.size() < 1 ) return;
-
 		try
 		{
-			if( isCastUtf8 )
-			{
-				// UnicodeToUtf8 활용
-				_worksheet.cell(cell_ref).value(UnicodeToUtf8(value));
-			}
-			else
-			{
-				// UnicodeToAnsi 활용
-				_worksheet.cell(cell_ref).value(UnicodeToAnsi(value));
-			}
+			PutCell(_worksheet, xlnt::cell_reference(cell_ref), UnicodeToUtf8(value));
 		}
 		catch( const std::exception& e )
 		{
@@ -238,7 +445,7 @@ namespace Xlnt
 
 	//***************************************************************************
 	// @brief 행과 열 번호를 이용해 셀에 와이드 문자열 값을 씁니다.
-	// @detail 지정한 행, 열 좌표의 셀에 와이드 문자열을 인코딩 변환을 거쳐 기록합니다.
+	// @detail 와이드 문자열은 항상 UTF-8로 변환해서 기록합니다. isCastUtf8는 사용하지 않습니다.
 	// @param row 행 번호
 	// @param col 열 번호
 	// @param value 기록할 와이드 문자열 값
@@ -246,18 +453,9 @@ namespace Xlnt
 	//***************************************************************************
 	void CXlntUtil::WriteCell(const uint32 row, const uint32 col, const std::wstring& value, const bool isCastUtf8)
 	{
-		if( value.size() < 1 ) return;
-
 		try
 		{
-			if( isCastUtf8 )
-			{
-				_worksheet.cell(col, row).value(UnicodeToUtf8(value));
-			}
-			else
-			{
-				_worksheet.cell(col, row).value(UnicodeToAnsi(value));
-			}
+			PutCell(_worksheet, xlnt::cell_reference(col, row), UnicodeToUtf8(value));
 		}
 		catch( const std::exception& e )
 		{
@@ -275,7 +473,11 @@ namespace Xlnt
 	{
 		try
 		{
-			return _worksheet.cell(cell_ref).to_string();
+			RequireSheet(_worksheet);
+
+			// worksheet::cell()은 없는 셀을 만들어 사용 범위(highest_row/column)를 늘리므로, 있는 셀만 읽는다.
+			const xlnt::cell_reference ref(cell_ref);
+			return _worksheet.has_cell(ref) ? CellText(_worksheet.cell(ref)) : std::string();
 		}
 		catch( const std::exception& e )
 		{
@@ -294,7 +496,10 @@ namespace Xlnt
 	{
 		try
 		{
-			return _worksheet.cell(col, row).to_string();
+			RequireSheet(_worksheet);
+
+			const xlnt::cell_reference ref(col, row);
+			return _worksheet.has_cell(ref) ? CellText(_worksheet.cell(ref)) : std::string();
 		}
 		catch( const std::exception& e )
 		{
@@ -310,7 +515,9 @@ namespace Xlnt
 	//***************************************************************************
 	void CXlntUtil::MergeCells(const std::string& cell1, const std::string& cell2)
 	{
-		_worksheet.merge_cells(cell1 + ":" + cell2);  // A1:B2 형태로 병합
+		RequireSheet(_worksheet);
+
+		MergeRange(_worksheet, xlnt::range_reference(cell1 + ":" + cell2));	// A1:B2 형태로 병합
 	}
 
 	//***************************************************************************
@@ -323,11 +530,13 @@ namespace Xlnt
 	//***************************************************************************
 	void CXlntUtil::MergeCells(const uint32 start_row, const uint32 start_col, const uint32 end_row, const uint32 end_col)
 	{
+		RequireSheet(_worksheet);
+
 		xlnt::cell_reference start_cell(start_col, start_row);  // 시작 셀
 		xlnt::cell_reference end_cell(end_col, end_row);        // 끝 셀
 		xlnt::range_reference range(start_cell, end_cell);      // 범위 지정
 
-		_worksheet.merge_cells(range);							// 병합 수행
+		MergeRange(_worksheet, range);							// 병합 수행
 	}
 
 	//***************************************************************************
@@ -338,6 +547,8 @@ namespace Xlnt
 	//***************************************************************************
 	void CXlntUtil::UnMergeCells(const std::string& cell1, const std::string& cell2)
 	{
+		RequireSheet(_worksheet);
+
 		_worksheet.unmerge_cells(cell1 + ":" + cell2);  // A1:B2 형태로 병합 해제
 	}
 
@@ -351,6 +562,8 @@ namespace Xlnt
 	//***************************************************************************
 	void CXlntUtil::UnMergeCells(const uint32 start_row, const uint32 start_col, const uint32 end_row, const uint32 end_col)
 	{
+		RequireSheet(_worksheet);
+
 		xlnt::cell_reference start_cell(start_col, start_row);  // 시작 셀
 		xlnt::cell_reference end_cell(end_col, end_row);        // 끝 셀
 		xlnt::range_reference range(start_cell, end_cell);      // 범위 지정
@@ -365,6 +578,8 @@ namespace Xlnt
 	//***************************************************************************
 	void CXlntUtil::InsertRow(const uint32 row_num, const uint32 amount)
 	{
+		RequireSheet(_worksheet);
+
 		_worksheet.insert_rows(row_num, amount);		// 지정된 위치에 amount개의 행 삽입
 	}
 
@@ -376,6 +591,8 @@ namespace Xlnt
 	//***************************************************************************
 	void CXlntUtil::InsertColumn(const uint32 col_num, const uint32 amount)
 	{
+		RequireSheet(_worksheet);
+
 		_worksheet.insert_columns(col_num, amount);		// 지정된 위치에 amount개의 열 삽입
 	}
 
@@ -387,6 +604,8 @@ namespace Xlnt
 	//***************************************************************************
 	void CXlntUtil::DeleteRow(const uint32 row_num, const uint32 amount)
 	{
+		RequireSheet(_worksheet);
+
 		_worksheet.delete_rows(row_num, amount);		// 지정된 위치에 amount개의 행 삭제
 	}
 
@@ -398,6 +617,8 @@ namespace Xlnt
 	//***************************************************************************
 	void CXlntUtil::DeleteColumn(const uint32 col_num, const uint32 amount)
 	{
+		RequireSheet(_worksheet);
+
 		_worksheet.delete_columns(col_num, amount);		// 지정된 위치에 amount개의 열 삭제
 	}
 
@@ -408,24 +629,42 @@ namespace Xlnt
 	//***************************************************************************
 	void CXlntUtil::ReOrderSheets(const std::vector<std::string>& new_order)
 	{
-		std::vector<xlnt::worksheet> sheets;
-
-		for( const auto& sheet_title : new_order )
+		// 먼저 전부 검증한다. 중간에 실패해서 시트 순서가 반쯤 바뀐 채로 남지 않게 한다.
+		std::vector<std::string> titles = GetSheetNames();
+		for( std::size_t i = 0; i < new_order.size(); ++i )
 		{
-			auto sheet = _workbook.sheet_by_title(sheet_title);
-			sheets.push_back(sheet);
+			if( std::find(titles.begin(), titles.end(), new_order[i]) == titles.end() )
+			{
+				throw std::runtime_error("시트가 존재하지 않습니다: " + new_order[i]);
+			}
+			if( std::find(new_order.begin(), new_order.begin() + i, new_order[i]) != new_order.begin() + i )
+			{
+				throw std::runtime_error("시트 이름이 중복되었습니다: " + new_order[i]);
+			}
 		}
 
-		// 기존 시트들 삭제
-		for( int i = static_cast<int>(_workbook.sheet_count()) - 1; i >= 0; --i )
+		// xlnt에는 시트 이동 API가 없으므로, 원하는 위치에 복사본을 만들고 원본을 지운 뒤 이름을 되돌린다.
+		// (시트를 지우고 이름만 같은 빈 시트를 만들면 셀 데이터가 모두 사라진다.)
+		// new_order에 없는 시트는 지정한 시트들 뒤에 기존 순서대로 남는다.
+		for( std::size_t pos = 0; pos < new_order.size(); ++pos )
 		{
-			_workbook.remove_sheet(_workbook.sheet_by_index(i));  // 첫 번째 시트부터 삭제
-		}
+			titles = GetSheetNames();
+			if( titles[pos] == new_order[pos] )
+			{
+				continue;
+			}
 
-		for( const auto& sheet : sheets )
-		{
-			auto createSheet = _workbook.create_sheet();  // 새 순서대로 시트 추가
-			createSheet.title(sheet.title());
+			xlnt::worksheet original = _workbook.sheet_by_title(new_order[pos]);
+			const bool wasCurrent = (_worksheet == original);
+
+			xlnt::worksheet moved = _workbook.copy_sheet(original, pos);
+			_workbook.remove_sheet(original);
+			moved.title(new_order[pos]);
+
+			if( wasCurrent )
+			{
+				_worksheet = moved;
+			}
 		}
 	}
 
@@ -438,6 +677,8 @@ namespace Xlnt
 	//***************************************************************************
 	xlnt::range CXlntUtil::CreateRange(const std::string& start_cell, const std::string& end_cell)
 	{
+		RequireSheet(_worksheet);
+
 		xlnt::range rng = _worksheet.range(start_cell + ":" + end_cell);
 		return rng;
 	}
@@ -453,6 +694,8 @@ namespace Xlnt
 	//***************************************************************************
 	xlnt::range CXlntUtil::CreateRange(const uint32 start_row, const uint32 start_col, const uint32 end_row, const uint32 end_col)
 	{
+		RequireSheet(_worksheet);
+
 		xlnt::cell_reference start_cell(start_col, start_row); // 시작 셀
 		xlnt::cell_reference end_cell(end_col, end_row);       // 끝 셀
 		xlnt::range_reference range_ref(start_cell, end_cell); // 범위 생성
@@ -466,7 +709,7 @@ namespace Xlnt
 	// @param range 대상 xlnt::range 객체
 	// @param value 기록할 값
 	//***************************************************************************
-	void WriteToRange(xlnt::range range, const std::string& value)
+	void CXlntUtil::WriteToRange(xlnt::range range, const std::string& value)
 	{
 		for( auto row : range )
 		{
@@ -485,8 +728,26 @@ namespace Xlnt
 	//***************************************************************************
 	void CXlntUtil::GetRowColumnCount(uint32& rowCount, uint32& columnCount)
 	{
-		rowCount = _worksheet.highest_row();				// 마지막 행 번호
-		columnCount = _worksheet.highest_column().index;	// 마지막 열 번호
+		RequireSheet(_worksheet);
+
+		// xlnt는 비어 있는 시트에도 highest_row/column을 1로 돌려주므로, 셀이 하나도 없으면 0으로 알린다.
+		bool hasCell = false;
+		for( auto row : _worksheet.rows(true) )
+		{
+			for( auto cell : row )
+			{
+				static_cast<void>(cell);
+				hasCell = true;
+				break;
+			}
+			if( hasCell )
+			{
+				break;
+			}
+		}
+
+		rowCount = hasCell ? _worksheet.highest_row() : 0;						// 마지막 행 번호
+		columnCount = hasCell ? _worksheet.highest_column().index : 0;			// 마지막 열 번호
 	}
 
 	//***************************************************************************
@@ -497,6 +758,8 @@ namespace Xlnt
 	//***************************************************************************
 	void CXlntUtil::SetRowHeight(const uint32 row, const double height)
 	{
+		RequireSheet(_worksheet);
+
 		_worksheet.row_properties(row).height = height;
 	}
 
@@ -508,6 +771,8 @@ namespace Xlnt
 	//***************************************************************************
 	void CXlntUtil::SetColumnWidth(const uint32 col, const double width)
 	{
+		RequireSheet(_worksheet);
+
 		_worksheet.column_properties(col).width = width;
 	}
 
@@ -519,10 +784,9 @@ namespace Xlnt
 	//***************************************************************************
 	void CXlntUtil::SetCellTextFormat(const uint32 row, const uint32 col)
 	{
-		xlnt::cell cell = _worksheet.cell(col, row);		// 특정 열의 셀 가져오기
-		xlnt::number_format text_format;
-		auto formatted = text_format.format("@");			// 텍스트 형식 설정
-		cell.number_format(formatted);						// 셀에 적용
+		RequireSheet(_worksheet);
+
+		_worksheet.cell(col, row).number_format(xlnt::number_format("@"));	// 텍스트 서식("@") 적용
 	}
 
 	//***************************************************************************
@@ -532,12 +796,14 @@ namespace Xlnt
 	//***************************************************************************
 	void CXlntUtil::SetAllCellTextFormat(const uint32 col)
 	{
-		for( uint32 row = 1; row <= _worksheet.highest_row(); ++row )
+		RequireSheet(_worksheet);
+
+		const xlnt::number_format textFormat("@");			// 텍스트 서식. 셀마다 만들 필요가 없다
+		const uint32 lastRow = _worksheet.highest_row();	// 루프 중 사용 범위가 바뀌지 않도록 한 번만 읽는다
+
+		for( uint32 row = 1; row <= lastRow; ++row )
 		{
-			auto cell = _worksheet.cell(col, row);			// 특정 열의 셀 가져오기
-			xlnt::number_format text_format;
-			auto formatted = text_format.format("@");		// 텍스트 형식 설정
-			cell.number_format(formatted);					// 셀에 적용
+			_worksheet.cell(col, row).number_format(textFormat);
 		}
 	}
 
@@ -551,9 +817,11 @@ namespace Xlnt
 		try
 		{
 #ifdef _UNICODE
-			_workbook.save(TStringToString(filePath));
-#else
+			// OpenExcel과 같은 이유로 와이드 경로를 그대로 넘긴다. (TStringToString은 ANSI일 수 있어 한글 경로가 깨진다)
 			_workbook.save(filePath);
+#else
+			// xlnt의 char 경로는 UTF-8로 해석된다. 한글 경로가 깨지지 않도록 ANSI에서 변환해 넘긴다.
+			_workbook.save(AnsiToUtf8(filePath));
 #endif
 		}
 		catch( const std::exception& e )
